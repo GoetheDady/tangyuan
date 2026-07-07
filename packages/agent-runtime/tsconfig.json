@@ -1,0 +1,7 @@
+{
+  "extends": "@tangyuan/tsconfig/base.json",
+  "include": ["src/**/*.ts", "src/**/*.test.ts"],
+  "compilerOptions": {
+    "types": ["vitest/globals"]
+  }
+}

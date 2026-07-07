@@ -1,0 +1,13 @@
+{
+  "name": "@tangyuan/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./base": "./base.mjs"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.39.1",
+    "typescript-eslint": "^8.49.0"
+  }
+}
