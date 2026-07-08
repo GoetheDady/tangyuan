@@ -36,3 +36,7 @@
 ```sh
 gh issue view <number> --comments
 ```
+
+## 开发流程
+
+默认的“从 issue 到完成”流程见 `docs/agents/development-process.md`。
