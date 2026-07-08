@@ -1,4 +1,11 @@
-import { access, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import {
+  access,
+  mkdir,
+  readFile,
+  rename,
+  stat,
+  writeFile,
+} from 'node:fs/promises'
 import { constants as fsConstants } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -81,7 +88,44 @@ export interface PiSdkVerificationRequest extends RuntimeConfiguration {
  */
 export interface PiSdkCreateSessionRequest extends RuntimeConfiguration {
   sessionId: string
+  sdkSessionFile: string
   cwd: string
+}
+
+/**
+ * 描述打开已有 Pi SDK 会话时需要的参数。
+ */
+export interface PiSdkOpenSessionRequest extends RuntimeConfiguration {
+  sessionId: string
+  sdkSessionFile: string
+  cwd: string
+}
+
+/**
+ * 描述从 Pi SDK 原生持久化中列出会话时需要的参数。
+ */
+export interface PiSdkListSessionsRequest {
+  cwd: string
+  sessionDir: string
+}
+
+/**
+ * 描述从 Pi SDK 原生持久化中读取消息时需要的参数。
+ */
+export interface PiSdkReadMessagesRequest {
+  sessionId: string
+  sdkSessionFile: string
+}
+
+/**
+ * 描述 Pi SDK 原生 session 列表里的单个会话。
+ */
+export interface PiSdkStoredSession {
+  sessionId: string
+  sdkSessionFile: string
+  title?: string
+  createdAt: string
+  updatedAt: string
 }
 
 /**
@@ -126,6 +170,13 @@ export interface PiSdkPromptOptions {
  * 描述 Pi SDK 会话运行器的最小能力。
  */
 export interface PiSdkSessionHandle {
+  /**
+   * Pi SDK 实际写入的原生 session 文件路径。
+   *
+   * @remarks 测试替身可以省略；真实 SDK 创建会话时会返回带时间戳的文件名。
+   */
+  sdkSessionFile?: string
+
   /**
    * 向真实 Pi SDK 会话发送 prompt。
    *
@@ -190,6 +241,56 @@ export interface PiSdkGateway {
    * @throws 当 SDK 无法创建会话或模型不存在时，Promise 会 reject。
    */
   createSession(request: PiSdkCreateSessionRequest): Promise<PiSdkSessionHandle>
+
+  /**
+   * 打开已有 Pi SDK 会话运行器。
+   *
+   * @param request - 已保存配置、会话标识、SDK session 文件和 Agent Home 工作目录。
+   * @returns 可发送 prompt 和取消运行的会话运行器。
+   * @throws 当 SDK 无法打开会话或模型不存在时，Promise 会 reject。
+   */
+  openSession(request: PiSdkOpenSessionRequest): Promise<PiSdkSessionHandle>
+
+  /**
+   * 从 Pi SDK 原生持久化中读取会话列表。
+   *
+   * @param request - Pi SDK session 所属工作目录和 session 目录。
+   * @returns SDK 侧能恢复出的会话摘要列表。
+   * @throws 当 SDK session 目录无法读取时，Promise 会 reject。
+   */
+  listSessions(request: PiSdkListSessionsRequest): Promise<PiSdkStoredSession[]>
+
+  /**
+   * 从 Pi SDK 原生 session 文件读取 transcript 消息。
+   *
+   * @param request - 会话标识和 SDK session 文件。
+   * @returns 转换成汤圆标准消息结构后的 transcript。
+   * @throws 当 SDK session 文件无法读取或解析时，Promise 会 reject。
+   */
+  readMessages(request: PiSdkReadMessagesRequest): Promise<AgentMessage[]>
+}
+
+/**
+ * 描述汤圆写入 userData/sessions/index.json 的单个会话索引条目。
+ */
+export interface PersistedSessionIndexEntry {
+  sessionId: string
+  sdkSessionFile: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  provider: string
+  model: string
+  agentId: AgentId
+  lastMessagePreview: string
+  status: AgentRunState
+}
+
+/**
+ * 描述汤圆本地会话索引文件结构。
+ */
+export interface PersistedSessionIndex {
+  sessions: PersistedSessionIndexEntry[]
 }
 
 /**
@@ -359,6 +460,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private readonly gateway: PiSdkGateway
   private readonly listeners = new Set<AgentEventListener>()
   private readonly sessions = new Map<string, AgentSessionSummary>()
+  private readonly sessionIndex = new Map<string, PersistedSessionIndexEntry>()
   private readonly messages = new Map<string, AgentMessage[]>()
   private readonly sessionHandles = new Map<string, PiSdkSessionHandle>()
   private readonly activeRunIds = new Map<string, string>()
@@ -410,7 +512,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   async saveConfiguration(
     configuration: RuntimeConfiguration,
   ): Promise<RuntimeSnapshot> {
-    const normalizedConfiguration = this.normalizeRuntimeConfiguration(configuration)
+    const normalizedConfiguration =
+      this.normalizeRuntimeConfiguration(configuration)
     const controller = new AbortController()
     this.configurationVerificationController = controller
 
@@ -471,9 +574,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   async listSessions(
     request: ListSessionsRequest,
   ): Promise<AgentSessionSummary[]> {
-    return [...this.sessions.values()].filter(
-      (session) => session.agentId === request.agentId,
-    )
+    await this.loadSessionIndex()
+
+    return [...this.sessions.values()]
+      .filter((session) => session.agentId === request.agentId)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
   }
 
   /**
@@ -494,22 +599,44 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       })
     }
 
-    const configuration = await this.readRequiredConfiguration()
-    const sessionId = `session-${this.sessions.size + 1}`
+    const [configuration, existingEntries] = await Promise.all([
+      this.readRequiredConfiguration(),
+      this.loadSessionIndex(),
+    ])
+    const sessionId = this.createNextSessionId(existingEntries)
+    const now = this.now()
+    const sdkSessionFile = this.resolveSdkSessionFile(sessionId)
+    await mkdir(dirname(sdkSessionFile), { recursive: true })
     const handle = await this.gateway.createSession({
       ...configuration,
       sessionId,
+      sdkSessionFile,
       cwd: this.resolveAgentHomePath(),
     })
+    const persistedSdkSessionFile = handle.sdkSessionFile ?? sdkSessionFile
     const session = createDefaultSessionSummary({
       sessionId,
       title: request.title,
-      updatedAt: this.now(),
+      updatedAt: now,
     })
+    const indexEntry: PersistedSessionIndexEntry = {
+      sessionId,
+      sdkSessionFile: persistedSdkSessionFile,
+      title: request.title,
+      createdAt: now,
+      updatedAt: now,
+      provider: configuration.providerId,
+      model: configuration.modelId,
+      agentId: request.agentId,
+      lastMessagePreview: '',
+      status: 'idle',
+    }
 
     this.sessions.set(session.sessionId, session)
+    this.sessionIndex.set(session.sessionId, indexEntry)
     this.messages.set(session.sessionId, [])
     this.sessionHandles.set(session.sessionId, handle)
+    await this.writeSessionIndex()
     this.emit({
       type: 'session-created',
       agentId: request.agentId,
@@ -530,8 +657,24 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   async getMessages(
     request: GetSessionMessagesRequest,
   ): Promise<AgentMessage[]> {
+    await this.ensureSessionLoaded(request.sessionId)
     this.assertKnownSession(request.sessionId, request.agentId)
-    return [...(this.messages.get(request.sessionId) ?? [])]
+
+    const cachedMessages = this.messages.get(request.sessionId)
+
+    if (cachedMessages?.length) {
+      return [...cachedMessages]
+    }
+
+    await this.ensureSessionHandle(request.sessionId)
+    const indexEntry = this.getKnownSessionIndexEntry(request.sessionId)
+    const messages = await this.gateway.readMessages({
+      sessionId: request.sessionId,
+      sdkSessionFile: indexEntry.sdkSessionFile,
+    })
+    this.messages.set(request.sessionId, messages)
+
+    return [...messages]
   }
 
   /**
@@ -542,10 +685,14 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当配置缺失、会话不存在或 SDK 调用失败时，Promise 会 reject。
    */
   async sendMessage(request: SendMessageRequest): Promise<void> {
+    await this.ensureSessionLoaded(request.sessionId)
     const session = this.assertKnownSession(request.sessionId, request.agentId)
-    const handle = this.sessionHandles.get(request.sessionId)
+    const handle = await this.ensureSessionHandle(request.sessionId)
 
-    if (this.activeRunIds.has(request.sessionId) || session.state === 'running') {
+    if (
+      this.activeRunIds.has(request.sessionId) ||
+      session.state === 'running'
+    ) {
       throw new AgentRuntimeError({
         code: 'run-already-active',
         message: '当前会话正在运行，请等待完成或先取消本次响应。',
@@ -592,6 +739,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     })
     this.activeRunIds.set(request.sessionId, runId)
     this.updateSessionState(session.sessionId, 'running')
+    await this.updateSessionIndexEntry(session.sessionId, {
+      lastMessagePreview: this.createMessagePreview(content),
+      status: 'running',
+      updatedAt: this.now(),
+    })
     this.emit({
       type: 'turn-started',
       agentId: request.agentId,
@@ -634,6 +786,10 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       if (this.activeRunIds.get(request.sessionId) !== runId) {
         this.removeMessageIfEmpty(agentMessage.messageId)
         this.updateSessionState(session.sessionId, 'cancelled')
+        await this.updateSessionIndexEntry(session.sessionId, {
+          status: 'cancelled',
+          updatedAt: this.now(),
+        })
         return
       }
 
@@ -667,10 +823,19 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         occurredAt: this.now(),
       })
       this.updateSessionState(session.sessionId, 'completed')
+      await this.updateSessionIndexEntry(session.sessionId, {
+        lastMessagePreview: this.createMessagePreview(completedMessage.content),
+        status: 'completed',
+        updatedAt: this.now(),
+      })
     } catch (error) {
       if (isAbortError(error) || !this.activeRunIds.has(request.sessionId)) {
         this.removeMessageIfEmpty(agentMessage.messageId)
         this.updateSessionState(session.sessionId, 'cancelled')
+        await this.updateSessionIndexEntry(session.sessionId, {
+          status: 'cancelled',
+          updatedAt: this.now(),
+        })
         this.emit({
           type: 'turn-cancelled',
           agentId: request.agentId,
@@ -688,6 +853,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       }
       this.removeMessageIfEmpty(agentMessage.messageId)
       this.updateSessionState(session.sessionId, 'failed')
+      await this.updateSessionIndexEntry(session.sessionId, {
+        lastMessagePreview: this.createMessagePreview(runtimeError.message),
+        status: 'failed',
+        updatedAt: this.now(),
+      })
       this.emit({
         type: 'turn-failed',
         agentId: request.agentId,
@@ -718,6 +888,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当会话不存在时，Promise 会 reject。
    */
   async cancelRun(request: CancelRunRequest): Promise<void> {
+    await this.ensureSessionLoaded(request.sessionId)
     this.assertKnownSession(request.sessionId, request.agentId)
     const runId = this.activeRunIds.get(request.sessionId)
 
@@ -727,6 +898,10 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
     await this.sessionHandles.get(request.sessionId)?.abort()
     this.updateSessionState(request.sessionId, 'cancelled')
+    await this.updateSessionIndexEntry(request.sessionId, {
+      status: 'cancelled',
+      updatedAt: this.now(),
+    })
 
     if (runId) {
       this.emit({
@@ -833,7 +1008,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     ) {
       throw new AgentRuntimeError({
         code: 'configuration-missing',
-        message: '请填写 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。',
+        message:
+          '请填写 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。',
         recoverable: true,
       })
     }
@@ -852,7 +1028,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
     try {
       const rawConfig = await readFile(configPath, 'utf8')
-      const parsedConfig = JSON.parse(rawConfig) as Partial<PersistedRuntimeConfiguration>
+      const parsedConfig = JSON.parse(
+        rawConfig,
+      ) as Partial<PersistedRuntimeConfiguration>
 
       if (
         typeof parsedConfig.providerId !== 'string' ||
@@ -868,7 +1046,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         apiKey: parsedConfig.apiKey,
       }
     } catch (error) {
-      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
         return null
       }
 
@@ -909,7 +1091,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   ): Promise<void> {
     const configPath = this.resolveConfigPath()
     await mkdir(dirname(configPath), { recursive: true })
-    await writeFile(`${configPath}.tmp`, `${JSON.stringify(configuration, null, 2)}\n`, 'utf8')
+    await writeFile(
+      `${configPath}.tmp`,
+      `${JSON.stringify(configuration, null, 2)}\n`,
+      'utf8',
+    )
     await import('node:fs/promises').then(({ rename }) =>
       rename(`${configPath}.tmp`, configPath),
     )
@@ -923,6 +1109,362 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    */
   private resolveConfigPath(): string {
     return join(this.userDataPath, 'config.json')
+  }
+
+  /**
+   * 读取本地会话索引；索引不存在时尝试从 Pi SDK 原生 session 重建。
+   *
+   * @returns 当前可展示的会话索引条目。
+   * @throws 当索引 JSON 损坏或 SDK 列表读取失败时，Promise 会 reject。
+   */
+  private async loadSessionIndex(): Promise<PersistedSessionIndexEntry[]> {
+    const indexPath = this.resolveSessionIndexPath()
+
+    try {
+      const rawIndex = await readFile(indexPath, 'utf8')
+      const parsedIndex = JSON.parse(rawIndex) as Partial<PersistedSessionIndex>
+      const entries = Array.isArray(parsedIndex.sessions)
+        ? parsedIndex.sessions.flatMap((entry) =>
+            this.normalizeSessionIndexEntry(entry),
+          )
+        : []
+      this.replaceSessionIndex(entries)
+
+      return entries
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        return this.rebuildSessionIndexFromSdk()
+      }
+
+      throw error
+    }
+  }
+
+  /**
+   * 在本地索引缺失时，从 Pi SDK 原生 session 列表重建基础索引。
+   *
+   * @returns 从 SDK 恢复出的索引条目。
+   * @throws 当运行时配置或 SDK session 列表读取失败时，Promise 会 reject。
+   */
+  private async rebuildSessionIndexFromSdk(): Promise<
+    PersistedSessionIndexEntry[]
+  > {
+    const configuration = await this.readPersistedConfiguration()
+
+    if (!configuration) {
+      this.replaceSessionIndex([])
+      return []
+    }
+
+    const sdkSessions = await this.gateway.listSessions({
+      cwd: this.resolveAgentHomePath(),
+      sessionDir: this.resolveSdkSessionDir(),
+    })
+    const entries = sdkSessions.map((session) => ({
+      sessionId: session.sessionId,
+      sdkSessionFile: session.sdkSessionFile,
+      title: session.title?.trim() || session.sessionId,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      provider: configuration.providerId,
+      model: configuration.modelId,
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      lastMessagePreview: '',
+      status: 'idle' as const,
+    }))
+
+    this.replaceSessionIndex(entries)
+    await this.writeSessionIndex()
+
+    return entries
+  }
+
+  /**
+   * 用已读取的索引条目刷新内存中的会话摘要缓存。
+   *
+   * @param entries - 从本地索引或 SDK 恢复出的索引条目。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private replaceSessionIndex(entries: PersistedSessionIndexEntry[]): void {
+    this.sessionIndex.clear()
+    this.sessions.clear()
+
+    for (const entry of entries) {
+      this.sessionIndex.set(entry.sessionId, entry)
+      this.sessions.set(
+        entry.sessionId,
+        this.createSessionSummaryFromIndexEntry(entry),
+      )
+    }
+  }
+
+  /**
+   * 把索引条目转换成 Renderer 使用的会话摘要。
+   *
+   * @param entry - 本地持久化索引条目。
+   * @returns 对应的 AgentSessionSummary。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private createSessionSummaryFromIndexEntry(
+    entry: PersistedSessionIndexEntry,
+  ): AgentSessionSummary {
+    return {
+      agentId: entry.agentId,
+      sessionId: entry.sessionId,
+      title: entry.title,
+      state: entry.status,
+      updatedAt: entry.updatedAt,
+    }
+  }
+
+  /**
+   * 将会话索引以临时文件加 rename 的方式写入 userData。
+   *
+   * @returns 无返回值。
+   * @throws 当目录创建或文件写入失败时，Promise 会 reject。
+   */
+  private async writeSessionIndex(): Promise<void> {
+    const indexPath = this.resolveSessionIndexPath()
+    const entries = [...this.sessionIndex.values()].sort((left, right) =>
+      right.updatedAt.localeCompare(left.updatedAt),
+    )
+    const payload: PersistedSessionIndex = {
+      sessions: entries,
+    }
+
+    await mkdir(dirname(indexPath), { recursive: true })
+    await writeFile(
+      `${indexPath}.tmp`,
+      `${JSON.stringify(payload, null, 2)}\n`,
+      'utf8',
+    )
+    await rename(`${indexPath}.tmp`, indexPath)
+  }
+
+  /**
+   * 更新单个会话索引条目并同步会话摘要缓存。
+   *
+   * @param sessionId - 需要更新的会话标识。
+   * @param patch - 要覆盖到索引条目上的字段。
+   * @returns 更新后的索引条目。
+   * @throws 当会话索引不存在时抛出 AgentRuntimeError。
+   */
+  private async updateSessionIndexEntry(
+    sessionId: string,
+    patch: Partial<PersistedSessionIndexEntry>,
+  ): Promise<PersistedSessionIndexEntry> {
+    const currentEntry = this.getKnownSessionIndexEntry(sessionId)
+    const nextEntry = {
+      ...currentEntry,
+      ...patch,
+    }
+    this.sessionIndex.set(sessionId, nextEntry)
+    this.sessions.set(
+      sessionId,
+      this.createSessionSummaryFromIndexEntry(nextEntry),
+    )
+    await this.writeSessionIndex()
+
+    return nextEntry
+  }
+
+  /**
+   * 确保指定会话已从索引加载到内存。
+   *
+   * @param sessionId - 需要加载的会话标识。
+   * @returns 无返回值。
+   * @throws 当索引读取失败时，Promise 会 reject。
+   */
+  private async ensureSessionLoaded(sessionId: string): Promise<void> {
+    if (this.sessions.has(sessionId)) {
+      return
+    }
+
+    await this.loadSessionIndex()
+  }
+
+  /**
+   * 确保指定会话已有 Pi SDK session handle，历史会话会通过 openSession 打开。
+   *
+   * @param sessionId - 需要打开的会话标识。
+   * @returns 可运行 prompt 的 Pi SDK session handle。
+   * @throws 当会话不存在、配置缺失或 SDK 打开失败时，Promise 会 reject。
+   */
+  private async ensureSessionHandle(
+    sessionId: string,
+  ): Promise<PiSdkSessionHandle> {
+    const existingHandle = this.sessionHandles.get(sessionId)
+
+    if (existingHandle) {
+      return existingHandle
+    }
+
+    const [configuration, indexEntry] = await Promise.all([
+      this.readRequiredConfiguration(),
+      Promise.resolve(this.getKnownSessionIndexEntry(sessionId)),
+    ])
+    const handle = await this.gateway.openSession({
+      ...configuration,
+      sessionId,
+      sdkSessionFile: indexEntry.sdkSessionFile,
+      cwd: this.resolveAgentHomePath(),
+    })
+    this.sessionHandles.set(sessionId, handle)
+
+    return handle
+  }
+
+  /**
+   * 读取已加载的单个索引条目。
+   *
+   * @param sessionId - 会话标识。
+   * @returns 对应索引条目。
+   * @throws 当索引条目不存在时抛出 AgentRuntimeError。
+   */
+  private getKnownSessionIndexEntry(
+    sessionId: string,
+  ): PersistedSessionIndexEntry {
+    const indexEntry = this.sessionIndex.get(sessionId)
+
+    if (!indexEntry) {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `找不到会话 ${sessionId} 的本地索引。`,
+        recoverable: true,
+      })
+    }
+
+    return indexEntry
+  }
+
+  /**
+   * 解析本地会话索引文件路径。
+   *
+   * @returns Electron userData 下的 sessions/index.json 路径。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private resolveSessionIndexPath(): string {
+    return join(this.userDataPath, 'sessions', 'index.json')
+  }
+
+  /**
+   * 解析 Pi SDK 原生 session 文件目录。
+   *
+   * @returns Electron userData 下保存 SDK session 的目录路径。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private resolveSdkSessionDir(): string {
+    return join(this.userDataPath, 'sessions', 'pi-sdk')
+  }
+
+  /**
+   * 解析单个 Pi SDK 原生 session 文件路径。
+   *
+   * @param sessionId - 会话标识。
+   * @returns 对应 session 的 JSONL 文件路径。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private resolveSdkSessionFile(sessionId: string): string {
+    return join(this.resolveSdkSessionDir(), `${sessionId}.jsonl`)
+  }
+
+  /**
+   * 将未知 JSON 值校验成会话索引条目。
+   *
+   * @param value - 从 index.json 解析出的未知条目。
+   * @returns 字段合法时返回单元素数组，否则返回空数组。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private normalizeSessionIndexEntry(
+    value: unknown,
+  ): PersistedSessionIndexEntry[] {
+    const entry = value as Partial<PersistedSessionIndexEntry>
+
+    if (
+      typeof entry.sessionId !== 'string' ||
+      typeof entry.sdkSessionFile !== 'string' ||
+      typeof entry.title !== 'string' ||
+      typeof entry.createdAt !== 'string' ||
+      typeof entry.updatedAt !== 'string' ||
+      typeof entry.provider !== 'string' ||
+      typeof entry.model !== 'string' ||
+      typeof entry.agentId !== 'string' ||
+      typeof entry.lastMessagePreview !== 'string' ||
+      !this.isAgentRunState(entry.status)
+    ) {
+      return []
+    }
+
+    return [
+      {
+        sessionId: entry.sessionId,
+        sdkSessionFile: entry.sdkSessionFile,
+        title: entry.title,
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
+        provider: entry.provider,
+        model: entry.model,
+        agentId: entry.agentId,
+        lastMessagePreview: entry.lastMessagePreview,
+        status: entry.status,
+      },
+    ]
+  }
+
+  /**
+   * 判断未知值是否是可展示的 Agent 运行状态。
+   *
+   * @param value - 待判断的未知值。
+   * @returns 是 AgentRunState 时返回 true。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private isAgentRunState(value: unknown): value is AgentRunState {
+    return (
+      value === 'idle' ||
+      value === 'running' ||
+      value === 'completed' ||
+      value === 'cancelled' ||
+      value === 'failed'
+    )
+  }
+
+  /**
+   * 基于已有索引生成下一个简单递增会话标识。
+   *
+   * @param entries - 当前已存在的索引条目。
+   * @returns 形如 session-N 的新会话标识。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private createNextSessionId(entries: PersistedSessionIndexEntry[]): string {
+    const maxNumericId = entries.reduce((maxId, entry) => {
+      const match = /^session-(\d+)$/.exec(entry.sessionId)
+      return match ? Math.max(maxId, Number(match[1])) : maxId
+    }, 0)
+
+    return `session-${maxNumericId + 1}`
+  }
+
+  /**
+   * 生成会话列表里展示的最后消息预览。
+   *
+   * @param content - 完整消息内容。
+   * @returns 压缩空白并截断后的预览文本。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private createMessagePreview(content: string): string {
+    return content.replace(/\s+/g, ' ').trim().slice(0, 120)
+  }
+
+  /**
+   * 判断文件系统错误是否表示路径不存在。
+   *
+   * @param error - 捕获到的未知错误。
+   * @returns 是 ENOENT 时返回 true。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private isNotFoundError(error: unknown): boolean {
+    return error instanceof Error && 'code' in error && error.code === 'ENOENT'
   }
 
   /**
@@ -949,11 +1491,12 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       mkdir(skillsPath, { recursive: true }),
     ])
 
-    const [bootstrapFileExists, soulFileExists, userFileExists] = await Promise.all([
-      this.pathExists(bootstrapPath),
-      this.pathExists(soulPath),
-      this.pathExists(userPath),
-    ])
+    const [bootstrapFileExists, soulFileExists, userFileExists] =
+      await Promise.all([
+        this.pathExists(bootstrapPath),
+        this.pathExists(soulPath),
+        this.pathExists(userPath),
+      ])
 
     if (!bootstrapFileExists && !soulFileExists && !userFileExists) {
       await writeFile(bootstrapPath, this.createBootstrapTemplate(), 'utf8')
@@ -961,7 +1504,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
     return {
       initialized: soulFileExists && userFileExists,
-      bootstrapRequired: !soulFileExists && (await this.pathExists(bootstrapPath)),
+      bootstrapRequired:
+        !soulFileExists && (await this.pathExists(bootstrapPath)),
       bootstrapFileExists: await this.pathExists(bootstrapPath),
       soulFileExists: await this.pathExists(soulPath),
       userFileExists: await this.pathExists(userPath),
@@ -977,7 +1521,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @returns 包含 soul.md/user.md 或 bootstrap.md 上下文的 prompt。
    * @throws 当 profile 文件读取失败时，Promise 会 reject。
    */
-  private async buildPromptWithProfileContext(userContent: string): Promise<string> {
+  private async buildPromptWithProfileContext(
+    userContent: string,
+  ): Promise<string> {
     const absoluteHomePath = this.resolveAgentHomePath()
     const soulPath = join(absoluteHomePath, 'soul.md')
     const userPath = join(absoluteHomePath, 'user.md')
@@ -1048,7 +1594,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       await access(path, fsConstants.F_OK)
       return true
     } catch (error) {
-      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
         return false
       }
 
@@ -1068,7 +1618,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       const fileStat = await stat(path)
       return fileStat.mtime.toISOString()
     } catch (error) {
-      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
         return null
       }
 
@@ -1184,7 +1738,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    */
   private appendMessageDelta(messageId: string, delta: string): AgentMessage {
     for (const [sessionId, messages] of this.messages) {
-      const messageIndex = messages.findIndex((message) => message.messageId === messageId)
+      const messageIndex = messages.findIndex(
+        (message) => message.messageId === messageId,
+      )
 
       if (messageIndex === -1) {
         continue
@@ -1223,7 +1779,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    */
   private completeMessage(messageId: string): AgentMessage {
     for (const messages of this.messages.values()) {
-      const message = messages.find((candidate) => candidate.messageId === messageId)
+      const message = messages.find(
+        (candidate) => candidate.messageId === messageId,
+      )
 
       if (message) {
         return message
@@ -1246,7 +1804,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    */
   private removeMessageIfEmpty(messageId: string): boolean {
     for (const [sessionId, messages] of this.messages) {
-      const message = messages.find((candidate) => candidate.messageId === messageId)
+      const message = messages.find(
+        (candidate) => candidate.messageId === messageId,
+      )
 
       if (!message || message.content) {
         continue
@@ -1318,13 +1878,14 @@ class RealPiSdkGateway implements PiSdkGateway {
    * @throws 当 SDK 模块加载或模型注册表读取失败时，Promise 会 reject。
    */
   async listProvidersAndModels(): Promise<PiSdkRuntimeResources> {
-    const { AuthStorage, ModelRegistry } = await import(
-      '@earendil-works/pi-coding-agent'
-    )
+    const { AuthStorage, ModelRegistry } =
+      await import('@earendil-works/pi-coding-agent')
     const authStorage = AuthStorage.inMemory()
     const modelRegistry = ModelRegistry.inMemory(authStorage)
     const models = modelRegistry.getAll()
-    const providerIds = [...new Set(models.map((model) => model.provider))].sort()
+    const providerIds = [
+      ...new Set(models.map((model) => model.provider)),
+    ].sort()
 
     return {
       providers: providerIds.map((providerId) => ({
@@ -1396,6 +1957,79 @@ class RealPiSdkGateway implements PiSdkGateway {
   async createSession(
     request: PiSdkCreateSessionRequest,
   ): Promise<PiSdkSessionHandle> {
+    return this.createSessionHandleFromRequest(request, 'create')
+  }
+
+  /**
+   * 打开已有 Pi SDK 会话运行器。
+   *
+   * @param request - 已验证配置、会话标识、SDK session 文件和 Agent Home 工作目录。
+   * @returns 可发送 prompt、取消运行并释放资源的会话运行器。
+   * @throws 当 SDK 模块加载、模型查找或会话打开失败时，Promise 会 reject。
+   */
+  async openSession(
+    request: PiSdkOpenSessionRequest,
+  ): Promise<PiSdkSessionHandle> {
+    return this.createSessionHandleFromRequest(request, 'open')
+  }
+
+  /**
+   * 从 Pi SDK 原生 session 目录列出可恢复的会话。
+   *
+   * @param request - Agent Home 工作目录和 SDK session 目录。
+   * @returns SDK session 摘要列表。
+   * @throws 当 SDK session 目录读取失败时，Promise 会 reject。
+   */
+  async listSessions(
+    request: PiSdkListSessionsRequest,
+  ): Promise<PiSdkStoredSession[]> {
+    const { SessionManager } = await import('@earendil-works/pi-coding-agent')
+    const sessions = await SessionManager.list(request.cwd, request.sessionDir)
+
+    return sessions.map((session) => ({
+      sessionId: session.id,
+      sdkSessionFile: session.path,
+      title: (session.name ?? session.firstMessage) || session.id,
+      createdAt: session.created.toISOString(),
+      updatedAt: session.modified.toISOString(),
+    }))
+  }
+
+  /**
+   * 从 Pi SDK 原生 session 文件读取 transcript 消息。
+   *
+   * @param request - 会话标识和 SDK session 文件。
+   * @returns 转换后的汤圆标准消息列表。
+   * @throws 当 SDK session 文件无法打开或读取时，Promise 会 reject。
+   */
+  async readMessages(
+    request: PiSdkReadMessagesRequest,
+  ): Promise<AgentMessage[]> {
+    const { SessionManager } = await import('@earendil-works/pi-coding-agent')
+    const sessionManager = SessionManager.open(
+      request.sdkSessionFile,
+      dirname(request.sdkSessionFile),
+    )
+
+    return sessionManager
+      .getEntries()
+      .flatMap((entry: unknown) =>
+        mapPiSdkSessionEntryToAgentMessage(entry, request.sessionId),
+      )
+  }
+
+  /**
+   * 根据请求创建或打开 Pi SDK session，并包装成 Driver 使用的 handle。
+   *
+   * @param request - 已验证配置、会话标识、SDK session 文件和 Agent Home 工作目录。
+   * @param mode - create 表示新建带固定 id 的 session，open 表示打开已有文件。
+   * @returns 可发送 prompt、取消运行并释放资源的会话运行器。
+   * @throws 当 SDK 模块加载、模型查找或 session 打开失败时，Promise 会 reject。
+   */
+  private async createSessionHandleFromRequest(
+    request: PiSdkCreateSessionRequest | PiSdkOpenSessionRequest,
+    mode: 'create' | 'open',
+  ): Promise<PiSdkSessionHandle> {
     const { AuthStorage, ModelRegistry, SessionManager, createAgentSession } =
       await import('@earendil-works/pi-coding-agent')
     const authStorage = AuthStorage.inMemory()
@@ -1408,17 +2042,27 @@ class RealPiSdkGateway implements PiSdkGateway {
       throw new Error(`找不到模型 ${request.providerId}/${request.modelId}`)
     }
 
+    const sessionManager =
+      mode === 'create'
+        ? SessionManager.create(request.cwd, dirname(request.sdkSessionFile), {
+            id: request.sessionId,
+          })
+        : SessionManager.open(
+            request.sdkSessionFile,
+            dirname(request.sdkSessionFile),
+            request.cwd,
+          )
+
     const { session } = await createAgentSession({
       cwd: request.cwd,
       authStorage,
       modelRegistry,
       model,
-      sessionManager: SessionManager.create(request.cwd, undefined, {
-        id: request.sessionId,
-      }),
+      sessionManager,
     })
 
     return {
+      sdkSessionFile: sessionManager.getSessionFile() ?? request.sdkSessionFile,
       prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
         const unsubscribe = session.subscribe((event: unknown) => {
           for (const streamEvent of normalizePiSdkSessionEvent(event)) {
@@ -1444,6 +2088,109 @@ class RealPiSdkGateway implements PiSdkGateway {
 }
 
 /**
+ * 将 Pi SDK session entry 转成汤圆标准消息。
+ *
+ * @param entry - Pi SDK SessionManager 返回的未知 entry。
+ * @param sessionId - 当前汤圆会话标识。
+ * @returns 可展示消息；不是 message entry 时返回空数组。
+ * @throws 此方法不会主动抛出错误。
+ */
+function mapPiSdkSessionEntryToAgentMessage(
+  entry: unknown,
+  sessionId: string,
+): AgentMessage[] {
+  const candidate = entry as {
+    type?: unknown
+    id?: unknown
+    timestamp?: unknown
+    message?: {
+      role?: unknown
+      content?: unknown
+    }
+  }
+
+  if (candidate.type !== 'message' || !candidate.message) {
+    return []
+  }
+
+  const role = mapPiSdkMessageRole(candidate.message.role)
+  const content = stringifyPiSdkMessageContent(candidate.message.content)
+
+  if (!content) {
+    return []
+  }
+
+  return [
+    {
+      messageId:
+        typeof candidate.id === 'string'
+          ? candidate.id
+          : `${sessionId}-sdk-message-${content.length}`,
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId,
+      role,
+      content,
+      createdAt:
+        typeof candidate.timestamp === 'string'
+          ? candidate.timestamp
+          : new Date(0).toISOString(),
+    },
+  ]
+}
+
+/**
+ * 将 Pi SDK 消息角色映射成汤圆标准角色。
+ *
+ * @param role - SDK 消息里的未知角色值。
+ * @returns 汤圆 transcript 使用的消息角色。
+ * @throws 此方法不会主动抛出错误。
+ */
+function mapPiSdkMessageRole(role: unknown): AgentMessage['role'] {
+  if (role === 'user') {
+    return 'user'
+  }
+
+  if (role === 'assistant') {
+    return 'agent'
+  }
+
+  return 'system'
+}
+
+/**
+ * 将 Pi SDK 消息内容压成 Renderer 可展示的纯文本。
+ *
+ * @param content - SDK 消息里的未知 content 值。
+ * @returns 可展示的纯文本内容。
+ * @throws 此方法不会主动抛出错误。
+ */
+function stringifyPiSdkMessageContent(content: unknown): string {
+  if (typeof content === 'string') {
+    return content
+  }
+
+  if (!Array.isArray(content)) {
+    return ''
+  }
+
+  return content
+    .map((part) => {
+      if (typeof part === 'string') {
+        return part
+      }
+
+      if (part && typeof part === 'object' && 'text' in part) {
+        const text = (part as { text?: unknown }).text
+        return typeof text === 'string' ? text : ''
+      }
+
+      return ''
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+/**
  * 判断错误是否来自 AbortController 取消。
  *
  * @param error - 捕获到的未知错误。
@@ -1452,8 +2199,9 @@ class RealPiSdkGateway implements PiSdkGateway {
  */
 function isAbortError(error: unknown): boolean {
   return (
-    error instanceof DOMException && error.name === 'AbortError'
-  ) || (error instanceof Error && error.name === 'AbortError')
+    (error instanceof DOMException && error.name === 'AbortError') ||
+    (error instanceof Error && error.name === 'AbortError')
+  )
 }
 
 /**
@@ -1568,23 +2316,38 @@ function normalizePiSdkSessionEvent(event: unknown): PiSdkStreamEvent[] {
     return []
   }
 
-  if (event.type === 'message_update' && isRecord(event.assistantMessageEvent)) {
+  if (
+    event.type === 'message_update' &&
+    isRecord(event.assistantMessageEvent)
+  ) {
     const assistantEvent = event.assistantMessageEvent
 
-    if (assistantEvent.type === 'text_delta' && typeof assistantEvent.delta === 'string') {
+    if (
+      assistantEvent.type === 'text_delta' &&
+      typeof assistantEvent.delta === 'string'
+    ) {
       return [{ type: 'text-delta', delta: assistantEvent.delta }]
     }
 
-    if (assistantEvent.type === 'thinking_start' || assistantEvent.type === 'thinking_delta') {
+    if (
+      assistantEvent.type === 'thinking_start' ||
+      assistantEvent.type === 'thinking_delta'
+    ) {
       return [{ type: 'thinking-started' }]
     }
   }
 
-  if (event.type === 'tool_execution_start' && typeof event.toolName === 'string') {
+  if (
+    event.type === 'tool_execution_start' &&
+    typeof event.toolName === 'string'
+  ) {
     return [{ type: 'tool-started', toolName: event.toolName }]
   }
 
-  if (event.type === 'tool_execution_end' && typeof event.toolName === 'string') {
+  if (
+    event.type === 'tool_execution_end' &&
+    typeof event.toolName === 'string'
+  ) {
     return [
       {
         type: event.isError ? 'tool-failed' : 'tool-completed',

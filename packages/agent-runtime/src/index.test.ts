@@ -1,14 +1,18 @@
-import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   AgentRuntimeError,
   type AgentEvent,
+  type AgentMessage,
   PiSdkDriver,
   type PiSdkCreateSessionRequest,
   type PiSdkGateway,
+  type PiSdkListSessionsRequest,
+  type PiSdkOpenSessionRequest,
   type PiSdkPromptOptions,
+  type PiSdkReadMessagesRequest,
   type PiSdkSessionHandle,
   type PiSdkVerificationRequest,
   createDefaultSessionSummary,
@@ -74,7 +78,9 @@ describe('PiSdkDriver', () => {
       status: 'missing-config',
     })
 
-    await expect(stat(join(rootPath, homePath.slice(2)))).resolves.toMatchObject({
+    await expect(
+      stat(join(rootPath, homePath.slice(2))),
+    ).resolves.toMatchObject({
       isDirectory: expect.any(Function),
     })
     await expect(
@@ -100,14 +106,18 @@ describe('PiSdkDriver', () => {
 
     await driver.getSnapshot()
     await import('node:fs/promises').then(({ writeFile }) =>
-      writeFile(join(resolvedHomePath, 'bootstrap.md'), 'custom bootstrap', 'utf8'),
+      writeFile(
+        join(resolvedHomePath, 'bootstrap.md'),
+        'custom bootstrap',
+        'utf8',
+      ),
     )
 
     await driver.refresh()
 
-    await expect(readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8')).resolves.toBe(
-      'custom bootstrap',
-    )
+    await expect(
+      readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
+    ).resolves.toBe('custom bootstrap')
   })
 
   it('recreates bootstrap.md when it and the profile files are missing', async () => {
@@ -126,9 +136,9 @@ describe('PiSdkDriver', () => {
         },
       },
     })
-    await expect(readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8')).resolves.toContain(
-      '# Bootstrap',
-    )
+    await expect(
+      readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
+    ).resolves.toContain('# Bootstrap')
   })
 
   it('marks the profile as initialized only when soul.md and user.md both exist', async () => {
@@ -176,7 +186,10 @@ describe('PiSdkDriver', () => {
     })
 
     await expect(
-      readFile(join(rootPath, 'Library/Application Support/Tangyuan/config.json'), 'utf8'),
+      readFile(
+        join(rootPath, 'Library/Application Support/Tangyuan/config.json'),
+        'utf8',
+      ),
     ).resolves.toContain('sk-test-secret-7890')
     expect(gateway.requests).toEqual([
       expect.objectContaining({
@@ -206,7 +219,10 @@ describe('PiSdkDriver', () => {
       message: expect.not.stringContaining('sk-test-secret-7890'),
     })
     await expect(
-      readFile(join(rootPath, 'Library/Application Support/Tangyuan/config.json'), 'utf8'),
+      readFile(
+        join(rootPath, 'Library/Application Support/Tangyuan/config.json'),
+        'utf8',
+      ),
     ).rejects.toThrow()
   })
 
@@ -273,11 +289,212 @@ describe('PiSdkDriver', () => {
     expect(gateway.sessionRequests).toEqual([
       expect.objectContaining({
         sessionId: 'session-1',
+        sdkSessionFile: expect.stringContaining('session-1.jsonl'),
         cwd: join(rootPath, '.tangyuan/agents/tangyuan'),
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',
       }),
     ])
+  })
+
+  it('persists a local session index when creating a Pi SDK session', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, userDataPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    await expect(
+      driver.createSession({
+        agentId: 'tangyuan',
+        title: '调试启动流程',
+      }),
+    ).resolves.toMatchObject({
+      agentId: 'tangyuan',
+      sessionId: 'session-1',
+      title: '调试启动流程',
+      state: 'idle',
+    })
+
+    await expect(
+      readJson(join(userDataPath, 'sessions/index.json')),
+    ).resolves.toEqual({
+      sessions: [
+        expect.objectContaining({
+          agentId: 'tangyuan',
+          sessionId: 'session-1',
+          title: '调试启动流程',
+          createdAt: '2026-07-08T00:00:00.000Z',
+          updatedAt: '2026-07-08T00:00:00.000Z',
+          provider: 'anthropic',
+          model: 'claude-sonnet-4-5',
+          sdkSessionFile: expect.stringContaining('session-1.jsonl'),
+          lastMessagePreview: '',
+          status: 'idle',
+        }),
+      ],
+    })
+    await expect(
+      stat(join(userDataPath, 'sessions/index.json.tmp')),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('updates the session index summary after a completed reply', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, userDataPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '帮我检查保存逻辑',
+    })
+
+    await expect(
+      readJson(join(userDataPath, 'sessions/index.json')),
+    ).resolves.toEqual({
+      sessions: [
+        expect.objectContaining({
+          sessionId: 'session-1',
+          updatedAt: '2026-07-08T00:00:00.000Z',
+          lastMessagePreview: '收到：帮我检查保存逻辑',
+          status: 'completed',
+        }),
+      ],
+    })
+  })
+
+  it('restores the session list and opens messages from Pi SDK storage after restart', async () => {
+    const sdkMessagesBySessionFile = new Map<string, AgentMessage[]>()
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = createPromptingHandle(request.sessionId, (messages) => {
+          sdkMessagesBySessionFile.set(request.sdkSessionFile, messages)
+        })
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+      openSession: async (request) => {
+        const handle = createPromptingHandle(request.sessionId)
+        gateway.openSessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+      readMessages: async (request) =>
+        sdkMessagesBySessionFile.get(request.sdkSessionFile) ?? [],
+    })
+    const { driver, rootPath, userDataPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '持久化检查',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '重启后还能看到吗',
+    })
+
+    const restartedDriver = createDriverAtPath({
+      gateway,
+      rootPath,
+      userDataPath,
+    })
+    await expect(
+      restartedDriver.listSessions({ agentId: 'tangyuan' }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        sessionId: 'session-1',
+        title: '持久化检查',
+        state: 'completed',
+      }),
+    ])
+    await expect(
+      restartedDriver.getMessages({
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        role: 'user',
+        content: '重启后还能看到吗',
+      }),
+      expect.objectContaining({
+        role: 'agent',
+        content: '收到：重启后还能看到吗',
+      }),
+    ])
+    expect(gateway.openSessionRequests).toEqual([
+      expect.objectContaining({
+        sessionId: 'session-1',
+        sdkSessionFile: expect.stringContaining('session-1.jsonl'),
+      }),
+    ])
+  })
+
+  it('rebuilds a basic local index from Pi SDK sessions when the index is missing', async () => {
+    const gateway = createPiSdkGateway({
+      listSessions: async () => [
+        {
+          sessionId: 'session-from-sdk',
+          sdkSessionFile: '/tmp/pi-sessions/session-from-sdk.json',
+          title: 'SDK 恢复会话',
+          createdAt: '2026-07-07T00:00:00.000Z',
+          updatedAt: '2026-07-07T00:01:00.000Z',
+        },
+      ],
+    })
+    const { driver, userDataPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    await rm(join(userDataPath, 'sessions/index.json'), {
+      force: true,
+    })
+
+    await expect(driver.listSessions({ agentId: 'tangyuan' })).resolves.toEqual(
+      [
+        expect.objectContaining({
+          agentId: 'tangyuan',
+          sessionId: 'session-from-sdk',
+          title: 'SDK 恢复会话',
+          state: 'idle',
+        }),
+      ],
+    )
+    await expect(
+      readJson(join(userDataPath, 'sessions/index.json')),
+    ).resolves.toEqual({
+      sessions: [
+        expect.objectContaining({
+          sessionId: 'session-from-sdk',
+          sdkSessionFile: '/tmp/pi-sessions/session-from-sdk.json',
+          provider: 'anthropic',
+          model: 'claude-sonnet-4-5',
+        }),
+      ],
+    })
   })
 
   it('appends the user message immediately and stores the agent reply after sending', async () => {
@@ -379,14 +596,23 @@ describe('PiSdkDriver', () => {
 
     expect(events).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ type: 'turn-started', runId: 'session-1-run-1' }),
         expect.objectContaining({
-          type: 'activity-updated',
-          activity: expect.objectContaining({ kind: 'thinking', label: '思考中' }),
+          type: 'turn-started',
+          runId: 'session-1-run-1',
         }),
         expect.objectContaining({
           type: 'activity-updated',
-          activity: expect.objectContaining({ kind: 'tool', label: '正在读取文件' }),
+          activity: expect.objectContaining({
+            kind: 'thinking',
+            label: '思考中',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'activity-updated',
+          activity: expect.objectContaining({
+            kind: 'tool',
+            label: '正在读取文件',
+          }),
         }),
         expect.objectContaining({ type: 'message-delta', delta: '你' }),
         expect.objectContaining({ type: 'message-delta', delta: '好' }),
@@ -430,7 +656,7 @@ describe('PiSdkDriver', () => {
         return handle
       },
     })
-    const { driver } = await createDriver({ gateway })
+    const { driver, userDataPath } = await createDriver({ gateway })
 
     await driver.saveConfiguration({
       providerId: 'anthropic',
@@ -451,6 +677,17 @@ describe('PiSdkDriver', () => {
       content: '第一条',
     })
     await firstRunStarted.promise
+    await expect(
+      readJson(join(userDataPath, 'sessions/index.json')),
+    ).resolves.toEqual({
+      sessions: expect.arrayContaining([
+        expect.objectContaining({
+          sessionId: sessionOne.sessionId,
+          status: 'running',
+          lastMessagePreview: '第一条',
+        }),
+      ]),
+    })
 
     await expect(
       driver.sendMessage({
@@ -513,12 +750,20 @@ describe('PiSdkDriver', () => {
       content: '开始',
     })
     await runStarted.promise
-    await driver.cancelRun({ agentId: 'tangyuan', sessionId: session.sessionId })
+    await driver.cancelRun({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+    })
 
     await expect(sendPromise).resolves.toBeUndefined()
-    await expect(driver.listSessions({ agentId: 'tangyuan' })).resolves.toEqual([
-      expect.objectContaining({ sessionId: session.sessionId, state: 'cancelled' }),
-    ])
+    await expect(driver.listSessions({ agentId: 'tangyuan' })).resolves.toEqual(
+      [
+        expect.objectContaining({
+          sessionId: session.sessionId,
+          state: 'cancelled',
+        }),
+      ],
+    )
     await expect(
       driver.getMessages({ agentId: 'tangyuan', sessionId: session.sessionId }),
     ).resolves.toEqual([
@@ -566,7 +811,9 @@ describe('PiSdkDriver', () => {
     ).rejects.toThrow('provider failed')
     await expect(
       driver.getMessages({ agentId: 'tangyuan', sessionId: session.sessionId }),
-    ).resolves.toEqual([expect.objectContaining({ role: 'user', content: '开始' })])
+    ).resolves.toEqual([
+      expect.objectContaining({ role: 'user', content: '开始' }),
+    ])
   })
 
   it('injects existing soul.md and user.md into the Pi SDK prompt', async () => {
@@ -575,8 +822,16 @@ describe('PiSdkDriver', () => {
     const resolvedHomePath = join(rootPath, homePath.slice(2))
 
     await driver.getSnapshot()
-    await writeFile(join(resolvedHomePath, 'soul.md'), '# Soul\n只说中文。', 'utf8')
-    await writeFile(join(resolvedHomePath, 'user.md'), '# User\n用户喜欢简洁回答。', 'utf8')
+    await writeFile(
+      join(resolvedHomePath, 'soul.md'),
+      '# Soul\n只说中文。',
+      'utf8',
+    )
+    await writeFile(
+      join(resolvedHomePath, 'user.md'),
+      '# User\n用户喜欢简洁回答。',
+      'utf8',
+    )
     await driver.saveConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
@@ -594,7 +849,9 @@ describe('PiSdkDriver', () => {
     })
 
     expect(gateway.sessionHandles[0]?.prompts[0]).toContain('只说中文。')
-    expect(gateway.sessionHandles[0]?.prompts[0]).toContain('用户喜欢简洁回答。')
+    expect(gateway.sessionHandles[0]?.prompts[0]).toContain(
+      '用户喜欢简洁回答。',
+    )
     expect(gateway.sessionHandles[0]?.prompts[0]).not.toContain('# Bootstrap')
   })
 
@@ -641,19 +898,40 @@ describe('PiSdkDriver', () => {
 
 async function createDriver(options: { gateway?: PiSdkGateway } = {}) {
   const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-agent-runtime-'))
+  const userDataPath = join(rootPath, 'Library/Application Support/Tangyuan')
   tempDirs.push(rootPath)
 
   return {
-    driver: new PiSdkDriver({
-      fsRoot: rootPath,
-      userDataPath: join(rootPath, 'Library/Application Support/Tangyuan'),
-      agentHomePath: '~/.tangyuan/agents/tangyuan',
-      now: () => '2026-07-08T00:00:00.000Z',
+    driver: createDriverAtPath({
+      rootPath,
+      userDataPath,
       ...(options.gateway ? { gateway: options.gateway } : {}),
     }),
     rootPath,
+    userDataPath,
     homePath: '~/.tangyuan/agents/tangyuan',
   }
+}
+
+/**
+ * 在指定目录创建 Driver，用于模拟应用重启后复用同一个 userData。
+ *
+ * @param options - Driver 需要复用的根目录、userData 路径和可选 SDK 网关。
+ * @returns 指向同一持久化目录的新 PiSdkDriver。
+ * @throws 此测试辅助方法不会主动抛出错误。
+ */
+function createDriverAtPath(options: {
+  rootPath: string
+  userDataPath: string
+  gateway?: PiSdkGateway
+}): PiSdkDriver {
+  return new PiSdkDriver({
+    fsRoot: options.rootPath,
+    userDataPath: options.userDataPath,
+    agentHomePath: '~/.tangyuan/agents/tangyuan',
+    now: () => '2026-07-08T00:00:00.000Z',
+    ...(options.gateway ? { gateway: options.gateway } : {}),
+  })
 }
 
 /**
@@ -663,18 +941,29 @@ async function createDriver(options: { gateway?: PiSdkGateway } = {}) {
  * @returns 记录调用参数的 PiSdkGateway。
  * @throws 此测试辅助方法不会主动抛出错误。
  */
-function createPiSdkGateway(options: Partial<PiSdkGateway> = {}): PiSdkGateway & {
+function createPiSdkGateway(
+  options: Partial<PiSdkGateway> = {},
+): PiSdkGateway & {
   requests: PiSdkVerificationRequest[]
   sessionRequests: PiSdkCreateSessionRequest[]
+  openSessionRequests: PiSdkOpenSessionRequest[]
+  listSessionRequests: PiSdkListSessionsRequest[]
+  readMessageRequests: PiSdkReadMessagesRequest[]
   sessionHandles: Array<PiSdkSessionHandle & { prompts: string[] }>
 } {
   const requests: PiSdkVerificationRequest[] = []
   const sessionRequests: PiSdkCreateSessionRequest[] = []
+  const openSessionRequests: PiSdkOpenSessionRequest[] = []
+  const listSessionRequests: PiSdkListSessionsRequest[] = []
+  const readMessageRequests: PiSdkReadMessagesRequest[] = []
   const sessionHandles: Array<PiSdkSessionHandle & { prompts: string[] }> = []
 
   return {
     requests,
     sessionRequests,
+    openSessionRequests,
+    listSessionRequests,
+    readMessageRequests,
     sessionHandles,
     listProvidersAndModels: async () => ({
       providers: [{ providerId: 'anthropic', displayName: 'Anthropic' }],
@@ -692,22 +981,85 @@ function createPiSdkGateway(options: Partial<PiSdkGateway> = {}): PiSdkGateway &
     },
     createSession: async (request) => {
       sessionRequests.push(request)
-      const prompts: string[] = []
-      const handle = {
-        prompts,
-        prompt: async (prompt: string) => {
-          prompts.push(prompt)
-          return `收到：${prompt.split('# 用户消息').at(-1)?.trim() ?? prompt}`
-        },
-        abort: async () => undefined,
-        dispose: () => undefined,
-      }
+      const handle = createPromptingHandle(request.sessionId)
       sessionHandles.push(handle)
 
       return handle
     },
+    openSession: async (request) => {
+      openSessionRequests.push(request)
+      const handle = createPromptingHandle(request.sessionId)
+      sessionHandles.push(handle)
+
+      return handle
+    },
+    listSessions: async (request) => {
+      listSessionRequests.push(request)
+      return []
+    },
+    readMessages: async (request) => {
+      readMessageRequests.push(request)
+      return []
+    },
     ...options,
   }
+}
+
+/**
+ * 创建能记录 prompt 并生成固定回复的 Pi SDK session handle。
+ *
+ * @param sessionId - 生成消息时使用的会话标识。
+ * @param onMessages - 可选回调，用于模拟 SDK 自己持久化后的消息读取。
+ * @returns 可发送 prompt 的测试 session handle。
+ * @throws 此测试辅助方法不会主动抛出错误。
+ */
+function createPromptingHandle(
+  sessionId: string,
+  onMessages?: (messages: AgentMessage[]) => void,
+): PiSdkSessionHandle & { prompts: string[] } {
+  const prompts: string[] = []
+
+  return {
+    prompts,
+    prompt: async (prompt: string) => {
+      prompts.push(prompt)
+      const userContent = prompt.split('# 用户消息').at(-1)?.trim() ?? prompt
+      const messages: AgentMessage[] = [
+        {
+          messageId: `${sessionId}-sdk-user-1`,
+          agentId: 'tangyuan',
+          sessionId,
+          role: 'user',
+          content: userContent,
+          createdAt: '2026-07-08T00:00:00.000Z',
+        },
+        {
+          messageId: `${sessionId}-sdk-agent-1`,
+          agentId: 'tangyuan',
+          sessionId,
+          role: 'agent',
+          content: `收到：${userContent}`,
+          createdAt: '2026-07-08T00:00:00.000Z',
+        },
+      ]
+      onMessages?.(messages)
+
+      return `收到：${userContent}`
+    },
+    abort: async () => undefined,
+    dispose: () => undefined,
+  }
+}
+
+/**
+ * 读取测试 JSON 文件并解析为未知对象。
+ *
+ * @param path - 需要读取的 JSON 文件路径。
+ * @returns 解析后的 JSON 数据。
+ * @throws 当文件不存在或 JSON 无法解析时，Promise 会 reject。
+ */
+async function readJson(path: string): Promise<unknown> {
+  return JSON.parse(await readFile(path, 'utf8')) as unknown
 }
 
 /**
@@ -716,7 +1068,10 @@ function createPiSdkGateway(options: Partial<PiSdkGateway> = {}): PiSdkGateway &
  * @returns Promise 和对应 resolve 函数。
  * @throws 此测试辅助方法不会主动抛出错误。
  */
-function createDeferred<T>(): { promise: Promise<T>; resolve(value?: T): void } {
+function createDeferred<T>(): {
+  promise: Promise<T>
+  resolve(value?: T): void
+} {
   let resolve!: (value?: T) => void
   const promise = new Promise<T>((innerResolve) => {
     resolve = innerResolve as (value?: T) => void
