@@ -855,6 +855,119 @@ describe('PiSdkDriver', () => {
     expect(gateway.sessionHandles[0]?.prompts[0]).not.toContain('# Bootstrap')
   })
 
+  it('lets the bootstrap turn create profile files, remove bootstrap.md, and enter history', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+            await writeFile(
+              join(request.cwd, 'soul.md'),
+              [
+                '# Soul',
+                '身份：汤圆是桌面端 Agent。',
+                '用户偏好：优先中文。',
+                '工作范围：协助工程任务。',
+                '沟通方式：解释专业术语。',
+                '权限边界：危险操作先确认。',
+                '敏感信息规则：不记录密钥。',
+                '记忆与技能原则：只记录长期偏好。',
+                '不确定时的处理方式：先说明假设。',
+              ].join('\n'),
+              'utf8',
+            )
+            await writeFile(
+              join(request.cwd, 'user.md'),
+              [
+                '# User',
+                '称呼：用户。',
+                '语言与语气偏好：中文，简洁。',
+                '常见工作类型：代码实现。',
+                '决策偏好：保守改动。',
+                '需要先确认的事项：破坏性操作。',
+                '禁止触碰的信息和边界：API Key。',
+                '长期偏好：完整方法注释。',
+              ].join('\n'),
+              'utf8',
+            )
+            await rm(join(request.cwd, 'bootstrap.md'), { force: true })
+
+            return '初始化完成。'
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+    })
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+    const events: AgentEvent[] = []
+    driver.subscribe((event) => {
+      events.push(event)
+    })
+
+    await driver.getSnapshot()
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: 'Bootstrap 初始化',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '请开始初始化。',
+    })
+
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+    expect(gateway.sessionHandles[0]?.prompts[0]).toContain('# Bootstrap')
+    expect(gateway.sessionHandles[0]?.prompts[0]).toContain(
+      'soul.md 至少必须覆盖：身份、用户偏好、工作范围、沟通方式、权限边界、敏感信息规则、记忆与技能原则、不确定时的处理方式。',
+    )
+    expect(gateway.sessionHandles[0]?.prompts[0]).toContain(
+      '完成后删除 bootstrap.md。',
+    )
+    await expect(readFile(join(resolvedHomePath, 'soul.md'), 'utf8')).resolves
+      .toContain('身份：汤圆是桌面端 Agent。')
+    await expect(readFile(join(resolvedHomePath, 'user.md'), 'utf8')).resolves
+      .toContain('称呼：用户。')
+    await expect(
+      readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      activeAgent: {
+        profile: {
+          initialized: true,
+          bootstrapRequired: false,
+          soulUpdatedAt: expect.any(String),
+          userUpdatedAt: expect.any(String),
+        },
+      },
+    })
+    await expect(driver.listSessions({ agentId: 'tangyuan' })).resolves.toEqual(
+      [
+        expect.objectContaining({
+          sessionId: session.sessionId,
+          title: 'Bootstrap 初始化',
+          state: 'completed',
+        }),
+      ],
+    )
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'profile-updated', target: 'soul' }),
+        expect.objectContaining({ type: 'profile-updated', target: 'user' }),
+      ]),
+    )
+  })
+
   it('blocks real session creation when configuration is missing', async () => {
     const { driver } = await createDriver()
 

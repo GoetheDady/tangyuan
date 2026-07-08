@@ -109,6 +109,31 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: '新会话' })).toBeInTheDocument()
   })
 
+  it('opens a bootstrap session immediately after saving configuration when profile is uninitialized', async () => {
+    const user = userEvent.setup()
+    window.api.listSessions = vi.fn().mockResolvedValue([])
+    window.api.createSession = vi.fn().mockResolvedValue(
+      createDefaultSessionSummary({
+        sessionId: 'bootstrap-session',
+        title: 'Bootstrap 初始化',
+        updatedAt: '2026-07-08T00:00:00.000Z'
+      })
+    )
+    render(<App />)
+
+    await user.type(await screen.findByLabelText('Provider'), 'anthropic')
+    await user.type(screen.getByLabelText('Model'), 'claude-sonnet-4-5')
+    await user.type(screen.getByLabelText('API Key'), 'sk-test-secret-7890')
+    await user.click(screen.getByRole('button', { name: '验证并保存' }))
+
+    expect(window.api.createSession).toHaveBeenCalledWith({
+      agentId: 'tangyuan',
+      title: 'Bootstrap 初始化'
+    })
+    expect(await screen.findAllByText('Bootstrap 初始化')).toHaveLength(2)
+    expect(screen.getByText('发送第一条消息开始会话。')).toBeInTheDocument()
+  })
+
   it('allows users to cancel configuration verification', async () => {
     const user = userEvent.setup()
     window.api.saveRuntimeConfiguration = vi.fn(() => new Promise<RuntimeSnapshot>(() => undefined))
@@ -130,7 +155,8 @@ describe('App', () => {
     const readyRuntime = createReadyRuntimeSnapshot({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
-      maskedValue: 'sk-t...7890'
+      maskedValue: 'sk-t...7890',
+      profileInitialized: true
     })
     Object.defineProperty(window, 'api', {
       configurable: true,
@@ -154,6 +180,42 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: '配置模型服务' })).toBeInTheDocument()
     expect(screen.getByText('sk-t...7890')).toBeInTheDocument()
     expect(screen.getByLabelText('API Key')).toHaveValue('')
+  })
+
+  it('opens a bootstrap session on startup when runtime is ready but profile is uninitialized', async () => {
+    const readyRuntime = createReadyRuntimeSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-t...7890'
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
+        refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
+        saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
+        cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
+        listSessions: vi.fn().mockResolvedValue([]),
+        createSession: vi.fn().mockResolvedValue(
+          createDefaultSessionSummary({
+            sessionId: 'bootstrap-session',
+            title: 'Bootstrap 初始化',
+            updatedAt: '2026-07-08T00:00:00.000Z'
+          })
+        ),
+        getMessages: vi.fn().mockResolvedValue([]),
+        sendMessage: vi.fn().mockResolvedValue([]),
+        cancelRun: vi.fn(),
+        subscribeToAgentEvents: vi.fn(() => () => undefined)
+      } satisfies DesktopPreloadApi
+    })
+    render(<App />)
+
+    expect(await screen.findAllByText('Bootstrap 初始化')).toHaveLength(2)
+    expect(window.api.createSession).toHaveBeenCalledWith({
+      agentId: 'tangyuan',
+      title: 'Bootstrap 初始化'
+    })
   })
 
   it('sends the first message through the preload API and renders the transcript', async () => {
@@ -345,6 +407,7 @@ function createReadyRuntimeSnapshot(input: {
   providerId: string
   modelId: string
   maskedValue: string
+  profileInitialized?: boolean
 }): RuntimeSnapshot {
   return createRuntimeSnapshot({
     activeAgent: {
@@ -352,8 +415,8 @@ function createReadyRuntimeSnapshot(input: {
       displayName: '汤圆',
       homePath: '~/.tangyuan/agents/tangyuan',
       profile: {
-        initialized: false,
-        bootstrapRequired: true,
+        initialized: input.profileInitialized ?? false,
+        bootstrapRequired: !(input.profileInitialized ?? false),
         soulUpdatedAt: null,
         userUpdatedAt: null
       }

@@ -100,6 +100,17 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     return window.api.subscribeToAgentEvents((event) => {
+      if (event.type === 'profile-updated') {
+        void window.api
+          .refreshRuntime()
+          .then((nextRuntime) => {
+            setRuntime(nextRuntime)
+          })
+          .catch((error: unknown) => {
+            setErrorMessage(error instanceof Error ? error.message : '刷新 Profile 状态失败')
+          })
+      }
+
       applyAgentEventToSessions(event, setSessions)
 
       const eventSessionId = getAgentEventSessionId(event)
@@ -156,6 +167,7 @@ function App(): React.JSX.Element {
         modelId: nextRuntime.settings.selectedModelId ?? configurationForm.modelId,
         apiKey: ''
       })
+      await openBootstrapSessionIfRequired(nextRuntime)
       setErrorMessage(null)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '配置验证失败')
@@ -206,6 +218,42 @@ function App(): React.JSX.Element {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '创建会话失败')
     }
+  }
+
+  /**
+   * 在首次 profile 尚未初始化时创建并选中 bootstrap 会话。
+   *
+   * @param nextRuntime - 保存配置后得到的最新运行时快照。
+   * @returns 无返回值。
+   * @throws Preload API 错误会透传给调用方，由保存配置流程统一展示。
+   */
+  const openBootstrapSessionIfRequired = async (nextRuntime: RuntimeSnapshot): Promise<void> => {
+    if (nextRuntime.status !== 'ready' || !nextRuntime.activeAgent.profile.bootstrapRequired) {
+      return
+    }
+
+    const existingSessions = await window.api.listSessions()
+
+    if (existingSessions.length) {
+      const [firstSession] = existingSessions
+      setSessions(existingSessions)
+      setSelectedSessionId(firstSession.sessionId)
+      setMessages(
+        await window.api.getMessages({
+          agentId: firstSession.agentId,
+          sessionId: firstSession.sessionId
+        })
+      )
+      return
+    }
+
+    const bootstrapSession = await window.api.createSession({
+      agentId: nextRuntime.activeAgent.agentId,
+      title: 'Bootstrap 初始化'
+    })
+    setSessions([bootstrapSession])
+    setSelectedSessionId(bootstrapSession.sessionId)
+    setMessages([])
   }
 
   /**
@@ -1033,7 +1081,16 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   messages: AgentMessage[]
 }> {
   const [runtime, sessions] = await Promise.all([api.getRuntimeSnapshot(), api.listSessions()])
-  const [firstSession] = sessions
+  const nextSessions =
+    runtime.status === 'ready' && runtime.activeAgent.profile.bootstrapRequired && !sessions.length
+      ? [
+          await api.createSession({
+            agentId: runtime.activeAgent.agentId,
+            title: 'Bootstrap 初始化'
+          })
+        ]
+      : sessions
+  const [firstSession] = nextSessions
   const messages = firstSession
     ? await api.getMessages({
         agentId: firstSession.agentId,
@@ -1041,7 +1098,7 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
       })
     : []
 
-  return { runtime, sessions, messages }
+  return { runtime, sessions: nextSessions, messages }
 }
 
 export default App

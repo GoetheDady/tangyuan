@@ -294,6 +294,19 @@ export interface PersistedSessionIndex {
 }
 
 /**
+ * 描述默认 Agent Home 中 profile/bootstrap 文件的当前状态。
+ */
+interface AgentHomeStatus {
+  initialized: boolean
+  bootstrapRequired: boolean
+  bootstrapFileExists: boolean
+  soulFileExists: boolean
+  userFileExists: boolean
+  soulUpdatedAt: string | null
+  userUpdatedAt: string | null
+}
+
+/**
  * 创建 AgentRuntimeError 时使用的输入。
  */
 export interface AgentRuntimeErrorInput extends AgentRuntimeErrorPayload {
@@ -753,6 +766,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     })
 
     try {
+      const profileStatusBeforeRun = await this.ensureDefaultAgentHome()
       const prompt = await this.buildPromptWithProfileContext(content)
       let accumulatedReply = ''
       const agentReply = await handle.prompt(prompt, {
@@ -822,6 +836,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         message: completedMessage,
         occurredAt: this.now(),
       })
+      await this.emitProfileUpdateEvents(profileStatusBeforeRun)
       this.updateSessionState(session.sessionId, 'completed')
       await this.updateSessionIndexEntry(session.sessionId, {
         lastMessagePreview: this.createMessagePreview(completedMessage.content),
@@ -1473,7 +1488,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @returns 默认 Agent Home 的文件状态。
    * @throws 当文件系统创建、读取或写入失败时，Promise 会 reject。
    */
-  private async ensureDefaultAgentHome() {
+  private async ensureDefaultAgentHome(): Promise<AgentHomeStatus> {
     const absoluteHomePath = this.resolveAgentHomePath()
     const bootstrapPath = join(absoluteHomePath, 'bootstrap.md')
     const soulPath = join(absoluteHomePath, 'soul.md')
@@ -1511,6 +1526,45 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       userFileExists: await this.pathExists(userPath),
       soulUpdatedAt: await this.getMtimeIso(soulPath),
       userUpdatedAt: await this.getMtimeIso(userPath),
+    }
+  }
+
+  /**
+   * 对比单次运行前后的 profile 文件状态，并在文件生成或更新后广播事件。
+   *
+   * @param previousStatus - 运行开始前的 Agent Home 文件状态。
+   * @returns 无返回值。
+   * @throws 当 Agent Home 状态读取失败时，Promise 会 reject。
+   */
+  private async emitProfileUpdateEvents(
+    previousStatus: AgentHomeStatus,
+  ): Promise<void> {
+    const nextStatus = await this.ensureDefaultAgentHome()
+
+    if (
+      nextStatus.soulUpdatedAt &&
+      nextStatus.soulUpdatedAt !== previousStatus.soulUpdatedAt
+    ) {
+      this.emit({
+        type: 'profile-updated',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        target: 'soul',
+        updatedAt: nextStatus.soulUpdatedAt,
+        occurredAt: this.now(),
+      })
+    }
+
+    if (
+      nextStatus.userUpdatedAt &&
+      nextStatus.userUpdatedAt !== previousStatus.userUpdatedAt
+    ) {
+      this.emit({
+        type: 'profile-updated',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        target: 'user',
+        updatedAt: nextStatus.userUpdatedAt,
+        occurredAt: this.now(),
+      })
     }
   }
 
@@ -1560,7 +1614,17 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     return [
       `# ${PROFILE_CONTEXT_HEADER}`,
       '',
-      '当前 profile 尚未初始化。请根据 bootstrap.md 的问题推进首次初始化；在信息足够时生成 soul.md 和 user.md。',
+      '当前 profile 尚未初始化。请根据 bootstrap.md 的问题推进首次初始化；信息不足时继续追问，不要要求用户点击完成按钮。',
+      '当你判断固定问题已经回答充分时，必须使用 Pi SDK 可用文件工具完成初始化。',
+      '',
+      '初始化完成规则：',
+      '1. 使用 write 或 edit 写入 soul.md。',
+      '2. 使用 write 或 edit 写入 user.md。',
+      '3. 完成后删除 bootstrap.md。',
+      '4. 不得把 API Key、密钥、令牌或其它敏感凭据写入 soul.md 或 user.md。',
+      '',
+      'soul.md 至少必须覆盖：身份、用户偏好、工作范围、沟通方式、权限边界、敏感信息规则、记忆与技能原则、不确定时的处理方式。',
+      'user.md 至少必须覆盖：称呼、语言与语气偏好、常见工作类型、决策偏好、需要先确认的事项、禁止触碰的信息和边界、长期偏好。',
       '',
       '## bootstrap.md',
       bootstrapContent.trim(),
