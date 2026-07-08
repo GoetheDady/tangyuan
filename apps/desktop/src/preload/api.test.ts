@@ -1,10 +1,12 @@
 import {
+  DESKTOP_AGENT_EVENT_CHANNEL,
   DESKTOP_IPC_CHANNELS,
+  type AgentEvent,
   type DesktopIpcChannel,
   type DesktopIpcResponse
 } from '@tangyuan/shared'
 import { describe, expect, it } from 'vitest'
-import { createTangyuanPreloadApi, type IpcInvoke } from './api'
+import { createTangyuanPreloadApi, type IpcInvoke, type IpcSubscribe } from './api'
 
 describe('createTangyuanPreloadApi', () => {
   it('exposes a typed renderer API backed by the allowed IPC channels', async () => {
@@ -14,7 +16,20 @@ describe('createTangyuanPreloadApi', () => {
 
       return undefined as unknown as DesktopIpcResponse<typeof channel>
     }
-    const api = createTangyuanPreloadApi(invoke)
+    const subscriptions: Array<[typeof DESKTOP_AGENT_EVENT_CHANNEL, AgentEvent['type']]> = []
+    const subscribe: IpcSubscribe = (channel, listener) => {
+      listener({
+        type: 'turn-started',
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        runId: 'run-1',
+        occurredAt: '2026-07-08T00:00:00.000Z'
+      })
+      subscriptions.push([channel, 'turn-started'])
+
+      return () => undefined
+    }
+    const api = createTangyuanPreloadApi(invoke, subscribe)
 
     expect(Object.keys(api).sort()).toEqual([
       'cancelRun',
@@ -25,7 +40,8 @@ describe('createTangyuanPreloadApi', () => {
       'listSessions',
       'refreshRuntime',
       'saveRuntimeConfiguration',
-      'sendMessage'
+      'sendMessage',
+      'subscribeToAgentEvents'
     ])
 
     await api.getRuntimeSnapshot()
@@ -45,6 +61,7 @@ describe('createTangyuanPreloadApi', () => {
       content: '你好'
     })
     await api.cancelRun({ agentId: 'tangyuan', sessionId: 'session-1' })
+    api.subscribeToAgentEvents(() => undefined)
 
     expect(calls).toEqual([
       [DESKTOP_IPC_CHANNELS.runtimeGetSnapshot],
@@ -89,5 +106,6 @@ describe('createTangyuanPreloadApi', () => {
         }
       ]
     ])
+    expect(subscriptions).toEqual([[DESKTOP_AGENT_EVENT_CHANNEL, 'turn-started']])
   })
 })

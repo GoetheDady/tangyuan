@@ -1,5 +1,6 @@
 import {
   DESKTOP_IPC_CHANNELS,
+  type AgentEvent,
   type DesktopIpcChannel,
   type DesktopIpcRequest,
   type DesktopIpcResponse
@@ -28,14 +29,28 @@ export interface IpcMainLike {
 }
 
 /**
+ * 描述 Main 侧把 Agent 事件推送到 Renderer 的广播方法。
+ */
+export type AgentEventBroadcaster = (event: AgentEvent) => void
+
+/**
  * 把允许的 IPC channel 连接到 DesktopAppStore。
  *
  * @param ipcMain - Electron ipcMain 或测试替身。
  * @param store - Main 侧应用状态中心。
+ * @param broadcastAgentEvent - 可选事件广播方法，用于推送 Agent 标准事件。
  * @returns 无返回值。
  * @throws 当 ipcMain.handle 注册失败时可能抛出错误。
  */
-export function registerDesktopAppIpc(ipcMain: IpcMainLike, store: DesktopAppStore): void {
+export function registerDesktopAppIpc(
+  ipcMain: IpcMainLike,
+  store: DesktopAppStore,
+  broadcastAgentEvent?: AgentEventBroadcaster
+): void {
+  if (broadcastAgentEvent) {
+    store.subscribe(broadcastAgentEvent)
+  }
+
   ipcMain.handle(DESKTOP_IPC_CHANNELS.runtimeGetSnapshot, async () => {
     return store.getRuntimeSnapshot()
   })

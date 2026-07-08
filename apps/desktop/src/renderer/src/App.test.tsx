@@ -2,6 +2,8 @@ import '@testing-library/jest-dom/vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
+  type AgentEventListener,
+  type AgentMessage,
   createDefaultSessionSummary,
   createRuntimeSnapshot,
   type DesktopPreloadApi,
@@ -63,7 +65,8 @@ describe('App', () => {
           title: '新会话',
           updatedAt: '2026-07-08T00:00:00.000Z'
         })
-      )
+      ),
+      subscribeToAgentEvents: vi.fn(() => () => undefined)
     }
 
     Object.defineProperty(window, 'api', {
@@ -140,7 +143,8 @@ describe('App', () => {
         createSession: vi.fn(),
         getMessages: vi.fn().mockResolvedValue([]),
         sendMessage: vi.fn().mockResolvedValue([]),
-        cancelRun: vi.fn()
+        cancelRun: vi.fn(),
+        subscribeToAgentEvents: vi.fn(() => () => undefined)
       } satisfies DesktopPreloadApi
     })
     render(<App />)
@@ -193,7 +197,8 @@ describe('App', () => {
             createdAt: '2026-07-08T00:00:00.000Z'
           }
         ]),
-        cancelRun: vi.fn()
+        cancelRun: vi.fn(),
+        subscribeToAgentEvents: vi.fn(() => () => undefined)
       } satisfies DesktopPreloadApi
     })
     render(<App />)
@@ -207,6 +212,91 @@ describe('App', () => {
       content: '你好'
     })
     expect(await screen.findByText('收到：你好')).toBeInTheDocument()
+  })
+
+  it('streams agent event deltas into the visible transcript', async () => {
+    const user = userEvent.setup()
+    const readyRuntime = createReadyRuntimeSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-t...7890'
+    })
+    const listeners: AgentEventListener[] = []
+    const releaseSend = createDeferred<void>()
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
+        refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
+        saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
+        cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
+        listSessions: vi.fn().mockResolvedValue([
+          createDefaultSessionSummary({
+            sessionId: 'welcome',
+            title: '新会话',
+            updatedAt: '2026-07-08T00:00:00.000Z'
+          })
+        ]),
+        createSession: vi.fn(),
+        getMessages: vi.fn().mockResolvedValue([]),
+        sendMessage: vi.fn(async () => {
+          for (const listener of listeners) {
+            listener({
+              type: 'turn-started',
+              agentId: 'tangyuan',
+              sessionId: 'welcome',
+              runId: 'run-1',
+              occurredAt: '2026-07-08T00:00:01.000Z'
+            })
+            listener({
+              type: 'message-delta',
+              agentId: 'tangyuan',
+              sessionId: 'welcome',
+              runId: 'run-1',
+              messageId: 'agent-message-1',
+              delta: '你',
+              occurredAt: '2026-07-08T00:00:02.000Z'
+            })
+            listener({
+              type: 'message-delta',
+              agentId: 'tangyuan',
+              sessionId: 'welcome',
+              runId: 'run-1',
+              messageId: 'agent-message-1',
+              delta: '好',
+              occurredAt: '2026-07-08T00:00:03.000Z'
+            })
+          }
+
+          await releaseSend.promise
+
+          return [
+            {
+              messageId: 'agent-message-1',
+              agentId: 'tangyuan',
+              sessionId: 'welcome',
+              role: 'agent',
+              content: '你好',
+              createdAt: '2026-07-08T00:00:02.000Z'
+            }
+          ] satisfies AgentMessage[]
+        }),
+        cancelRun: vi.fn(),
+        subscribeToAgentEvents: vi.fn((listener: AgentEventListener) => {
+          listeners.push(listener)
+
+          return () => undefined
+        })
+      } satisfies DesktopPreloadApi
+    })
+    render(<App />)
+
+    await user.type(await screen.findByLabelText('消息'), '开始')
+    await user.click(screen.getByRole('button', { name: '发送' }))
+
+    expect(await screen.findByText('你好')).toBeInTheDocument()
+    expect(screen.getAllByText('运行中').length).toBeGreaterThan(0)
+    releaseSend.resolve()
   })
 })
 
@@ -287,4 +377,19 @@ function createReadyRuntimeSnapshot(input: {
       }
     }
   })
+}
+
+/**
+ * 创建可手动 resolve 的 Promise，用于控制 Renderer 测试里的异步发送。
+ *
+ * @returns Promise 和对应 resolve 函数。
+ * @throws 此测试辅助方法不会主动抛出错误。
+ */
+function createDeferred<T>(): { promise: Promise<T>; resolve(value?: T): void } {
+  let resolve!: (value?: T) => void
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve as (value?: T) => void
+  })
+
+  return { promise, resolve }
 }

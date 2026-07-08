@@ -1,9 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { IpcInvoke } from './api'
+import type { IpcInvoke, IpcSubscribe } from './api'
 import { createTangyuanPreloadApi } from './api'
 
 const invoke: IpcInvoke = (channel, ...payload) => ipcRenderer.invoke(channel, ...payload)
-const api = createTangyuanPreloadApi(invoke)
+const subscribe: IpcSubscribe = (channel, listener) => {
+  const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+    listener(payload as Parameters<typeof listener>[0])
+  }
+  ipcRenderer.on(channel, handler)
+
+  return () => {
+    ipcRenderer.off(channel, handler)
+  }
+}
+const api = createTangyuanPreloadApi(invoke, subscribe)
 
 if (process.contextIsolated) {
   try {

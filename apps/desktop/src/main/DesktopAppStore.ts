@@ -1,4 +1,10 @@
-import type { AgentSessionDriver, RuntimeResourceDriver } from '@tangyuan/agent-runtime'
+import type {
+  AgentEvent,
+  AgentEventListener,
+  AgentEventSubscription,
+  AgentSessionDriver,
+  RuntimeResourceDriver
+} from '@tangyuan/agent-runtime'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentMessage,
@@ -103,6 +109,23 @@ export interface DesktopAppStore {
    * @throws 当会话不存在或 AgentSessionDriver 取消失败时，Promise 会 reject。
    */
   cancelRun(request: CancelRunRequest): Promise<AgentSessionSummary>
+
+  /**
+   * 订阅 Store 转发的 Agent 标准事件。
+   *
+   * @param listener - 事件监听回调。
+   * @returns 可取消订阅的句柄。
+   * @throws 此方法不会主动抛出错误。
+   */
+  subscribe(listener: AgentEventListener): AgentEventSubscription
+
+  /**
+   * 取消所有仍处于运行中的会话。
+   *
+   * @returns 无返回值。
+   * @throws 当任一会话取消失败时，Promise 会 reject。
+   */
+  cancelAllActiveRuns(): Promise<void>
 }
 
 /**
@@ -119,6 +142,9 @@ export function createDesktopAppStore(dependencies: DesktopAppStoreDependencies)
 class DefaultDesktopAppStore implements DesktopAppStore {
   private readonly runtimeDriver: RuntimeResourceDriver
   private readonly sessionDriver: AgentSessionDriver
+  private readonly listeners = new Set<AgentEventListener>()
+  private readonly messagesBySession = new Map<string, AgentMessage[]>()
+  private readonly activeRunIds = new Map<string, string>()
   private runtimeSnapshot: RuntimeSnapshot | null = null
   private sessions: AgentSessionSummary[] = []
 
@@ -132,6 +158,10 @@ class DefaultDesktopAppStore implements DesktopAppStore {
   constructor(dependencies: DesktopAppStoreDependencies) {
     this.runtimeDriver = dependencies.runtimeDriver
     this.sessionDriver = dependencies.sessionDriver
+    this.sessionDriver.subscribe((event) => {
+      this.applyAgentEvent(event)
+      this.emit(event)
+    })
   }
 
   /**
@@ -197,9 +227,13 @@ class DefaultDesktopAppStore implements DesktopAppStore {
    * @throws 当 AgentSessionDriver 读取失败时，Promise 会 reject。
    */
   async listSessions(): Promise<AgentSessionSummary[]> {
-    this.sessions = await this.sessionDriver.listSessions({
+    const driverSessions = await this.sessionDriver.listSessions({
       agentId: TANGYUAN_DEFAULT_AGENT_ID
     })
+    this.sessions = driverSessions.map((session) => ({
+      ...session,
+      state: this.activeRunIds.has(session.sessionId) ? 'running' : session.state
+    }))
     return this.sessions
   }
 
@@ -229,7 +263,14 @@ class DefaultDesktopAppStore implements DesktopAppStore {
    * @throws 当 AgentSessionDriver 读取失败时，Promise 会 reject。
    */
   async getMessages(request: GetSessionMessagesRequest): Promise<AgentMessage[]> {
-    return this.sessionDriver.getMessages(request)
+    if (this.messagesBySession.has(request.sessionId)) {
+      return [...(this.messagesBySession.get(request.sessionId) ?? [])]
+    }
+
+    const messages = await this.sessionDriver.getMessages(request)
+    this.messagesBySession.set(request.sessionId, messages)
+
+    return messages
   }
 
   /**
@@ -241,12 +282,18 @@ class DefaultDesktopAppStore implements DesktopAppStore {
    */
   async sendMessage(request: SendMessageRequest): Promise<AgentMessage[]> {
     await this.assertRuntimeReady()
-    await this.sessionDriver.sendMessage(request)
-    this.sessions = await this.sessionDriver.listSessions({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID
-    })
 
-    return this.sessionDriver.getMessages({
+    const session =
+      this.sessions.find((candidate) => candidate.sessionId === request.sessionId) ??
+      (await this.findSession(request.sessionId))
+
+    if (this.activeRunIds.has(request.sessionId) || session?.state === 'running') {
+      throw new Error('当前会话正在运行，请等待完成或先取消本次响应。')
+    }
+
+    await this.sessionDriver.sendMessage(request)
+
+    return this.getMessages({
       agentId: request.agentId,
       sessionId: request.sessionId
     })
@@ -261,9 +308,8 @@ class DefaultDesktopAppStore implements DesktopAppStore {
    */
   async cancelRun(request: CancelRunRequest): Promise<AgentSessionSummary> {
     await this.sessionDriver.cancelRun(request)
-    this.sessions = await this.sessionDriver.listSessions({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID
-    })
+    this.activeRunIds.delete(request.sessionId)
+    await this.listSessions()
     const session = this.sessions.find((candidate) => candidate.sessionId === request.sessionId)
 
     if (!session) {
@@ -271,6 +317,44 @@ class DefaultDesktopAppStore implements DesktopAppStore {
     }
 
     return session
+  }
+
+  /**
+   * 订阅 Store 转发的 Agent 标准事件。
+   *
+   * @param listener - 事件监听回调。
+   * @returns 可取消订阅的句柄。
+   * @throws 此方法不会主动抛出错误。
+   */
+  subscribe(listener: AgentEventListener): AgentEventSubscription {
+    this.listeners.add(listener)
+
+    return {
+      unsubscribe: () => {
+        this.listeners.delete(listener)
+      }
+    }
+  }
+
+  /**
+   * 取消所有仍处于 running 状态的会话。
+   *
+   * @returns 无返回值。
+   * @throws 当底层 Driver 取消失败时，Promise 会 reject。
+   */
+  async cancelAllActiveRuns(): Promise<void> {
+    const runningSessions = this.sessions.filter(
+      (session) => session.state === 'running' || this.activeRunIds.has(session.sessionId)
+    )
+
+    await Promise.all(
+      runningSessions.map((session) =>
+        this.cancelRun({
+          agentId: session.agentId,
+          sessionId: session.sessionId
+        })
+      )
+    )
   }
 
   /**
@@ -286,6 +370,211 @@ class DefaultDesktopAppStore implements DesktopAppStore {
       throw new Error(
         '发送消息前，请先配置 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。'
       )
+    }
+  }
+
+  /**
+   * 从当前缓存或 Driver 会话列表中查找会话摘要。
+   *
+   * @param sessionId - 需要查找的会话标识。
+   * @returns 找到时返回会话摘要，否则返回 undefined。
+   * @throws 当 Driver 读取会话列表失败时，Promise 会 reject。
+   */
+  private async findSession(sessionId: string): Promise<AgentSessionSummary | undefined> {
+    const cachedSession = this.sessions.find((session) => session.sessionId === sessionId)
+
+    if (cachedSession) {
+      return cachedSession
+    }
+
+    await this.listSessions()
+
+    return this.sessions.find((session) => session.sessionId === sessionId)
+  }
+
+  /**
+   * 把 Driver 事件归并到 Store 的本地缓存。
+   *
+   * @param event - Driver 发出的标准事件。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private applyAgentEvent(event: AgentEvent): void {
+    if (event.type === 'session-created') {
+      this.upsertSession(event.session)
+      this.messagesBySession.set(event.session.sessionId, [])
+      return
+    }
+
+    if (event.type === 'message-appended') {
+      this.upsertMessage(event.message)
+      return
+    }
+
+    if (event.type === 'turn-started') {
+      this.activeRunIds.set(event.sessionId, event.runId)
+      this.upsertSessionState(event.sessionId, 'running', event.occurredAt)
+      return
+    }
+
+    if (event.type === 'message-delta') {
+      this.appendDelta(event)
+      return
+    }
+
+    if (event.type === 'message-completed') {
+      this.upsertMessage(event.message)
+      return
+    }
+
+    if (event.type === 'activity-updated') {
+      this.upsertActivityMessage(event)
+      return
+    }
+
+    if (event.type === 'turn-cancelled') {
+      this.activeRunIds.delete(event.sessionId)
+      this.upsertSessionState(event.sessionId, 'cancelled', event.occurredAt)
+      return
+    }
+
+    if (event.type === 'turn-failed') {
+      this.activeRunIds.delete(event.sessionId)
+      this.upsertSessionState(event.sessionId, 'failed', event.occurredAt)
+      this.upsertMessage({
+        messageId: `${event.sessionId}-${event.runId}-error`,
+        agentId: event.agentId,
+        sessionId: event.sessionId,
+        role: 'system',
+        content: event.error.message,
+        createdAt: event.occurredAt
+      })
+      return
+    }
+
+    if (event.type === 'run-state-changed') {
+      this.upsertSessionState(event.sessionId, event.state, event.occurredAt)
+
+      if (event.state !== 'running') {
+        this.activeRunIds.delete(event.sessionId)
+      }
+    }
+  }
+
+  /**
+   * 新增或替换会话摘要，并保持最近更新会话排在前面。
+   *
+   * @param session - 需要写入缓存的会话摘要。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private upsertSession(session: AgentSessionSummary): void {
+    this.sessions = [
+      session,
+      ...this.sessions.filter((candidate) => candidate.sessionId !== session.sessionId)
+    ]
+  }
+
+  /**
+   * 更新指定会话的运行状态。
+   *
+   * @param sessionId - 需要更新的会话标识。
+   * @param state - 新运行状态。
+   * @param updatedAt - 状态更新时间。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private upsertSessionState(
+    sessionId: string,
+    state: AgentSessionSummary['state'],
+    updatedAt: string
+  ): void {
+    this.sessions = this.sessions.map((session) =>
+      session.sessionId === sessionId ? { ...session, state, updatedAt } : session
+    )
+  }
+
+  /**
+   * 新增或替换 transcript 消息。
+   *
+   * @param message - 需要写入缓存的消息。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private upsertMessage(message: AgentMessage): void {
+    const messages = this.messagesBySession.get(message.sessionId) ?? []
+    const messageExists = messages.some((candidate) => candidate.messageId === message.messageId)
+    const nextMessages = messageExists
+      ? messages.map((candidate) =>
+          candidate.messageId === message.messageId ? message : candidate
+        )
+      : [...messages, message]
+    this.messagesBySession.set(message.sessionId, nextMessages)
+  }
+
+  /**
+   * 把文本增量拼接进对应 Agent 消息。
+   *
+   * @param event - message-delta 标准事件。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private appendDelta(event: Extract<AgentEvent, { type: 'message-delta' }>): void {
+    const messages = this.messagesBySession.get(event.sessionId) ?? []
+    const messageIndex = messages.findIndex((message) => message.messageId === event.messageId)
+
+    if (messageIndex === -1) {
+      this.messagesBySession.set(event.sessionId, [
+        ...messages,
+        {
+          messageId: event.messageId,
+          agentId: event.agentId,
+          sessionId: event.sessionId,
+          role: 'agent',
+          content: event.delta,
+          createdAt: event.occurredAt
+        }
+      ])
+      return
+    }
+
+    const nextMessages = [...messages]
+    const currentMessage = nextMessages[messageIndex]
+    nextMessages[messageIndex] = {
+      ...currentMessage,
+      content: `${currentMessage.content}${event.delta}`
+    }
+    this.messagesBySession.set(event.sessionId, nextMessages)
+  }
+
+  /**
+   * 把 thinking/tool 活动写成可见但不含敏感参数的系统消息。
+   *
+   * @param event - activity-updated 标准事件。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private upsertActivityMessage(event: Extract<AgentEvent, { type: 'activity-updated' }>): void {
+    this.upsertMessage({
+      messageId: `${event.sessionId}-${event.runId}-${event.activity.kind}`,
+      agentId: event.agentId,
+      sessionId: event.sessionId,
+      role: 'system',
+      content: event.activity.label,
+      createdAt: event.occurredAt
+    })
+  }
+
+  /**
+   * 向 Store 订阅者广播标准事件。
+   *
+   * @param event - 需要广播的标准事件。
+   * @returns 无返回值。
+   * @throws 订阅者回调抛出的错误会透传给调用方。
+   */
+  private emit(event: AgentEvent): void {
+    for (const listener of this.listeners) {
+      listener(event)
     }
   }
 }

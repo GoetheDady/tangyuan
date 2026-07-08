@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { PiSdkDriver } from '@tangyuan/agent-runtime'
+import { DESKTOP_AGENT_EVENT_CHANNEL } from '@tangyuan/shared'
 import icon from '../../resources/icon.png?asset'
 import { createDesktopAppStore } from './DesktopAppStore'
 import { registerDesktopAppIpc } from './ipc'
@@ -11,6 +12,7 @@ const desktopAppStore = createDesktopAppStore({
   runtimeDriver: piSdkDriver,
   sessionDriver: piSdkDriver
 })
+let isQuittingAfterCancellingRuns = false
 
 /**
  * 创建并加载桌面主窗口。
@@ -65,7 +67,11 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  registerDesktopAppIpc(ipcMain, desktopAppStore)
+  registerDesktopAppIpc(ipcMain, desktopAppStore, (event) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send(DESKTOP_AGENT_EVENT_CHANNEL, event)
+    }
+  })
 
   createWindow()
 
@@ -83,6 +89,18 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', (event) => {
+  if (isQuittingAfterCancellingRuns) {
+    return
+  }
+
+  event.preventDefault()
+  isQuittingAfterCancellingRuns = true
+  void desktopAppStore.cancelAllActiveRuns().finally(() => {
+    app.quit()
+  })
 })
 
 // In this file you can include the rest of your app's specific main process

@@ -8,6 +8,7 @@ import {
   PiSdkDriver,
   type PiSdkCreateSessionRequest,
   type PiSdkGateway,
+  type PiSdkPromptOptions,
   type PiSdkSessionHandle,
   type PiSdkVerificationRequest,
   createDefaultSessionSummary,
@@ -332,6 +333,242 @@ describe('PiSdkDriver', () => {
     )
   })
 
+  it('maps Pi SDK streaming events to normalized turn and delta events', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
+            handle.prompts.push(prompt)
+            options?.onEvent?.({ type: 'thinking-started' })
+            options?.onEvent?.({ type: 'tool-started', toolName: 'read' })
+            options?.onEvent?.({ type: 'text-delta', delta: '你' })
+            options?.onEvent?.({ type: 'text-delta', delta: '好' })
+            options?.onEvent?.({ type: 'tool-completed', toolName: 'read' })
+            return '你好'
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+    })
+    const { driver } = await createDriver({ gateway })
+    const events: AgentEvent[] = []
+    driver.subscribe((event) => {
+      events.push(event)
+    })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '你好',
+    })
+
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'turn-started', runId: 'session-1-run-1' }),
+        expect.objectContaining({
+          type: 'activity-updated',
+          activity: expect.objectContaining({ kind: 'thinking', label: '思考中' }),
+        }),
+        expect.objectContaining({
+          type: 'activity-updated',
+          activity: expect.objectContaining({ kind: 'tool', label: '正在读取文件' }),
+        }),
+        expect.objectContaining({ type: 'message-delta', delta: '你' }),
+        expect.objectContaining({ type: 'message-delta', delta: '好' }),
+        expect.objectContaining({
+          type: 'message-completed',
+          message: expect.objectContaining({ role: 'agent', content: '你好' }),
+        }),
+      ]),
+    )
+    await expect(
+      driver.getMessages({ agentId: 'tangyuan', sessionId: session.sessionId }),
+    ).resolves.toEqual([
+      expect.objectContaining({ role: 'user', content: '你好' }),
+      expect.objectContaining({ role: 'agent', content: '你好' }),
+    ])
+  })
+
+  it('blocks a duplicate active run in the same session but allows another session', async () => {
+    const releaseFirstRun = createDeferred<void>()
+    const firstRunStarted = createDeferred<void>()
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+
+            if (request.sessionId === 'session-1') {
+              firstRunStarted.resolve()
+              await releaseFirstRun.promise
+            }
+
+            return `完成 ${request.sessionId}`
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+    })
+    const { driver } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const sessionOne = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '会话一',
+    })
+    const sessionTwo = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '会话二',
+    })
+    const firstRun = driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: sessionOne.sessionId,
+      content: '第一条',
+    })
+    await firstRunStarted.promise
+
+    await expect(
+      driver.sendMessage({
+        agentId: 'tangyuan',
+        sessionId: sessionOne.sessionId,
+        content: '重复',
+      }),
+    ).rejects.toMatchObject({ code: 'run-already-active' })
+    await expect(
+      driver.sendMessage({
+        agentId: 'tangyuan',
+        sessionId: sessionTwo.sessionId,
+        content: '并发',
+      }),
+    ).resolves.toBeUndefined()
+
+    releaseFirstRun.resolve()
+    await expect(firstRun).resolves.toBeUndefined()
+  })
+
+  it('cancels an active run and preserves generated partial content', async () => {
+    const runStarted = createDeferred<void>()
+    const releasePrompt = createDeferred<void>()
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
+            handle.prompts.push(prompt)
+            options?.onEvent?.({ type: 'text-delta', delta: '部分内容' })
+            runStarted.resolve()
+            await releasePrompt.promise
+            return '部分内容'
+          },
+          abort: async () => {
+            releasePrompt.resolve()
+          },
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+    })
+    const { driver } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+    const sendPromise = driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '开始',
+    })
+    await runStarted.promise
+    await driver.cancelRun({ agentId: 'tangyuan', sessionId: session.sessionId })
+
+    await expect(sendPromise).resolves.toBeUndefined()
+    await expect(driver.listSessions({ agentId: 'tangyuan' })).resolves.toEqual([
+      expect.objectContaining({ sessionId: session.sessionId, state: 'cancelled' }),
+    ])
+    await expect(
+      driver.getMessages({ agentId: 'tangyuan', sessionId: session.sessionId }),
+    ).resolves.toEqual([
+      expect.objectContaining({ role: 'user', content: '开始' }),
+      expect.objectContaining({ role: 'agent', content: '部分内容' }),
+    ])
+  })
+
+  it('does not keep an empty agent message when a run fails before deltas arrive', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+            throw new Error('provider failed')
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+    })
+    const { driver } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+
+    await expect(
+      driver.sendMessage({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+        content: '开始',
+      }),
+    ).rejects.toThrow('provider failed')
+    await expect(
+      driver.getMessages({ agentId: 'tangyuan', sessionId: session.sessionId }),
+    ).resolves.toEqual([expect.objectContaining({ role: 'user', content: '开始' })])
+  })
+
   it('injects existing soul.md and user.md into the Pi SDK prompt', async () => {
     const gateway = createPiSdkGateway()
     const { driver, rootPath, homePath } = await createDriver({ gateway })
@@ -471,4 +708,19 @@ function createPiSdkGateway(options: Partial<PiSdkGateway> = {}): PiSdkGateway &
     },
     ...options,
   }
+}
+
+/**
+ * 创建可手动 resolve 的 Promise，用于控制 Driver 并发测试。
+ *
+ * @returns Promise 和对应 resolve 函数。
+ * @throws 此测试辅助方法不会主动抛出错误。
+ */
+function createDeferred<T>(): { promise: Promise<T>; resolve(value?: T): void } {
+  let resolve!: (value?: T) => void
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve as (value?: T) => void
+  })
+
+  return { promise, resolve }
 }

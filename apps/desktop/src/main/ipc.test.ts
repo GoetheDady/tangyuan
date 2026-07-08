@@ -1,5 +1,6 @@
 import {
   DESKTOP_IPC_CHANNELS,
+  type AgentEvent,
   TANGYUAN_DEFAULT_AGENT_ID,
   createDefaultSessionSummary,
   createRuntimeSnapshot,
@@ -37,12 +38,23 @@ describe('registerDesktopAppIpc', () => {
       createSession: vi.fn().mockResolvedValue(session),
       getMessages: vi.fn().mockResolvedValue([]),
       sendMessage: vi.fn().mockResolvedValue([]),
-      cancelRun: vi.fn().mockResolvedValue(session)
+      cancelRun: vi.fn().mockResolvedValue(session),
+      subscribe: vi.fn(),
+      cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined)
     }
+    const broadcastAgentEvent = vi.fn()
+    store.subscribe = vi.fn((listener) => {
+      listener(createTurnStartedEvent())
 
-    registerDesktopAppIpc(ipcMain, store)
+      return {
+        unsubscribe: vi.fn()
+      }
+    })
+
+    registerDesktopAppIpc(ipcMain, store, broadcastAgentEvent)
 
     expect(ipcMain.handle).toHaveBeenCalledTimes(9)
+    expect(broadcastAgentEvent).toHaveBeenCalledWith(createTurnStartedEvent())
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
     ).resolves.toEqual(snapshot)
@@ -184,4 +196,20 @@ function createSessionSummary(): AgentSessionSummary {
     title: '新会话',
     updatedAt: '2026-07-08T00:00:00.000Z'
   })
+}
+
+/**
+ * 创建 IPC 测试使用的标准 turn-started 事件。
+ *
+ * @returns 默认 Agent 下的 turn-started 事件。
+ * @throws 此测试辅助方法不会主动抛出错误。
+ */
+function createTurnStartedEvent(): AgentEvent {
+  return {
+    type: 'turn-started',
+    agentId: TANGYUAN_DEFAULT_AGENT_ID,
+    sessionId: 'session-1',
+    runId: 'run-1',
+    occurredAt: '2026-07-08T00:00:00.000Z'
+  }
 }

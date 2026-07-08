@@ -43,6 +43,148 @@ export interface AgentSessionSummary {
 }
 
 /**
+ * 描述 Agent Runtime 统一错误码。
+ */
+export type AgentRuntimeErrorCode =
+  | 'configuration-missing'
+  | 'driver-unavailable'
+  | 'provider-verification-failed'
+  | 'session-not-found'
+  | 'run-already-active'
+  | 'run-cancelled'
+  | 'unknown'
+
+/**
+ * 描述可以安全传给 Renderer 的 Agent Runtime 错误。
+ */
+export interface AgentRuntimeErrorPayload {
+  code: AgentRuntimeErrorCode
+  message: string
+  recoverable: boolean
+}
+
+/**
+ * 描述 Agent 运行中可展示给用户的简略活动类型。
+ */
+export type AgentActivityKind = 'thinking' | 'tool'
+
+/**
+ * 描述 Agent 运行中可展示给用户的简略活动状态。
+ */
+export type AgentActivityState = 'running' | 'completed' | 'failed'
+
+/**
+ * 描述 Agent 运行中不含敏感参数的简略活动。
+ */
+export interface AgentActivity {
+  kind: AgentActivityKind
+  state: AgentActivityState
+  label: string
+}
+
+/**
+ * 描述 Agent 运行过程中发给 DesktopAppStore 和 Renderer 的标准事件。
+ */
+export type AgentEvent =
+  | {
+      type: 'session-created'
+      agentId: AgentId
+      session: AgentSessionSummary
+      occurredAt: string
+    }
+  | {
+      type: 'message-appended'
+      agentId: AgentId
+      message: AgentMessage
+      occurredAt: string
+    }
+  | {
+      type: 'turn-started'
+      agentId: AgentId
+      sessionId: string
+      runId: string
+      occurredAt: string
+    }
+  | {
+      type: 'message-delta'
+      agentId: AgentId
+      sessionId: string
+      runId: string
+      messageId: string
+      delta: string
+      occurredAt: string
+    }
+  | {
+      type: 'message-completed'
+      agentId: AgentId
+      sessionId: string
+      runId: string
+      message: AgentMessage
+      occurredAt: string
+    }
+  | {
+      type: 'turn-cancelled'
+      agentId: AgentId
+      sessionId: string
+      runId: string
+      occurredAt: string
+    }
+  | {
+      type: 'turn-failed'
+      agentId: AgentId
+      sessionId: string
+      runId: string
+      error: AgentRuntimeErrorPayload
+      occurredAt: string
+    }
+  | {
+      type: 'activity-updated'
+      agentId: AgentId
+      sessionId: string
+      runId: string
+      activity: AgentActivity
+      occurredAt: string
+    }
+  | {
+      type: 'run-state-changed'
+      agentId: AgentId
+      sessionId: string
+      state: AgentRunState
+      occurredAt: string
+    }
+  | {
+      type: 'profile-updated'
+      agentId: AgentId
+      target: 'soul' | 'user'
+      updatedAt: string
+      occurredAt: string
+    }
+  | {
+      type: 'runtime-error'
+      agentId: AgentId
+      error: AgentRuntimeErrorPayload
+      occurredAt: string
+    }
+
+/**
+ * 处理 Agent 标准事件的回调方法。
+ */
+export type AgentEventListener = (event: AgentEvent) => void
+
+/**
+ * 描述事件订阅句柄。
+ */
+export interface AgentEventSubscription {
+  /**
+   * 取消事件订阅。
+   *
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  unsubscribe(): void
+}
+
+/**
  * 描述 Agent profile 文件是否已经初始化以及最近更新时间。
  */
 export interface AgentProfileStatus {
@@ -225,6 +367,11 @@ export const DESKTOP_IPC_CHANNELS = {
 } as const
 
 /**
+ * Main 进程向 Renderer 推送 Agent 标准事件时使用的 IPC channel。
+ */
+export const DESKTOP_AGENT_EVENT_CHANNEL = 'tangyuan:agent:event'
+
+/**
  * 描述桌面端允许使用的 IPC channel 名称。
  */
 export type DesktopIpcChannel =
@@ -365,6 +512,15 @@ export interface DesktopPreloadApi {
    * @throws 当会话不存在或 Main 进程无法取消运行时，Promise 会 reject。
    */
   cancelRun(request: CancelRunRequest): Promise<AgentSessionSummary>
+
+  /**
+   * 订阅 Main 进程转发的 Agent 标准事件。
+   *
+   * @param listener - 接收标准事件的回调。
+   * @returns 取消订阅方法。
+   * @throws 此方法不会主动抛出错误。
+   */
+  subscribeToAgentEvents(listener: AgentEventListener): () => void
 }
 
 /**

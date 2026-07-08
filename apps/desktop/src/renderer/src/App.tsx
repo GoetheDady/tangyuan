@@ -1,4 +1,5 @@
 import type {
+  AgentEvent,
   AgentMessage,
   AgentRunState,
   AgentSessionSummary,
@@ -96,6 +97,27 @@ function App(): React.JSX.Element {
       isMounted = false
     }
   }, [])
+
+  useEffect(() => {
+    return window.api.subscribeToAgentEvents((event) => {
+      applyAgentEventToSessions(event, setSessions)
+
+      const eventSessionId = getAgentEventSessionId(event)
+      if (!eventSessionId || eventSessionId !== selectedSessionId) {
+        return
+      }
+
+      applyAgentEventToMessages(event, setMessages)
+
+      if (
+        event.type === 'turn-cancelled' ||
+        event.type === 'turn-failed' ||
+        (event.type === 'run-state-changed' && event.state !== 'running')
+      ) {
+        setIsSendingMessage(false)
+      }
+    })
+  }, [selectedSessionId])
 
   /**
    * 刷新运行时资源并更新界面状态。
@@ -269,6 +291,7 @@ function App(): React.JSX.Element {
     ? (runtime.auth.apiKey.maskedValue ?? '已保存')
     : '未保存'
   const isRuntimeReady = runtime?.status === 'ready'
+  const isSelectedSessionRunning = selectedSession?.state === 'running'
 
   if (!isRuntimeReady || isConfigurationVisible) {
     return (
@@ -681,7 +704,8 @@ function App(): React.JSX.Element {
                     onChange={(event) => {
                       setComposerText(event.target.value)
                     }}
-                    disabled={isSendingMessage}
+                    disabled={isSendingMessage || isSelectedSessionRunning}
+                    aria-busy={isSelectedSessionRunning}
                   />
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <p className="text-xs text-text-muted">
@@ -690,7 +714,12 @@ function App(): React.JSX.Element {
                     <button
                       className="flex h-10 min-w-24 items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-medium text-surface transition hover:bg-brand-soft focus:outline-none focus:ring-2 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-60"
                       type="submit"
-                      disabled={isSendingMessage || !selectedSession || !composerText.trim()}
+                      disabled={
+                        isSendingMessage ||
+                        isSelectedSessionRunning ||
+                        !selectedSession ||
+                        !composerText.trim()
+                      }
                     >
                       <MessageSquarePlus size={16} aria-hidden="true" />
                       {isSendingMessage ? '发送中' : '发送'}
@@ -775,6 +804,220 @@ function formatMessageRole(role: AgentMessage['role']): string {
  */
 function formatTimestamp(value: string | null | undefined): string {
   return value ?? '未记录'
+}
+
+type StateSetter<T> = (value: T | ((currentValue: T) => T)) => void
+
+/**
+ * 把 Agent 标准事件归并到会话列表状态。
+ *
+ * @param event - Main 推送的标准 Agent 事件。
+ * @param setSessions - React 会话状态 setter。
+ * @returns 无返回值。
+ * @throws 此方法不会主动抛出错误。
+ */
+function applyAgentEventToSessions(
+  event: AgentEvent,
+  setSessions: StateSetter<AgentSessionSummary[]>
+): void {
+  if (event.type === 'session-created') {
+    setSessions((currentSessions) => [
+      event.session,
+      ...currentSessions.filter((session) => session.sessionId !== event.session.sessionId)
+    ])
+    return
+  }
+
+  const sessionId = getAgentEventSessionId(event)
+  const nextState = getAgentEventRunState(event)
+
+  if (!sessionId || !nextState) {
+    return
+  }
+
+  setSessions((currentSessions) =>
+    currentSessions.map((session) =>
+      session.sessionId === sessionId
+        ? { ...session, state: nextState, updatedAt: event.occurredAt }
+        : session
+    )
+  )
+}
+
+/**
+ * 把 Agent 标准事件归并到当前 transcript。
+ *
+ * @param event - Main 推送的标准 Agent 事件。
+ * @param setMessages - React 消息状态 setter。
+ * @returns 无返回值。
+ * @throws 此方法不会主动抛出错误。
+ */
+function applyAgentEventToMessages(
+  event: AgentEvent,
+  setMessages: StateSetter<AgentMessage[]>
+): void {
+  if (event.type === 'message-appended' || event.type === 'message-completed') {
+    setMessages((currentMessages) => upsertTranscriptMessage(currentMessages, event.message))
+    return
+  }
+
+  if (event.type === 'message-delta') {
+    setMessages((currentMessages) => appendTranscriptDelta(currentMessages, event))
+    return
+  }
+
+  if (event.type === 'activity-updated') {
+    setMessages((currentMessages) =>
+      upsertTranscriptMessage(currentMessages, {
+        messageId: `${event.sessionId}-${event.runId}-${event.activity.kind}`,
+        agentId: event.agentId,
+        sessionId: event.sessionId,
+        role: 'system',
+        content: event.activity.label,
+        createdAt: event.occurredAt
+      })
+    )
+    return
+  }
+
+  if (event.type === 'turn-failed') {
+    setMessages((currentMessages) =>
+      upsertTranscriptMessage(currentMessages, {
+        messageId: `${event.sessionId}-${event.runId}-error`,
+        agentId: event.agentId,
+        sessionId: event.sessionId,
+        role: 'system',
+        content: event.error.message,
+        createdAt: event.occurredAt
+      })
+    )
+  }
+}
+
+/**
+ * 从 Agent 事件中读取所属会话标识。
+ *
+ * @param event - 标准 Agent 事件。
+ * @returns 有会话归属时返回 sessionId，否则返回 null。
+ * @throws 此方法不会主动抛出错误。
+ */
+function getAgentEventSessionId(event: AgentEvent): string | null {
+  if (event.type === 'session-created') {
+    return event.session.sessionId
+  }
+
+  if (
+    event.type === 'turn-started' ||
+    event.type === 'message-delta' ||
+    event.type === 'message-completed' ||
+    event.type === 'turn-cancelled' ||
+    event.type === 'turn-failed' ||
+    event.type === 'activity-updated' ||
+    event.type === 'run-state-changed'
+  ) {
+    return event.sessionId
+  }
+
+  if (event.type === 'message-appended') {
+    return event.message.sessionId
+  }
+
+  return null
+}
+
+/**
+ * 从 Agent 事件中读取会话的新运行状态。
+ *
+ * @param event - 标准 Agent 事件。
+ * @returns 可用于会话摘要的新状态；无状态变化时返回 null。
+ * @throws 此方法不会主动抛出错误。
+ */
+function getAgentEventRunState(event: AgentEvent): AgentRunState | null {
+  if (event.type === 'turn-started') {
+    return 'running'
+  }
+
+  if (event.type === 'turn-cancelled') {
+    return 'cancelled'
+  }
+
+  if (event.type === 'turn-failed') {
+    return 'failed'
+  }
+
+  if (event.type === 'run-state-changed') {
+    return event.state
+  }
+
+  return null
+}
+
+/**
+ * 新增或替换 transcript 消息，并替换对应的乐观用户消息。
+ *
+ * @param messages - 当前 transcript。
+ * @param message - 需要写入的消息。
+ * @returns 更新后的 transcript。
+ * @throws 此方法不会主动抛出错误。
+ */
+function upsertTranscriptMessage(messages: AgentMessage[], message: AgentMessage): AgentMessage[] {
+  const exactIndex = messages.findIndex((candidate) => candidate.messageId === message.messageId)
+
+  if (exactIndex !== -1) {
+    return messages.map((candidate) =>
+      candidate.messageId === message.messageId ? message : candidate
+    )
+  }
+
+  if (message.role === 'user') {
+    const optimisticIndex = messages.findIndex(
+      (candidate) =>
+        candidate.messageId.startsWith('optimistic-') &&
+        candidate.role === 'user' &&
+        candidate.content === message.content
+    )
+
+    if (optimisticIndex !== -1) {
+      return messages.map((candidate, index) => (index === optimisticIndex ? message : candidate))
+    }
+  }
+
+  return [...messages, message]
+}
+
+/**
+ * 把文本增量拼接到 transcript 中的 Agent 消息。
+ *
+ * @param messages - 当前 transcript。
+ * @param event - message-delta 标准事件。
+ * @returns 更新后的 transcript。
+ * @throws 此方法不会主动抛出错误。
+ */
+function appendTranscriptDelta(
+  messages: AgentMessage[],
+  event: Extract<AgentEvent, { type: 'message-delta' }>
+): AgentMessage[] {
+  const messageIndex = messages.findIndex((message) => message.messageId === event.messageId)
+
+  if (messageIndex === -1) {
+    return [
+      ...messages,
+      {
+        messageId: event.messageId,
+        agentId: event.agentId,
+        sessionId: event.sessionId,
+        role: 'agent',
+        content: event.delta,
+        createdAt: event.occurredAt
+      }
+    ]
+  }
+
+  return messages.map((message) =>
+    message.messageId === event.messageId
+      ? { ...message, content: `${message.content}${event.delta}` }
+      : message
+  )
 }
 
 /**

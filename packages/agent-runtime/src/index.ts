@@ -7,7 +7,12 @@ import {
   createAgentProfileStatus,
   createDefaultSessionSummary,
   createRuntimeSnapshot,
+  type AgentEvent,
+  type AgentEventListener,
+  type AgentEventSubscription,
   type AgentId,
+  type AgentRuntimeErrorCode,
+  type AgentRuntimeErrorPayload,
   type AgentMessage,
   type AgentRunState,
   type AgentSessionSummary,
@@ -27,7 +32,12 @@ export {
   TANGYUAN_DEFAULT_AGENT_ID,
   createAgentProfileStatus,
   createDefaultSessionSummary,
+  type AgentEvent,
+  type AgentEventListener,
+  type AgentEventSubscription,
   type AgentId,
+  type AgentRuntimeErrorCode,
+  type AgentRuntimeErrorPayload,
   type AgentMessage,
   type AgentRunState,
   type AgentSessionSummary,
@@ -75,6 +85,44 @@ export interface PiSdkCreateSessionRequest extends RuntimeConfiguration {
 }
 
 /**
+ * 描述 Pi SDK 流式事件归一前的最小事件集合。
+ */
+export type PiSdkStreamEvent =
+  | {
+      type: 'text-delta'
+      delta: string
+    }
+  | {
+      type: 'thinking-started'
+    }
+  | {
+      type: 'tool-started'
+      toolName: string
+    }
+  | {
+      type: 'tool-completed'
+      toolName: string
+    }
+  | {
+      type: 'tool-failed'
+      toolName: string
+    }
+
+/**
+ * 描述 Pi SDK prompt 调用时可接收的事件回调。
+ */
+export interface PiSdkPromptOptions {
+  /**
+   * 接收 Pi SDK 流式事件的回调。
+   *
+   * @param event - 已归一到最小集合的 Pi SDK 事件。
+   * @returns 无返回值。
+   * @throws 回调抛出的错误会透传给 prompt 调用方。
+   */
+  onEvent?(event: PiSdkStreamEvent): void
+}
+
+/**
  * 描述 Pi SDK 会话运行器的最小能力。
  */
 export interface PiSdkSessionHandle {
@@ -82,10 +130,11 @@ export interface PiSdkSessionHandle {
    * 向真实 Pi SDK 会话发送 prompt。
    *
    * @param prompt - 已注入 profile 上下文的用户输入。
+   * @param options - 可选流式事件回调。
    * @returns Agent 最后一条文本回复；没有文本回复时返回 null。
    * @throws 当 SDK 调用失败时，Promise 会 reject。
    */
-  prompt(prompt: string): Promise<string | null>
+  prompt(prompt: string, options?: PiSdkPromptOptions): Promise<string | null>
 
   /**
    * 取消当前会话正在运行的 Agent 响应。
@@ -144,85 +193,10 @@ export interface PiSdkGateway {
 }
 
 /**
- * 描述 Agent Runtime 统一错误码。
- */
-export type AgentRuntimeErrorCode =
-  | 'configuration-missing'
-  | 'driver-unavailable'
-  | 'provider-verification-failed'
-  | 'session-not-found'
-  | 'run-cancelled'
-  | 'unknown'
-
-/**
- * 描述可以安全传给 Renderer 的 Agent Runtime 错误。
- */
-export interface AgentRuntimeErrorPayload {
-  code: AgentRuntimeErrorCode
-  message: string
-  recoverable: boolean
-}
-
-/**
  * 创建 AgentRuntimeError 时使用的输入。
  */
 export interface AgentRuntimeErrorInput extends AgentRuntimeErrorPayload {
   cause?: unknown
-}
-
-/**
- * 描述 Agent 运行过程中发给 DesktopAppStore 的标准事件。
- */
-export type AgentEvent =
-  | {
-      type: 'session-created'
-      agentId: AgentId
-      session: AgentSessionSummary
-      occurredAt: string
-    }
-  | {
-      type: 'message-appended'
-      agentId: AgentId
-      message: AgentMessage
-      occurredAt: string
-    }
-  | {
-      type: 'run-state-changed'
-      agentId: AgentId
-      sessionId: string
-      state: AgentRunState
-      occurredAt: string
-    }
-  | {
-      type: 'profile-updated'
-      agentId: AgentId
-      target: 'soul' | 'user'
-      updatedAt: string
-      occurredAt: string
-    }
-  | {
-      type: 'runtime-error'
-      agentId: AgentId
-      error: AgentRuntimeErrorPayload
-      occurredAt: string
-    }
-
-/**
- * 处理 Agent 标准事件的回调方法。
- */
-export type AgentEventListener = (event: AgentEvent) => void
-
-/**
- * 描述事件订阅句柄。
- */
-export interface AgentEventSubscription {
-  /**
-   * 取消事件订阅。
-   *
-   * @returns 无返回值。
-   * @throws 此方法不会主动抛出错误。
-   */
-  unsubscribe(): void
 }
 
 /**
@@ -387,6 +361,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private readonly sessions = new Map<string, AgentSessionSummary>()
   private readonly messages = new Map<string, AgentMessage[]>()
   private readonly sessionHandles = new Map<string, PiSdkSessionHandle>()
+  private readonly activeRunIds = new Map<string, string>()
+  private readonly runSequenceBySession = new Map<string, number>()
   private configurationVerificationController: AbortController | null = null
 
   /**
@@ -569,6 +545,14 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     const session = this.assertKnownSession(request.sessionId, request.agentId)
     const handle = this.sessionHandles.get(request.sessionId)
 
+    if (this.activeRunIds.has(request.sessionId) || session.state === 'running') {
+      throw new AgentRuntimeError({
+        code: 'run-already-active',
+        message: '当前会话正在运行，请等待完成或先取消本次响应。',
+        recoverable: true,
+      })
+    }
+
     if (!handle) {
       throw new AgentRuntimeError({
         code: 'session-not-found',
@@ -599,41 +583,130 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       message: userMessage,
       occurredAt: this.now(),
     })
+    const runId = this.createRunId(request.sessionId)
+    const agentMessage = this.appendMessage({
+      agentId: request.agentId,
+      sessionId: request.sessionId,
+      role: 'agent',
+      content: '',
+    })
+    this.activeRunIds.set(request.sessionId, runId)
     this.updateSessionState(session.sessionId, 'running')
+    this.emit({
+      type: 'turn-started',
+      agentId: request.agentId,
+      sessionId: request.sessionId,
+      runId,
+      occurredAt: this.now(),
+    })
 
     try {
       const prompt = await this.buildPromptWithProfileContext(content)
-      const agentReply = await handle.prompt(prompt)
+      let accumulatedReply = ''
+      const agentReply = await handle.prompt(prompt, {
+        onEvent: (event) => {
+          if (event.type === 'text-delta') {
+            accumulatedReply += event.delta
+            this.appendMessageDelta(agentMessage.messageId, event.delta)
+            this.emit({
+              type: 'message-delta',
+              agentId: request.agentId,
+              sessionId: request.sessionId,
+              runId,
+              messageId: agentMessage.messageId,
+              delta: event.delta,
+              occurredAt: this.now(),
+            })
+            return
+          }
 
-      if (agentReply?.trim()) {
-        const agentMessage = this.appendMessage({
+          this.emit({
+            type: 'activity-updated',
+            agentId: request.agentId,
+            sessionId: request.sessionId,
+            runId,
+            activity: mapPiSdkStreamEventToActivity(event),
+            occurredAt: this.now(),
+          })
+        },
+      })
+
+      if (this.activeRunIds.get(request.sessionId) !== runId) {
+        this.removeMessageIfEmpty(agentMessage.messageId)
+        this.updateSessionState(session.sessionId, 'cancelled')
+        return
+      }
+
+      if (!accumulatedReply && agentReply?.trim()) {
+        accumulatedReply = agentReply.trim()
+        this.appendMessageDelta(agentMessage.messageId, accumulatedReply)
+        this.emit({
+          type: 'message-delta',
           agentId: request.agentId,
           sessionId: request.sessionId,
-          role: 'agent',
-          content: agentReply.trim(),
-        })
-        this.emit({
-          type: 'message-appended',
-          agentId: request.agentId,
-          message: agentMessage,
+          runId,
+          messageId: agentMessage.messageId,
+          delta: accumulatedReply,
           occurredAt: this.now(),
         })
       }
 
+      const completedMessage = this.completeMessage(agentMessage.messageId)
+      this.emit({
+        type: 'message-completed',
+        agentId: request.agentId,
+        sessionId: request.sessionId,
+        runId,
+        message: completedMessage,
+        occurredAt: this.now(),
+      })
+      this.emit({
+        type: 'message-appended',
+        agentId: request.agentId,
+        message: completedMessage,
+        occurredAt: this.now(),
+      })
       this.updateSessionState(session.sessionId, 'completed')
     } catch (error) {
+      if (isAbortError(error) || !this.activeRunIds.has(request.sessionId)) {
+        this.removeMessageIfEmpty(agentMessage.messageId)
+        this.updateSessionState(session.sessionId, 'cancelled')
+        this.emit({
+          type: 'turn-cancelled',
+          agentId: request.agentId,
+          sessionId: request.sessionId,
+          runId,
+          occurredAt: this.now(),
+        })
+        return
+      }
+
+      const runtimeError = {
+        code: 'unknown' as const,
+        message: sanitizeErrorMessage(error),
+        recoverable: true,
+      }
+      this.removeMessageIfEmpty(agentMessage.messageId)
       this.updateSessionState(session.sessionId, 'failed')
+      this.emit({
+        type: 'turn-failed',
+        agentId: request.agentId,
+        sessionId: request.sessionId,
+        runId,
+        error: runtimeError,
+        occurredAt: this.now(),
+      })
       this.emit({
         type: 'runtime-error',
         agentId: request.agentId,
-        error: {
-          code: 'unknown',
-          message: sanitizeErrorMessage(error),
-          recoverable: true,
-        },
+        error: runtimeError,
         occurredAt: this.now(),
       })
       throw error
+    } finally {
+      if (this.activeRunIds.get(request.sessionId) === runId) {
+        this.activeRunIds.delete(request.sessionId)
+      }
     }
   }
 
@@ -646,8 +719,24 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    */
   async cancelRun(request: CancelRunRequest): Promise<void> {
     this.assertKnownSession(request.sessionId, request.agentId)
+    const runId = this.activeRunIds.get(request.sessionId)
+
+    if (runId) {
+      this.activeRunIds.delete(request.sessionId)
+    }
+
     await this.sessionHandles.get(request.sessionId)?.abort()
     this.updateSessionState(request.sessionId, 'cancelled')
+
+    if (runId) {
+      this.emit({
+        type: 'turn-cancelled',
+        agentId: request.agentId,
+        sessionId: request.sessionId,
+        runId,
+        occurredAt: this.now(),
+      })
+    }
   }
 
   /**
@@ -1072,6 +1161,109 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
+   * 为指定会话创建单次运行标识。
+   *
+   * @param sessionId - 需要开始运行的会话标识。
+   * @returns 当前会话下递增且稳定的运行标识。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private createRunId(sessionId: string): string {
+    const nextSequence = (this.runSequenceBySession.get(sessionId) ?? 0) + 1
+    this.runSequenceBySession.set(sessionId, nextSequence)
+
+    return `${sessionId}-run-${nextSequence}`
+  }
+
+  /**
+   * 把 Agent 文本增量拼接到指定消息。
+   *
+   * @param messageId - 需要更新的消息标识。
+   * @param delta - 本次新增的文本片段。
+   * @returns 更新后的 Agent 消息。
+   * @throws 当消息不存在时抛出 AgentRuntimeError。
+   */
+  private appendMessageDelta(messageId: string, delta: string): AgentMessage {
+    for (const [sessionId, messages] of this.messages) {
+      const messageIndex = messages.findIndex((message) => message.messageId === messageId)
+
+      if (messageIndex === -1) {
+        continue
+      }
+
+      const currentMessage = messages[messageIndex]
+
+      if (!currentMessage) {
+        break
+      }
+
+      const nextMessage = {
+        ...currentMessage,
+        content: `${currentMessage.content}${delta}`,
+      }
+      const nextMessages = [...messages]
+      nextMessages[messageIndex] = nextMessage
+      this.messages.set(sessionId, nextMessages)
+
+      return nextMessage
+    }
+
+    throw new AgentRuntimeError({
+      code: 'session-not-found',
+      message: `找不到消息 ${messageId}。`,
+      recoverable: true,
+    })
+  }
+
+  /**
+   * 读取已经完成流式拼接的 Agent 消息。
+   *
+   * @param messageId - 需要读取的消息标识。
+   * @returns 完成后的 Agent 消息。
+   * @throws 当消息不存在时抛出 AgentRuntimeError。
+   */
+  private completeMessage(messageId: string): AgentMessage {
+    for (const messages of this.messages.values()) {
+      const message = messages.find((candidate) => candidate.messageId === messageId)
+
+      if (message) {
+        return message
+      }
+    }
+
+    throw new AgentRuntimeError({
+      code: 'session-not-found',
+      message: `找不到消息 ${messageId}。`,
+      recoverable: true,
+    })
+  }
+
+  /**
+   * 当指定消息仍为空时从 transcript 中移除。
+   *
+   * @param messageId - 需要按需移除的消息标识。
+   * @returns 如果移除了空消息则返回 true，否则返回 false。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private removeMessageIfEmpty(messageId: string): boolean {
+    for (const [sessionId, messages] of this.messages) {
+      const message = messages.find((candidate) => candidate.messageId === messageId)
+
+      if (!message || message.content) {
+        continue
+      }
+
+      this.messages.set(
+        sessionId,
+        messages.filter((candidate) => candidate.messageId !== messageId),
+      )
+
+      return true
+    }
+
+    return false
+  }
+
+  /**
    * 更新会话运行状态并广播状态事件。
    *
    * @param sessionId - 需要更新的会话标识。
@@ -1227,9 +1419,19 @@ class RealPiSdkGateway implements PiSdkGateway {
     })
 
     return {
-      prompt: async (prompt: string) => {
-        await session.prompt(prompt)
-        return session.getLastAssistantText() ?? null
+      prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
+        const unsubscribe = session.subscribe((event: unknown) => {
+          for (const streamEvent of normalizePiSdkSessionEvent(event)) {
+            options?.onEvent?.(streamEvent)
+          }
+        })
+
+        try {
+          await session.prompt(prompt)
+          return session.getLastAssistantText() ?? null
+        } finally {
+          unsubscribe()
+        }
       },
       abort: async () => {
         await session.abort()
@@ -1274,4 +1476,133 @@ function sanitizeErrorMessage(error: unknown, apiKey?: string): string {
     : rawMessage
 
   return redactedMessage || '请检查 Provider、Model 和 API Key 后重试。'
+}
+
+/**
+ * 把 Pi SDK 流式事件转换成 Renderer 可展示的简略活动。
+ *
+ * @param event - Pi SDK 网关产出的最小流式事件。
+ * @returns 不包含原始参数和 JSON 的活动摘要。
+ * @throws 此方法不会主动抛出错误。
+ */
+function mapPiSdkStreamEventToActivity(event: PiSdkStreamEvent) {
+  if (event.type === 'text-delta') {
+    return {
+      kind: 'thinking' as const,
+      state: 'running' as const,
+      label: '思考中',
+    }
+  }
+
+  if (event.type === 'thinking-started') {
+    return {
+      kind: 'thinking' as const,
+      state: 'running' as const,
+      label: '思考中',
+    }
+  }
+
+  if (event.type === 'tool-started') {
+    return {
+      kind: 'tool' as const,
+      state: 'running' as const,
+      label: createToolActivityLabel(event.toolName, 'running'),
+    }
+  }
+
+  if (event.type === 'tool-completed') {
+    return {
+      kind: 'tool' as const,
+      state: 'completed' as const,
+      label: createToolActivityLabel(event.toolName, 'completed'),
+    }
+  }
+
+  return {
+    kind: 'tool' as const,
+    state: 'failed' as const,
+    label: createToolActivityLabel(event.toolName, 'failed'),
+  }
+}
+
+/**
+ * 根据工具名生成不含参数的中文活动文案。
+ *
+ * @param toolName - Pi SDK 报告的工具名。
+ * @param state - 工具执行状态。
+ * @returns 可展示给用户的简略工具状态。
+ * @throws 此方法不会主动抛出错误。
+ */
+function createToolActivityLabel(
+  toolName: string,
+  state: 'running' | 'completed' | 'failed',
+): string {
+  if (state === 'failed') {
+    return '工具失败'
+  }
+
+  if (state === 'completed') {
+    return '工具完成'
+  }
+
+  const labels: Record<string, string> = {
+    read: '正在读取文件',
+    write: '正在写入文件',
+    edit: '正在编辑文件',
+    bash: '正在运行命令',
+    search: '正在搜索',
+  }
+
+  return labels[toolName] ?? '正在使用工具'
+}
+
+/**
+ * 把真实 Pi SDK session 事件宽松解析成 v1 所需的最小流式事件。
+ *
+ * @param event - SDK subscribe 回调收到的未知事件对象。
+ * @returns 一个或多个可映射到汤圆事件的最小流式事件。
+ * @throws 此方法不会主动抛出错误。
+ */
+function normalizePiSdkSessionEvent(event: unknown): PiSdkStreamEvent[] {
+  if (!isRecord(event)) {
+    return []
+  }
+
+  if (event.type === 'message_update' && isRecord(event.assistantMessageEvent)) {
+    const assistantEvent = event.assistantMessageEvent
+
+    if (assistantEvent.type === 'text_delta' && typeof assistantEvent.delta === 'string') {
+      return [{ type: 'text-delta', delta: assistantEvent.delta }]
+    }
+
+    if (assistantEvent.type === 'thinking_start' || assistantEvent.type === 'thinking_delta') {
+      return [{ type: 'thinking-started' }]
+    }
+  }
+
+  if (event.type === 'tool_execution_start' && typeof event.toolName === 'string') {
+    return [{ type: 'tool-started', toolName: event.toolName }]
+  }
+
+  if (event.type === 'tool_execution_end' && typeof event.toolName === 'string') {
+    return [
+      {
+        type: event.isError ? 'tool-failed' : 'tool-completed',
+        toolName: event.toolName,
+      },
+    ]
+  }
+
+  return []
+}
+
+/**
+ * 判断未知值是否是可读取字段的普通对象。
+ *
+ * @param value - 需要判断的未知值。
+ * @returns 如果值是非 null 对象则返回 true。
+ * @throws 此方法不会主动抛出错误。
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }
