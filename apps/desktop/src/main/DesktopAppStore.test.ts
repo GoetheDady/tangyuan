@@ -56,6 +56,7 @@ function createSnapshot(): RuntimeSnapshot {
       homePath: '~/.tangyuan/agents/tangyuan',
       profile: {
         initialized: false,
+        bootstrapRequired: true,
         soulUpdatedAt: null,
         userUpdatedAt: null
       }

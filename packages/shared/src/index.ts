@@ -47,6 +47,7 @@ export interface AgentSessionSummary {
  */
 export interface AgentProfileStatus {
   initialized: boolean
+  bootstrapRequired: boolean
   soulUpdatedAt: string | null
   userUpdatedAt: string | null
 }
@@ -136,6 +137,19 @@ export interface RuntimeSnapshotInput {
     state?: RuntimeAuthState
     apiKey: ApiKeyState
   }
+}
+
+/**
+ * 描述默认 Agent Home 初始化时要创建的文件和目录状态。
+ */
+export interface AgentHomeBootstrapStatus {
+  initialized: boolean
+  bootstrapRequired: boolean
+  bootstrapFileExists: boolean
+  soulFileExists: boolean
+  userFileExists: boolean
+  soulUpdatedAt: string | null
+  userUpdatedAt: string | null
 }
 
 /**
@@ -326,6 +340,24 @@ export function createRuntimeSnapshot(
       state: snapshot.auth.state ?? getRuntimeAuthState(snapshot.auth.apiKey),
     },
     status: getRuntimeStatus(snapshot),
+  }
+}
+
+/**
+ * 生成适合 Renderer 展示的 Agent profile 状态。
+ *
+ * @param status - 默认 Agent Home 的 bootstrap 和 profile 文件状态。
+ * @returns 适合写入 RuntimeSnapshot 的 profile 状态。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function createAgentProfileStatus(
+  status: AgentHomeBootstrapStatus,
+): AgentProfileStatus {
+  return {
+    initialized: status.initialized,
+    bootstrapRequired: status.bootstrapRequired,
+    soulUpdatedAt: status.soulUpdatedAt,
+    userUpdatedAt: status.userUpdatedAt,
   }
 }
 

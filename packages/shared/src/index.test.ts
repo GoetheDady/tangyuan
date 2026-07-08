@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DESKTOP_IPC_CHANNELS,
   TANGYUAN_DEFAULT_AGENT_ID,
+  createAgentProfileStatus,
   createDefaultSessionSummary,
   createRuntimeSnapshot,
   type RuntimeSnapshotInput,
@@ -81,6 +82,7 @@ describe('createRuntimeSnapshot', () => {
         agentId: 'tangyuan',
         profile: {
           initialized: false,
+          bootstrapRequired: false,
           soulUpdatedAt: null,
           userUpdatedAt: null,
         },
@@ -147,6 +149,7 @@ function createRuntimeSnapshotInput(
       homePath: '~/.tangyuan/agents/tangyuan',
       profile: {
         initialized: false,
+        bootstrapRequired: false,
         soulUpdatedAt: null,
         userUpdatedAt: null,
         ...overrides.activeAgent?.profile,
@@ -176,3 +179,24 @@ function createRuntimeSnapshotInput(
     ...overrides,
   }
 }
+
+describe('createAgentProfileStatus', () => {
+  it('maps bootstrap state into a renderable profile status', () => {
+    expect(
+      createAgentProfileStatus({
+        initialized: true,
+        bootstrapRequired: false,
+        bootstrapFileExists: false,
+        soulFileExists: true,
+        userFileExists: true,
+        soulUpdatedAt: '2026-07-08T00:00:00.000Z',
+        userUpdatedAt: '2026-07-08T00:00:00.000Z',
+      }),
+    ).toEqual({
+      initialized: true,
+      bootstrapRequired: false,
+      soulUpdatedAt: '2026-07-08T00:00:00.000Z',
+      userUpdatedAt: '2026-07-08T00:00:00.000Z',
+    })
+  })
+})

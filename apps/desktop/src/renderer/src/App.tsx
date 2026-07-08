@@ -4,7 +4,15 @@ import type {
   DesktopPreloadApi,
   RuntimeSnapshot
 } from '@tangyuan/shared'
-import { CheckCircle2, KeyRound, MessageSquarePlus, RefreshCcw, Settings2 } from 'lucide-react'
+import {
+  CheckCircle2,
+  Clock3,
+  KeyRound,
+  MessageSquarePlus,
+  RefreshCcw,
+  Settings2,
+  TriangleAlert
+} from 'lucide-react'
 import { animate } from 'motion'
 import { motion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
@@ -205,12 +213,15 @@ function App(): React.JSX.Element {
                       <dd className="font-medium">{apiKeyLabel}</dd>
                     </div>
                   </dl>
+                  <div className="mt-3 text-xs text-text-muted">
+                    这里展示的是运行时快照，也就是给界面看的整理后数据，不直接暴露底层 SDK 细节。
+                  </div>
                 </div>
 
                 <div className="rounded-md border border-border bg-surface p-4">
                   <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                     <CheckCircle2 size={16} aria-hidden="true" />
-                    画像
+                    Profile
                   </div>
                   <dl className="grid grid-cols-2 gap-3 text-sm">
                     <div>
@@ -220,10 +231,32 @@ function App(): React.JSX.Element {
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-text-muted">本地目录</dt>
-                      <dd className="font-medium">{runtime?.activeAgent.homePath ?? '未读取'}</dd>
+                      <dt className="text-text-muted">Bootstrap</dt>
+                      <dd className="font-medium">
+                        {runtime?.activeAgent.profile.bootstrapRequired ? '需要初始化' : '可直接使用'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-text-muted">soul.md 更新时间</dt>
+                      <dd className="font-medium">{formatTimestamp(runtime?.activeAgent.profile.soulUpdatedAt)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-text-muted">user.md 更新时间</dt>
+                      <dd className="font-medium">{formatTimestamp(runtime?.activeAgent.profile.userUpdatedAt)}</dd>
                     </div>
                   </dl>
+                  <div className="mt-3 flex items-start gap-2 rounded-md border border-border bg-surface-soft px-3 py-2 text-xs text-text-muted">
+                    {runtime?.activeAgent.profile.bootstrapRequired ? (
+                      <TriangleAlert size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
+                    ) : (
+                      <Clock3 size={14} className="mt-0.5 shrink-0 text-text-muted" aria-hidden="true" />
+                    )}
+                    <span>
+                      {runtime?.activeAgent.profile.bootstrapRequired
+                        ? '首次启动会生成 bootstrap.md，完成初始化后再进入普通会话。'
+                        : 'bootstrap.md 已完成或不再需要，当前 profile 可以继续沿用。'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -274,6 +307,17 @@ function formatRunState(state: AgentRunState): string {
   }
 
   return labels[state]
+}
+
+/**
+ * 格式化 profile 文件更新时间。
+ *
+ * @param value - 文件更新时间的 ISO 字符串。
+ * @returns 可展示的时间文本，缺失时显示“未记录”。
+ * @throws 此方法不会主动抛出错误。
+ */
+function formatTimestamp(value: string | null | undefined): string {
+  return value ?? '未记录'
 }
 
 /**
