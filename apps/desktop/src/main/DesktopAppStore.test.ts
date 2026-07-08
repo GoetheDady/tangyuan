@@ -6,6 +6,7 @@ import type {
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
+  type RuntimeConfiguration,
   type RuntimeSnapshot
 } from '@tangyuan/shared'
 import { describe, expect, it, vi } from 'vitest'
@@ -40,6 +41,56 @@ describe('DesktopAppStore', () => {
       agentId: TANGYUAN_DEFAULT_AGENT_ID
     })
   })
+
+  it('saves runtime configuration through the runtime driver after verification', async () => {
+    const savedSnapshot = createSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-...7890'
+    })
+    const runtimeDriver = createRuntimeDriver(savedSnapshot)
+    const sessionDriver = createSessionDriver([])
+    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+    const configuration: RuntimeConfiguration = {
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890'
+    }
+
+    await expect(store.saveRuntimeConfiguration(configuration)).resolves.toEqual(savedSnapshot)
+
+    expect(runtimeDriver.saveConfiguration).toHaveBeenCalledWith(configuration)
+  })
+
+  it('rejects configuration saves when the runtime driver cannot verify settings', async () => {
+    const runtimeDriver = createRuntimeDriver(createSnapshot())
+    runtimeDriver.saveConfiguration = vi.fn().mockRejectedValue(new Error('验证失败'))
+    const sessionDriver = createSessionDriver([])
+    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+
+    await expect(
+      store.saveRuntimeConfiguration({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        apiKey: 'sk-test-secret-7890'
+      })
+    ).rejects.toThrow('验证失败')
+  })
+
+  it('cancels runtime configuration verification through the runtime driver', async () => {
+    const snapshot = createSnapshot()
+    const runtimeDriver = createRuntimeDriver(snapshot)
+    const sessionDriver = createSessionDriver([])
+    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+
+    await expect(
+      store.cancelRuntimeConfigurationVerification({ verificationId: 'verify-1' })
+    ).resolves.toEqual(snapshot)
+
+    expect(runtimeDriver.cancelConfigurationVerification).toHaveBeenCalledWith({
+      verificationId: 'verify-1'
+    })
+  })
 })
 
 /**
@@ -48,7 +99,15 @@ describe('DesktopAppStore', () => {
  * @returns 一个缺少配置但包含默认 Agent profile 的 RuntimeSnapshot。
  * @throws 此测试辅助方法不会抛出错误。
  */
-function createSnapshot(): RuntimeSnapshot {
+function createSnapshot(
+  overrides: {
+    providerId?: string | null
+    modelId?: string | null
+    maskedValue?: string | null
+  } = {}
+): RuntimeSnapshot {
+  const configured = Boolean(overrides.providerId && overrides.modelId && overrides.maskedValue)
+
   return {
     activeAgent: {
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
@@ -64,17 +123,17 @@ function createSnapshot(): RuntimeSnapshot {
     providers: [],
     models: [],
     settings: {
-      selectedProviderId: null,
-      selectedModelId: null
+      selectedProviderId: overrides.providerId ?? null,
+      selectedModelId: overrides.modelId ?? null
     },
     auth: {
-      state: 'missing-api-key',
+      state: configured ? 'api-key-configured' : 'missing-api-key',
       apiKey: {
-        configured: false,
-        maskedValue: null
+        configured,
+        maskedValue: overrides.maskedValue ?? null
       }
     },
-    status: 'missing-config'
+    status: configured ? 'ready' : 'missing-config'
   }
 }
 
@@ -88,7 +147,9 @@ function createSnapshot(): RuntimeSnapshot {
 function createRuntimeDriver(snapshot: RuntimeSnapshot): RuntimeResourceDriver {
   return {
     getSnapshot: vi.fn().mockResolvedValue(snapshot),
-    refresh: vi.fn().mockResolvedValue(snapshot)
+    refresh: vi.fn().mockResolvedValue(snapshot),
+    saveConfiguration: vi.fn().mockResolvedValue(snapshot),
+    cancelConfigurationVerification: vi.fn().mockResolvedValue(snapshot)
   }
 }
 

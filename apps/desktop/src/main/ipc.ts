@@ -42,6 +42,15 @@ export function registerDesktopAppIpc(ipcMain: IpcMainLike, store: DesktopAppSto
   ipcMain.handle(DESKTOP_IPC_CHANNELS.runtimeRefresh, async () => {
     return store.refreshRuntime()
   })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration, async (_event, payload) => {
+    return store.saveRuntimeConfiguration(payload)
+  })
+  ipcMain.handle(
+    DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification,
+    async (_event, payload) => {
+      return store.cancelRuntimeConfigurationVerification(payload)
+    }
+  )
   ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsList, async () => {
     return store.listSessions()
   })

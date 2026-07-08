@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   AgentRuntimeError,
   PiSdkDriver,
+  type PiSdkGateway,
+  type PiSdkVerificationRequest,
   createDefaultSessionSummary,
 } from './index'
 
@@ -144,19 +146,152 @@ describe('PiSdkDriver', () => {
       },
     })
   })
+
+  it('verifies configuration before saving config JSON with a masked API key snapshot', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, rootPath } = await createDriver({ gateway })
+
+    await expect(
+      driver.saveConfiguration({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        apiKey: 'sk-test-secret-7890',
+      }),
+    ).resolves.toMatchObject({
+      settings: {
+        selectedProviderId: 'anthropic',
+        selectedModelId: 'claude-sonnet-4-5',
+      },
+      auth: {
+        apiKey: {
+          configured: true,
+          maskedValue: 'sk-t...7890',
+        },
+      },
+      status: 'ready',
+    })
+
+    await expect(
+      readFile(join(rootPath, 'Library/Application Support/Tangyuan/config.json'), 'utf8'),
+    ).resolves.toContain('sk-test-secret-7890')
+    expect(gateway.requests).toEqual([
+      expect.objectContaining({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        prompt: 'Reply with OK.',
+      }),
+    ])
+  })
+
+  it('does not save the API key when configuration verification fails', async () => {
+    const gateway = createPiSdkGateway({
+      verifyConfiguration: async () => {
+        throw new Error('provider rejected sk-test-secret-7890')
+      },
+    })
+    const { driver, rootPath } = await createDriver({ gateway })
+
+    await expect(
+      driver.saveConfiguration({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        apiKey: 'sk-test-secret-7890',
+      }),
+    ).rejects.toMatchObject({
+      code: 'provider-verification-failed',
+      message: expect.not.stringContaining('sk-test-secret-7890'),
+    })
+    await expect(
+      readFile(join(rootPath, 'Library/Application Support/Tangyuan/config.json'), 'utf8'),
+    ).rejects.toThrow()
+  })
+
+  it('cancels an in-flight configuration verification', async () => {
+    const gateway = createPiSdkGateway({
+      verifyConfiguration: async ({ signal }) => {
+        await new Promise<void>((_resolve, reject) => {
+          signal.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'))
+          })
+        })
+      },
+    })
+    const { driver } = await createDriver({ gateway })
+    const savePromise = driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const handledSavePromise = savePromise.then(
+      () => ({ status: 'resolved' as const }),
+      (error: unknown) => ({ status: 'rejected' as const, error }),
+    )
+
+    await expect(
+      driver.cancelConfigurationVerification({ verificationId: 'current' }),
+    ).resolves.toMatchObject({
+      status: 'missing-config',
+    })
+    await expect(handledSavePromise).resolves.toMatchObject({
+      status: 'rejected',
+      error: {
+        code: 'run-cancelled',
+        message: expect.not.stringContaining('sk-test-secret-7890'),
+      },
+    })
+  })
+
+  it('masks short and long API keys without exposing the complete secret', () => {
+    expect(PiSdkDriver.maskApiKey('sk-test-secret-7890')).toBe('sk-t...7890')
+    expect(PiSdkDriver.maskApiKey('short')).toBe('•••••')
+  })
 })
 
-async function createDriver() {
+async function createDriver(options: { gateway?: PiSdkGateway } = {}) {
   const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-agent-runtime-'))
   tempDirs.push(rootPath)
 
   return {
     driver: new PiSdkDriver({
       fsRoot: rootPath,
+      userDataPath: join(rootPath, 'Library/Application Support/Tangyuan'),
       agentHomePath: '~/.tangyuan/agents/tangyuan',
       now: () => '2026-07-08T00:00:00.000Z',
+      ...(options.gateway ? { gateway: options.gateway } : {}),
     }),
     rootPath,
     homePath: '~/.tangyuan/agents/tangyuan',
+  }
+}
+
+/**
+ * 创建 Pi SDK 网关测试替身，用于模拟真实 SDK 的配置验证。
+ *
+ * @param options - 可覆盖的验证行为。
+ * @returns 记录调用参数的 PiSdkGateway。
+ * @throws 此测试辅助方法不会主动抛出错误。
+ */
+function createPiSdkGateway(options: Partial<PiSdkGateway> = {}): PiSdkGateway & {
+  requests: PiSdkVerificationRequest[]
+} {
+  const requests: PiSdkVerificationRequest[] = []
+
+  return {
+    requests,
+    listProvidersAndModels: async () => ({
+      providers: [{ providerId: 'anthropic', displayName: 'Anthropic' }],
+      models: [
+        {
+          providerId: 'anthropic',
+          modelId: 'claude-sonnet-4-5',
+          displayName: 'Claude Sonnet 4.5',
+        },
+      ],
+    }),
+    verifyConfiguration: async (request) => {
+      requests.push(request)
+      await (options.verifyConfiguration?.(request) ?? Promise.resolve())
+    },
+    ...options,
   }
 }

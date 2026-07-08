@@ -4,7 +4,9 @@ import {
   type DesktopIpcChannel,
   type DesktopIpcPayloadArgs,
   type DesktopIpcResponse,
-  type DesktopPreloadApi
+  type DesktopPreloadApi,
+  type RuntimeConfiguration,
+  type CancelConfigurationVerificationRequest
 } from '@tangyuan/shared'
 
 /**
@@ -29,6 +31,14 @@ export function createTangyuanPreloadApi(invoke: IpcInvoke): DesktopPreloadApi {
     },
     refreshRuntime: async () => {
       return invoke(DESKTOP_IPC_CHANNELS.runtimeRefresh)
+    },
+    saveRuntimeConfiguration: async (configuration: RuntimeConfiguration) => {
+      return invoke(DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration, configuration)
+    },
+    cancelRuntimeConfigurationVerification: async (
+      request: CancelConfigurationVerificationRequest
+    ) => {
+      return invoke(DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification, request)
     },
     listSessions: async () => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsList)

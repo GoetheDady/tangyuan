@@ -31,18 +31,32 @@ describe('registerDesktopAppIpc', () => {
     const store: DesktopAppStore = {
       getRuntimeSnapshot: vi.fn().mockResolvedValue(snapshot),
       refreshRuntime: vi.fn().mockResolvedValue(snapshot),
+      saveRuntimeConfiguration: vi.fn().mockResolvedValue(snapshot),
+      cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(snapshot),
       listSessions: vi.fn().mockResolvedValue([session]),
       createSession: vi.fn().mockResolvedValue(session)
     }
 
     registerDesktopAppIpc(ipcMain, store)
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(4)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(6)
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
     ).resolves.toEqual(snapshot)
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeRefresh)(null, undefined)
+    ).resolves.toEqual(snapshot)
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration)(null, {
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        apiKey: 'sk-test-secret-7890'
+      })
+    ).resolves.toEqual(snapshot)
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification)(null, {
+        verificationId: 'verify-1'
+      })
     ).resolves.toEqual(snapshot)
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsList)(null, undefined)
@@ -56,6 +70,14 @@ describe('registerDesktopAppIpc', () => {
     expect(store.createSession).toHaveBeenCalledWith({
       agentId: 'tangyuan',
       title: '新会话'
+    })
+    expect(store.saveRuntimeConfiguration).toHaveBeenCalledWith({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890'
+    })
+    expect(store.cancelRuntimeConfigurationVerification).toHaveBeenCalledWith({
+      verificationId: 'verify-1'
     })
   })
 })

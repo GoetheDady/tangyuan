@@ -16,11 +16,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@earendil-works/pi-coding-agent": "^0.80.3",
     "@tangyuan/shared": "workspace:*"
   },
   "devDependencies": {
-    "@tangyuan/tsconfig": "workspace:*",
     "@tangyuan/eslint-config": "workspace:*",
+    "@tangyuan/tsconfig": "workspace:*",
     "eslint": "^9.39.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16"

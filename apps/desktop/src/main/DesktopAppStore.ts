@@ -2,7 +2,9 @@ import type { AgentSessionDriver, RuntimeResourceDriver } from '@tangyuan/agent-
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
+  type CancelConfigurationVerificationRequest,
   type CreateSessionRequest,
+  type RuntimeConfiguration,
   type RuntimeSnapshot
 } from '@tangyuan/shared'
 
@@ -33,6 +35,26 @@ export interface DesktopAppStore {
    * @throws 当 RuntimeResourceDriver 刷新失败时，Promise 会 reject。
    */
   refreshRuntime(): Promise<RuntimeSnapshot>
+
+  /**
+   * 验证并保存运行时配置。
+   *
+   * @param configuration - Provider、模型和 API Key。
+   * @returns 保存后的 RuntimeSnapshot。
+   * @throws 当 RuntimeResourceDriver 缺少保存能力或验证失败时，Promise 会 reject。
+   */
+  saveRuntimeConfiguration(configuration: RuntimeConfiguration): Promise<RuntimeSnapshot>
+
+  /**
+   * 取消正在进行的运行时配置验证。
+   *
+   * @param request - 需要取消的验证标识。
+   * @returns 取消后的 RuntimeSnapshot。
+   * @throws 当 RuntimeResourceDriver 缺少取消能力或取消失败时，Promise 会 reject。
+   */
+  cancelRuntimeConfigurationVerification(
+    request: CancelConfigurationVerificationRequest
+  ): Promise<RuntimeSnapshot>
 
   /**
    * 读取默认 Agent 的会话摘要列表。
@@ -100,6 +122,40 @@ class DefaultDesktopAppStore implements DesktopAppStore {
    */
   async refreshRuntime(): Promise<RuntimeSnapshot> {
     this.runtimeSnapshot = await this.runtimeDriver.refresh()
+    return this.runtimeSnapshot
+  }
+
+  /**
+   * 验证并保存运行时配置，再写入 Store 缓存。
+   *
+   * @param configuration - Provider、模型和 API Key。
+   * @returns 保存后的 RuntimeSnapshot。
+   * @throws 当 RuntimeResourceDriver 缺少保存能力或验证失败时，Promise 会 reject。
+   */
+  async saveRuntimeConfiguration(configuration: RuntimeConfiguration): Promise<RuntimeSnapshot> {
+    if (!this.runtimeDriver.saveConfiguration) {
+      throw new Error('当前运行时不支持保存配置。')
+    }
+
+    this.runtimeSnapshot = await this.runtimeDriver.saveConfiguration(configuration)
+    return this.runtimeSnapshot
+  }
+
+  /**
+   * 取消正在进行的运行时配置验证，再刷新 Store 缓存。
+   *
+   * @param request - 需要取消的验证标识。
+   * @returns 取消后的 RuntimeSnapshot。
+   * @throws 当 RuntimeResourceDriver 缺少取消能力或取消失败时，Promise 会 reject。
+   */
+  async cancelRuntimeConfigurationVerification(
+    request: CancelConfigurationVerificationRequest
+  ): Promise<RuntimeSnapshot> {
+    if (!this.runtimeDriver.cancelConfigurationVerification) {
+      throw new Error('当前运行时不支持取消配置验证。')
+    }
+
+    this.runtimeSnapshot = await this.runtimeDriver.cancelConfigurationVerification(request)
     return this.runtimeSnapshot
   }
 

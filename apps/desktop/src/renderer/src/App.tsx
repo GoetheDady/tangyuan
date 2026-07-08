@@ -2,9 +2,11 @@ import type {
   AgentRunState,
   AgentSessionSummary,
   DesktopPreloadApi,
+  RuntimeConfiguration,
   RuntimeSnapshot
 } from '@tangyuan/shared'
 import {
+  Ban,
   CheckCircle2,
   Clock3,
   KeyRound,
@@ -29,6 +31,13 @@ function App(): React.JSX.Element {
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null)
   const [sessions, setSessions] = useState<AgentSessionSummary[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isVerifyingConfiguration, setIsVerifyingConfiguration] = useState(false)
+  const [isConfigurationVisible, setIsConfigurationVisible] = useState(false)
+  const [configurationForm, setConfigurationForm] = useState<RuntimeConfiguration>({
+    providerId: '',
+    modelId: '',
+    apiKey: ''
+  })
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -56,6 +65,11 @@ function App(): React.JSX.Element {
 
         setRuntime(workbench.runtime)
         setSessions(workbench.sessions)
+        setConfigurationForm((currentForm) => ({
+          providerId: currentForm.providerId || workbench.runtime.settings.selectedProviderId || '',
+          modelId: currentForm.modelId || workbench.runtime.settings.selectedModelId || '',
+          apiKey: ''
+        }))
         setErrorMessage(null)
       })
       .catch((error: unknown) => {
@@ -93,6 +107,53 @@ function App(): React.JSX.Element {
   }
 
   /**
+   * 保存配置前调用 Main 侧真实 Pi SDK 验证流程。
+   *
+   * @returns 无返回值。
+   * @throws Preload API 错误会被捕获并写入 errorMessage。
+   */
+  const saveConfiguration = async (): Promise<void> => {
+    setIsVerifyingConfiguration(true)
+    setErrorMessage(null)
+
+    try {
+      const nextRuntime = await window.api.saveRuntimeConfiguration(configurationForm)
+      setRuntime(nextRuntime)
+      setIsConfigurationVisible(false)
+      setConfigurationForm({
+        providerId: nextRuntime.settings.selectedProviderId ?? configurationForm.providerId,
+        modelId: nextRuntime.settings.selectedModelId ?? configurationForm.modelId,
+        apiKey: ''
+      })
+      setErrorMessage(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '配置验证失败')
+    } finally {
+      setIsVerifyingConfiguration(false)
+    }
+  }
+
+  /**
+   * 取消当前配置验证。
+   *
+   * @returns 无返回值。
+   * @throws Preload API 错误会被捕获并写入 errorMessage。
+   */
+  const cancelConfigurationVerification = async (): Promise<void> => {
+    try {
+      const nextRuntime = await window.api.cancelRuntimeConfigurationVerification({
+        verificationId: 'current'
+      })
+      setRuntime(nextRuntime)
+      setErrorMessage('已取消配置验证。')
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '取消配置验证失败')
+    } finally {
+      setIsVerifyingConfiguration(false)
+    }
+  }
+
+  /**
    * 创建默认 Agent 的新会话并放到列表顶部。
    *
    * @returns 无返回值。
@@ -125,6 +186,184 @@ function App(): React.JSX.Element {
   const apiKeyLabel = runtime?.auth.apiKey.configured
     ? (runtime.auth.apiKey.maskedValue ?? '已保存')
     : '未保存'
+  const isRuntimeReady = runtime?.status === 'ready'
+
+  if (!isRuntimeReady || isConfigurationVisible) {
+    return (
+      <main className="min-h-screen bg-background px-8 py-7 text-text">
+        <motion.section
+          className="mx-auto grid min-h-[calc(100vh-3.5rem)] max-w-5xl grid-cols-[320px_1fr] overflow-hidden rounded-lg border border-border bg-surface shadow-sm"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+        >
+          <aside className="border-r border-border bg-surface-soft/70 p-6">
+            <div className="mb-7 flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-md bg-brand text-surface">
+                <KeyRound size={20} aria-hidden="true" />
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold leading-6">汤圆</h1>
+                <p className="text-sm text-text-muted">桌面智能体工作台</p>
+              </div>
+            </div>
+
+            <dl className="space-y-4 text-sm">
+              <div>
+                <dt className="text-text-muted">就绪状态</dt>
+                <dd className="mt-1 font-medium">{statusLabel}</dd>
+              </div>
+              <div>
+                <dt className="text-text-muted">接口密钥</dt>
+                <dd className="mt-1 font-medium">{apiKeyLabel}</dd>
+              </div>
+              <div>
+                <dt className="text-text-muted">模型服务</dt>
+                <dd className="mt-1 font-medium">{providerLabel}</dd>
+              </div>
+              <div>
+                <dt className="text-text-muted">模型</dt>
+                <dd className="mt-1 font-medium">{modelLabel}</dd>
+              </div>
+            </dl>
+          </aside>
+
+          <section className="flex flex-col">
+            <header className="flex items-center justify-between border-b border-border px-6 py-4">
+              <div>
+                <p className="text-sm text-text-muted">Pi SDK 验证</p>
+                <h2 className="text-xl font-semibold leading-7">配置模型服务</h2>
+              </div>
+              <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm">
+                <span
+                  ref={statusDotRef}
+                  className={`size-2 rounded-full ${runtime?.status === 'ready' ? 'bg-success' : 'bg-danger'}`}
+                />
+                {statusLabel}
+              </div>
+            </header>
+
+            <div className="grid flex-1 grid-cols-[1fr_280px]">
+              <form
+                className="space-y-5 p-6"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  void saveConfiguration()
+                }}
+              >
+                <label className="block text-sm font-medium">
+                  Provider
+                  <input
+                    className="mt-2 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm outline-none focus:ring-2 focus:ring-focus"
+                    list="provider-options"
+                    value={configurationForm.providerId}
+                    onChange={(event) => {
+                      setConfigurationForm((currentForm) => ({
+                        ...currentForm,
+                        providerId: event.target.value
+                      }))
+                    }}
+                    disabled={isVerifyingConfiguration}
+                  />
+                </label>
+                <datalist id="provider-options">
+                  {runtime?.providers.map((provider) => (
+                    <option key={provider.providerId} value={provider.providerId}>
+                      {provider.displayName}
+                    </option>
+                  ))}
+                </datalist>
+
+                <label className="block text-sm font-medium">
+                  Model
+                  <input
+                    className="mt-2 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm outline-none focus:ring-2 focus:ring-focus"
+                    list="model-options"
+                    value={configurationForm.modelId}
+                    onChange={(event) => {
+                      setConfigurationForm((currentForm) => ({
+                        ...currentForm,
+                        modelId: event.target.value
+                      }))
+                    }}
+                    disabled={isVerifyingConfiguration}
+                  />
+                </label>
+                <datalist id="model-options">
+                  {runtime?.models
+                    .filter(
+                      (model) =>
+                        !configurationForm.providerId ||
+                        model.providerId === configurationForm.providerId
+                    )
+                    .map((model) => (
+                      <option key={`${model.providerId}:${model.modelId}`} value={model.modelId}>
+                        {model.displayName}
+                      </option>
+                    ))}
+                </datalist>
+
+                <label className="block text-sm font-medium">
+                  API Key
+                  <input
+                    className="mt-2 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm outline-none focus:ring-2 focus:ring-focus"
+                    type="password"
+                    value={configurationForm.apiKey}
+                    onChange={(event) => {
+                      setConfigurationForm((currentForm) => ({
+                        ...currentForm,
+                        apiKey: event.target.value
+                      }))
+                    }}
+                    disabled={isVerifyingConfiguration}
+                  />
+                </label>
+
+                <div className="flex gap-3">
+                  <button
+                    className="flex h-10 min-w-36 items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-medium text-surface transition hover:bg-brand-soft focus:outline-none focus:ring-2 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-60"
+                    type="submit"
+                    disabled={isVerifyingConfiguration || isLoading}
+                  >
+                    <CheckCircle2 size={16} aria-hidden="true" />
+                    {isVerifyingConfiguration ? '验证中' : '验证并保存'}
+                  </button>
+                  {isVerifyingConfiguration ? (
+                    <button
+                      className="flex h-10 min-w-28 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 text-sm font-medium transition hover:bg-surface-soft focus:outline-none focus:ring-2 focus:ring-focus"
+                      type="button"
+                      onClick={() => {
+                        void cancelConfigurationVerification()
+                      }}
+                    >
+                      <Ban size={16} aria-hidden="true" />
+                      取消验证
+                    </button>
+                  ) : null}
+                </div>
+              </form>
+
+              <aside className="border-l border-border bg-surface-soft/50 p-5">
+                <p className="mb-3 text-sm font-medium">运行时资源</p>
+                <button
+                  className="mb-4 flex h-10 w-full items-center justify-center gap-2 rounded-md border border-border bg-surface px-3 text-sm font-medium transition hover:bg-surface-soft focus:outline-none focus:ring-2 focus:ring-focus"
+                  onClick={() => {
+                    void refreshRuntime()
+                  }}
+                >
+                  <RefreshCcw id="refresh-icon" size={16} aria-hidden="true" />
+                  刷新资源
+                </button>
+                <div className="rounded-md border border-border bg-surface p-3 text-sm text-text-muted">
+                  {errorMessage ?? '配置通过验证后才会保存，并进入会话工作台。'}
+                </div>
+              </aside>
+            </div>
+          </section>
+        </motion.section>
+      </main>
+    )
+  }
 
   return (
     <main className="min-h-screen bg-background px-8 py-7 text-text">
@@ -233,23 +472,37 @@ function App(): React.JSX.Element {
                     <div>
                       <dt className="text-text-muted">Bootstrap</dt>
                       <dd className="font-medium">
-                        {runtime?.activeAgent.profile.bootstrapRequired ? '需要初始化' : '可直接使用'}
+                        {runtime?.activeAgent.profile.bootstrapRequired
+                          ? '需要初始化'
+                          : '可直接使用'}
                       </dd>
                     </div>
                     <div>
                       <dt className="text-text-muted">soul.md 更新时间</dt>
-                      <dd className="font-medium">{formatTimestamp(runtime?.activeAgent.profile.soulUpdatedAt)}</dd>
+                      <dd className="font-medium">
+                        {formatTimestamp(runtime?.activeAgent.profile.soulUpdatedAt)}
+                      </dd>
                     </div>
                     <div>
                       <dt className="text-text-muted">user.md 更新时间</dt>
-                      <dd className="font-medium">{formatTimestamp(runtime?.activeAgent.profile.userUpdatedAt)}</dd>
+                      <dd className="font-medium">
+                        {formatTimestamp(runtime?.activeAgent.profile.userUpdatedAt)}
+                      </dd>
                     </div>
                   </dl>
                   <div className="mt-3 flex items-start gap-2 rounded-md border border-border bg-surface-soft px-3 py-2 text-xs text-text-muted">
                     {runtime?.activeAgent.profile.bootstrapRequired ? (
-                      <TriangleAlert size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
+                      <TriangleAlert
+                        size={14}
+                        className="mt-0.5 shrink-0 text-warning"
+                        aria-hidden="true"
+                      />
                     ) : (
-                      <Clock3 size={14} className="mt-0.5 shrink-0 text-text-muted" aria-hidden="true" />
+                      <Clock3
+                        size={14}
+                        className="mt-0.5 shrink-0 text-text-muted"
+                        aria-hidden="true"
+                      />
                     )}
                     <span>
                       {runtime?.activeAgent.profile.bootstrapRequired
@@ -268,7 +521,12 @@ function App(): React.JSX.Element {
             <aside className="border-l border-border bg-surface-soft/50 p-5">
               <p className="mb-3 text-sm font-medium">运行时控制</p>
               <div className="space-y-3">
-                <button className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-border bg-surface px-3 text-sm font-medium transition hover:bg-surface-soft focus:outline-none focus:ring-2 focus:ring-focus">
+                <button
+                  className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-border bg-surface px-3 text-sm font-medium transition hover:bg-surface-soft focus:outline-none focus:ring-2 focus:ring-focus"
+                  onClick={() => {
+                    setIsConfigurationVisible(true)
+                  }}
+                >
                   <KeyRound size={16} aria-hidden="true" />
                   配置接口密钥
                 </button>

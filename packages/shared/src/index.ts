@@ -202,11 +202,21 @@ export interface RuntimeConfiguration {
 }
 
 /**
+ * 描述取消配置验证时传给 Main 进程的请求。
+ */
+export interface CancelConfigurationVerificationRequest {
+  verificationId: string
+}
+
+/**
  * 桌面端允许 Renderer 通过 Preload API 调用的 IPC channel。
  */
 export const DESKTOP_IPC_CHANNELS = {
   runtimeGetSnapshot: 'tangyuan:runtime:get-snapshot',
   runtimeRefresh: 'tangyuan:runtime:refresh',
+  runtimeSaveConfiguration: 'tangyuan:runtime:save-configuration',
+  runtimeCancelConfigurationVerification:
+    'tangyuan:runtime:cancel-configuration-verification',
   sessionsList: 'tangyuan:sessions:list',
   sessionsCreate: 'tangyuan:sessions:create',
 } as const
@@ -223,6 +233,8 @@ export type DesktopIpcChannel =
 export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.runtimeGetSnapshot]: undefined
   [DESKTOP_IPC_CHANNELS.runtimeRefresh]: undefined
+  [DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration]: RuntimeConfiguration
+  [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification]: CancelConfigurationVerificationRequest
   [DESKTOP_IPC_CHANNELS.sessionsList]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: CreateSessionRequest
 }
@@ -233,6 +245,8 @@ export interface DesktopIpcRequestMap {
 export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.runtimeGetSnapshot]: RuntimeSnapshot
   [DESKTOP_IPC_CHANNELS.runtimeRefresh]: RuntimeSnapshot
+  [DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration]: RuntimeSnapshot
+  [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification]: RuntimeSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsList]: AgentSessionSummary[]
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: AgentSessionSummary
 }
@@ -276,6 +290,28 @@ export interface DesktopPreloadApi {
    * @throws 当 Provider 或模型资源刷新失败时，Promise 会 reject。
    */
   refreshRuntime(): Promise<RuntimeSnapshot>
+
+  /**
+   * 验证并保存运行时配置。
+   *
+   * @param configuration - Provider、模型和 API Key。
+   * @returns 保存后的 RuntimeSnapshot。
+   * @throws 当 Main 进程验证失败或保存失败时，Promise 会 reject。
+   */
+  saveRuntimeConfiguration(
+    configuration: RuntimeConfiguration,
+  ): Promise<RuntimeSnapshot>
+
+  /**
+   * 取消正在进行的配置验证。
+   *
+   * @param request - 需要取消的验证标识。
+   * @returns 取消后的 RuntimeSnapshot。
+   * @throws 当 Main 进程无法取消验证时，Promise 会 reject。
+   */
+  cancelRuntimeConfigurationVerification(
+    request: CancelConfigurationVerificationRequest,
+  ): Promise<RuntimeSnapshot>
 
   /**
    * 读取当前 Agent 的会话列表。

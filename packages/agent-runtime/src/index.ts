@@ -1,7 +1,7 @@
-import { access, mkdir, stat, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { constants as fsConstants } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   createAgentProfileStatus,
@@ -11,10 +11,13 @@ import {
   type AgentMessage,
   type AgentRunState,
   type AgentSessionSummary,
+  type CancelConfigurationVerificationRequest,
   type CancelRunRequest,
   type CreateSessionRequest,
   type GetSessionMessagesRequest,
   type ListSessionsRequest,
+  type ModelDescriptor,
+  type ProviderDescriptor,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
   type SendMessageRequest,
@@ -28,14 +31,65 @@ export {
   type AgentMessage,
   type AgentRunState,
   type AgentSessionSummary,
+  type CancelConfigurationVerificationRequest,
   type CancelRunRequest,
   type CreateSessionRequest,
   type GetSessionMessagesRequest,
   type ListSessionsRequest,
+  type ModelDescriptor,
+  type ProviderDescriptor,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
   type SendMessageRequest,
 } from '@tangyuan/shared'
+
+/**
+ * 描述 Pi SDK 临时配置验证时使用的固定 prompt。
+ */
+const CONFIGURATION_VERIFICATION_PROMPT = 'Reply with OK.'
+
+/**
+ * 描述持久化在 Electron userData 下的运行时配置。
+ */
+export type PersistedRuntimeConfiguration = RuntimeConfiguration
+
+/**
+ * 描述 Pi SDK 验证配置时需要的参数。
+ */
+export interface PiSdkVerificationRequest extends RuntimeConfiguration {
+  prompt: string
+  signal: AbortSignal
+}
+
+/**
+ * 描述从 Pi SDK ModelRegistry 读取到的资源列表。
+ */
+export interface PiSdkRuntimeResources {
+  providers: ProviderDescriptor[]
+  models: ModelDescriptor[]
+}
+
+/**
+ * 描述 Pi SDK 操作的窄网关，方便产品代码真实调用 SDK，测试代码替换外部网络。
+ */
+export interface PiSdkGateway {
+  /**
+   * 读取 SDK ModelRegistry 中可展示的 Provider 和 Model。
+   *
+   * @returns Provider 和模型描述列表。
+   * @throws 当 SDK 资源读取失败时，Promise 会 reject。
+   */
+  listProvidersAndModels(): Promise<PiSdkRuntimeResources>
+
+  /**
+   * 使用临时 session 验证 Provider/API Key/Model。
+   *
+   * @param request - 验证所需配置、固定 prompt 和取消信号。
+   * @returns 无返回值；成功 resolve 表示验证通过。
+   * @throws 当 SDK 调用失败、模型不可用或用户取消时，Promise 会 reject。
+   */
+  verifyConfiguration(request: PiSdkVerificationRequest): Promise<void>
+}
 
 /**
  * 描述 Agent Runtime 统一错误码。
@@ -208,6 +262,17 @@ export interface RuntimeResourceDriver {
   saveConfiguration?(
     configuration: RuntimeConfiguration,
   ): Promise<RuntimeSnapshot>
+
+  /**
+   * 取消正在进行的配置验证。
+   *
+   * @param request - 需要取消的验证标识；v1 只维护一个当前验证。
+   * @returns 取消后的 RuntimeSnapshot。
+   * @throws 当底层 SDK 或运行时无法取消验证时，Promise 会 reject。
+   */
+  cancelConfigurationVerification?(
+    request: CancelConfigurationVerificationRequest,
+  ): Promise<RuntimeSnapshot>
 }
 
 /**
@@ -253,6 +318,8 @@ export interface PiSdkDriverOptions {
   now?: () => string
   agentHomePath?: string
   fsRoot?: string
+  userDataPath?: string
+  gateway?: PiSdkGateway
 }
 
 /**
@@ -262,8 +329,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private readonly now: () => string
   private readonly agentHomePath: string
   private readonly fsRoot: string
+  private readonly userDataPath: string
+  private readonly gateway: PiSdkGateway
   private readonly listeners = new Set<AgentEventListener>()
   private readonly sessions = new Map<string, AgentSessionSummary>()
+  private configurationVerificationController: AbortController | null = null
 
   /**
    * 创建 Pi SDK Driver 骨架。
@@ -276,6 +346,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     this.now = options.now ?? (() => new Date().toISOString())
     this.agentHomePath = options.agentHomePath ?? '~/.tangyuan/agents/tangyuan'
     this.fsRoot = options.fsRoot ?? homedir()
+    this.userDataPath = options.userDataPath ?? join(this.fsRoot, '.tangyuan')
+    this.gateway = options.gateway ?? new RealPiSdkGateway()
   }
 
   /**
@@ -295,6 +367,67 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当默认 Agent Home 初始化失败时，Promise 会 reject。
    */
   async refresh(): Promise<RuntimeSnapshot> {
+    return this.readRuntimeSnapshot()
+  }
+
+  /**
+   * 使用真实 Pi SDK 验证 Provider/API Key/Model 后保存配置。
+   *
+   * @param configuration - 用户输入的模型服务、模型和接口密钥。
+   * @returns 保存后的 RuntimeSnapshot，API Key 只包含脱敏展示值。
+   * @throws 当配置缺失、SDK 验证失败或写入失败时，Promise 会 reject。
+   */
+  async saveConfiguration(
+    configuration: RuntimeConfiguration,
+  ): Promise<RuntimeSnapshot> {
+    const normalizedConfiguration = this.normalizeRuntimeConfiguration(configuration)
+    const controller = new AbortController()
+    this.configurationVerificationController = controller
+
+    try {
+      await this.gateway.verifyConfiguration({
+        ...normalizedConfiguration,
+        prompt: CONFIGURATION_VERIFICATION_PROMPT,
+        signal: controller.signal,
+      })
+    } catch (error) {
+      if (isAbortError(error) || controller.signal.aborted) {
+        throw new AgentRuntimeError({
+          code: 'run-cancelled',
+          message: '已取消配置验证。',
+          recoverable: true,
+        })
+      }
+
+      throw new AgentRuntimeError({
+        code: 'provider-verification-failed',
+        message: `配置验证失败：${sanitizeErrorMessage(error, normalizedConfiguration.apiKey)}`,
+        recoverable: true,
+      })
+    } finally {
+      if (this.configurationVerificationController === controller) {
+        this.configurationVerificationController = null
+      }
+    }
+
+    await this.writePersistedConfiguration(normalizedConfiguration)
+    return this.readRuntimeSnapshot()
+  }
+
+  /**
+   * 取消当前配置验证。
+   *
+   * @param request - 取消请求；v1 只维护一个当前验证，verificationId 用于日志和未来扩展。
+   * @returns 当前 RuntimeSnapshot。
+   * @throws 当快照读取失败时，Promise 会 reject。
+   */
+  async cancelConfigurationVerification(
+    request: CancelConfigurationVerificationRequest,
+  ): Promise<RuntimeSnapshot> {
+    void request
+    this.configurationVerificationController?.abort()
+    this.configurationVerificationController = null
+
     return this.readRuntimeSnapshot()
   }
 
@@ -423,6 +556,10 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    */
   private async readRuntimeSnapshot(): Promise<RuntimeSnapshot> {
     const homeStatus = await this.ensureDefaultAgentHome()
+    const [configuration, resources] = await Promise.all([
+      this.readPersistedConfiguration(),
+      this.gateway.listProvidersAndModels(),
+    ])
 
     return createRuntimeSnapshot({
       activeAgent: {
@@ -431,19 +568,132 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         homePath: this.agentHomePath,
         profile: createAgentProfileStatus(homeStatus),
       },
-      providers: [],
-      models: [],
+      providers: resources.providers,
+      models: resources.models,
       settings: {
-        selectedProviderId: null,
-        selectedModelId: null,
+        selectedProviderId: configuration?.providerId ?? null,
+        selectedModelId: configuration?.modelId ?? null,
       },
       auth: {
         apiKey: {
-          configured: false,
-          maskedValue: null,
+          configured: Boolean(configuration?.apiKey),
+          maskedValue: configuration?.apiKey
+            ? PiSdkDriver.maskApiKey(configuration.apiKey)
+            : null,
         },
       },
     })
+  }
+
+  /**
+   * 生成适合界面展示的 API Key 脱敏值。
+   *
+   * @param apiKey - 原始 API Key。
+   * @returns 不暴露完整密钥的字符串。
+   * @throws 此方法不会主动抛出错误。
+   */
+  static maskApiKey(apiKey: string): string {
+    const trimmed = apiKey.trim()
+
+    if (trimmed.length <= 8) {
+      return '•'.repeat(trimmed.length)
+    }
+
+    return `${trimmed.slice(0, 4)}...${trimmed.slice(-4)}`
+  }
+
+  /**
+   * 校验并清理用户输入的运行时配置。
+   *
+   * @param configuration - 用户输入的配置。
+   * @returns 去除首尾空白后的 RuntimeConfiguration。
+   * @throws 当 Provider、Model 或 API Key 为空时抛出 AgentRuntimeError。
+   */
+  private normalizeRuntimeConfiguration(
+    configuration: RuntimeConfiguration,
+  ): RuntimeConfiguration {
+    const normalizedConfiguration = {
+      providerId: configuration.providerId.trim(),
+      modelId: configuration.modelId.trim(),
+      apiKey: configuration.apiKey.trim(),
+    }
+
+    if (
+      !normalizedConfiguration.providerId ||
+      !normalizedConfiguration.modelId ||
+      !normalizedConfiguration.apiKey
+    ) {
+      throw new AgentRuntimeError({
+        code: 'configuration-missing',
+        message: '请填写 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。',
+        recoverable: true,
+      })
+    }
+
+    return normalizedConfiguration
+  }
+
+  /**
+   * 从 Electron userData 下读取配置 JSON。
+   *
+   * @returns 已保存的运行时配置；不存在时返回 null。
+   * @throws 当 JSON 无法读取或格式错误时，Promise 会 reject。
+   */
+  private async readPersistedConfiguration(): Promise<PersistedRuntimeConfiguration | null> {
+    const configPath = this.resolveConfigPath()
+
+    try {
+      const rawConfig = await readFile(configPath, 'utf8')
+      const parsedConfig = JSON.parse(rawConfig) as Partial<PersistedRuntimeConfiguration>
+
+      if (
+        typeof parsedConfig.providerId !== 'string' ||
+        typeof parsedConfig.modelId !== 'string' ||
+        typeof parsedConfig.apiKey !== 'string'
+      ) {
+        return null
+      }
+
+      return {
+        providerId: parsedConfig.providerId,
+        modelId: parsedConfig.modelId,
+        apiKey: parsedConfig.apiKey,
+      }
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        return null
+      }
+
+      throw error
+    }
+  }
+
+  /**
+   * 写入 Electron userData 下的配置 JSON。
+   *
+   * @param configuration - 已通过真实 SDK 验证的运行时配置。
+   * @returns 无返回值。
+   * @throws 当目录创建或文件写入失败时，Promise 会 reject。
+   */
+  private async writePersistedConfiguration(
+    configuration: PersistedRuntimeConfiguration,
+  ): Promise<void> {
+    const configPath = this.resolveConfigPath()
+    await mkdir(dirname(configPath), { recursive: true })
+    await writeFile(`${configPath}.tmp`, `${JSON.stringify(configuration, null, 2)}\n`, 'utf8')
+    await import('node:fs/promises').then(({ rename }) =>
+      rename(`${configPath}.tmp`, configPath),
+    )
+  }
+
+  /**
+   * 解析配置 JSON 的绝对路径。
+   *
+   * @returns Electron userData 下的 config.json 路径。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private resolveConfigPath(): string {
+    return join(this.userDataPath, 'config.json')
   }
 
   /**
@@ -594,4 +844,117 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       listener(event)
     }
   }
+}
+
+/**
+ * 生产环境使用的 Pi SDK 网关。
+ */
+class RealPiSdkGateway implements PiSdkGateway {
+  /**
+   * 读取 Pi SDK ModelRegistry 中的 Provider 和 Model。
+   *
+   * @returns Provider 和模型描述列表。
+   * @throws 当 SDK 模块加载或模型注册表读取失败时，Promise 会 reject。
+   */
+  async listProvidersAndModels(): Promise<PiSdkRuntimeResources> {
+    const { AuthStorage, ModelRegistry } = await import(
+      '@earendil-works/pi-coding-agent'
+    )
+    const authStorage = AuthStorage.inMemory()
+    const modelRegistry = ModelRegistry.inMemory(authStorage)
+    const models = modelRegistry.getAll()
+    const providerIds = [...new Set(models.map((model) => model.provider))].sort()
+
+    return {
+      providers: providerIds.map((providerId) => ({
+        providerId,
+        displayName: modelRegistry.getProviderDisplayName(providerId),
+      })),
+      models: models.map((model) => ({
+        providerId: model.provider,
+        modelId: model.id,
+        displayName: model.name ?? model.id,
+      })),
+    }
+  }
+
+  /**
+   * 使用 Pi SDK 临时 session 验证运行时配置。
+   *
+   * @param request - Provider、Model、API Key、固定 prompt 和取消信号。
+   * @returns 无返回值。
+   * @throws 当 SDK 调用失败、模型不存在或取消信号触发时，Promise 会 reject。
+   */
+  async verifyConfiguration(request: PiSdkVerificationRequest): Promise<void> {
+    const { AuthStorage, ModelRegistry, SessionManager, createAgentSession } =
+      await import('@earendil-works/pi-coding-agent')
+    const authStorage = AuthStorage.inMemory()
+    authStorage.setRuntimeApiKey(request.providerId, request.apiKey)
+
+    const modelRegistry = ModelRegistry.inMemory(authStorage)
+    const model = modelRegistry.find(request.providerId, request.modelId)
+
+    if (!model) {
+      throw new Error(`找不到模型 ${request.providerId}/${request.modelId}`)
+    }
+
+    const { session } = await createAgentSession({
+      authStorage,
+      modelRegistry,
+      model,
+      sessionManager: SessionManager.inMemory(),
+      noTools: 'all',
+    })
+
+    const abortSession = (): void => {
+      void session.abort()
+    }
+
+    request.signal.addEventListener('abort', abortSession, { once: true })
+
+    try {
+      if (request.signal.aborted) {
+        await session.abort()
+        throw new DOMException('Aborted', 'AbortError')
+      }
+
+      await session.prompt(request.prompt)
+    } finally {
+      request.signal.removeEventListener('abort', abortSession)
+      session.dispose()
+    }
+  }
+}
+
+/**
+ * 判断错误是否来自 AbortController 取消。
+ *
+ * @param error - 捕获到的未知错误。
+ * @returns 如果是取消错误则返回 true。
+ * @throws 此方法不会主动抛出错误。
+ */
+function isAbortError(error: unknown): boolean {
+  return (
+    error instanceof DOMException && error.name === 'AbortError'
+  ) || (error instanceof Error && error.name === 'AbortError')
+}
+
+/**
+ * 把错误消息转换成不含 API Key 的用户可读文案。
+ *
+ * @param error - 捕获到的未知错误。
+ * @param apiKey - 需要从消息中移除的原始 API Key。
+ * @returns 脱敏后的错误消息。
+ * @throws 此方法不会主动抛出错误。
+ */
+function sanitizeErrorMessage(error: unknown, apiKey: string): string {
+  const rawMessage =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : '请检查 Provider、Model 和 API Key 后重试。'
+  const redactedMessage = rawMessage.split(apiKey).join('[API Key 已隐藏]')
+
+  return redactedMessage || '请检查 Provider、Model 和 API Key 后重试。'
 }

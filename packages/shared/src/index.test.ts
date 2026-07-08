@@ -126,6 +126,9 @@ describe('DESKTOP_IPC_CHANNELS', () => {
     expect(DESKTOP_IPC_CHANNELS).toEqual({
       runtimeGetSnapshot: 'tangyuan:runtime:get-snapshot',
       runtimeRefresh: 'tangyuan:runtime:refresh',
+      runtimeSaveConfiguration: 'tangyuan:runtime:save-configuration',
+      runtimeCancelConfigurationVerification:
+        'tangyuan:runtime:cancel-configuration-verification',
       sessionsList: 'tangyuan:sessions:list',
       sessionsCreate: 'tangyuan:sessions:create',
     })
