@@ -17,12 +17,15 @@ describe('createTangyuanPreloadApi', () => {
     const api = createTangyuanPreloadApi(invoke)
 
     expect(Object.keys(api).sort()).toEqual([
+      'cancelRun',
       'cancelRuntimeConfigurationVerification',
       'createSession',
+      'getMessages',
       'getRuntimeSnapshot',
       'listSessions',
       'refreshRuntime',
-      'saveRuntimeConfiguration'
+      'saveRuntimeConfiguration',
+      'sendMessage'
     ])
 
     await api.getRuntimeSnapshot()
@@ -35,6 +38,13 @@ describe('createTangyuanPreloadApi', () => {
     await api.cancelRuntimeConfigurationVerification({ verificationId: 'verify-1' })
     await api.listSessions()
     await api.createSession({ agentId: 'tangyuan', title: '新会话' })
+    await api.getMessages({ agentId: 'tangyuan', sessionId: 'session-1' })
+    await api.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: 'session-1',
+      content: '你好'
+    })
+    await api.cancelRun({ agentId: 'tangyuan', sessionId: 'session-1' })
 
     expect(calls).toEqual([
       [DESKTOP_IPC_CHANNELS.runtimeGetSnapshot],
@@ -54,6 +64,28 @@ describe('createTangyuanPreloadApi', () => {
         {
           agentId: 'tangyuan',
           title: '新会话'
+        }
+      ],
+      [
+        DESKTOP_IPC_CHANNELS.sessionsGetMessages,
+        {
+          agentId: 'tangyuan',
+          sessionId: 'session-1'
+        }
+      ],
+      [
+        DESKTOP_IPC_CHANNELS.sessionsSendMessage,
+        {
+          agentId: 'tangyuan',
+          sessionId: 'session-1',
+          content: '你好'
+        }
+      ],
+      [
+        DESKTOP_IPC_CHANNELS.sessionsCancelRun,
+        {
+          agentId: 'tangyuan',
+          sessionId: 'session-1'
         }
       ]
     ])

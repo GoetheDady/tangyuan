@@ -34,12 +34,15 @@ describe('registerDesktopAppIpc', () => {
       saveRuntimeConfiguration: vi.fn().mockResolvedValue(snapshot),
       cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(snapshot),
       listSessions: vi.fn().mockResolvedValue([session]),
-      createSession: vi.fn().mockResolvedValue(session)
+      createSession: vi.fn().mockResolvedValue(session),
+      getMessages: vi.fn().mockResolvedValue([]),
+      sendMessage: vi.fn().mockResolvedValue([]),
+      cancelRun: vi.fn().mockResolvedValue(session)
     }
 
     registerDesktopAppIpc(ipcMain, store)
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(6)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(9)
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
     ).resolves.toEqual(snapshot)
@@ -67,6 +70,25 @@ describe('registerDesktopAppIpc', () => {
         title: '新会话'
       })
     ).resolves.toEqual(session)
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsGetMessages)(null, {
+        agentId: 'tangyuan',
+        sessionId: 'session-1'
+      })
+    ).resolves.toEqual([])
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsSendMessage)(null, {
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        content: '你好'
+      })
+    ).resolves.toEqual([])
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsCancelRun)(null, {
+        agentId: 'tangyuan',
+        sessionId: 'session-1'
+      })
+    ).resolves.toEqual(session)
     expect(store.createSession).toHaveBeenCalledWith({
       agentId: 'tangyuan',
       title: '新会话'
@@ -78,6 +100,19 @@ describe('registerDesktopAppIpc', () => {
     })
     expect(store.cancelRuntimeConfigurationVerification).toHaveBeenCalledWith({
       verificationId: 'verify-1'
+    })
+    expect(store.getMessages).toHaveBeenCalledWith({
+      agentId: 'tangyuan',
+      sessionId: 'session-1'
+    })
+    expect(store.sendMessage).toHaveBeenCalledWith({
+      agentId: 'tangyuan',
+      sessionId: 'session-1',
+      content: '你好'
+    })
+    expect(store.cancelRun).toHaveBeenCalledWith({
+      agentId: 'tangyuan',
+      sessionId: 'session-1'
     })
   })
 })

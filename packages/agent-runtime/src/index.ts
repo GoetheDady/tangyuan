@@ -49,6 +49,11 @@ export {
 const CONFIGURATION_VERIFICATION_PROMPT = 'Reply with OK.'
 
 /**
+ * 默认 Agent profile 注入到 Pi SDK prompt 时使用的分隔标题。
+ */
+const PROFILE_CONTEXT_HEADER = '汤圆长期上下文'
+
+/**
  * 描述持久化在 Electron userData 下的运行时配置。
  */
 export type PersistedRuntimeConfiguration = RuntimeConfiguration
@@ -59,6 +64,44 @@ export type PersistedRuntimeConfiguration = RuntimeConfiguration
 export interface PiSdkVerificationRequest extends RuntimeConfiguration {
   prompt: string
   signal: AbortSignal
+}
+
+/**
+ * 描述创建真实 Pi SDK 会话时需要的参数。
+ */
+export interface PiSdkCreateSessionRequest extends RuntimeConfiguration {
+  sessionId: string
+  cwd: string
+}
+
+/**
+ * 描述 Pi SDK 会话运行器的最小能力。
+ */
+export interface PiSdkSessionHandle {
+  /**
+   * 向真实 Pi SDK 会话发送 prompt。
+   *
+   * @param prompt - 已注入 profile 上下文的用户输入。
+   * @returns Agent 最后一条文本回复；没有文本回复时返回 null。
+   * @throws 当 SDK 调用失败时，Promise 会 reject。
+   */
+  prompt(prompt: string): Promise<string | null>
+
+  /**
+   * 取消当前会话正在运行的 Agent 响应。
+   *
+   * @returns 无返回值。
+   * @throws 当 SDK 无法取消时，Promise 会 reject。
+   */
+  abort(): Promise<void>
+
+  /**
+   * 释放真实 Pi SDK 会话资源。
+   *
+   * @returns 无返回值。
+   * @throws 此方法不应主动抛出错误。
+   */
+  dispose(): void
 }
 
 /**
@@ -89,6 +132,15 @@ export interface PiSdkGateway {
    * @throws 当 SDK 调用失败、模型不可用或用户取消时，Promise 会 reject。
    */
   verifyConfiguration(request: PiSdkVerificationRequest): Promise<void>
+
+  /**
+   * 创建真实 Pi SDK 会话运行器。
+   *
+   * @param request - 已验证配置、会话标识和 Agent Home 工作目录。
+   * @returns 可发送 prompt 和取消运行的会话运行器。
+   * @throws 当 SDK 无法创建会话或模型不存在时，Promise 会 reject。
+   */
+  createSession(request: PiSdkCreateSessionRequest): Promise<PiSdkSessionHandle>
 }
 
 /**
@@ -333,6 +385,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private readonly gateway: PiSdkGateway
   private readonly listeners = new Set<AgentEventListener>()
   private readonly sessions = new Map<string, AgentSessionSummary>()
+  private readonly messages = new Map<string, AgentMessage[]>()
+  private readonly sessionHandles = new Map<string, PiSdkSessionHandle>()
   private configurationVerificationController: AbortController | null = null
 
   /**
@@ -447,7 +501,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
-   * 创建一个新的本地会话摘要。
+   * 创建一个新的真实 Pi SDK 会话摘要。
    *
    * @param request - 新会话所属 Agent 和标题。
    * @returns 创建后的会话摘要。
@@ -464,13 +518,22 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       })
     }
 
+    const configuration = await this.readRequiredConfiguration()
+    const sessionId = `session-${this.sessions.size + 1}`
+    const handle = await this.gateway.createSession({
+      ...configuration,
+      sessionId,
+      cwd: this.resolveAgentHomePath(),
+    })
     const session = createDefaultSessionSummary({
-      sessionId: `session-${this.sessions.size + 1}`,
+      sessionId,
       title: request.title,
       updatedAt: this.now(),
     })
 
     this.sessions.set(session.sessionId, session)
+    this.messages.set(session.sessionId, [])
+    this.sessionHandles.set(session.sessionId, handle)
     this.emit({
       type: 'session-created',
       agentId: request.agentId,
@@ -485,14 +548,14 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * 读取指定会话的消息列表。
    *
    * @param request - 会话定位信息。
-   * @returns 当前骨架实现返回空消息列表。
+   * @returns 当前本地 transcript 消息列表。
    * @throws 当会话不存在时，Promise 会 reject。
    */
   async getMessages(
     request: GetSessionMessagesRequest,
   ): Promise<AgentMessage[]> {
-    this.assertKnownSession(request.sessionId)
-    return []
+    this.assertKnownSession(request.sessionId, request.agentId)
+    return [...(this.messages.get(request.sessionId) ?? [])]
   }
 
   /**
@@ -500,17 +563,78 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    *
    * @param request - 会话定位信息和消息内容。
    * @returns 无返回值。
-   * @throws 当前骨架实现始终以 `configuration-missing` reject。
+   * @throws 当配置缺失、会话不存在或 SDK 调用失败时，Promise 会 reject。
    */
   async sendMessage(request: SendMessageRequest): Promise<void> {
-    this.assertKnownSession(request.sessionId)
+    const session = this.assertKnownSession(request.sessionId, request.agentId)
+    const handle = this.sessionHandles.get(request.sessionId)
 
-    throw new AgentRuntimeError({
-      code: 'configuration-missing',
-      message:
-        '发送消息前，请先配置 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。',
-      recoverable: true,
+    if (!handle) {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `找不到会话 ${request.sessionId} 的 Pi SDK 运行器。`,
+        recoverable: true,
+      })
+    }
+
+    const content = request.content.trim()
+
+    if (!content) {
+      throw new AgentRuntimeError({
+        code: 'unknown',
+        message: '请输入要发送给汤圆的消息。',
+        recoverable: true,
+      })
+    }
+
+    const userMessage = this.appendMessage({
+      agentId: request.agentId,
+      sessionId: request.sessionId,
+      role: 'user',
+      content,
     })
+    this.emit({
+      type: 'message-appended',
+      agentId: request.agentId,
+      message: userMessage,
+      occurredAt: this.now(),
+    })
+    this.updateSessionState(session.sessionId, 'running')
+
+    try {
+      const prompt = await this.buildPromptWithProfileContext(content)
+      const agentReply = await handle.prompt(prompt)
+
+      if (agentReply?.trim()) {
+        const agentMessage = this.appendMessage({
+          agentId: request.agentId,
+          sessionId: request.sessionId,
+          role: 'agent',
+          content: agentReply.trim(),
+        })
+        this.emit({
+          type: 'message-appended',
+          agentId: request.agentId,
+          message: agentMessage,
+          occurredAt: this.now(),
+        })
+      }
+
+      this.updateSessionState(session.sessionId, 'completed')
+    } catch (error) {
+      this.updateSessionState(session.sessionId, 'failed')
+      this.emit({
+        type: 'runtime-error',
+        agentId: request.agentId,
+        error: {
+          code: 'unknown',
+          message: sanitizeErrorMessage(error),
+          recoverable: true,
+        },
+        occurredAt: this.now(),
+      })
+      throw error
+    }
   }
 
   /**
@@ -521,14 +645,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当会话不存在时，Promise 会 reject。
    */
   async cancelRun(request: CancelRunRequest): Promise<void> {
-    this.assertKnownSession(request.sessionId)
-    this.emit({
-      type: 'run-state-changed',
-      agentId: request.agentId,
-      sessionId: request.sessionId,
-      state: 'cancelled',
-      occurredAt: this.now(),
-    })
+    this.assertKnownSession(request.sessionId, request.agentId)
+    await this.sessionHandles.get(request.sessionId)?.abort()
+    this.updateSessionState(request.sessionId, 'cancelled')
   }
 
   /**
@@ -669,6 +788,27 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
+   * 读取已保存且可用于真实会话的运行时配置。
+   *
+   * @returns 已保存的 Provider、模型和 API Key。
+   * @throws 当配置不存在时抛出 AgentRuntimeError。
+   */
+  private async readRequiredConfiguration(): Promise<PersistedRuntimeConfiguration> {
+    const configuration = await this.readPersistedConfiguration()
+
+    if (!configuration) {
+      throw new AgentRuntimeError({
+        code: 'configuration-missing',
+        message:
+          '创建会话前，请先配置 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。',
+        recoverable: true,
+      })
+    }
+
+    return configuration
+  }
+
+  /**
    * 写入 Electron userData 下的配置 JSON。
    *
    * @param configuration - 已通过真实 SDK 验证的运行时配置。
@@ -739,6 +879,60 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       soulUpdatedAt: await this.getMtimeIso(soulPath),
       userUpdatedAt: await this.getMtimeIso(userPath),
     }
+  }
+
+  /**
+   * 读取默认 Agent profile 文件并注入到用户 prompt。
+   *
+   * @param userContent - 用户在 Renderer 中输入的原始消息。
+   * @returns 包含 soul.md/user.md 或 bootstrap.md 上下文的 prompt。
+   * @throws 当 profile 文件读取失败时，Promise 会 reject。
+   */
+  private async buildPromptWithProfileContext(userContent: string): Promise<string> {
+    const absoluteHomePath = this.resolveAgentHomePath()
+    const soulPath = join(absoluteHomePath, 'soul.md')
+    const userPath = join(absoluteHomePath, 'user.md')
+    const bootstrapPath = join(absoluteHomePath, 'bootstrap.md')
+    const [soulFileExists, userFileExists] = await Promise.all([
+      this.pathExists(soulPath),
+      this.pathExists(userPath),
+    ])
+
+    if (soulFileExists && userFileExists) {
+      const [soulContent, profileUserContent] = await Promise.all([
+        readFile(soulPath, 'utf8'),
+        readFile(userPath, 'utf8'),
+      ])
+
+      return [
+        `# ${PROFILE_CONTEXT_HEADER}`,
+        '',
+        '## soul.md',
+        soulContent.trim(),
+        '',
+        '## user.md',
+        profileUserContent.trim(),
+        '',
+        '# 用户消息',
+        userContent,
+      ].join('\n')
+    }
+
+    const bootstrapContent = (await this.pathExists(bootstrapPath))
+      ? await readFile(bootstrapPath, 'utf8')
+      : this.createBootstrapTemplate()
+
+    return [
+      `# ${PROFILE_CONTEXT_HEADER}`,
+      '',
+      '当前 profile 尚未初始化。请根据 bootstrap.md 的问题推进首次初始化；在信息足够时生成 soul.md 和 user.md。',
+      '',
+      '## bootstrap.md',
+      bootstrapContent.trim(),
+      '',
+      '# 用户消息',
+      userContent,
+    ].join('\n')
   }
 
   /**
@@ -819,17 +1013,92 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * 确认会话已存在。
    *
    * @param sessionId - 需要确认的会话标识。
-   * @returns 无返回值。
+   * @param agentId - 会话必须归属的 Agent 标识。
+   * @returns 对应的会话摘要。
    * @throws 当会话不存在时抛出 AgentRuntimeError。
    */
-  private assertKnownSession(sessionId: string): void {
-    if (!this.sessions.has(sessionId)) {
+  private assertKnownSession(
+    sessionId: string,
+    agentId = TANGYUAN_DEFAULT_AGENT_ID,
+  ): AgentSessionSummary {
+    const session = this.sessions.get(sessionId)
+
+    if (!session) {
       throw new AgentRuntimeError({
         code: 'session-not-found',
         message: `找不到会话 ${sessionId}。`,
         recoverable: true,
       })
     }
+
+    if (session.agentId !== agentId) {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `会话 ${sessionId} 不属于 Agent ${agentId}。`,
+        recoverable: true,
+      })
+    }
+
+    return session
+  }
+
+  /**
+   * 向本地 transcript 追加一条标准消息。
+   *
+   * @param input - 消息归属、角色和文本内容。
+   * @returns 已写入本地 transcript 的标准消息。
+   * @throws 当会话不存在时抛出 AgentRuntimeError。
+   */
+  private appendMessage(input: {
+    agentId: AgentId
+    sessionId: string
+    role: AgentMessage['role']
+    content: string
+  }): AgentMessage {
+    this.assertKnownSession(input.sessionId)
+
+    const messages = this.messages.get(input.sessionId) ?? []
+    const message: AgentMessage = {
+      messageId: `${input.sessionId}-message-${messages.length + 1}`,
+      agentId: input.agentId,
+      sessionId: input.sessionId,
+      role: input.role,
+      content: input.content,
+      createdAt: this.now(),
+    }
+    this.messages.set(input.sessionId, [...messages, message])
+
+    return message
+  }
+
+  /**
+   * 更新会话运行状态并广播状态事件。
+   *
+   * @param sessionId - 需要更新的会话标识。
+   * @param state - 新的运行状态。
+   * @returns 更新后的会话摘要。
+   * @throws 当会话不存在时抛出 AgentRuntimeError。
+   */
+  private updateSessionState(
+    sessionId: string,
+    state: AgentRunState,
+  ): AgentSessionSummary {
+    const session = this.assertKnownSession(sessionId)
+    const nextSession = {
+      ...session,
+      state,
+      updatedAt: this.now(),
+    }
+    this.sessions.set(sessionId, nextSession)
+    this.emit({
+      type: 'run-state-changed',
+      agentId: nextSession.agentId,
+      sessionId,
+      state,
+      occurredAt: this.now(),
+    })
+
+    return nextSession
   }
 
   /**
@@ -924,6 +1193,52 @@ class RealPiSdkGateway implements PiSdkGateway {
       session.dispose()
     }
   }
+
+  /**
+   * 创建真实 Pi SDK 会话运行器。
+   *
+   * @param request - 已验证配置、会话标识和 Agent Home 工作目录。
+   * @returns 可发送 prompt、取消运行并释放资源的会话运行器。
+   * @throws 当 SDK 模块加载、模型查找或会话创建失败时，Promise 会 reject。
+   */
+  async createSession(
+    request: PiSdkCreateSessionRequest,
+  ): Promise<PiSdkSessionHandle> {
+    const { AuthStorage, ModelRegistry, SessionManager, createAgentSession } =
+      await import('@earendil-works/pi-coding-agent')
+    const authStorage = AuthStorage.inMemory()
+    authStorage.setRuntimeApiKey(request.providerId, request.apiKey)
+
+    const modelRegistry = ModelRegistry.inMemory(authStorage)
+    const model = modelRegistry.find(request.providerId, request.modelId)
+
+    if (!model) {
+      throw new Error(`找不到模型 ${request.providerId}/${request.modelId}`)
+    }
+
+    const { session } = await createAgentSession({
+      cwd: request.cwd,
+      authStorage,
+      modelRegistry,
+      model,
+      sessionManager: SessionManager.create(request.cwd, undefined, {
+        id: request.sessionId,
+      }),
+    })
+
+    return {
+      prompt: async (prompt: string) => {
+        await session.prompt(prompt)
+        return session.getLastAssistantText() ?? null
+      },
+      abort: async () => {
+        await session.abort()
+      },
+      dispose: () => {
+        session.dispose()
+      },
+    }
+  }
 }
 
 /**
@@ -943,18 +1258,20 @@ function isAbortError(error: unknown): boolean {
  * 把错误消息转换成不含 API Key 的用户可读文案。
  *
  * @param error - 捕获到的未知错误。
- * @param apiKey - 需要从消息中移除的原始 API Key。
+ * @param apiKey - 需要从消息中移除的原始 API Key；非配置错误可省略。
  * @returns 脱敏后的错误消息。
  * @throws 此方法不会主动抛出错误。
  */
-function sanitizeErrorMessage(error: unknown, apiKey: string): string {
+function sanitizeErrorMessage(error: unknown, apiKey?: string): string {
   const rawMessage =
     error instanceof Error
       ? error.message
       : typeof error === 'string'
         ? error
         : '请检查 Provider、Model 和 API Key 后重试。'
-  const redactedMessage = rawMessage.split(apiKey).join('[API Key 已隐藏]')
+  const redactedMessage = apiKey
+    ? rawMessage.split(apiKey).join('[API Key 已隐藏]')
+    : rawMessage
 
   return redactedMessage || '请检查 Provider、Model 和 API Key 后重试。'
 }

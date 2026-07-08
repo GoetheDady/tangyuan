@@ -219,6 +219,9 @@ export const DESKTOP_IPC_CHANNELS = {
     'tangyuan:runtime:cancel-configuration-verification',
   sessionsList: 'tangyuan:sessions:list',
   sessionsCreate: 'tangyuan:sessions:create',
+  sessionsGetMessages: 'tangyuan:sessions:get-messages',
+  sessionsSendMessage: 'tangyuan:sessions:send-message',
+  sessionsCancelRun: 'tangyuan:sessions:cancel-run',
 } as const
 
 /**
@@ -237,6 +240,9 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification]: CancelConfigurationVerificationRequest
   [DESKTOP_IPC_CHANNELS.sessionsList]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: CreateSessionRequest
+  [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: GetSessionMessagesRequest
+  [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: SendMessageRequest
+  [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: CancelRunRequest
 }
 
 /**
@@ -249,6 +255,9 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification]: RuntimeSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsList]: AgentSessionSummary[]
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: AgentSessionSummary
+  [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: AgentMessage[]
+  [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: AgentMessage[]
+  [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: AgentSessionSummary
 }
 
 /**
@@ -329,6 +338,33 @@ export interface DesktopPreloadApi {
    * @throws 当 Driver 无法创建会话时，Promise 会 reject。
    */
   createSession(request: CreateSessionRequest): Promise<AgentSessionSummary>
+
+  /**
+   * 读取指定会话的 transcript。
+   *
+   * @param request - 会话所属 Agent 和会话标识。
+   * @returns 会话里的消息列表。
+   * @throws 当会话不存在或 Main 进程无法读取消息时，Promise 会 reject。
+   */
+  getMessages(request: GetSessionMessagesRequest): Promise<AgentMessage[]>
+
+  /**
+   * 向指定 Agent 会话发送一条用户消息。
+   *
+   * @param request - 会话所属 Agent、会话标识和用户消息内容。
+   * @returns 发送完成后可展示的最新消息列表。
+   * @throws 当配置缺失、会话不存在或 Agent 运行失败时，Promise 会 reject。
+   */
+  sendMessage(request: SendMessageRequest): Promise<AgentMessage[]>
+
+  /**
+   * 取消指定会话正在运行的 Agent 响应。
+   *
+   * @param request - 会话所属 Agent 和会话标识。
+   * @returns 取消后的会话摘要。
+   * @throws 当会话不存在或 Main 进程无法取消运行时，Promise 会 reject。
+   */
+  cancelRun(request: CancelRunRequest): Promise<AgentSessionSummary>
 }
 
 /**

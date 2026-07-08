@@ -1,11 +1,15 @@
 import type { AgentSessionDriver, RuntimeResourceDriver } from '@tangyuan/agent-runtime'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
+  type AgentMessage,
   type AgentSessionSummary,
   type CancelConfigurationVerificationRequest,
+  type CancelRunRequest,
   type CreateSessionRequest,
+  type GetSessionMessagesRequest,
   type RuntimeConfiguration,
-  type RuntimeSnapshot
+  type RuntimeSnapshot,
+  type SendMessageRequest
 } from '@tangyuan/shared'
 
 /**
@@ -72,6 +76,33 @@ export interface DesktopAppStore {
    * @throws 当 AgentSessionDriver 创建失败时，Promise 会 reject。
    */
   createSession(request: CreateSessionRequest): Promise<AgentSessionSummary>
+
+  /**
+   * 读取指定会话的 transcript。
+   *
+   * @param request - 会话所属 Agent 和会话标识。
+   * @returns 当前会话消息列表。
+   * @throws 当 AgentSessionDriver 读取失败时，Promise 会 reject。
+   */
+  getMessages(request: GetSessionMessagesRequest): Promise<AgentMessage[]>
+
+  /**
+   * 向指定会话发送用户消息。
+   *
+   * @param request - 会话所属 Agent、会话标识和消息内容。
+   * @returns 发送完成后的当前会话消息列表。
+   * @throws 当运行时缺少配置、会话不存在或 AgentSessionDriver 发送失败时，Promise 会 reject。
+   */
+  sendMessage(request: SendMessageRequest): Promise<AgentMessage[]>
+
+  /**
+   * 取消指定会话正在运行的 Agent 响应。
+   *
+   * @param request - 会话所属 Agent 和会话标识。
+   * @returns 取消后的会话摘要。
+   * @throws 当会话不存在或 AgentSessionDriver 取消失败时，Promise 会 reject。
+   */
+  cancelRun(request: CancelRunRequest): Promise<AgentSessionSummary>
 }
 
 /**
@@ -180,11 +211,81 @@ class DefaultDesktopAppStore implements DesktopAppStore {
    * @throws 当 AgentSessionDriver 创建失败时，Promise 会 reject。
    */
   async createSession(request: CreateSessionRequest): Promise<AgentSessionSummary> {
+    await this.assertRuntimeReady()
+
     const session = await this.sessionDriver.createSession(request)
     this.sessions = [
       session,
       ...this.sessions.filter((candidate) => candidate.sessionId !== session.sessionId)
     ]
     return session
+  }
+
+  /**
+   * 读取指定会话的消息列表。
+   *
+   * @param request - 会话所属 Agent 和会话标识。
+   * @returns 当前会话消息列表。
+   * @throws 当 AgentSessionDriver 读取失败时，Promise 会 reject。
+   */
+  async getMessages(request: GetSessionMessagesRequest): Promise<AgentMessage[]> {
+    return this.sessionDriver.getMessages(request)
+  }
+
+  /**
+   * 向指定会话发送消息，并返回发送完成后的最新 transcript。
+   *
+   * @param request - 会话所属 Agent、会话标识和用户消息内容。
+   * @returns 发送完成后的当前会话消息列表。
+   * @throws 当运行时缺少配置、会话不存在或 AgentSessionDriver 发送失败时，Promise 会 reject。
+   */
+  async sendMessage(request: SendMessageRequest): Promise<AgentMessage[]> {
+    await this.assertRuntimeReady()
+    await this.sessionDriver.sendMessage(request)
+    this.sessions = await this.sessionDriver.listSessions({
+      agentId: TANGYUAN_DEFAULT_AGENT_ID
+    })
+
+    return this.sessionDriver.getMessages({
+      agentId: request.agentId,
+      sessionId: request.sessionId
+    })
+  }
+
+  /**
+   * 取消指定会话正在运行的 Agent 响应，并返回更新后的摘要。
+   *
+   * @param request - 会话所属 Agent 和会话标识。
+   * @returns 取消后的会话摘要。
+   * @throws 当会话不存在或 AgentSessionDriver 取消失败时，Promise 会 reject。
+   */
+  async cancelRun(request: CancelRunRequest): Promise<AgentSessionSummary> {
+    await this.sessionDriver.cancelRun(request)
+    this.sessions = await this.sessionDriver.listSessions({
+      agentId: TANGYUAN_DEFAULT_AGENT_ID
+    })
+    const session = this.sessions.find((candidate) => candidate.sessionId === request.sessionId)
+
+    if (!session) {
+      throw new Error(`找不到会话 ${request.sessionId}。`)
+    }
+
+    return session
+  }
+
+  /**
+   * 确认运行时快照已经满足会话启动条件。
+   *
+   * @returns 无返回值。
+   * @throws 当 Provider、模型或 API Key 缺失时抛出可读错误。
+   */
+  private async assertRuntimeReady(): Promise<void> {
+    const snapshot = this.runtimeSnapshot ?? (await this.getRuntimeSnapshot())
+
+    if (snapshot.status !== 'ready') {
+      throw new Error(
+        '发送消息前，请先配置 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。'
+      )
+    }
   }
 }

@@ -9,6 +9,7 @@ describe('renderer process boundary', () => {
       'electron',
       'node:',
       '@tangyuan/agent-runtime',
+      '@earendil-works/pi-coding-agent',
       '@pi/agent-sdk',
       'pi-agent-sdk'
     ]

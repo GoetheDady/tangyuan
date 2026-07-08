@@ -57,4 +57,13 @@ export function registerDesktopAppIpc(ipcMain: IpcMainLike, store: DesktopAppSto
   ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsCreate, async (_event, payload) => {
     return store.createSession(payload)
   })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsGetMessages, async (_event, payload) => {
+    return store.getMessages(payload)
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsSendMessage, async (_event, payload) => {
+    return store.sendMessage(payload)
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsCancelRun, async (_event, payload) => {
+    return store.cancelRun(payload)
+  })
 }

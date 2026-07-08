@@ -1,4 +1,5 @@
 import type {
+  AgentMessage,
   AgentRunState,
   AgentSessionSummary,
   DesktopPreloadApi,
@@ -30,7 +31,11 @@ function App(): React.JSX.Element {
   const statusDotRef = useRef<HTMLSpanElement>(null)
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null)
   const [sessions, setSessions] = useState<AgentSessionSummary[]>([])
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [messages, setMessages] = useState<AgentMessage[]>([])
+  const [composerText, setComposerText] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [isVerifyingConfiguration, setIsVerifyingConfiguration] = useState(false)
   const [isConfigurationVisible, setIsConfigurationVisible] = useState(false)
   const [configurationForm, setConfigurationForm] = useState<RuntimeConfiguration>({
@@ -65,6 +70,10 @@ function App(): React.JSX.Element {
 
         setRuntime(workbench.runtime)
         setSessions(workbench.sessions)
+        setSelectedSessionId(
+          (currentSessionId) => currentSessionId ?? workbench.sessions[0]?.sessionId ?? null
+        )
+        setMessages(workbench.messages)
         setConfigurationForm((currentForm) => ({
           providerId: currentForm.providerId || workbench.runtime.settings.selectedProviderId || '',
           modelId: currentForm.modelId || workbench.runtime.settings.selectedModelId || '',
@@ -169,13 +178,86 @@ function App(): React.JSX.Element {
         session,
         ...currentSessions.filter((candidate) => candidate.sessionId !== session.sessionId)
       ])
+      setSelectedSessionId(session.sessionId)
+      setMessages([])
       setErrorMessage(null)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '创建会话失败')
     }
   }
 
-  const selectedSession = sessions[0] ?? null
+  /**
+   * 打开指定会话并读取 transcript。
+   *
+   * @param session - 用户在会话列表中选择的会话摘要。
+   * @returns 无返回值。
+   * @throws Preload API 错误会被捕获并写入 errorMessage。
+   */
+  const openSession = async (session: AgentSessionSummary): Promise<void> => {
+    setSelectedSessionId(session.sessionId)
+
+    try {
+      const nextMessages = await window.api.getMessages({
+        agentId: session.agentId,
+        sessionId: session.sessionId
+      })
+      setMessages(nextMessages)
+      setErrorMessage(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '读取会话消息失败')
+    }
+  }
+
+  /**
+   * 向当前会话发送用户消息。
+   *
+   * @returns 无返回值。
+   * @throws Preload API 错误会被捕获并写入 errorMessage。
+   */
+  const sendMessage = async (): Promise<void> => {
+    const selectedSession = sessions.find((session) => session.sessionId === selectedSessionId)
+    const content = composerText.trim()
+
+    if (!selectedSession) {
+      setErrorMessage('请先创建一个新会话。')
+      return
+    }
+
+    if (!content) {
+      return
+    }
+
+    const optimisticMessage: AgentMessage = {
+      messageId: `optimistic-${Date.now()}`,
+      agentId: selectedSession.agentId,
+      sessionId: selectedSession.sessionId,
+      role: 'user',
+      content,
+      createdAt: new Date().toISOString()
+    }
+    setMessages((currentMessages) => [...currentMessages, optimisticMessage])
+    setComposerText('')
+    setIsSendingMessage(true)
+    setErrorMessage(null)
+
+    try {
+      const nextMessages = await window.api.sendMessage({
+        agentId: selectedSession.agentId,
+        sessionId: selectedSession.sessionId,
+        content
+      })
+      setMessages(nextMessages)
+      setSessions(await window.api.listSessions())
+      setErrorMessage(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '发送消息失败')
+    } finally {
+      setIsSendingMessage(false)
+    }
+  }
+
+  const selectedSession =
+    sessions.find((session) => session.sessionId === selectedSessionId) ?? sessions[0] ?? null
   const statusLabel = isLoading
     ? '正在读取运行时'
     : runtime?.status === 'ready'
@@ -396,13 +478,23 @@ function App(): React.JSX.Element {
 
           <div className="space-y-2">
             <p className="text-xs font-medium uppercase tracking-wide text-text-muted">会话</p>
-            {selectedSession ? (
-              <div className="rounded-md border border-border bg-surface p-3">
-                <p className="text-sm font-medium">{selectedSession.title}</p>
-                <p className="mt-1 text-xs text-text-muted">
-                  {formatRunState(selectedSession.state)}
-                </p>
-              </div>
+            {sessions.length ? (
+              sessions.map((session) => (
+                <button
+                  key={session.sessionId}
+                  className={`w-full rounded-md border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-focus ${
+                    session.sessionId === selectedSession?.sessionId
+                      ? 'border-brand bg-surface'
+                      : 'border-border bg-surface hover:bg-surface-soft'
+                  }`}
+                  onClick={() => {
+                    void openSession(session)
+                  }}
+                >
+                  <p className="text-sm font-medium">{session.title}</p>
+                  <p className="mt-1 text-xs text-text-muted">{formatRunState(session.state)}</p>
+                </button>
+              ))
             ) : (
               <div className="rounded-md border border-border bg-surface p-3 text-sm text-text-muted">
                 暂无会话
@@ -427,8 +519,8 @@ function App(): React.JSX.Element {
           </header>
 
           <div className="grid flex-1 grid-cols-[1fr_300px] gap-0">
-            <div className="flex flex-col justify-between p-6">
-              <div className="space-y-4">
+            <div className="flex min-h-0 flex-col p-6">
+              <div className="mb-5 grid grid-cols-2 gap-4">
                 <div className="rounded-md border border-border bg-surface p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-medium">
                     <Settings2 size={16} aria-hidden="true" />
@@ -513,8 +605,98 @@ function App(): React.JSX.Element {
                 </div>
               </div>
 
-              <div className="mt-6 flex min-h-24 items-center rounded-md border border-border bg-surface px-4 text-sm text-text-muted">
-                {errorMessage ?? '配置模型服务和模型后，这里会承载真实智能体会话。'}
+              <div className="flex min-h-0 flex-1 flex-col rounded-md border border-border bg-surface">
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {selectedSession?.title ?? '尚未选择会话'}
+                    </p>
+                    <p className="text-xs text-text-muted">
+                      {selectedSession ? formatRunState(selectedSession.state) : '创建会话后开始'}
+                    </p>
+                  </div>
+                  {selectedSession?.state === 'running' ? (
+                    <button
+                      className="flex h-9 items-center justify-center gap-2 rounded-md border border-border bg-surface px-3 text-sm font-medium transition hover:bg-surface-soft focus:outline-none focus:ring-2 focus:ring-focus"
+                      onClick={() => {
+                        void window.api
+                          .cancelRun({
+                            agentId: selectedSession.agentId,
+                            sessionId: selectedSession.sessionId
+                          })
+                          .then((nextSession) => {
+                            setSessions((currentSessions) =>
+                              currentSessions.map((session) =>
+                                session.sessionId === nextSession.sessionId ? nextSession : session
+                              )
+                            )
+                          })
+                          .catch((error: unknown) => {
+                            setErrorMessage(error instanceof Error ? error.message : '取消运行失败')
+                          })
+                      }}
+                    >
+                      <Ban size={16} aria-hidden="true" />
+                      取消
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+                  {messages.length ? (
+                    messages.map((message) => (
+                      <article
+                        key={message.messageId}
+                        className={`max-w-[84%] rounded-md border px-3 py-2 text-sm ${
+                          message.role === 'user'
+                            ? 'ml-auto border-brand bg-brand text-surface'
+                            : 'border-border bg-surface-soft text-text'
+                        }`}
+                      >
+                        <p className="mb-1 text-xs opacity-75">{formatMessageRole(message.role)}</p>
+                        <p className="whitespace-pre-wrap leading-6">{message.content}</p>
+                      </article>
+                    ))
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-text-muted">
+                      {selectedSession ? '发送第一条消息开始会话。' : '创建新会话后开始。'}
+                    </div>
+                  )}
+                </div>
+
+                <form
+                  className="border-t border-border p-3"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void sendMessage()
+                  }}
+                >
+                  <label className="sr-only" htmlFor="composer">
+                    消息
+                  </label>
+                  <textarea
+                    id="composer"
+                    className="min-h-24 w-full resize-none rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-focus"
+                    value={composerText}
+                    onChange={(event) => {
+                      setComposerText(event.target.value)
+                    }}
+                    disabled={isSendingMessage}
+                  />
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <p className="text-xs text-text-muted">
+                      {errorMessage ?? '消息会通过 Preload API 进入 Main，再由 Pi SDK 会话处理。'}
+                    </p>
+                    <button
+                      className="flex h-10 min-w-24 items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-medium text-surface transition hover:bg-brand-soft focus:outline-none focus:ring-2 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-60"
+                      type="submit"
+                      disabled={isSendingMessage || !selectedSession || !composerText.trim()}
+                    >
+                      <MessageSquarePlus size={16} aria-hidden="true" />
+                      {isSendingMessage ? '发送中' : '发送'}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
 
@@ -568,6 +750,23 @@ function formatRunState(state: AgentRunState): string {
 }
 
 /**
+ * 把消息角色转换为用户可读中文。
+ *
+ * @param role - transcript 消息来源。
+ * @returns 对应的中文展示文案。
+ * @throws 此方法不会主动抛出错误。
+ */
+function formatMessageRole(role: AgentMessage['role']): string {
+  const labels: Record<AgentMessage['role'], string> = {
+    user: '你',
+    agent: '汤圆',
+    system: '系统'
+  }
+
+  return labels[role]
+}
+
+/**
  * 格式化 profile 文件更新时间。
  *
  * @param value - 文件更新时间的 ISO 字符串。
@@ -588,10 +787,18 @@ function formatTimestamp(value: string | null | undefined): string {
 async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   runtime: RuntimeSnapshot
   sessions: AgentSessionSummary[]
+  messages: AgentMessage[]
 }> {
   const [runtime, sessions] = await Promise.all([api.getRuntimeSnapshot(), api.listSessions()])
+  const [firstSession] = sessions
+  const messages = firstSession
+    ? await api.getMessages({
+        agentId: firstSession.agentId,
+        sessionId: firstSession.sessionId
+      })
+    : []
 
-  return { runtime, sessions }
+  return { runtime, sessions, messages }
 }
 
 export default App

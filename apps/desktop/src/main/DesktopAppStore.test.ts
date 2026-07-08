@@ -25,7 +25,13 @@ describe('DesktopAppStore', () => {
 
   it('creates sessions through the session driver and refreshes the cached list', async () => {
     const session = createSessionSummary('session-1')
-    const runtimeDriver = createRuntimeDriver(createSnapshot())
+    const runtimeDriver = createRuntimeDriver(
+      createSnapshot({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        maskedValue: 'sk-t...7890'
+      })
+    )
     const sessionDriver = createSessionDriver([session])
     const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
 
@@ -40,6 +46,63 @@ describe('DesktopAppStore', () => {
     expect(sessionDriver.listSessions).toHaveBeenCalledWith({
       agentId: TANGYUAN_DEFAULT_AGENT_ID
     })
+  })
+
+  it('sends messages through the session driver only when runtime is ready', async () => {
+    const session = createSessionSummary('session-1')
+    const runtimeDriver = createRuntimeDriver(
+      createSnapshot({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        maskedValue: 'sk-t...7890'
+      })
+    )
+    const sessionDriver = createSessionDriver([session])
+    sessionDriver.getMessages = vi.fn().mockResolvedValue([
+      {
+        messageId: 'message-1',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        role: 'user',
+        content: '你好',
+        createdAt: '2026-07-08T00:00:00.000Z'
+      }
+    ])
+    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+
+    await expect(
+      store.sendMessage({
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        content: '你好'
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        role: 'user',
+        content: '你好'
+      })
+    ])
+
+    expect(sessionDriver.sendMessage).toHaveBeenCalledWith({
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+      content: '你好'
+    })
+  })
+
+  it('blocks sending messages when runtime configuration is missing', async () => {
+    const runtimeDriver = createRuntimeDriver(createSnapshot())
+    const sessionDriver = createSessionDriver([])
+    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+
+    await expect(
+      store.sendMessage({
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: 'session-1',
+        content: '你好'
+      })
+    ).rejects.toThrow('发送消息前，请先配置 Provider')
+    expect(sessionDriver.sendMessage).not.toHaveBeenCalled()
   })
 
   it('saves runtime configuration through the runtime driver after verification', async () => {

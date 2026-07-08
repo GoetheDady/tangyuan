@@ -37,6 +37,32 @@ describe('App', () => {
           title: '新会话',
           updatedAt: '2026-07-08T00:00:00.000Z'
         })
+      ),
+      getMessages: vi.fn().mockResolvedValue([]),
+      sendMessage: vi.fn().mockResolvedValue([
+        {
+          messageId: 'message-1',
+          agentId: 'tangyuan',
+          sessionId: 'welcome',
+          role: 'user',
+          content: '你好',
+          createdAt: '2026-07-08T00:00:00.000Z'
+        },
+        {
+          messageId: 'message-2',
+          agentId: 'tangyuan',
+          sessionId: 'welcome',
+          role: 'agent',
+          content: '收到：你好',
+          createdAt: '2026-07-08T00:00:00.000Z'
+        }
+      ]),
+      cancelRun: vi.fn().mockResolvedValue(
+        createDefaultSessionSummary({
+          sessionId: 'welcome',
+          title: '新会话',
+          updatedAt: '2026-07-08T00:00:00.000Z'
+        })
       )
     }
 
@@ -111,7 +137,10 @@ describe('App', () => {
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
         cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
         listSessions: vi.fn().mockResolvedValue([]),
-        createSession: vi.fn()
+        createSession: vi.fn(),
+        getMessages: vi.fn().mockResolvedValue([]),
+        sendMessage: vi.fn().mockResolvedValue([]),
+        cancelRun: vi.fn()
       } satisfies DesktopPreloadApi
     })
     render(<App />)
@@ -121,6 +150,63 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: '配置模型服务' })).toBeInTheDocument()
     expect(screen.getByText('sk-t...7890')).toBeInTheDocument()
     expect(screen.getByLabelText('API Key')).toHaveValue('')
+  })
+
+  it('sends the first message through the preload API and renders the transcript', async () => {
+    const user = userEvent.setup()
+    const readyRuntime = createReadyRuntimeSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-t...7890'
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
+        refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
+        saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
+        cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
+        listSessions: vi.fn().mockResolvedValue([
+          createDefaultSessionSummary({
+            sessionId: 'welcome',
+            title: '新会话',
+            updatedAt: '2026-07-08T00:00:00.000Z'
+          })
+        ]),
+        createSession: vi.fn(),
+        getMessages: vi.fn().mockResolvedValue([]),
+        sendMessage: vi.fn().mockResolvedValue([
+          {
+            messageId: 'message-1',
+            agentId: 'tangyuan',
+            sessionId: 'welcome',
+            role: 'user',
+            content: '你好',
+            createdAt: '2026-07-08T00:00:00.000Z'
+          },
+          {
+            messageId: 'message-2',
+            agentId: 'tangyuan',
+            sessionId: 'welcome',
+            role: 'agent',
+            content: '收到：你好',
+            createdAt: '2026-07-08T00:00:00.000Z'
+          }
+        ]),
+        cancelRun: vi.fn()
+      } satisfies DesktopPreloadApi
+    })
+    render(<App />)
+
+    await user.type(await screen.findByLabelText('消息'), '你好')
+    await user.click(screen.getByRole('button', { name: '发送' }))
+
+    expect(window.api.sendMessage).toHaveBeenCalledWith({
+      agentId: 'tangyuan',
+      sessionId: 'welcome',
+      content: '你好'
+    })
+    expect(await screen.findByText('收到：你好')).toBeInTheDocument()
   })
 })
 

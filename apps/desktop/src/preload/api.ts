@@ -1,12 +1,15 @@
 import {
   DESKTOP_IPC_CHANNELS,
+  type CancelRunRequest,
   type CreateSessionRequest,
   type DesktopIpcChannel,
   type DesktopIpcPayloadArgs,
   type DesktopIpcResponse,
   type DesktopPreloadApi,
+  type GetSessionMessagesRequest,
   type RuntimeConfiguration,
-  type CancelConfigurationVerificationRequest
+  type CancelConfigurationVerificationRequest,
+  type SendMessageRequest
 } from '@tangyuan/shared'
 
 /**
@@ -45,6 +48,15 @@ export function createTangyuanPreloadApi(invoke: IpcInvoke): DesktopPreloadApi {
     },
     createSession: async (request: CreateSessionRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsCreate, request)
+    },
+    getMessages: async (request: GetSessionMessagesRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsGetMessages, request)
+    },
+    sendMessage: async (request: SendMessageRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsSendMessage, request)
+    },
+    cancelRun: async (request: CancelRunRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsCancelRun, request)
     }
   }
 }

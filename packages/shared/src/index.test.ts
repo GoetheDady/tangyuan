@@ -131,6 +131,9 @@ describe('DESKTOP_IPC_CHANNELS', () => {
         'tangyuan:runtime:cancel-configuration-verification',
       sessionsList: 'tangyuan:sessions:list',
       sessionsCreate: 'tangyuan:sessions:create',
+      sessionsGetMessages: 'tangyuan:sessions:get-messages',
+      sessionsSendMessage: 'tangyuan:sessions:send-message',
+      sessionsCancelRun: 'tangyuan:sessions:cancel-run',
     })
   })
 })
