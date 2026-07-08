@@ -1,10 +1,24 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { PiSdkDriver } from '@tangyuan/agent-runtime'
 import icon from '../../resources/icon.png?asset'
+import { createDesktopAppStore } from './DesktopAppStore'
+import { registerDesktopAppIpc } from './ipc'
 
+const piSdkDriver = new PiSdkDriver()
+const desktopAppStore = createDesktopAppStore({
+  runtimeDriver: piSdkDriver,
+  sessionDriver: piSdkDriver
+})
+
+/**
+ * 创建并加载桌面主窗口。
+ *
+ * @returns 无返回值。
+ * @throws 当 Electron 无法创建 BrowserWindow 或加载页面失败时可能抛出错误。
+ */
 function createWindow(): void {
-  // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
@@ -13,6 +27,8 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
       sandbox: false
     }
   })
@@ -49,8 +65,7 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
+  registerDesktopAppIpc(ipcMain, desktopAppStore)
 
   createWindow()
 

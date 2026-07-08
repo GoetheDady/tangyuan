@@ -1,8 +1,7 @@
-import { ElectronAPI } from '@electron-toolkit/preload'
+import type { DesktopPreloadApi } from '@tangyuan/shared'
 
 declare global {
   interface Window {
-    electron: ElectronAPI
-    api: unknown
+    api: DesktopPreloadApi
   }
 }
