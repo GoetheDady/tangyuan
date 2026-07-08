@@ -2,6 +2,7 @@ import {
   access,
   mkdir,
   readFile,
+  readdir,
   rename,
   stat,
   writeFile,
@@ -304,6 +305,21 @@ interface AgentHomeStatus {
   userFileExists: boolean
   soulUpdatedAt: string | null
   userUpdatedAt: string | null
+}
+
+type ProfileMaintenanceTarget = 'soul' | 'user'
+
+interface ProfileMaintenanceFileSnapshot {
+  target: ProfileMaintenanceTarget
+  path: string
+  historyPath: string
+  content: string
+  historyFiles: Set<string>
+}
+
+interface ProfileMaintenanceSnapshot {
+  soul: ProfileMaintenanceFileSnapshot
+  user: ProfileMaintenanceFileSnapshot
 }
 
 /**
@@ -836,7 +852,25 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         message: completedMessage,
         occurredAt: this.now(),
       })
-      await this.emitProfileUpdateEvents(profileStatusBeforeRun)
+      const profileStatusAfterMainReply = await this.emitProfileUpdateEvents(
+        profileStatusBeforeRun,
+        {
+          agentId: request.agentId,
+          sessionId: request.sessionId,
+        },
+      )
+
+      if (profileStatusBeforeRun.initialized) {
+        await this.runProfileMaintenanceTurn({
+          agentId: request.agentId,
+          sessionId: request.sessionId,
+          handle,
+          userContent: content,
+          agentContent: completedMessage.content,
+          profileStatus: profileStatusAfterMainReply,
+        })
+      }
+
       this.updateSessionState(session.sessionId, 'completed')
       await this.updateSessionIndexEntry(session.sessionId, {
         lastMessagePreview: this.createMessagePreview(completedMessage.content),
@@ -1249,12 +1283,15 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     await mkdir(dirname(indexPath), { recursive: true })
+    const tempIndexPath = `${indexPath}.${process.pid}-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2)}.tmp`
     await writeFile(
-      `${indexPath}.tmp`,
+      tempIndexPath,
       `${JSON.stringify(payload, null, 2)}\n`,
       'utf8',
     )
-    await rename(`${indexPath}.tmp`, indexPath)
+    await rename(tempIndexPath, indexPath)
   }
 
   /**
@@ -1533,39 +1570,396 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * 对比单次运行前后的 profile 文件状态，并在文件生成或更新后广播事件。
    *
    * @param previousStatus - 运行开始前的 Agent Home 文件状态。
-   * @returns 无返回值。
+   * @param transcriptTarget - 需要向 transcript 追加系统消息时的会话归属。
+   * @returns 更新后的 Agent Home 文件状态。
    * @throws 当 Agent Home 状态读取失败时，Promise 会 reject。
    */
   private async emitProfileUpdateEvents(
     previousStatus: AgentHomeStatus,
-  ): Promise<void> {
+    transcriptTarget?: {
+      agentId: AgentId
+      sessionId: string
+    },
+  ): Promise<AgentHomeStatus> {
     const nextStatus = await this.ensureDefaultAgentHome()
 
     if (
       nextStatus.soulUpdatedAt &&
       nextStatus.soulUpdatedAt !== previousStatus.soulUpdatedAt
     ) {
-      this.emit({
-        type: 'profile-updated',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
-        target: 'soul',
-        updatedAt: nextStatus.soulUpdatedAt,
-        occurredAt: this.now(),
-      })
+      this.emitProfileUpdated(
+        'soul',
+        nextStatus.soulUpdatedAt,
+        transcriptTarget,
+      )
     }
 
     if (
       nextStatus.userUpdatedAt &&
       nextStatus.userUpdatedAt !== previousStatus.userUpdatedAt
     ) {
-      this.emit({
-        type: 'profile-updated',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
-        target: 'user',
-        updatedAt: nextStatus.userUpdatedAt,
-        occurredAt: this.now(),
+      this.emitProfileUpdated(
+        'user',
+        nextStatus.userUpdatedAt,
+        transcriptTarget,
+      )
+    }
+
+    return nextStatus
+  }
+
+  /**
+   * 在主回复完成后启动一次后台 profile 维护回合。
+   *
+   * @param input - 当前会话、SDK 运行器、主回合文本和 profile 状态。
+   * @returns 无返回值。
+   * @throws 当维护失败系统消息无法追加时，Promise 会 reject；维护流程自身错误会转换为系统消息。
+   */
+  private async runProfileMaintenanceTurn(input: {
+    agentId: AgentId
+    sessionId: string
+    handle: PiSdkSessionHandle
+    userContent: string
+    agentContent: string
+    profileStatus: AgentHomeStatus
+  }): Promise<void> {
+    if (
+      !input.profileStatus.soulFileExists ||
+      !input.profileStatus.userFileExists
+    ) {
+      return
+    }
+
+    try {
+      const profileSnapshot = await this.readProfileMaintenanceSnapshot()
+      const maintenancePrompt = this.buildProfileMaintenancePrompt({
+        userContent: input.userContent,
+        agentContent: input.agentContent,
+        soulContent: profileSnapshot.soul.content,
+        profileUserContent: profileSnapshot.user.content,
+      })
+
+      await input.handle.prompt(maintenancePrompt)
+
+      const configuration = await this.readPersistedConfiguration()
+      await this.applyProfileMaintenanceResults({
+        agentId: input.agentId,
+        sessionId: input.sessionId,
+        previousSnapshot: profileSnapshot,
+        apiKey: configuration?.apiKey ?? null,
+      })
+    } catch (error) {
+      this.appendAndEmitSystemMessage({
+        agentId: input.agentId,
+        sessionId: input.sessionId,
+        content: `Profile 维护失败：${sanitizeErrorMessage(error)}`,
       })
     }
+  }
+
+  /**
+   * 读取维护回合开始前的 profile 文件内容和历史目录状态。
+   *
+   * @returns soul.md、user.md 及其历史目录的快照。
+   * @throws 当 profile 文件或历史目录无法读取时，Promise 会 reject。
+   */
+  private async readProfileMaintenanceSnapshot(): Promise<ProfileMaintenanceSnapshot> {
+    const absoluteHomePath = this.resolveAgentHomePath()
+
+    return {
+      soul: await this.readProfileMaintenanceFileSnapshot({
+        target: 'soul',
+        path: join(absoluteHomePath, 'soul.md'),
+        historyPath: join(absoluteHomePath, 'soul.history'),
+      }),
+      user: await this.readProfileMaintenanceFileSnapshot({
+        target: 'user',
+        path: join(absoluteHomePath, 'user.md'),
+        historyPath: join(absoluteHomePath, 'user.history'),
+      }),
+    }
+  }
+
+  /**
+   * 读取单个 profile 文件及其历史目录状态。
+   *
+   * @param input - 需要读取的 profile 目标、文件路径和历史目录路径。
+   * @returns 可用于维护结果校验的文件快照。
+   * @throws 当文件读取失败时，Promise 会 reject。
+   */
+  private async readProfileMaintenanceFileSnapshot(input: {
+    target: ProfileMaintenanceTarget
+    path: string
+    historyPath: string
+  }): Promise<ProfileMaintenanceFileSnapshot> {
+    return {
+      target: input.target,
+      path: input.path,
+      historyPath: input.historyPath,
+      content: await readFile(input.path, 'utf8'),
+      historyFiles: await this.readDirectoryFileSet(input.historyPath),
+    }
+  }
+
+  /**
+   * 应用维护回合结束后的 profile 文件校验、脱敏和事件广播。
+   *
+   * @param input - 会话归属、维护前快照和可用于精确脱敏的 API Key。
+   * @returns 无返回值。
+   * @throws 当文件读取、恢复或脱敏写入失败时，Promise 会 reject。
+   */
+  private async applyProfileMaintenanceResults(input: {
+    agentId: AgentId
+    sessionId: string
+    previousSnapshot: ProfileMaintenanceSnapshot
+    apiKey: string | null
+  }): Promise<void> {
+    await Promise.all([
+      this.applyProfileMaintenanceFileResult({
+        agentId: input.agentId,
+        sessionId: input.sessionId,
+        previousFile: input.previousSnapshot.soul,
+        apiKey: input.apiKey,
+      }),
+      this.applyProfileMaintenanceFileResult({
+        agentId: input.agentId,
+        sessionId: input.sessionId,
+        previousFile: input.previousSnapshot.user,
+        apiKey: input.apiKey,
+      }),
+    ])
+  }
+
+  /**
+   * 校验单个 profile 文件是否带备份更新，并在通过后广播更新消息。
+   *
+   * @param input - 会话归属、维护前文件快照和可用于精确脱敏的 API Key。
+   * @returns 无返回值。
+   * @throws 当文件读取、恢复或脱敏写入失败时，Promise 会 reject。
+   */
+  private async applyProfileMaintenanceFileResult(input: {
+    agentId: AgentId
+    sessionId: string
+    previousFile: ProfileMaintenanceFileSnapshot
+    apiKey: string | null
+  }): Promise<void> {
+    const nextContent = await readFile(input.previousFile.path, 'utf8')
+
+    if (nextContent === input.previousFile.content) {
+      return
+    }
+
+    const hasBackup = await this.hasNewHistoryFile(input.previousFile)
+
+    if (!hasBackup) {
+      await writeFile(
+        input.previousFile.path,
+        input.previousFile.content,
+        'utf8',
+      )
+      this.appendAndEmitSystemMessage({
+        agentId: input.agentId,
+        sessionId: input.sessionId,
+        content: `更新${this.formatProfileTargetLabel(input.previousFile.target)}失败：缺少更新前备份，已保留旧版本。`,
+      })
+      return
+    }
+
+    const redactedContent = this.redactSensitiveProfileContent(
+      nextContent,
+      input.apiKey,
+    )
+
+    if (redactedContent !== nextContent) {
+      await writeFile(input.previousFile.path, redactedContent, 'utf8')
+    }
+
+    this.emitProfileUpdated(
+      input.previousFile.target,
+      (await this.getMtimeIso(input.previousFile.path)) ?? this.now(),
+      {
+        agentId: input.agentId,
+        sessionId: input.sessionId,
+      },
+    )
+  }
+
+  /**
+   * 构造后台 profile 维护回合使用的 prompt。
+   *
+   * @param input - 本轮主回合的用户消息、Agent 回复以及当前 profile 内容。
+   * @returns 只用于后台维护的完整 prompt。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private buildProfileMaintenancePrompt(input: {
+    userContent: string
+    agentContent: string
+    soulContent: string
+    profileUserContent: string
+  }): string {
+    return [
+      '# 后台 profile 维护回合',
+      '',
+      '这是主回复完成后的后台 profile 维护回合，不要回复用户，不要继续主回复，也不要输出会混入 transcript 的总结。',
+      '只在本轮对话明确改变长期偏好、边界、称呼、工作规则或 Agent 行为规则时更新 profile；内容无实质变化时不要写文件。',
+      '',
+      '更新规则：',
+      '1. 单轮最多更新一次 soul.md，最多更新一次 user.md。',
+      '2. 更新前必须使用 read 读取旧文件。',
+      '3. 更新前必须使用 write 把旧内容备份到 soul.history/ 或 user.history/。',
+      '4. 更新必须使用 edit 或 write 完成。',
+      '5. 不得把 API Key、token、password、密码、密钥或令牌写入 soul.md / user.md。',
+      '',
+      '## 当前 soul.md',
+      input.soulContent.trim(),
+      '',
+      '## 当前 user.md',
+      input.profileUserContent.trim(),
+      '',
+      '## 刚完成的用户消息',
+      input.userContent,
+      '',
+      '## 刚完成的 Agent 主回复',
+      input.agentContent,
+    ].join('\n')
+  }
+
+  /**
+   * 判断维护回合是否写入了新的历史备份文件。
+   *
+   * @param previousFile - 维护回合开始前的 profile 文件快照。
+   * @returns 有新增历史文件时返回 true，否则返回 false。
+   * @throws 当历史目录无法读取时，Promise 会 reject。
+   */
+  private async hasNewHistoryFile(
+    previousFile: ProfileMaintenanceFileSnapshot,
+  ): Promise<boolean> {
+    const nextHistoryFiles = await this.readDirectoryFileSet(
+      previousFile.historyPath,
+    )
+
+    for (const fileName of nextHistoryFiles) {
+      if (!previousFile.historyFiles.has(fileName)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  /**
+   * 读取目录下的文件名集合，目录不存在时返回空集合。
+   *
+   * @param path - 需要读取的目录路径。
+   * @returns 目录下的文件名集合。
+   * @throws 当目录读取失败且不是 ENOENT 时，Promise 会 reject。
+   */
+  private async readDirectoryFileSet(path: string): Promise<Set<string>> {
+    try {
+      return new Set(await readdir(path))
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        return new Set()
+      }
+
+      throw error
+    }
+  }
+
+  /**
+   * 从 profile 内容中移除敏感凭据。
+   *
+   * @param content - Agent 写入的 profile 原始内容。
+   * @param apiKey - 已保存配置里的 API Key，用于精确替换。
+   * @returns 已脱敏的 profile 内容。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private redactSensitiveProfileContent(
+    content: string,
+    apiKey: string | null,
+  ): string {
+    const exactRedactedContent = apiKey
+      ? content.split(apiKey).join('[已隐藏敏感凭据]')
+      : content
+
+    return exactRedactedContent
+      .replace(/\bsk-[A-Za-z0-9][A-Za-z0-9_-]{6,}\b/g, '[已隐藏敏感凭据]')
+      .replace(
+        /((?:api\s*key|token|password|secret|密钥|令牌|密码)\s*[:：=]\s*)([^\s，。；;]+)/gi,
+        '$1[已隐藏敏感凭据]',
+      )
+  }
+
+  /**
+   * 广播 profile 更新时间，并可选追加用户可见的系统消息。
+   *
+   * @param target - 被更新的 profile 目标。
+   * @param updatedAt - 文件系统记录的更新时间。
+   * @param transcriptTarget - 需要追加 transcript 系统消息时的会话归属。
+   * @returns 无返回值。
+   * @throws 当系统消息追加失败时，Promise 会 reject。
+   */
+  private emitProfileUpdated(
+    target: ProfileMaintenanceTarget,
+    updatedAt: string,
+    transcriptTarget?: {
+      agentId: AgentId
+      sessionId: string
+    },
+  ): void {
+    this.emit({
+      type: 'profile-updated',
+      agentId: transcriptTarget?.agentId ?? TANGYUAN_DEFAULT_AGENT_ID,
+      target,
+      updatedAt,
+      occurredAt: this.now(),
+    })
+
+    if (transcriptTarget) {
+      this.appendAndEmitSystemMessage({
+        ...transcriptTarget,
+        content: target === 'soul' ? '已更新 Agent 规则' : '已更新用户画像',
+      })
+    }
+  }
+
+  /**
+   * 追加并广播一条系统消息。
+   *
+   * @param input - 系统消息的会话归属和内容。
+   * @returns 已追加的系统消息。
+   * @throws 当会话不存在时抛出 AgentRuntimeError。
+   */
+  private appendAndEmitSystemMessage(input: {
+    agentId: AgentId
+    sessionId: string
+    content: string
+  }): AgentMessage {
+    const message = this.appendMessage({
+      agentId: input.agentId,
+      sessionId: input.sessionId,
+      role: 'system',
+      content: input.content,
+    })
+    this.emit({
+      type: 'message-appended',
+      agentId: input.agentId,
+      message,
+      occurredAt: this.now(),
+    })
+
+    return message
+  }
+
+  /**
+   * 把 profile 目标转换为用户可读的中文标签。
+   *
+   * @param target - profile 文件目标。
+   * @returns 用于系统消息的中文标签。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private formatProfileTargetLabel(target: ProfileMaintenanceTarget): string {
+    return target === 'soul' ? 'Agent 规则' : '用户画像'
   }
 
   /**

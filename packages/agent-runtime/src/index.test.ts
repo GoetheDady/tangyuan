@@ -855,6 +855,416 @@ describe('PiSdkDriver', () => {
     expect(gateway.sessionHandles[0]?.prompts[0]).not.toContain('# Bootstrap')
   })
 
+  it('runs one hidden profile maintenance turn after the main reply when no update is needed', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+
+            return handle.prompts.length === 1
+              ? '主回复完成。'
+              : '维护回合输出不应进入 transcript。'
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+    })
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+
+    await writeInitializedProfile(resolvedHomePath)
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '记住我偏好短回答',
+    })
+
+    expect(gateway.sessionHandles[0]?.prompts).toHaveLength(2)
+    expect(gateway.sessionHandles[0]?.prompts[1]).toContain(
+      '后台 profile 维护回合',
+    )
+    expect(gateway.sessionHandles[0]?.prompts[1]).toContain('不要回复用户')
+    expect(gateway.sessionHandles[0]?.prompts[1]).toContain(
+      '使用 read 读取旧文件',
+    )
+    expect(gateway.sessionHandles[0]?.prompts[1]).toContain('soul.history')
+    await expect(
+      driver.getMessages({ agentId: 'tangyuan', sessionId: session.sessionId }),
+    ).resolves.toEqual([
+      expect.objectContaining({ role: 'user', content: '记住我偏好短回答' }),
+      expect.objectContaining({ role: 'agent', content: '主回复完成。' }),
+    ])
+  })
+
+  it('accepts a backed-up user.md update and appends a system message', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+
+            if (handle.prompts.length === 2) {
+              const previousUser = await readFile(
+                join(request.cwd, 'user.md'),
+                'utf8',
+              )
+              await writeFile(
+                join(request.cwd, 'user.history', 'user-20260708.md'),
+                previousUser,
+                'utf8',
+              )
+              await writeFile(
+                join(request.cwd, 'user.md'),
+                '# User\n语言与语气偏好：中文，短回答。',
+                'utf8',
+              )
+            }
+
+            return handle.prompts.length === 1 ? '好的。' : null
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+    })
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+    const events: AgentEvent[] = []
+    driver.subscribe((event) => {
+      events.push(event)
+    })
+
+    await writeInitializedProfile(resolvedHomePath)
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '以后请短回答',
+    })
+
+    await expect(
+      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+    ).resolves.toContain('短回答')
+    await expect(
+      readFile(
+        join(resolvedHomePath, 'user.history', 'user-20260708.md'),
+        'utf8',
+      ),
+    ).resolves.toContain('用户喜欢简洁回答。')
+    await expect(
+      driver.getMessages({ agentId: 'tangyuan', sessionId: session.sessionId }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'system',
+          content: '已更新用户画像',
+        }),
+      ]),
+    )
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'profile-updated', target: 'user' }),
+      ]),
+    )
+  })
+
+  it('accepts a backed-up soul.md update and appends a system message', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+
+            if (handle.prompts.length === 2) {
+              const previousSoul = await readFile(
+                join(request.cwd, 'soul.md'),
+                'utf8',
+              )
+              await writeFile(
+                join(request.cwd, 'soul.history', 'soul-20260708.md'),
+                previousSoul,
+                'utf8',
+              )
+              await writeFile(
+                join(request.cwd, 'soul.md'),
+                '# Soul\n权限边界：修改 Git 历史前必须确认。',
+                'utf8',
+              )
+            }
+
+            return handle.prompts.length === 1 ? '明白。' : null
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+    })
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+
+    await writeInitializedProfile(resolvedHomePath)
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '改 Git 历史前先问我',
+    })
+
+    await expect(
+      readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
+    ).resolves.toContain('修改 Git 历史前必须确认')
+    await expect(
+      driver.getMessages({ agentId: 'tangyuan', sessionId: session.sessionId }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'system',
+          content: '已更新 Agent 规则',
+        }),
+      ]),
+    )
+  })
+
+  it('rejects a profile update that changed a file without a history backup', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+
+            if (handle.prompts.length === 2) {
+              await writeFile(
+                join(request.cwd, 'user.md'),
+                '# User\n语言与语气偏好：英文。',
+                'utf8',
+              )
+            }
+
+            return handle.prompts.length === 1 ? '收到。' : null
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+    })
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+    const events: AgentEvent[] = []
+    driver.subscribe((event) => {
+      events.push(event)
+    })
+
+    await writeInitializedProfile(resolvedHomePath)
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '切换成英文',
+    })
+
+    await expect(
+      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+    ).resolves.toContain('用户喜欢简洁回答。')
+    await expect(
+      driver.getMessages({ agentId: 'tangyuan', sessionId: session.sessionId }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'system',
+          content: '更新用户画像失败：缺少更新前备份，已保留旧版本。',
+        }),
+      ]),
+    )
+    expect(events).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'profile-updated', target: 'user' }),
+      ]),
+    )
+  })
+
+  it('keeps the main reply completed when the hidden maintenance turn fails', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+
+            if (handle.prompts.length === 2) {
+              throw new Error('maintenance failed')
+            }
+
+            return '主回复已经完成。'
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+    })
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+
+    await writeInitializedProfile(resolvedHomePath)
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+
+    await expect(
+      driver.sendMessage({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+        content: '照常回复',
+      }),
+    ).resolves.toBeUndefined()
+    await expect(driver.listSessions({ agentId: 'tangyuan' })).resolves.toEqual(
+      [
+        expect.objectContaining({
+          sessionId: session.sessionId,
+          state: 'completed',
+        }),
+      ],
+    )
+    await expect(
+      driver.getMessages({ agentId: 'tangyuan', sessionId: session.sessionId }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'agent', content: '主回复已经完成。' }),
+        expect.objectContaining({
+          role: 'system',
+          content: 'Profile 维护失败：maintenance failed',
+        }),
+      ]),
+    )
+  })
+
+  it('redacts API keys from a backed-up profile update before keeping it', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+
+            if (handle.prompts.length === 2) {
+              const previousUser = await readFile(
+                join(request.cwd, 'user.md'),
+                'utf8',
+              )
+              await writeFile(
+                join(request.cwd, 'user.history', 'user-20260708.md'),
+                previousUser,
+                'utf8',
+              )
+              await writeFile(
+                join(request.cwd, 'user.md'),
+                '# User\n用户 API Key 是 sk-test-secret-7890，偏好中文。',
+                'utf8',
+              )
+            }
+
+            return handle.prompts.length === 1 ? '收到。' : null
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+    })
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+
+    await writeInitializedProfile(resolvedHomePath)
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '我偏好中文',
+    })
+
+    const nextUserProfile = await readFile(
+      join(resolvedHomePath, 'user.md'),
+      'utf8',
+    )
+    expect(nextUserProfile).not.toContain('sk-test-secret-7890')
+    expect(nextUserProfile).toContain('[已隐藏敏感凭据]')
+  })
+
   it('lets the bootstrap turn create profile files, remove bootstrap.md, and enter history', async () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
@@ -934,10 +1344,12 @@ describe('PiSdkDriver', () => {
     expect(gateway.sessionHandles[0]?.prompts[0]).toContain(
       '完成后删除 bootstrap.md。',
     )
-    await expect(readFile(join(resolvedHomePath, 'soul.md'), 'utf8')).resolves
-      .toContain('身份：汤圆是桌面端 Agent。')
-    await expect(readFile(join(resolvedHomePath, 'user.md'), 'utf8')).resolves
-      .toContain('称呼：用户。')
+    await expect(
+      readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
+    ).resolves.toContain('身份：汤圆是桌面端 Agent。')
+    await expect(
+      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+    ).resolves.toContain('称呼：用户。')
     await expect(
       readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
     ).rejects.toMatchObject({ code: 'ENOENT' })
@@ -1024,6 +1436,32 @@ async function createDriver(options: { gateway?: PiSdkGateway } = {}) {
     userDataPath,
     homePath: '~/.tangyuan/agents/tangyuan',
   }
+}
+
+/**
+ * 写入已初始化的默认 profile 文件和历史目录，用于测试常规维护回合。
+ *
+ * @param resolvedHomePath - 已解析到临时文件系统里的 Agent Home 绝对路径。
+ * @returns 无返回值。
+ * @throws 当目录创建或文件写入失败时，Promise 会 reject。
+ */
+async function writeInitializedProfile(
+  resolvedHomePath: string,
+): Promise<void> {
+  await import('node:fs/promises').then(async ({ mkdir }) => {
+    await mkdir(join(resolvedHomePath, 'soul.history'), { recursive: true })
+    await mkdir(join(resolvedHomePath, 'user.history'), { recursive: true })
+  })
+  await writeFile(
+    join(resolvedHomePath, 'soul.md'),
+    '# Soul\n只说中文。',
+    'utf8',
+  )
+  await writeFile(
+    join(resolvedHomePath, 'user.md'),
+    '# User\n用户喜欢简洁回答。',
+    'utf8',
+  )
 }
 
 /**
