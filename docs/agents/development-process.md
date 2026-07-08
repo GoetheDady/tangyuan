@@ -35,6 +35,15 @@
    - `git add`、commit、push。
    - 在 GitHub Issue 正文里把 acceptance criteria 勾上。
    - 关闭 issue，并在评论里写明 commit 和验证命令。
+   - 如果用户说“更新 issue”“同步 issue”“收尾 issue”，默认包括：更新评论、勾选已完成的 acceptance criteria、关闭已经完成的 issue。
+
+## GitHub Issue 操作细节
+
+- 多行 Markdown 不要通过普通 shell 字符串里的 `\n\n` 传给 `gh`，否则容易写成字面文本。优先使用 `--body-file -` 加 heredoc（here document，Shell 里把一整段文本作为标准输入传给命令的写法）。
+- 更新 issue 正文时，先用 `gh issue view <number> --json body` 读取当前正文，再用 `gh issue edit <number> --body-file -` 写回，避免覆盖未读上下文。
+- 关闭 issue 时，本机 `gh issue close` 支持 `--comment`，不一定支持 `--comment-file`。需要多行关闭评论时，用命令替换读取 heredoc 后传给 `--comment`。
+- 关闭前必须确认 acceptance criteria 已经全部按实际完成情况勾选；有未完成项时不要为了收尾强行关闭。
+- 如果代码已完成但真实外部条件无法验证，例如没有真实 API Key，则可以关闭已满足自动化验收的 issue，但关闭评论必须写明剩余人工验证风险。
 
 ## 状态约定
 

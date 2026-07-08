@@ -13,11 +13,16 @@
 
 - 创建 issue：`gh issue create --title "..." --body "..."`
 - 查看 issue：`gh issue view <number> --comments`
+- 读取 issue 正文：`gh issue view <number> --json body`
+- 更新多行 issue 正文：`gh issue edit <number> --body-file -`
 - 列出 issues：`gh issue list --state open`
 - 评论 issue：`gh issue comment <number> --body "..."`
+- 写入多行评论：`gh issue comment <number> --body-file -`
 - 添加标签：`gh issue edit <number> --add-label "..."`
 - 移除标签：`gh issue edit <number> --remove-label "..."`
 - 关闭 issue：`gh issue close <number> --comment "..."`
+
+多行 Markdown 优先用 `--body-file -` 从标准输入传入。标准输入是命令从外部接收文本的入口；配合 heredoc 可以把一整段正文原样传给 `gh`，避免 `\n` 被写成字面文本。
 
 ## PR 是否作为请求入口
 
