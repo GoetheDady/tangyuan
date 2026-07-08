@@ -9,6 +9,9 @@
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "verify:local": "pnpm lint && pnpm typecheck && pnpm test",
+    "package:mac": "pnpm --filter apps-desktop package:mac",
+    "smoke:packaged:mac": "pnpm --filter apps-desktop smoke:packaged:mac",
     "format": "pnpm -r format"
   },
   "devDependencies": {

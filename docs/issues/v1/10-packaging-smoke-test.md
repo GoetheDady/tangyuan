@@ -8,14 +8,21 @@
 
 ## Acceptance criteria
 
-- [ ] 提供 macOS 打包命令，能产出可启动的应用包。
-- [ ] 打包后的应用可以启动，并显示配置页或工作台。
-- [ ] 打包后的应用可以读取/创建 `~/.tangyuan/agents/tangyuan`。
-- [ ] 打包后的应用能进入 Provider/API Key/Model 配置流程。
-- [ ] 文档记录真实 SDK 集成验收步骤，包括配置验证、创建会话、发送消息、取消响应、重启恢复历史。
-- [ ] 文档记录真实 API Key 不得写入仓库、日志、截图或测试 fixture。
-- [ ] CI 或本地脚本至少运行 `pnpm lint`、`pnpm typecheck`、`pnpm test`。
-- [ ] 如果真实模型调用不适合自动化，必须提供清晰的手动验收清单。
+- [x] 提供 macOS 打包命令，能产出可启动的应用包。
+- [x] 打包后的应用可以启动，并显示配置页或工作台。
+- [x] 打包后的应用可以读取/创建 `~/.tangyuan/agents/tangyuan`。
+- [x] 打包后的应用能进入 Provider/API Key/Model 配置流程。
+- [x] 文档记录真实 SDK 集成验收步骤，包括配置验证、创建会话、发送消息、取消响应、重启恢复历史。
+- [x] 文档记录真实 API Key 不得写入仓库、日志、截图或测试 fixture。
+- [x] CI 或本地脚本至少运行 `pnpm lint`、`pnpm typecheck`、`pnpm test`。
+- [x] 如果真实模型调用不适合自动化，必须提供清晰的手动验收清单。
+
+## Implementation Notes
+
+- macOS 打包命令：`pnpm package:mac`。
+- 打包冒烟测试命令：`pnpm smoke:packaged:mac`。
+- 本地质量门禁命令：`pnpm verify:local`。
+- 真实 SDK 手动验收步骤见 `docs/desktop-packaging-and-sdk-acceptance.md`。
 
 ## Blocked by
 

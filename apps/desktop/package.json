@@ -18,7 +18,10 @@
     "test": "vitest run",
     "build:unpack": "pnpm build && electron-builder --dir",
     "build:win": "pnpm build && electron-builder --win",
-    "build:mac": "electron-vite build && electron-builder --mac",
+    "build:mac": "pnpm build && electron-builder --mac",
+    "build:mac:dir": "pnpm build && electron-builder --mac --dir",
+    "package:mac": "pnpm build:mac",
+    "smoke:packaged:mac": "node scripts/packaged-smoke-test.mjs",
     "build:linux": "electron-vite build && electron-builder --linux"
   },
   "dependencies": {
