@@ -1,19 +1,20 @@
 import type {
   RuntimeConfiguration,
-  RuntimeSnapshot
+  RuntimeSnapshot,
 } from '@tangyuan/contracts'
-import { Ban, CheckCircle2, RefreshCcw, Sparkles } from 'lucide-react'
+import { ArrowRight, Ban, Check, CheckCircle2, RefreshCcw, Sparkles } from 'lucide-react'
 import { motion } from 'motion/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 /**
- * Provider 控制台页面：管理模型服务凭据和默认配置。
+ * Provider 控制台页面：管理多个模型服务凭据和汤圆默认配置。
  *
  * @returns 控制台 Provider 配置页面。
  * @throws 此组件不会主动抛出错误；保存错误会通过 toast 反馈。
@@ -25,13 +26,16 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isVerifyingConfiguration, setIsVerifyingConfiguration] = useState(false)
-  const [isRestoringConfiguration, setIsRestoringConfiguration] = useState(false)
-  const [configurationForm, setConfigurationForm] = useState<RuntimeConfiguration>({
-    providerId: '',
-    modelId: '',
-    apiKey: ''
-  })
+  const [isVerifyingProvider, setIsVerifyingProvider] = useState<string | null>(
+    null,
+  )
+  const [isRestoringConfiguration, setIsRestoringConfiguration] =
+    useState(false)
+
+  // 每个 Provider 独立表单：modelId 和 apiKey
+  const [providerForms, setProviderForms] = useState<
+    Record<string, { modelId: string; apiKey: string }>
+  >({})
 
   useEffect(() => {
     let isMounted = true
@@ -41,41 +45,34 @@ export function ConsoleProviderPage(): React.JSX.Element {
       .then((snapshot) => {
         if (!isMounted) return
         setRuntime(snapshot)
-        setConfigurationForm((currentForm) => ({
-          providerId: currentForm.providerId || snapshot.settings.selectedProviderId || '',
-          modelId: currentForm.modelId || snapshot.settings.selectedModelId || '',
-          apiKey: ''
-        }))
+
+        // 预填充已配置 Provider 的 modelId
+        const forms: Record<string, { modelId: string; apiKey: string }> = {}
+        for (const provider of snapshot.providers) {
+          const providerAuth = snapshot.configuredProviders[provider.providerId]
+          forms[provider.providerId] = {
+            modelId:
+              snapshot.settings.selectedProviderId === provider.providerId
+                ? (snapshot.settings.selectedModelId ?? '')
+                : '',
+            apiKey: '',
+          }
+        }
+        setProviderForms(forms)
       })
       .catch((error: unknown) => {
         if (!isMounted) return
-        toast.error(error instanceof Error ? error.message : '无法读取运行时状态')
+        toast.error(
+          error instanceof Error ? error.message : '无法读取运行时状态',
+        )
       })
       .finally(() => {
         if (isMounted) setIsLoading(false)
       })
-
-    return () => {
-      isMounted = false
-    }
   }, [])
 
-  const selectableModels = useMemo(
-    () =>
-      runtime?.models.filter(
-        (model) => model.providerId === configurationForm.providerId
-      ) ?? [],
-    [configurationForm.providerId, runtime?.models]
-  )
-
-  const canSubmitConfiguration = Boolean(
-    configurationForm.providerId &&
-      configurationForm.modelId &&
-      configurationForm.apiKey.trim()
-  )
-
   /**
-   * 刷新 Provider 和模型资源，并同步配置表单默认值。
+   * 刷新 Provider 和模型资源。
    *
    * @returns 无返回值。
    * @throws Preload API 错误会被捕获并通过 toast 反馈。
@@ -84,41 +81,51 @@ export function ConsoleProviderPage(): React.JSX.Element {
     try {
       const nextRuntime = await window.api.refreshRuntime()
       setRuntime(nextRuntime)
-      setConfigurationForm((currentForm) => ({
-        providerId: currentForm.providerId || nextRuntime.settings.selectedProviderId || '',
-        modelId: currentForm.modelId || nextRuntime.settings.selectedModelId || '',
-        apiKey: ''
-      }))
       toast.success('已刷新可用模型资源')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '刷新运行时资源失败')
+      toast.error(
+        error instanceof Error ? error.message : '刷新运行时资源失败',
+      )
     }
   }
 
   /**
-   * 保存配置前调用 Main 侧真实 Pi SDK 验证流程。
+   * 验证并保存某个 Provider 的 API Key。
    *
+   * @param providerId - 要保存凭据的 Provider 标识。
    * @returns 无返回值。
    * @throws Preload API 错误会被捕获并通过 toast 反馈。
    */
-  const saveConfiguration = async (): Promise<void> => {
-    setIsVerifyingConfiguration(true)
+  const saveConfiguration = async (providerId: string): Promise<void> => {
+    const form = providerForms[providerId]
+    if (!form) return
+
+    const configuration: RuntimeConfiguration = {
+      providerId,
+      modelId: form.modelId,
+      apiKey: form.apiKey,
+    }
+
+    setIsVerifyingProvider(providerId)
 
     try {
-      const nextRuntime = await window.api.saveRuntimeConfiguration(configurationForm)
+      const nextRuntime =
+        await window.api.saveRuntimeConfiguration(configuration)
       setRuntime(nextRuntime)
-      setConfigurationForm({
-        providerId: nextRuntime.settings.selectedProviderId ?? configurationForm.providerId,
-        modelId: nextRuntime.settings.selectedModelId ?? configurationForm.modelId,
-        apiKey: ''
-      })
+      // 清空该 Provider 的 API Key 输入
+      setProviderForms((prev) => ({
+        ...prev,
+        [providerId]: { ...prev[providerId], apiKey: '' },
+      }))
       await openBootstrapSessionIfRequired(nextRuntime)
       toast.success('配置已保存')
-      navigate(redirectTarget, { replace: true })
+      // 不自动跳转，以便用户继续配置其他 Provider
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '配置验证失败')
+      toast.error(
+        error instanceof Error ? error.message : '配置验证失败',
+      )
     } finally {
-      setIsVerifyingConfiguration(false)
+      setIsVerifyingProvider(null)
     }
   }
 
@@ -130,24 +137,55 @@ export function ConsoleProviderPage(): React.JSX.Element {
    */
   const cancelConfigurationVerification = async (): Promise<void> => {
     try {
-      const nextRuntime = await window.api.cancelRuntimeConfigurationVerification({
-        verificationId: 'current'
-      })
+      const nextRuntime =
+        await window.api.cancelRuntimeConfigurationVerification({
+          verificationId: 'current',
+        })
       setRuntime(nextRuntime)
       toast.success('已取消配置验证')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '取消配置验证失败')
+      toast.error(
+        error instanceof Error ? error.message : '取消配置验证失败',
+      )
     } finally {
-      setIsVerifyingConfiguration(false)
+      setIsVerifyingProvider(null)
     }
   }
 
-  // 如果配置已就绪，直接跳转到目标页
+  // 仅在初始加载时：如果配置已就绪，直接跳转到目标页
+  const initialRedirectAttempted = useRef(false)
   useEffect(() => {
-    if (!isLoading && !isVerifyingConfiguration && runtime?.status === 'ready') {
+    if (initialRedirectAttempted.current) return
+    if (
+      !isLoading &&
+      !isVerifyingProvider &&
+      runtime?.status === 'ready'
+    ) {
+      initialRedirectAttempted.current = true
       navigate(redirectTarget, { replace: true })
     }
-  }, [isLoading, isVerifyingConfiguration, runtime?.status, navigate, redirectTarget])
+  }, [
+    isLoading,
+    isVerifyingProvider,
+    runtime?.status,
+    navigate,
+    redirectTarget,
+  ])
+
+  // 获取选中 Provider 的可用模型列表
+  const getModelsForProvider = (providerId: string) =>
+    runtime?.models.filter((m) => m.providerId === providerId) ?? []
+
+  // 有凭据的 Provider 列表
+  const configuredProviderIds = useMemo(
+    () =>
+      runtime
+        ? Object.entries(runtime.configuredProviders)
+            .filter(([, auth]) => auth.configured)
+            .map(([id]) => id)
+        : [],
+    [runtime],
+  )
 
   if (isLoading) {
     return (
@@ -189,7 +227,9 @@ export function ConsoleProviderPage(): React.JSX.Element {
                       toast.success('已从备份恢复配置')
                     } catch (error) {
                       toast.error(
-                        error instanceof Error ? error.message : '恢复配置失败',
+                        error instanceof Error
+                          ? error.message
+                          : '恢复配置失败',
                       )
                     } finally {
                       setIsRestoringConfiguration(false)
@@ -210,7 +250,9 @@ export function ConsoleProviderPage(): React.JSX.Element {
                     toast.success('已重置配置')
                   } catch (error) {
                     toast.error(
-                      error instanceof Error ? error.message : '重置配置失败',
+                      error instanceof Error
+                        ? error.message
+                        : '重置配置失败',
                     )
                   } finally {
                     setIsRestoringConfiguration(false)
@@ -238,127 +280,276 @@ export function ConsoleProviderPage(): React.JSX.Element {
         transition={{ duration: 0.25 }}
       >
         <div className="grid w-full grid-cols-[0.9fr_1.1fr] overflow-hidden rounded-lg border bg-card shadow-sm">
+          {/* 左侧品牌面板 */}
           <section className="border-r bg-muted/35 p-8">
             <div className="mb-7 grid size-11 place-items-center rounded-md bg-primary text-primary-foreground">
               <Sparkles size={21} aria-hidden="true" />
             </div>
             <p className="text-sm text-muted-foreground">控制台</p>
-            <h1 className="mt-2 text-3xl font-semibold leading-tight">配置模型服务</h1>
+            <h1 className="mt-2 text-3xl font-semibold leading-tight">
+              配置模型服务
+            </h1>
             <p className="mt-4 max-w-sm text-sm leading-6 text-muted-foreground">
-              选择 Provider、模型并验证 API Key。完成后会直接进入聊天主界面。
+              为 Provider 配置 API Key
+              并选择汤圆默认模型。完成后会直接进入聊天主界面。
             </p>
           </section>
 
-          <section className="p-8">
-            <form
-              className="space-y-5"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void saveConfiguration()
-              }}
-            >
-              <div className="space-y-2">
-                <Label htmlFor="provider">Provider</Label>
-                <select
-                  id="provider"
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  value={configurationForm.providerId}
-                  onChange={(event) => {
-                    setConfigurationForm((currentForm) => ({
-                      ...currentForm,
-                      providerId: event.target.value,
-                      modelId: ''
-                    }))
-                  }}
-                  disabled={isVerifyingConfiguration}
-                >
-                  <option value="">选择模型服务</option>
-                  {runtime?.providers.map((provider) => (
-                    <option key={provider.providerId} value={provider.providerId}>
-                      {provider.displayName}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          {/* 右侧配置面板 */}
+          <section className="space-y-6 overflow-y-auto p-8">
+            {/* 汤圆默认模型 */}
+            <div className="rounded-md border bg-muted/20 p-4">
+              <h2 className="mb-3 text-sm font-semibold">汤圆默认模型</h2>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="default-provider">Provider</Label>
+                  <select
+                    id="default-provider"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    value={runtime?.settings.selectedProviderId ?? ''}
+                    disabled={
+                      configuredProviderIds.length === 0 ||
+                      isVerifyingProvider !== null
+                    }
+                    onChange={(event) => {
+                      const newProviderId = event.target.value
+                      if (!newProviderId) return
+                      // 切换到新 Provider 时，同步更新其表单 modelId
+                      const targetForm = providerForms[newProviderId]
+                      const configuration: RuntimeConfiguration = {
+                        providerId: newProviderId,
+                        modelId: targetForm?.modelId ?? '',
+                        apiKey: '',
+                      }
+                      // 复用现有 API Key 更新默认设置
+                      const existingAuth =
+                        runtime?.configuredProviders[newProviderId]
+                      if (!existingAuth?.configured) return
 
-              <div className="space-y-2">
-                <Label htmlFor="model">Model</Label>
-                <select
-                  id="model"
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  value={configurationForm.modelId}
-                  onChange={(event) => {
-                    setConfigurationForm((currentForm) => ({
-                      ...currentForm,
-                      modelId: event.target.value
-                    }))
-                  }}
-                  disabled={isVerifyingConfiguration || !configurationForm.providerId}
-                >
-                  <option value="">选择模型</option>
-                  {selectableModels.map((model) => (
-                    <option key={`${model.providerId}:${model.modelId}`} value={model.modelId}>
-                      {model.displayName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="api-key">API Key</Label>
-                <Input
-                  id="api-key"
-                  type="password"
-                  value={configurationForm.apiKey}
-                  onChange={(event) => {
-                    setConfigurationForm((currentForm) => ({
-                      ...currentForm,
-                      apiKey: event.target.value
-                    }))
-                  }}
-                  disabled={isVerifyingConfiguration}
-                />
-                {runtime?.auth.apiKey.maskedValue ? (
-                  <p className="text-xs text-muted-foreground">
-                    已保存：{runtime.auth.apiKey.maskedValue}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                <Button
-                  type="submit"
-                  disabled={isVerifyingConfiguration || isLoading || !canSubmitConfiguration}
-                >
-                  <CheckCircle2 aria-hidden="true" />
-                  {isVerifyingConfiguration ? '验证中' : '验证并保存'}
-                </Button>
-                {isVerifyingConfiguration ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      void cancelConfigurationVerification()
+                      // 修改默认设置：用空 apiKey 会导致 normalize 拒绝
+                      // 我们需要通过 saveConfiguration 来设置默认
+                      // MVP：引导用户在 Provider 卡片中重新验证以切换默认
+                      toast.info('请在下方 Provider 凭据中重新验证以切换默认模型')
                     }}
                   >
-                    <Ban aria-hidden="true" />
-                    取消验证
-                  </Button>
-                ) : null}
+                    {configuredProviderIds.length === 0 ? (
+                      <option value="">请先配置 Provider 凭据</option>
+                    ) : null}
+                    {configuredProviderIds.map((id) => {
+                      const provider = runtime?.providers.find(
+                        (p) => p.providerId === id,
+                      )
+                      return (
+                        <option key={id} value={id}>
+                          {provider?.displayName ?? id}
+                        </option>
+                      )
+                    })}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="default-model">Model</Label>
+                  <select
+                    id="default-model"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    value={runtime?.settings.selectedModelId ?? ''}
+                    disabled
+                  >
+                    <option value="">
+                      {runtime?.settings.selectedModelId ?? '未选择'}
+                    </option>
+                  </select>
+                </div>
+              </div>
+              {configuredProviderIds.length === 0 ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  请先配置至少一个 Provider 的 API Key 以启用聊天。
+                </p>
+              ) : null}
+            </div>
+
+            {/* Provider 凭据卡片 */}
+            <div>
+              <h2 className="mb-3 text-sm font-semibold">Provider 凭据</h2>
+              {!runtime?.providers.length ? (
+                <p className="text-sm text-muted-foreground">
+                  未发现可用 Provider，请检查 Pi Agent 安装后刷新资源。
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {runtime.providers.map((provider) => {
+                    const providerAuth =
+                      runtime.configuredProviders[provider.providerId]
+                    const isConfigured = providerAuth?.configured ?? false
+                    const form = providerForms[provider.providerId] ?? {
+                      modelId: '',
+                      apiKey: '',
+                    }
+                    const isVerifyingThis =
+                      isVerifyingProvider === provider.providerId
+                    const isVerifyingOther =
+                      isVerifyingProvider !== null && !isVerifyingThis
+                    const models = getModelsForProvider(provider.providerId)
+                    const canSubmit =
+                      Boolean(form.modelId) && form.apiKey.trim().length > 0
+
+                    return (
+                      <div
+                        key={provider.providerId}
+                        className="rounded-md border bg-card p-4"
+                      >
+                        <div className="mb-3 flex items-center justify-between">
+                          <h3 className="text-sm font-medium">
+                            {provider.displayName}
+                          </h3>
+                          <Badge
+                            variant={isConfigured ? 'default' : 'secondary'}
+                          >
+                            {isConfigured ? (
+                              <Check
+                                size={12}
+                                className="mr-1"
+                                aria-hidden="true"
+                              />
+                            ) : null}
+                            {isConfigured ? '已配置' : '未配置'}
+                          </Badge>
+                        </div>
+
+                        {isConfigured && providerAuth?.maskedValue ? (
+                          <p className="mb-3 text-xs text-muted-foreground">
+                            已保存：{providerAuth.maskedValue}
+                          </p>
+                        ) : null}
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label
+                              htmlFor={`model-${provider.providerId}`}
+                            >
+                              Model
+                            </Label>
+                            <select
+                              id={`model-${provider.providerId}`}
+                              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                              value={form.modelId}
+                              onChange={(event) => {
+                                setProviderForms((prev) => ({
+                                  ...prev,
+                                  [provider.providerId]: {
+                                    ...prev[provider.providerId],
+                                    modelId: event.target.value,
+                                  },
+                                }))
+                              }}
+                              disabled={isVerifyingThis}
+                            >
+                              <option value="">选择模型</option>
+                              {models.map((model) => (
+                                <option
+                                  key={`${model.providerId}:${model.modelId}`}
+                                  value={model.modelId}
+                                >
+                                  {model.displayName}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label
+                              htmlFor={`api-key-${provider.providerId}`}
+                            >
+                              API Key
+                            </Label>
+                            <Input
+                              id={`api-key-${provider.providerId}`}
+                              type="password"
+                              placeholder={
+                                isConfigured ? '留空以保留已保存的密钥' : ''
+                              }
+                              value={form.apiKey}
+                              onChange={(event) => {
+                                setProviderForms((prev) => ({
+                                  ...prev,
+                                  [provider.providerId]: {
+                                    ...prev[provider.providerId],
+                                    apiKey: event.target.value,
+                                  },
+                                }))
+                              }}
+                              disabled={isVerifyingThis}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            disabled={
+                              isVerifyingOther || !canSubmit
+                            }
+                            onClick={() => {
+                              void saveConfiguration(provider.providerId)
+                            }}
+                          >
+                            <CheckCircle2 aria-hidden="true" />
+                            {isVerifyingThis
+                              ? '验证中'
+                              : isConfigured
+                                ? '验证并更新'
+                                : '验证并保存'}
+                          </Button>
+                          {isVerifyingThis ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              type="button"
+                              onClick={() => {
+                                void cancelConfigurationVerification()
+                              }}
+                            >
+                              <Ban aria-hidden="true" />
+                              取消验证
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 操作按钮 */}
+            <div className="flex items-center gap-3 pt-1">
+              {runtime?.status === 'ready' ? (
                 <Button
-                  type="button"
-                  variant="outline"
+                  size="sm"
                   onClick={() => {
-                    void refreshRuntime()
+                    navigate(redirectTarget, { replace: true })
                   }}
                 >
-                  <RefreshCcw aria-hidden="true" />
-                  刷新资源
+                  <ArrowRight aria-hidden="true" />
+                  进入聊天
                 </Button>
-              </div>
-            </form>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  void refreshRuntime()
+                }}
+              >
+                <RefreshCcw aria-hidden="true" />
+                刷新资源
+              </Button>
+            </div>
 
-            <p className="mt-6 text-xs text-muted-foreground">配置通过验证后才会保存。</p>
+            <p className="text-xs text-muted-foreground">
+              配置通过真实 Provider 验证后才会保存。API Key
+              仅加密保存在本机。
+            </p>
           </section>
         </div>
       </motion.section>
@@ -374,9 +565,12 @@ export function ConsoleProviderPage(): React.JSX.Element {
  * @throws Preload API 错误会透传给调用方，由保存配置流程统一展示。
  */
 async function openBootstrapSessionIfRequired(
-  nextRuntime: RuntimeSnapshot
+  nextRuntime: RuntimeSnapshot,
 ): Promise<void> {
-  if (nextRuntime.status !== 'ready' || !nextRuntime.activeAgent.profile.bootstrapRequired) {
+  if (
+    nextRuntime.status !== 'ready' ||
+    !nextRuntime.activeAgent.profile.bootstrapRequired
+  ) {
     return
   }
 
@@ -388,6 +582,6 @@ async function openBootstrapSessionIfRequired(
 
   await window.api.createSession({
     agentId: nextRuntime.activeAgent.agentId,
-    title: 'Bootstrap 初始化'
+    title: 'Bootstrap 初始化',
   })
 }

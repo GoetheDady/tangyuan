@@ -42,6 +42,12 @@ export function createReadyRuntimeSnapshot(
       selectedProviderId: 'anthropic',
       selectedModelId: 'claude-sonnet-4-5',
     },
+    configuredProviders: {
+      anthropic: {
+        configured: true,
+        maskedValue: 'sk-a...7xq',
+      },
+    },
     auth: {
       apiKey: {
         configured: true,
@@ -84,6 +90,7 @@ export function createMissingConfigSnapshot(
       selectedProviderId: null,
       selectedModelId: null,
     },
+    configuredProviders: {},
     auth: {
       apiKey: {
         configured: false,

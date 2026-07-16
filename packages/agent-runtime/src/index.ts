@@ -42,6 +42,7 @@ import {
   type ModelDescriptor,
   type PersistedConfigurationV1,
   type PersistedConfigurationV2,
+  type ProviderAuthSnapshot,
   type ProviderCredentials,
   type ProviderDescriptor,
   type RuntimeConfiguration,
@@ -931,6 +932,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
           agentContent: completedMessage.content,
           profileStatus: profileStatusAfterMainReply,
         })
+      } else {
+        await this.performBootstrapCompletionGating()
       }
 
       this.updateSessionState(session.sessionId, 'completed')
@@ -1060,6 +1063,19 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       : null
     const hasBackup = await this.hasBackupFile()
 
+    // 构建按 providerId 索引的凭据配置状态，Renderer 只能读取脱敏值
+    const configuredProviders: Record<string, ProviderAuthSnapshot> = {}
+    if (readResult.config) {
+      for (const [providerId, creds] of Object.entries(
+        readResult.config.providers,
+      )) {
+        configuredProviders[providerId] = {
+          configured: true,
+          maskedValue: PiSdkDriver.maskApiKey(creds.apiKey),
+        }
+      }
+    }
+
     return createRuntimeSnapshot({
       activeAgent: {
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
@@ -1073,6 +1089,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         selectedProviderId: runtimeConfig?.providerId ?? null,
         selectedModelId: runtimeConfig?.modelId ?? null,
       },
+      configuredProviders,
       auth: {
         apiKey: {
           configured: Boolean(runtimeConfig?.apiKey),
@@ -1166,7 +1183,17 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       }
 
       // 解密
-      const config = await this.decryptConfigFromDisk(parseResult.data)
+      let config: InternalRuntimeConfig
+      try {
+        config = await this.decryptConfigFromDisk(parseResult.data)
+      } catch {
+        return {
+          config: null,
+          recoveryState: 'corrupted',
+          hasBackup: await this.hasBackupFile(),
+        }
+      }
+
       return {
         config,
         recoveryState: 'ok',
@@ -1183,10 +1210,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
           recoveryState: 'ok',
           hasBackup: false,
         }
-      }
-
-      if (error instanceof AgentRuntimeError) {
-        throw error
       }
 
       return {
@@ -2065,6 +2088,46 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         content: `Profile 维护失败：${sanitizeErrorMessage(error)}`,
       })
     }
+  }
+
+  /**
+   * 在 bootstrap 模式回合结束后施行文件门控。
+   *
+   * - 若 soul.md 与 user.md 同时存在：删除 bootstrap.md（Agent 可能遗漏）。
+   * - 若 bootstrap.md 已被 Agent 删除但 profile 仍未就绪：重新创建 bootstrap.md。
+   * - 其它情况不做任何操作，bootstrap 流程继续。
+   *
+   * @returns 无返回值。
+   * @throws 当 bootstrap.md 重建写入失败时，Promise 会 reject。
+   */
+  private async performBootstrapCompletionGating(): Promise<void> {
+    const absoluteHomePath = this.resolveAgentHomePath()
+    const bootstrapPath = join(absoluteHomePath, 'bootstrap.md')
+    const soulPath = join(absoluteHomePath, 'soul.md')
+    const userPath = join(absoluteHomePath, 'user.md')
+
+    const [bootstrapExists, soulExists, userExists] = await Promise.all([
+      this.pathExists(bootstrapPath),
+      this.pathExists(soulPath),
+      this.pathExists(userPath),
+    ])
+
+    // Gate 1: bootstrap 完成 — 确保 bootstrap.md 已被删除
+    if (soulExists && userExists) {
+      if (bootstrapExists) {
+        await import('node:fs/promises').then(({ rm }) =>
+          rm(bootstrapPath, { force: true }),
+        )
+      }
+      return
+    }
+
+    // Gate 2: 恢复 — bootstrap.md 被误删但 profile 未完成
+    if (!bootstrapExists) {
+      await writeFile(bootstrapPath, this.createBootstrapTemplate(), 'utf8')
+    }
+
+    // Gate 3: bootstrap 仍在进行中 — 不做任何操作
   }
 
   /**

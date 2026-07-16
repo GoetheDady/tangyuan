@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -8,6 +8,7 @@ import {
   type AgentMessage,
   PiSdkDriver,
   type PiSdkCreateSessionRequest,
+  type PiSdkDriverOptions,
   type PiSdkGateway,
   type PiSdkListSessionsRequest,
   type PiSdkOpenSessionRequest,
@@ -1488,6 +1489,495 @@ describe('PiSdkDriver', () => {
     )
   })
 
+  it('deletes bootstrap.md when the agent writes both profile files but forgets to remove it', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+            // Agent 写入两个 profile 文件，但遗留 bootstrap.md
+            await writeFile(
+              join(request.cwd, 'soul.md'),
+              '# Soul\n只说中文。',
+              'utf8',
+            )
+            await writeFile(
+              join(request.cwd, 'user.md'),
+              '# User\n简洁回答。',
+              'utf8',
+            )
+            return '初始化完成。'
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+        return handle
+      },
+    })
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+
+    await driver.getSnapshot()
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: 'Bootstrap 初始化',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '请开始初始化。',
+    })
+
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+    // soul.md 和 user.md 存在
+    await expect(
+      readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
+    ).resolves.toContain('# Soul')
+    await expect(
+      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+    ).resolves.toContain('# User')
+    // bootstrap.md 被 runtime 自动清理
+    await expect(
+      readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+    // 快照反映已初始化状态
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      activeAgent: {
+        profile: {
+          initialized: true,
+          bootstrapRequired: false,
+        },
+      },
+    })
+  })
+
+  it('recreates bootstrap.md when the agent deletes it but only writes soul.md', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+            await writeFile(
+              join(request.cwd, 'soul.md'),
+              '# Soul\n部分初始化。',
+              'utf8',
+            )
+            await rm(join(request.cwd, 'bootstrap.md'), { force: true })
+            return 'soul.md 已创建。'
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+        return handle
+      },
+    })
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+
+    await driver.getSnapshot()
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: 'Bootstrap 初始化',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '请开始初始化。',
+    })
+
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+    // soul.md 存在
+    await expect(
+      readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
+    ).resolves.toContain('# Soul')
+    // user.md 不存在
+    await expect(
+      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+    // bootstrap.md 被重建
+    await expect(
+      readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
+    ).resolves.toContain('# Bootstrap')
+    // 仍未初始化（soul.md 存在但 user.md 缺失）
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      activeAgent: {
+        profile: {
+          initialized: false,
+        },
+      },
+    })
+  })
+
+  it('recreates bootstrap.md when the agent deletes it but only writes user.md', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+            await writeFile(
+              join(request.cwd, 'user.md'),
+              '# User\n部分初始化。',
+              'utf8',
+            )
+            await rm(join(request.cwd, 'bootstrap.md'), { force: true })
+            return 'user.md 已创建。'
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+        return handle
+      },
+    })
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+
+    await driver.getSnapshot()
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: 'Bootstrap 初始化',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '请开始初始化。',
+    })
+
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+    await expect(
+      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+    ).resolves.toContain('# User')
+    await expect(
+      readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(
+      readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
+    ).resolves.toContain('# Bootstrap')
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      activeAgent: {
+        profile: {
+          initialized: false,
+        },
+      },
+    })
+  })
+
+  it('recreates bootstrap.md when the agent deletes it without writing any profile file', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+            await rm(join(request.cwd, 'bootstrap.md'), { force: true })
+            return '已完成。'
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+        return handle
+      },
+    })
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+
+    await driver.getSnapshot()
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: 'Bootstrap 初始化',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '请开始初始化。',
+    })
+
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+    // 两个 profile 文件都不存在
+    await expect(
+      readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(
+      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+    // bootstrap.md 被重建
+    await expect(
+      readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
+    ).resolves.toContain('# Bootstrap')
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      activeAgent: {
+        profile: {
+          initialized: false,
+        },
+      },
+    })
+  })
+
+  it('keeps bootstrap active across turns when the agent writes one file at a time', async () => {
+    let turnCount = 0
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+            turnCount++
+            if (turnCount === 1) {
+              // 第一回合：只写 soul.md
+              await writeFile(
+                join(request.cwd, 'soul.md'),
+                '# Soul\n第一回合。',
+                'utf8',
+              )
+              return 'soul.md 已创建，请继续告诉我你的偏好。'
+            }
+            // 第二回合：写 user.md
+            await writeFile(
+              join(request.cwd, 'user.md'),
+              '# User\n第二回合。',
+              'utf8',
+            )
+            await rm(join(request.cwd, 'bootstrap.md'), { force: true })
+            return '初始化完成。'
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+        return handle
+      },
+    })
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+
+    await driver.getSnapshot()
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: 'Bootstrap 初始化',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '我想用中文。',
+    })
+
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+    // 第一回合后：soul.md 存在，user.md 不存在，bootstrap.md 仍存在
+    await expect(
+      readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
+    ).resolves.toContain('# Soul')
+    await expect(
+      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(
+      readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
+    ).resolves.toContain('# Bootstrap')
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      activeAgent: {
+        profile: {
+          initialized: false,
+        },
+      },
+    })
+
+    // 第二回合
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '我喜欢简洁回答。',
+    })
+
+    // 第二回合后：两个 profile 都存在，bootstrap.md 被删除
+    await expect(
+      readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
+    ).resolves.toContain('# Soul')
+    await expect(
+      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+    ).resolves.toContain('# User')
+    await expect(
+      readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      activeAgent: {
+        profile: {
+          initialized: true,
+          bootstrapRequired: false,
+        },
+      },
+    })
+  })
+
+  it('preserves bootstrap state after simulating an app restart', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+            await writeFile(
+              join(request.cwd, 'soul.md'),
+              '# Soul\n只说中文。',
+              'utf8',
+            )
+            return 'soul.md 已创建。'
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+        return handle
+      },
+    })
+    const { driver, rootPath, userDataPath, homePath } = await createDriver({
+      gateway,
+    })
+
+    await driver.getSnapshot()
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: 'Bootstrap 初始化',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '请开始初始化。',
+    })
+
+    // 模拟重启：创建新 driver 指向同一持久化目录
+    const restartedDriver = createDriverAtPath({ rootPath, userDataPath })
+    const snapshot = await restartedDriver.getSnapshot()
+
+    expect(snapshot.activeAgent.profile).toMatchObject({
+      initialized: false,
+    })
+
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+    await expect(
+      readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
+    ).resolves.toContain('# Soul')
+    await expect(
+      readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
+    ).resolves.toContain('# Bootstrap')
+    await expect(
+      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('enters normal conversation after bootstrap completes and runs profile maintenance', async () => {
+    let turnCount = 0
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string) => {
+            handle.prompts.push(prompt)
+            turnCount++
+            if (turnCount === 1) {
+              // Bootstrap 回合：写入两个 profile 文件
+              await writeFile(
+                join(request.cwd, 'soul.md'),
+                '# Soul\n只说中文。',
+                'utf8',
+              )
+              await writeFile(
+                join(request.cwd, 'user.md'),
+                '# User\n简洁回答。',
+                'utf8',
+              )
+              return '初始化完成。'
+            }
+            // 正常回合
+            return '好的，已经记住了。'
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+        return handle
+      },
+    })
+    const { driver } = await createDriver({ gateway })
+
+    await driver.getSnapshot()
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: 'Bootstrap 初始化',
+    })
+
+    // 第一回合：bootstrap
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '请开始初始化。',
+    })
+
+    // Bootstrap 回合的 prompt 包含 bootstrap 指令
+    expect(gateway.sessionHandles[0]?.prompts[0]).toContain('# Bootstrap')
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      activeAgent: {
+        profile: { initialized: true, bootstrapRequired: false },
+      },
+    })
+
+    // 第二回合：正常对话
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '记住我喜欢用 TypeScript。',
+    })
+
+    // 正常回合的 prompt 包含 profile 上下文而非 bootstrap 指令
+    const secondPrompt = gateway.sessionHandles[0]?.prompts[1]
+    expect(secondPrompt).toContain('# Soul')
+    expect(secondPrompt).toContain('# User')
+    expect(secondPrompt).not.toContain('bootstrap.md')
+    // 正常回合触发了一次维护回合（共 3 次 prompt 调用：bootstrap 主回合 + 正常主回合 + 维护回合）
+    expect(gateway.sessionHandles[0]?.prompts.length).toBe(3)
+  })
+
   it('blocks real session creation when configuration is missing', async () => {
     const { driver } = await createDriver()
 
@@ -1527,9 +2017,448 @@ describe('PiSdkDriver', () => {
       message: expect.stringContaining('不属于 Agent other-agent'),
     })
   })
+
+  it('migrates a v1 config file to v2 on read and writes it back to disk', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, userDataPath } = await createDriver({ gateway })
+    const configPath = join(userDataPath, 'config.json')
+
+    // 写入 v1 格式的配置文件
+    await mkdir(userDataPath, { recursive: true })
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        apiKey: 'sk-legacy-key',
+      }),
+      'utf8',
+    )
+
+    // 读取快照时应触发迁移
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      settings: {
+        selectedProviderId: 'anthropic',
+        selectedModelId: 'claude-sonnet-4-5',
+      },
+      auth: {
+        apiKey: {
+          configured: true,
+          maskedValue: 'sk-l...-key',
+        },
+      },
+      status: 'ready',
+      configRecovery: {
+        state: 'ok',
+        hasBackup: true,
+      },
+    })
+
+    // 验证磁盘上已写入 v2 格式
+    const rawConfig = await readFile(configPath, 'utf8')
+    const parsedConfig = JSON.parse(rawConfig) as Record<string, unknown>
+    expect(parsedConfig['schemaVersion']).toBe(2)
+    expect(parsedConfig['providers']).toBeDefined()
+    expect(parsedConfig['agents']).toBeDefined()
+    // v2 格式中 API Key 已加密
+    expect(rawConfig).not.toContain('sk-legacy-key')
+  })
+
+  it('returns migration-failed recovery state when v1 config cannot be migrated', async () => {
+    const gateway = createPiSdkGateway()
+    const encryptionAdapter = createFakeEncryptionAdapter()
+    // 使用会在加密时失败的适配器模拟迁移写入失败
+    encryptionAdapter.encrypt = async () => {
+      throw new Error('encryption unavailable')
+    }
+    const { driver, userDataPath } = await createDriver({
+      gateway,
+      encryptionAdapter,
+    })
+    const configPath = join(userDataPath, 'config.json')
+
+    await mkdir(userDataPath, { recursive: true })
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        apiKey: 'sk-legacy-key',
+      }),
+      'utf8',
+    )
+
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      configRecovery: {
+        state: 'migration-failed',
+        hasBackup: false,
+      },
+    })
+  })
+
+  it('refuses to save configuration when the encryption adapter is unavailable', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({
+      gateway,
+      encryptionAdapter: null,
+    })
+
+    await expect(
+      driver.saveConfiguration({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        apiKey: 'sk-test-secret-7890',
+      }),
+    ).rejects.toMatchObject({
+      code: 'driver-unavailable',
+      message: expect.stringContaining('加密服务不可用'),
+    })
+  })
+
+  it('refuses to save when the encryption adapter reports it is unavailable', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({
+      gateway,
+      encryptionAdapter: {
+        encrypt: async () => 'encrypted:test',
+        decrypt: async () => 'test',
+        isAvailable: () => false,
+      },
+    })
+
+    await expect(
+      driver.saveConfiguration({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        apiKey: 'sk-test-secret-7890',
+      }),
+    ).rejects.toMatchObject({
+      code: 'driver-unavailable',
+      message: expect.stringContaining('加密服务不可用'),
+    })
+  })
+
+  it('reports corrupted recovery state when config JSON is unparseable', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, userDataPath } = await createDriver({ gateway })
+    const configPath = join(userDataPath, 'config.json')
+
+    await mkdir(userDataPath, { recursive: true })
+    await writeFile(configPath, 'not valid json {{{', 'utf8')
+
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      configRecovery: {
+        state: 'corrupted',
+        hasBackup: false,
+      },
+    })
+  })
+
+  it('reports corrupted recovery state when v2 config fails schema validation', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, userDataPath } = await createDriver({ gateway })
+    const configPath = join(userDataPath, 'config.json')
+
+    await mkdir(userDataPath, { recursive: true })
+    // 写入"合法 JSON 但不符合 v2 schema"的内容
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        schemaVersion: 2,
+        providers: 'not-an-object',
+        agents: null,
+      }),
+      'utf8',
+    )
+
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      configRecovery: {
+        state: 'corrupted',
+        hasBackup: false,
+      },
+    })
+  })
+
+  it('creates a backup file before each write and reports hasBackup: true', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, userDataPath } = await createDriver({ gateway })
+
+    // 第一次保存不会创建备份（因为旧文件不存在）
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    // 第二次保存时旧文件存在，会先备份再写入
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-opus-4-8',
+      apiKey: 'sk-test-secret-9999',
+    })
+
+    const backupPath = join(userDataPath, 'config.backup.json')
+    await expect(readFile(backupPath, 'utf8')).resolves.toContain('encrypted:')
+
+    // 快照应报告备份存在
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      configRecovery: {
+        hasBackup: true,
+      },
+    })
+  })
+
+  it('restores configuration from a valid backup file', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, userDataPath } = await createDriver({ gateway })
+
+    // 保存第一次
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    // 保存第二次（此时会创建备份）
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-opus-4-8',
+      apiKey: 'sk-test-secret-8888',
+    })
+
+    // 确保备份存在
+    const backupPath = join(userDataPath, 'config.backup.json')
+    await expect(readFile(backupPath, 'utf8')).resolves.toContain('encrypted:')
+
+    // 损坏配置文件
+    const configPath = join(userDataPath, 'config.json')
+    await writeFile(configPath, 'corrupted data {{{', 'utf8')
+
+    // 验证损坏状态
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      configRecovery: { state: 'corrupted', hasBackup: true },
+    })
+
+    // 从备份恢复
+    await expect(driver.restoreFromBackup()).resolves.toMatchObject({
+      settings: {
+        selectedProviderId: 'anthropic',
+        selectedModelId: 'claude-sonnet-4-5',
+      },
+      auth: {
+        apiKey: { configured: true, maskedValue: 'sk-t...7890' },
+      },
+      status: 'ready',
+      configRecovery: { state: 'ok', hasBackup: true },
+    })
+
+    // 验证配置文件已恢复为有效内容
+    const rawConfig = await readFile(configPath, 'utf8')
+    expect(() => JSON.parse(rawConfig)).not.toThrow()
+    expect(rawConfig).toContain('"schemaVersion"')
+  })
+
+  it('rejects restore when no backup file exists', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+
+    await expect(driver.restoreFromBackup()).rejects.toMatchObject({
+      code: 'configuration-missing',
+      message: expect.stringContaining('没有可用的配置备份'),
+    })
+  })
+
+  it('rejects restore when the backup file is corrupted', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, userDataPath } = await createDriver({ gateway })
+
+    // 保存一次以创建目录
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    // 写入损坏的备份
+    const backupPath = join(userDataPath, 'config.backup.json')
+    await writeFile(backupPath, 'not valid json', 'utf8')
+
+    await expect(driver.restoreFromBackup()).rejects.toMatchObject({
+      code: 'configuration-missing',
+      message: expect.stringContaining('备份文件已损坏'),
+    })
+  })
+
+  it('rejects restore when backup has valid JSON but invalid schema', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, userDataPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    // 写入格式不兼容的备份
+    const backupPath = join(userDataPath, 'config.backup.json')
+    await writeFile(
+      backupPath,
+      JSON.stringify({ schemaVersion: 99, providers: {}, agents: {} }),
+      'utf8',
+    )
+
+    await expect(driver.restoreFromBackup()).rejects.toMatchObject({
+      code: 'configuration-missing',
+      message: expect.stringContaining('备份文件格式不兼容'),
+    })
+  })
+
+  it('resets configuration by deleting config and backup files while preserving agent home', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, userDataPath, rootPath, homePath } = await createDriver({
+      gateway,
+    })
+
+    // 保存第一次
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    // 保存第二次（此时会创建备份）
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-opus-4-8',
+      apiKey: 'sk-test-secret-8888',
+    })
+
+    const configPath = join(userDataPath, 'config.json')
+    const backupPath = join(userDataPath, 'config.backup.json')
+
+    // 验证文件存在
+    await expect(readFile(configPath, 'utf8')).resolves.toBeDefined()
+    await expect(readFile(backupPath, 'utf8')).resolves.toBeDefined()
+
+    // 重置配置
+    await driver.resetConfiguration()
+
+    // 配置文件和备份已删除
+    await expect(
+      import('node:fs/promises').then(({ access }) =>
+        access(configPath),
+      ),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(
+      import('node:fs/promises').then(({ access }) =>
+        access(backupPath),
+      ),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+
+    // Agent home 目录仍然存在（bootstrap.md 等文件未被删除）
+    const resolvedHomePath = join(rootPath, homePath.slice(2))
+    await expect(
+      readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
+    ).resolves.toContain('# Bootstrap')
+
+    // 重置后快照应显示缺少配置
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      status: 'missing-config',
+      configRecovery: { state: 'ok', hasBackup: false },
+    })
+  })
+
+  it('reports corrupted recovery state when encrypted data cannot be decrypted', async () => {
+    const gateway = createPiSdkGateway()
+    const encryptionAdapter = createFakeEncryptionAdapter()
+    // 修改 decrypt 使其对特定密文失败
+    const originalDecrypt = encryptionAdapter.decrypt
+    encryptionAdapter.decrypt = async (ciphertext: string) => {
+      if (ciphertext.includes('corrupted')) {
+        throw new Error('decryption failed')
+      }
+      return originalDecrypt(ciphertext)
+    }
+    const { driver, userDataPath } = await createDriver({
+      gateway,
+      encryptionAdapter,
+    })
+    const configPath = join(userDataPath, 'config.json')
+
+    // 直接写入用不同密钥加密的假数据（decrypt 会失败）
+    await mkdir(userDataPath, { recursive: true })
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        schemaVersion: 2,
+        providers: {
+          anthropic: {
+            encryptedApiKey: 'encrypted:corrupted-data',
+            updatedAt: '2026-07-16T00:00:00.000Z',
+          },
+        },
+        agents: {
+          tangyuan: {
+            displayName: '汤圆',
+            defaultProviderId: 'anthropic',
+            defaultModelId: 'claude-sonnet-4-5',
+            status: 'active',
+            archivedAt: null,
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    await expect(driver.getSnapshot()).resolves.toMatchObject({
+      configRecovery: {
+        state: 'corrupted',
+        hasBackup: false,
+      },
+    })
+  })
+
+  it('refuses to create a session when config is in corrupted state', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, userDataPath } = await createDriver({ gateway })
+    const configPath = join(userDataPath, 'config.json')
+
+    await mkdir(userDataPath, { recursive: true })
+    await writeFile(configPath, 'corrupted {{{', 'utf8')
+
+    await expect(
+      driver.createSession({ agentId: 'tangyuan', title: '新会话' }),
+    ).rejects.toMatchObject({
+      code: 'configuration-missing',
+      message: expect.stringContaining('配置文件已损坏'),
+    })
+  })
+
+  it('enforces sequential config writes use temp file + atomic rename', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, userDataPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    // 原子写入后，不应该留下 .tmp 文件
+    const tmpPath = join(userDataPath, 'config.json.tmp')
+    await expect(
+      import('node:fs/promises').then(({ access }) => access(tmpPath)),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+
+    // config.json 应包含有效 JSON
+    const configPath = join(userDataPath, 'config.json')
+    const rawConfig = await readFile(configPath, 'utf8')
+    expect(() => JSON.parse(rawConfig)).not.toThrow()
+  })
 })
 
-async function createDriver(options: { gateway?: PiSdkGateway } = {}) {
+async function createDriver(options: {
+  gateway?: PiSdkGateway
+  encryptionAdapter?: ConfigEncryptionAdapter | null
+} = {}) {
   const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-agent-runtime-'))
   const userDataPath = join(rootPath, 'Library/Application Support/Tangyuan')
   tempDirs.push(rootPath)
@@ -1539,6 +2468,9 @@ async function createDriver(options: { gateway?: PiSdkGateway } = {}) {
       rootPath,
       userDataPath,
       ...(options.gateway ? { gateway: options.gateway } : {}),
+      ...(options.encryptionAdapter !== undefined
+        ? { encryptionAdapter: options.encryptionAdapter }
+        : {}),
     }),
     rootPath,
     userDataPath,
@@ -1583,15 +2515,26 @@ function createDriverAtPath(options: {
   rootPath: string
   userDataPath: string
   gateway?: PiSdkGateway
+  encryptionAdapter?: ConfigEncryptionAdapter | null
 }): PiSdkDriver {
-  return new PiSdkDriver({
+  const resolvedEncryptionAdapter =
+    options.encryptionAdapter !== undefined
+      ? options.encryptionAdapter
+      : createFakeEncryptionAdapter()
+
+  const driverOptions: PiSdkDriverOptions = {
     fsRoot: options.rootPath,
     userDataPath: options.userDataPath,
     agentHomePath: '~/.tangyuan/agents/tangyuan',
     now: () => '2026-07-08T00:00:00.000Z',
-    encryptionAdapter: createFakeEncryptionAdapter(),
     ...(options.gateway ? { gateway: options.gateway } : {}),
-  })
+  }
+
+  if (resolvedEncryptionAdapter) {
+    driverOptions.encryptionAdapter = resolvedEncryptionAdapter
+  }
+
+  return new PiSdkDriver(driverOptions)
 }
 
 /**

@@ -478,6 +478,63 @@ describe('TangyuanRuntime', () => {
       verificationId: 'verify-1',
     })
   })
+
+  it('restores configuration from backup through the runtime driver', async () => {
+    const restoredSnapshot = createSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-t...7890',
+    })
+    const runtimeDriver = createRuntimeDriver(restoredSnapshot)
+    const sessionDriver = createSessionDriver([])
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
+
+    await expect(runtime.restoreFromBackup()).resolves.toEqual(restoredSnapshot)
+    expect(runtimeDriver.restoreFromBackup).toHaveBeenCalledOnce()
+  })
+
+  it('resets configuration through the runtime driver and refreshes the snapshot', async () => {
+    const resetSnapshot = createSnapshot()
+    const runtimeDriver = createRuntimeDriver(resetSnapshot)
+    const sessionDriver = createSessionDriver([])
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
+
+    await expect(runtime.resetConfiguration()).resolves.toEqual(resetSnapshot)
+    expect(runtimeDriver.resetConfiguration).toHaveBeenCalledOnce()
+    expect(runtimeDriver.getSnapshot).toHaveBeenCalled()
+  })
+
+  it('rejects restoreFromBackup when the runtime driver does not support it', async () => {
+    const snapshot = createSnapshot()
+    const runtimeDriver = createRuntimeDriver(snapshot)
+    delete runtimeDriver.restoreFromBackup
+    const sessionDriver = createSessionDriver([])
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
+
+    await expect(runtime.restoreFromBackup()).rejects.toThrow('当前运行时不支持配置恢复')
+  })
+
+  it('rejects resetConfiguration when the runtime driver does not support it', async () => {
+    const snapshot = createSnapshot()
+    const runtimeDriver = createRuntimeDriver(snapshot)
+    delete runtimeDriver.resetConfiguration
+    const sessionDriver = createSessionDriver([])
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
+
+    await expect(runtime.resetConfiguration()).rejects.toThrow('当前运行时不支持配置重置')
+  })
 })
 
 /**
@@ -496,6 +553,14 @@ function createSnapshot(
   const configured = Boolean(
     overrides.providerId && overrides.modelId && overrides.maskedValue,
   )
+
+  const configuredProviders: Record<string, { configured: boolean; maskedValue: string | null }> = {}
+  if (configured && overrides.providerId) {
+    configuredProviders[overrides.providerId] = {
+      configured: true,
+      maskedValue: overrides.maskedValue ?? null,
+    }
+  }
 
   return {
     activeAgent: {
@@ -522,6 +587,7 @@ function createSnapshot(
         maskedValue: overrides.maskedValue ?? null,
       },
     },
+    configuredProviders,
     status: configured ? 'ready' : 'missing-config',
     configRecovery: { state: 'ok', hasBackup: false },
   }
@@ -540,6 +606,8 @@ function createRuntimeDriver(snapshot: RuntimeSnapshot): RuntimeResourceDriver {
     refresh: vi.fn().mockResolvedValue(snapshot),
     saveConfiguration: vi.fn().mockResolvedValue(snapshot),
     cancelConfigurationVerification: vi.fn().mockResolvedValue(snapshot),
+    restoreFromBackup: vi.fn().mockResolvedValue(snapshot),
+    resetConfiguration: vi.fn().mockResolvedValue(undefined),
   }
 }
 

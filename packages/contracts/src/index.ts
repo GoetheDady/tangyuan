@@ -271,6 +271,8 @@ export interface RuntimeSnapshot {
   models: ModelDescriptor[]
   settings: RuntimeSettings
   auth: RuntimeAuthSnapshot
+  /** 按 providerId 索引的 Provider 凭据配置状态；Renderer 只能读取脱敏值。 */
+  configuredProviders: Record<string, ProviderAuthSnapshot>
   status: RuntimeStatus
   configRecovery: ConfigRecoveryInfo
 }
@@ -287,6 +289,8 @@ export interface RuntimeSnapshotInput {
     state?: RuntimeAuthState
     apiKey: ApiKeyState
   }
+  /** 按 providerId 索引的 Provider 凭据配置状态。*/
+  configuredProviders?: Record<string, ProviderAuthSnapshot>
   configRecovery?: ConfigRecoveryInfo
 }
 
@@ -518,6 +522,14 @@ export const apiKeyStateSchema = z.strictObject({
 })
 
 /**
+ * 校验单个 Provider 的认证状态（可安全传给 Renderer）。
+ */
+export const providerAuthSnapshotSchema = z.strictObject({
+  configured: z.boolean(),
+  maskedValue: z.string().nullable(),
+})
+
+/**
  * 校验运行时 Provider 与 Model 设置。
  */
 export const runtimeSettingsSchema = z.strictObject({
@@ -542,6 +554,7 @@ export const runtimeSnapshotSchema = z.strictObject({
   models: z.array(modelDescriptorSchema),
   settings: runtimeSettingsSchema,
   auth: runtimeAuthSnapshotSchema,
+  configuredProviders: z.record(z.string(), providerAuthSnapshotSchema),
   status: z.enum(['missing-config', 'ready']),
   configRecovery: z.strictObject({
     state: z.enum(['ok', 'corrupted', 'migration-failed']),
@@ -1041,16 +1054,21 @@ export interface DesktopPreloadApi {
 /**
  * 根据运行时配置生成 Renderer 可直接展示的就绪状态。
  *
+ * 只有同时满足以下条件才返回 `ready`：
+ * 1. 已选择默认 Provider 和 Model
+ * 2. 所选 Provider 的凭据已配置
+ *
  * @param snapshot - 当前运行时资源快照，不包含派生状态。
- * @returns 如果 Provider、模型和 API Key 都存在则返回 `ready`，否则返回 `missing-config`。
+ * @returns 满足会话启动条件时返回 `ready`，否则返回 `missing-config`。
  * @throws 此方法不会主动抛出错误。
  */
 export function getRuntimeStatus(
   snapshot: RuntimeSnapshotInput,
 ): RuntimeStatus {
-  return snapshot.settings.selectedProviderId &&
-    snapshot.settings.selectedModelId &&
-    snapshot.auth.apiKey.configured
+  const { selectedProviderId, selectedModelId } = snapshot.settings
+  if (!selectedProviderId || !selectedModelId) return 'missing-config'
+  const configuredProviders = snapshot.configuredProviders ?? {}
+  return configuredProviders[selectedProviderId]?.configured
     ? 'ready'
     : 'missing-config'
 }
@@ -1069,6 +1087,10 @@ export function getRuntimeAuthState(apiKey: ApiKeyState): RuntimeAuthState {
 /**
  * 生成带有默认状态字段的运行时资源快照。
  *
+ * `auth` 字段从 `configuredProviders` 和当前选中的 Provider 派生：
+ * - 如果选中 Provider 在 `configuredProviders` 中，`auth.apiKey` 取其值
+ * - 否则 `auth.apiKey` 为未配置状态
+ *
  * @param snapshot - 不包含派生状态的运行时资源数据。
  * @returns 带有 `status` 的完整运行时资源快照。
  * @throws 此方法不会主动抛出错误。
@@ -1076,13 +1098,28 @@ export function getRuntimeAuthState(apiKey: ApiKeyState): RuntimeAuthState {
 export function createRuntimeSnapshot(
   snapshot: RuntimeSnapshotInput,
 ): RuntimeSnapshot {
+  const configuredProviders = snapshot.configuredProviders ?? {}
+
+  // 从选中 Provider 派生向后兼容的 auth 字段
+  const selectedProviderId = snapshot.settings.selectedProviderId
+  const selectedProviderAuth = selectedProviderId
+    ? configuredProviders[selectedProviderId]
+    : undefined
+  const derivedApiKey: ApiKeyState = selectedProviderAuth ?? {
+    configured: false,
+    maskedValue: null,
+  }
+  const derivedAuth: RuntimeAuthSnapshot = {
+    state:
+      snapshot.auth.state ?? getRuntimeAuthState(derivedApiKey),
+    apiKey: derivedApiKey,
+  }
+
   return {
     ...snapshot,
-    auth: {
-      ...snapshot.auth,
-      state: snapshot.auth.state ?? getRuntimeAuthState(snapshot.auth.apiKey),
-    },
-    status: getRuntimeStatus(snapshot),
+    configuredProviders,
+    auth: derivedAuth,
+    status: getRuntimeStatus({ ...snapshot, configuredProviders }),
     configRecovery: snapshot.configRecovery ?? {
       state: 'ok',
       hasBackup: false,
