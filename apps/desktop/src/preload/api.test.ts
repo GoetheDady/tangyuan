@@ -40,6 +40,8 @@ describe('createTangyuanPreloadApi', () => {
       'listSessions',
       'openExternalLink',
       'refreshRuntime',
+      'resetConfiguration',
+      'restoreFromBackup',
       'saveRuntimeConfiguration',
       'sendMessage',
       'subscribeToAgentEvents'
@@ -62,6 +64,8 @@ describe('createTangyuanPreloadApi', () => {
       content: '你好'
     })
     await api.cancelRun({ agentId: 'tangyuan', sessionId: 'session-1' })
+    await api.restoreFromBackup()
+    await api.resetConfiguration()
     await api.openExternalLink({ url: 'https://example.com' })
     api.subscribeToAgentEvents(() => undefined)
 
@@ -107,6 +111,8 @@ describe('createTangyuanPreloadApi', () => {
           sessionId: 'session-1'
         }
       ],
+      [DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup],
+      [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration],
       [
         DESKTOP_IPC_CHANNELS.openExternalLink,
         { url: 'https://example.com' }

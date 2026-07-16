@@ -1,13 +1,30 @@
-import { app, shell, BrowserWindow, ipcMain, session } from 'electron'
+import { app, safeStorage, shell, BrowserWindow, ipcMain, session } from 'electron'
 import { mkdir, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createTangyuanRuntime } from '@tangyuan/agent-runtime'
+import type { ConfigEncryptionAdapter } from '@tangyuan/agent-runtime'
 import { DESKTOP_AGENT_EVENT_CHANNEL } from '@tangyuan/contracts'
 import icon from '../../resources/icon.png?asset'
 import { registerDesktopAppIpc } from './ipc'
 
-const tangyuanRuntime = createTangyuanRuntime()
+const encryptionAdapter: ConfigEncryptionAdapter = {
+  encrypt: async (plaintext: string): Promise<string> => {
+    if (!safeStorage.isEncryptionAvailable()) {
+      throw new Error('系统加密服务不可用')
+    }
+    return safeStorage.encryptString(plaintext).toString('base64')
+  },
+  decrypt: async (ciphertext: string): Promise<string> => {
+    if (!safeStorage.isEncryptionAvailable()) {
+      throw new Error('系统加密服务不可用')
+    }
+    return safeStorage.decryptString(Buffer.from(ciphertext, 'base64'))
+  },
+  isAvailable: (): boolean => safeStorage.isEncryptionAvailable(),
+}
+
+const tangyuanRuntime = createTangyuanRuntime({ encryptionAdapter })
 const smokeTestResultPath = process.env['TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH']
 let isQuittingAfterCancellingRuns = false
 

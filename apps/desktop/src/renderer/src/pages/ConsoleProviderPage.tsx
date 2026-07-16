@@ -26,6 +26,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isVerifyingConfiguration, setIsVerifyingConfiguration] = useState(false)
+  const [isRestoringConfiguration, setIsRestoringConfiguration] = useState(false)
   const [configurationForm, setConfigurationForm] = useState<RuntimeConfiguration>({
     providerId: '',
     modelId: '',
@@ -152,6 +153,78 @@ export function ConsoleProviderPage(): React.JSX.Element {
     return (
       <main className="grid min-h-screen place-items-center bg-background text-foreground">
         <div className="text-sm text-muted-foreground">正在打开控制台...</div>
+      </main>
+    )
+  }
+
+  const isConfigCorrupted =
+    runtime?.configRecovery.state === 'corrupted' ||
+    runtime?.configRecovery.state === 'migration-failed'
+
+  if (isConfigCorrupted) {
+    return (
+      <main className="min-h-screen bg-background px-6 py-8 text-foreground">
+        <motion.section
+          className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl items-center justify-center"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+        >
+          <div className="w-full max-w-md rounded-lg border bg-card p-8 shadow-sm">
+            <h1 className="text-xl font-semibold">配置文件异常</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {runtime?.configRecovery.state === 'migration-failed'
+                ? '配置文件无法自动迁移到新格式。'
+                : '配置文件已损坏，无法读取。'}
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              {runtime?.configRecovery.hasBackup ? (
+                <Button
+                  disabled={isRestoringConfiguration}
+                  onClick={async () => {
+                    setIsRestoringConfiguration(true)
+                    try {
+                      const nextRuntime = await window.api.restoreFromBackup()
+                      setRuntime(nextRuntime)
+                      toast.success('已从备份恢复配置')
+                    } catch (error) {
+                      toast.error(
+                        error instanceof Error ? error.message : '恢复配置失败',
+                      )
+                    } finally {
+                      setIsRestoringConfiguration(false)
+                    }
+                  }}
+                >
+                  {isRestoringConfiguration ? '恢复中' : '从备份恢复'}
+                </Button>
+              ) : null}
+              <Button
+                variant="outline"
+                disabled={isRestoringConfiguration}
+                onClick={async () => {
+                  setIsRestoringConfiguration(true)
+                  try {
+                    const nextRuntime = await window.api.resetConfiguration()
+                    setRuntime(nextRuntime)
+                    toast.success('已重置配置')
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error ? error.message : '重置配置失败',
+                    )
+                  } finally {
+                    setIsRestoringConfiguration(false)
+                  }
+                }}
+              >
+                重置配置
+              </Button>
+            </div>
+            <p className="mt-4 text-xs text-muted-foreground">
+              重置配置不会删除 Agent 数据、用户资料或会话记录。
+            </p>
+          </div>
+        </motion.section>
       </main>
     )
   }

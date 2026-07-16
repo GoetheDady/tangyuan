@@ -131,6 +131,20 @@ export function registerDesktopAppIpc(
       )
     )
   })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup,
+      await runtime.restoreFromBackup()
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.runtimeResetConfiguration, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.runtimeResetConfiguration, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.runtimeResetConfiguration,
+      await runtime.resetConfiguration()
+    )
+  })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.openExternalLink, async (_event, payload) => {
     if (!openExternalLink) {
       throw new Error('外部链接功能不可用。')

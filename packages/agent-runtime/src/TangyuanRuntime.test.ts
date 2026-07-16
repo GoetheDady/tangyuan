@@ -523,6 +523,7 @@ function createSnapshot(
       },
     },
     status: configured ? 'ready' : 'missing-config',
+    configRecovery: { state: 'ok', hasBackup: false },
   }
 }
 

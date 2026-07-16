@@ -6,6 +6,11 @@ import { z } from 'zod'
 export const TANGYUAN_DEFAULT_AGENT_ID = 'tangyuan'
 
 /**
+ * 当前配置文件的 schema 版本，用于顺序迁移。
+ */
+export const CURRENT_SCHEMA_VERSION = 2
+
+/**
  * 描述 Agent 的唯一标识。
  */
 export type AgentId = string
@@ -267,6 +272,7 @@ export interface RuntimeSnapshot {
   settings: RuntimeSettings
   auth: RuntimeAuthSnapshot
   status: RuntimeStatus
+  configRecovery: ConfigRecoveryInfo
 }
 
 /**
@@ -281,6 +287,7 @@ export interface RuntimeSnapshotInput {
     state?: RuntimeAuthState
     apiKey: ApiKeyState
   }
+  configRecovery?: ConfigRecoveryInfo
 }
 
 /**
@@ -350,6 +357,93 @@ export interface RuntimeConfiguration {
  */
 export interface CancelConfigurationVerificationRequest {
   verificationId: string
+}
+
+/**
+ * 描述持久化在磁盘上的单个 Provider 凭据（API Key 已加密）。
+ */
+export interface ProviderCredentials {
+  encryptedApiKey: string
+  updatedAt: string
+}
+
+/**
+ * 描述持久化在磁盘上的单个 Agent 配置。
+ */
+export interface AgentConfig {
+  displayName: string
+  defaultProviderId: string | null
+  defaultModelId: string | null
+  status: 'active' | 'archived'
+  archivedAt: string | null
+}
+
+/**
+ * 描述 v2 版本磁盘配置结构。
+ */
+export interface PersistedConfigurationV2 {
+  schemaVersion: 2
+  providers: Record<string, ProviderCredentials>
+  agents: Record<string, AgentConfig>
+}
+
+/**
+ * 描述 v1 版本磁盘配置结构（用于迁移）。
+ */
+export interface PersistedConfigurationV1 {
+  providerId: string
+  modelId: string
+  apiKey: string
+}
+
+/**
+ * 描述解密后的 Provider 凭据（仅存在于 Main 进程内存中）。
+ */
+export interface InternalProviderCredentials {
+  apiKey: string
+  updatedAt: string
+}
+
+/**
+ * 描述解密后的运行时配置（仅存在于 Main 进程内存中，不离开 Main 进程）。
+ */
+export interface InternalRuntimeConfig {
+  schemaVersion: number
+  providers: Record<string, InternalProviderCredentials>
+  agents: Record<string, AgentConfig>
+}
+
+/**
+ * 描述配置完整性状态。
+ */
+export type ConfigRecoveryState = 'ok' | 'corrupted' | 'migration-failed'
+
+/**
+ * 描述配置恢复信息。
+ */
+export interface ConfigRecoveryInfo {
+  state: ConfigRecoveryState
+  hasBackup: boolean
+}
+
+/**
+ * 描述单个 Provider 的认证状态（Renderer 可见）。
+ */
+export interface ProviderAuthSnapshot {
+  configured: boolean
+  maskedValue: string | null
+}
+
+/**
+ * 描述配置存储加解密抽象，由 Electron Main 注入 safeStorage 实现。
+ */
+export interface ConfigEncryptionAdapter {
+  /** 加密明文 API Key，返回 base64 密文。 */
+  encrypt(plaintext: string): Promise<string>
+  /** 解密 base64 密文，返回明文 API Key。 */
+  decrypt(ciphertext: string): Promise<string>
+  /** 检查当前系统是否可用加密能力。 */
+  isAvailable(): boolean
 }
 
 const nonEmptyIdentifierSchema = z.string().trim().min(1)
@@ -449,6 +543,46 @@ export const runtimeSnapshotSchema = z.strictObject({
   settings: runtimeSettingsSchema,
   auth: runtimeAuthSnapshotSchema,
   status: z.enum(['missing-config', 'ready']),
+  configRecovery: z.strictObject({
+    state: z.enum(['ok', 'corrupted', 'migration-failed']),
+    hasBackup: z.boolean(),
+  }),
+})
+
+/**
+ * 校验持久化在磁盘上的 v2 Provider 凭据。
+ */
+export const providerCredentialsSchema = z.strictObject({
+  encryptedApiKey: z.string(),
+  updatedAt: timestampSchema,
+})
+
+/**
+ * 校验持久化在磁盘上的 Agent 配置。
+ */
+export const agentConfigSchema = z.strictObject({
+  displayName: z.string(),
+  defaultProviderId: z.string().nullable(),
+  defaultModelId: z.string().nullable(),
+  status: z.enum(['active', 'archived']),
+  archivedAt: z.string().nullable(),
+})
+
+/**
+ * 校验 v2 版本磁盘配置结构。
+ */
+export const persistedConfigurationV2Schema = z.strictObject({
+  schemaVersion: z.literal(2),
+  providers: z.record(z.string(), providerCredentialsSchema),
+  agents: z.record(z.string(), agentConfigSchema),
+})
+
+/**
+ * 校验配置恢复信息。
+ */
+export const configRecoveryInfoSchema = z.strictObject({
+  state: z.enum(['ok', 'corrupted', 'migration-failed']),
+  hasBackup: z.boolean(),
 })
 
 /**
@@ -634,6 +768,8 @@ export const DESKTOP_IPC_CHANNELS = {
   runtimeSaveConfiguration: 'tangyuan:runtime:save-configuration',
   runtimeCancelConfigurationVerification:
     'tangyuan:runtime:cancel-configuration-verification',
+  runtimeRestoreFromBackup: 'tangyuan:runtime:restore-from-backup',
+  runtimeResetConfiguration: 'tangyuan:runtime:reset-configuration',
   sessionsList: 'tangyuan:sessions:list',
   sessionsCreate: 'tangyuan:sessions:create',
   sessionsGetMessages: 'tangyuan:sessions:get-messages',
@@ -661,6 +797,8 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.runtimeRefresh]: undefined
   [DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration]: RuntimeConfiguration
   [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification]: CancelConfigurationVerificationRequest
+  [DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup]: undefined
+  [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsList]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: CreateSessionRequest
   [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: GetSessionMessagesRequest
@@ -678,6 +816,8 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration]: runtimeConfigurationSchema,
   [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification]:
     cancelConfigurationVerificationRequestSchema,
+  [DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup]: z.undefined(),
+  [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsList]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: createSessionRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: getSessionMessagesRequestSchema,
@@ -711,6 +851,8 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.runtimeRefresh]: RuntimeSnapshot
   [DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration]: RuntimeSnapshot
   [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification]: RuntimeSnapshot
+  [DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup]: RuntimeSnapshot
+  [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: RuntimeSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsList]: AgentSessionSummary[]
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: AgentSessionSummary
   [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: AgentMessage[]
@@ -728,6 +870,8 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration]: runtimeSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification]:
     runtimeSnapshotSchema,
+  [DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup]: runtimeSnapshotSchema,
+  [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: runtimeSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsList]: z.array(agentSessionSummarySchema),
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: agentSessionSummarySchema,
   [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: z.array(agentMessageSchema),
@@ -869,6 +1013,22 @@ export interface DesktopPreloadApi {
   subscribeToAgentEvents(listener: AgentEventListener): () => void
 
   /**
+   * 从备份恢复配置。
+   *
+   * @returns 恢复后的 RuntimeSnapshot。
+   * @throws 当备份不存在或恢复失败时，Promise 会 reject。
+   */
+  restoreFromBackup(): Promise<RuntimeSnapshot>
+
+  /**
+   * 重置配置并删除当前和备份配置文件（不删除 Agent 数据或 Pi session）。
+   *
+   * @returns 重置后的 RuntimeSnapshot。
+   * @throws 当重置失败时，Promise 会 reject。
+   */
+  resetConfiguration(): Promise<RuntimeSnapshot>
+
+  /**
    * 请求 Main 进程校验协议后使用系统浏览器安全打开外部链接。
    *
    * @param request - 待打开的外部 URL。
@@ -923,6 +1083,10 @@ export function createRuntimeSnapshot(
       state: snapshot.auth.state ?? getRuntimeAuthState(snapshot.auth.apiKey),
     },
     status: getRuntimeStatus(snapshot),
+    configRecovery: snapshot.configRecovery ?? {
+      state: 'ok',
+      hasBackup: false,
+    },
   }
 }
 
@@ -962,5 +1126,43 @@ export function createDefaultSessionSummary(input: {
     title: input.title,
     updatedAt: input.updatedAt,
     state: 'idle',
+  }
+}
+
+/**
+ * 将 v1 格式的配置迁移为 v2 内部运行时配置。
+ *
+ * v1 的单个 providerId/modelId/apiKey 被迁移为：
+ * - providers[providerId] = { apiKey, updatedAt: now }
+ * - agents.tangyuan = { defaultProviderId: providerId, defaultModelId: modelId, ... }
+ *
+ * 迁移后 API Key 仍为明文（未加密），需由 Runtime 在下次写入时加密。
+ *
+ * @param v1 - v1 磁盘配置格式。
+ * @param now - 当前时间戳，用于填充 updatedAt 字段。
+ * @returns v2 内部运行时配置。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function migrateConfigV1ToV2(
+  v1: PersistedConfigurationV1,
+  now: string,
+): InternalRuntimeConfig {
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    providers: {
+      [v1.providerId]: {
+        apiKey: v1.apiKey,
+        updatedAt: now,
+      },
+    },
+    agents: {
+      [TANGYUAN_DEFAULT_AGENT_ID]: {
+        displayName: '汤圆',
+        defaultProviderId: v1.providerId,
+        defaultModelId: v1.modelId,
+        status: 'active',
+        archivedAt: null,
+      },
+    },
   }
 }

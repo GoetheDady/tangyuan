@@ -115,6 +115,37 @@ class DefaultTangyuanRuntime {
   }
 
   /**
+   * 从最近的备份恢复配置文件。
+   *
+   * @returns 恢复后的 RuntimeSnapshot。
+   * @throws 当 RuntimeResourceDriver 缺少恢复能力或恢复失败时，Promise 会 reject。
+   */
+  async restoreFromBackup(): Promise<RuntimeSnapshot> {
+    if (!this.runtimeDriver.restoreFromBackup) {
+      throw new Error('当前运行时不支持配置恢复。')
+    }
+
+    this.runtimeSnapshot = await this.runtimeDriver.restoreFromBackup()
+    return this.runtimeSnapshot
+  }
+
+  /**
+   * 删除配置文件和备份（不删除 Agent 数据、用户资料或 Pi session）。
+   *
+   * @returns 重置后的 RuntimeSnapshot。
+   * @throws 当 RuntimeResourceDriver 缺少重置能力或重置失败时，Promise 会 reject。
+   */
+  async resetConfiguration(): Promise<RuntimeSnapshot> {
+    if (!this.runtimeDriver.resetConfiguration) {
+      throw new Error('当前运行时不支持配置重置。')
+    }
+
+    await this.runtimeDriver.resetConfiguration()
+    this.runtimeSnapshot = await this.runtimeDriver.getSnapshot()
+    return this.runtimeSnapshot
+  }
+
+  /**
    * 读取默认 Agent 的会话摘要列表并写入 Runtime 缓存。
    *
    * @returns 会话摘要列表。
@@ -531,6 +562,8 @@ export type TangyuanRuntime = Pick<
   | 'refreshRuntime'
   | 'saveRuntimeConfiguration'
   | 'cancelRuntimeConfigurationVerification'
+  | 'restoreFromBackup'
+  | 'resetConfiguration'
   | 'listSessions'
   | 'createSession'
   | 'getMessages'

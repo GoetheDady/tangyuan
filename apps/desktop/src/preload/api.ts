@@ -76,6 +76,12 @@ export function createTangyuanPreloadApi(
     subscribeToAgentEvents: (listener: AgentEventListener) => {
       return subscribe(DESKTOP_AGENT_EVENT_CHANNEL, listener)
     },
+    restoreFromBackup: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup)
+    },
+    resetConfiguration: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.runtimeResetConfiguration)
+    },
     openExternalLink: async (request: OpenExternalLinkRequest) => {
       await invoke(DESKTOP_IPC_CHANNELS.openExternalLink, request)
     }

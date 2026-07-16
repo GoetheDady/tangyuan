@@ -40,7 +40,9 @@ describe('registerDesktopAppIpc', () => {
       sendMessage: vi.fn().mockResolvedValue([]),
       cancelRun: vi.fn().mockResolvedValue(session),
       subscribe: vi.fn(),
-      cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined)
+      cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined),
+      restoreFromBackup: vi.fn().mockResolvedValue(snapshot),
+      resetConfiguration: vi.fn().mockResolvedValue(snapshot),
     }
     const broadcastAgentEvent = vi.fn()
     const openExternalLink = vi.fn().mockResolvedValue(undefined)
@@ -54,7 +56,7 @@ describe('registerDesktopAppIpc', () => {
 
     registerDesktopAppIpc(ipcMain, runtime, broadcastAgentEvent, openExternalLink)
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(10)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(12)
     expect(broadcastAgentEvent).toHaveBeenCalledWith(createTurnStartedEvent())
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
@@ -154,7 +156,9 @@ describe('registerDesktopAppIpc', () => {
       sendMessage: vi.fn().mockResolvedValue([]),
       cancelRun: vi.fn(),
       subscribe: vi.fn(),
-      cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined)
+      cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined),
+      restoreFromBackup: vi.fn().mockResolvedValue(snapshot),
+      resetConfiguration: vi.fn().mockResolvedValue(snapshot),
     }
 
     registerDesktopAppIpc(ipcMain, runtime)

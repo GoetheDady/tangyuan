@@ -17,6 +17,7 @@ import {
   type PiSdkVerificationRequest,
   createTangyuanRuntimeForTesting,
   createDefaultSessionSummary,
+  type ConfigEncryptionAdapter,
 } from './index'
 
 const tempDirs: string[] = []
@@ -291,7 +292,13 @@ describe('PiSdkDriver', () => {
         join(rootPath, 'Library/Application Support/Tangyuan/config.json'),
         'utf8',
       ),
-    ).resolves.toContain('sk-test-secret-7890')
+    ).resolves.not.toContain('sk-test-secret-7890')
+    await expect(
+      readFile(
+        join(rootPath, 'Library/Application Support/Tangyuan/config.json'),
+        'utf8',
+      ),
+    ).resolves.toContain('encrypted:')
     expect(gateway.requests).toEqual([
       expect.objectContaining({
         providerId: 'anthropic',
@@ -1582,8 +1589,29 @@ function createDriverAtPath(options: {
     userDataPath: options.userDataPath,
     agentHomePath: '~/.tangyuan/agents/tangyuan',
     now: () => '2026-07-08T00:00:00.000Z',
+    encryptionAdapter: createFakeEncryptionAdapter(),
     ...(options.gateway ? { gateway: options.gateway } : {}),
   })
+}
+
+/**
+ * 创建测试用假加密适配器（基于 base64 编码）。
+ *
+ * @returns 可用的 ConfigEncryptionAdapter。
+ * @throws 此测试辅助方法不会主动抛出错误。
+ */
+function createFakeEncryptionAdapter(): ConfigEncryptionAdapter {
+  return {
+    encrypt: async (plaintext: string) =>
+      `encrypted:${Buffer.from(plaintext).toString('base64')}`,
+    decrypt: async (ciphertext: string) => {
+      if (!ciphertext.startsWith('encrypted:')) {
+        throw new Error('Invalid fake ciphertext')
+      }
+      return Buffer.from(ciphertext.slice('encrypted:'.length), 'base64').toString('utf8')
+    },
+    isAvailable: () => true,
+  }
 }
 
 /**

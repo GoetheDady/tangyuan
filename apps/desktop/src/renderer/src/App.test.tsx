@@ -73,7 +73,9 @@ describe('App', () => {
         })
       ),
       subscribeToAgentEvents: vi.fn(() => () => undefined),
-      openExternalLink: vi.fn()
+      openExternalLink: vi.fn(),
+      restoreFromBackup: vi.fn(),
+      resetConfiguration: vi.fn()
     }
 
     Object.defineProperty(window, 'api', {
@@ -223,7 +225,9 @@ describe('App', () => {
         sendMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
-      openExternalLink: vi.fn()
+      openExternalLink: vi.fn(),
+      restoreFromBackup: vi.fn(),
+      resetConfiguration: vi.fn()
       } satisfies DesktopPreloadApi
     })
     render(<App />)
@@ -258,7 +262,9 @@ describe('App', () => {
         sendMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
-      openExternalLink: vi.fn()
+      openExternalLink: vi.fn(),
+      restoreFromBackup: vi.fn(),
+      resetConfiguration: vi.fn()
       } satisfies DesktopPreloadApi
     })
     render(<App />)
@@ -313,7 +319,9 @@ describe('App', () => {
         ]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
-      openExternalLink: vi.fn()
+      openExternalLink: vi.fn(),
+      restoreFromBackup: vi.fn(),
+      resetConfiguration: vi.fn()
       } satisfies DesktopPreloadApi
     })
     window.location.hash = '#/chat/tangyuan'
@@ -420,7 +428,9 @@ describe('App', () => {
 
           return () => undefined
         }),
-        openExternalLink: vi.fn()
+        openExternalLink: vi.fn(),
+      restoreFromBackup: vi.fn(),
+      resetConfiguration: vi.fn()
       } satisfies DesktopPreloadApi
     })
     render(<App />)
@@ -483,7 +493,9 @@ describe('App', () => {
         sendMessage: vi.fn(),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
-      openExternalLink: vi.fn()
+      openExternalLink: vi.fn(),
+      restoreFromBackup: vi.fn(),
+      resetConfiguration: vi.fn()
       } satisfies DesktopPreloadApi
     })
     render(<App />)
