@@ -15,6 +15,7 @@ import {
   type PiSdkReadMessagesRequest,
   type PiSdkSessionHandle,
   type PiSdkVerificationRequest,
+  createTangyuanRuntimeForTesting,
   createDefaultSessionSummary,
 } from './index'
 
@@ -60,6 +61,106 @@ describe('AgentRuntimeError', () => {
       message: 'Provider and model are required before starting a run.',
       recoverable: true,
     })
+  })
+})
+
+describe('TangyuanRuntime', () => {
+  it('keeps configuration, sessions, messages, streaming events, and cancellation behind one interface', async () => {
+    const runStarted = createDeferred<void>()
+    const releaseRun = createDeferred<void>()
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        let wasCancelled = false
+        const handle = {
+          prompts: [] as string[],
+          prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
+            handle.prompts.push(prompt)
+            options?.onEvent?.({ type: 'text-delta', delta: '收' })
+            runStarted.resolve()
+            await releaseRun.promise
+
+            if (wasCancelled) {
+              throw new DOMException('Aborted', 'AbortError')
+            }
+
+            options?.onEvent?.({ type: 'text-delta', delta: '到' })
+            return '收到'
+          },
+          abort: async () => {
+            wasCancelled = true
+            releaseRun.resolve()
+          },
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+    })
+    const { driver } = await createDriver({ gateway })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver: driver,
+      sessionDriver: driver,
+    })
+    const events: AgentEvent[] = []
+    runtime.subscribe((event) => {
+      events.push(event)
+    })
+
+    await runtime.saveRuntimeConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await runtime.createSession({
+      agentId: 'tangyuan',
+      title: '运行时边界测试',
+    })
+    const sendPromise = runtime.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '你好',
+    })
+    await runStarted.promise
+
+    await expect(runtime.listSessions()).resolves.toEqual([
+      expect.objectContaining({
+        sessionId: session.sessionId,
+        state: 'running',
+      }),
+    ])
+    await expect(
+      runtime.cancelRun({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        sessionId: session.sessionId,
+        state: 'cancelled',
+      }),
+    )
+    await expect(sendPromise).resolves.toEqual([
+      expect.objectContaining({ role: 'user', content: '你好' }),
+      expect.objectContaining({ role: 'agent', content: '收' }),
+    ])
+    await expect(
+      runtime.getMessages({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({ role: 'user', content: '你好' }),
+      expect.objectContaining({ role: 'agent', content: '收' }),
+    ])
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'turn-started' }),
+        expect.objectContaining({ type: 'message-delta', delta: '收' }),
+        expect.objectContaining({ type: 'turn-cancelled' }),
+      ]),
+    )
   })
 })
 

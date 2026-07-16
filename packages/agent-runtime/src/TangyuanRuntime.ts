@@ -3,8 +3,8 @@ import type {
   AgentEventListener,
   AgentEventSubscription,
   AgentSessionDriver,
-  RuntimeResourceDriver
-} from '@tangyuan/agent-runtime'
+  RuntimeResourceDriver,
+} from './index'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentMessage,
@@ -15,131 +15,21 @@ import {
   type GetSessionMessagesRequest,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
-  type SendMessageRequest
-} from '@tangyuan/shared'
+  type SendMessageRequest,
+} from '@tangyuan/contracts'
 
 /**
- * 创建 DesktopAppStore 时需要注入的 Driver。
+ * 创建 TangyuanRuntime 时需要注入的内部 Driver。
  */
-export interface DesktopAppStoreDependencies {
+export interface TangyuanRuntimeDependencies {
   runtimeDriver: RuntimeResourceDriver
   sessionDriver: AgentSessionDriver
 }
 
 /**
- * 描述 Main 侧供 IPC 层调用的应用状态中心。
+ * Electron Main 调用运行时行为的唯一高层接口。
  */
-export interface DesktopAppStore {
-  /**
-   * 读取当前运行时快照。
-   *
-   * @returns 当前 RuntimeSnapshot。
-   * @throws 当 RuntimeResourceDriver 读取失败时，Promise 会 reject。
-   */
-  getRuntimeSnapshot(): Promise<RuntimeSnapshot>
-
-  /**
-   * 刷新运行时资源。
-   *
-   * @returns 刷新后的 RuntimeSnapshot。
-   * @throws 当 RuntimeResourceDriver 刷新失败时，Promise 会 reject。
-   */
-  refreshRuntime(): Promise<RuntimeSnapshot>
-
-  /**
-   * 验证并保存运行时配置。
-   *
-   * @param configuration - Provider、模型和 API Key。
-   * @returns 保存后的 RuntimeSnapshot。
-   * @throws 当 RuntimeResourceDriver 缺少保存能力或验证失败时，Promise 会 reject。
-   */
-  saveRuntimeConfiguration(configuration: RuntimeConfiguration): Promise<RuntimeSnapshot>
-
-  /**
-   * 取消正在进行的运行时配置验证。
-   *
-   * @param request - 需要取消的验证标识。
-   * @returns 取消后的 RuntimeSnapshot。
-   * @throws 当 RuntimeResourceDriver 缺少取消能力或取消失败时，Promise 会 reject。
-   */
-  cancelRuntimeConfigurationVerification(
-    request: CancelConfigurationVerificationRequest
-  ): Promise<RuntimeSnapshot>
-
-  /**
-   * 读取默认 Agent 的会话摘要列表。
-   *
-   * @returns 会话摘要列表。
-   * @throws 当 AgentSessionDriver 读取失败时，Promise 会 reject。
-   */
-  listSessions(): Promise<AgentSessionSummary[]>
-
-  /**
-   * 创建一个新的 Agent 会话。
-   *
-   * @param request - 新会话所属 Agent 和标题。
-   * @returns 创建后的会话摘要。
-   * @throws 当 AgentSessionDriver 创建失败时，Promise 会 reject。
-   */
-  createSession(request: CreateSessionRequest): Promise<AgentSessionSummary>
-
-  /**
-   * 读取指定会话的 transcript。
-   *
-   * @param request - 会话所属 Agent 和会话标识。
-   * @returns 当前会话消息列表。
-   * @throws 当 AgentSessionDriver 读取失败时，Promise 会 reject。
-   */
-  getMessages(request: GetSessionMessagesRequest): Promise<AgentMessage[]>
-
-  /**
-   * 向指定会话发送用户消息。
-   *
-   * @param request - 会话所属 Agent、会话标识和消息内容。
-   * @returns 发送完成后的当前会话消息列表。
-   * @throws 当运行时缺少配置、会话不存在或 AgentSessionDriver 发送失败时，Promise 会 reject。
-   */
-  sendMessage(request: SendMessageRequest): Promise<AgentMessage[]>
-
-  /**
-   * 取消指定会话正在运行的 Agent 响应。
-   *
-   * @param request - 会话所属 Agent 和会话标识。
-   * @returns 取消后的会话摘要。
-   * @throws 当会话不存在或 AgentSessionDriver 取消失败时，Promise 会 reject。
-   */
-  cancelRun(request: CancelRunRequest): Promise<AgentSessionSummary>
-
-  /**
-   * 订阅 Store 转发的 Agent 标准事件。
-   *
-   * @param listener - 事件监听回调。
-   * @returns 可取消订阅的句柄。
-   * @throws 此方法不会主动抛出错误。
-   */
-  subscribe(listener: AgentEventListener): AgentEventSubscription
-
-  /**
-   * 取消所有仍处于运行中的会话。
-   *
-   * @returns 无返回值。
-   * @throws 当任一会话取消失败时，Promise 会 reject。
-   */
-  cancelAllActiveRuns(): Promise<void>
-}
-
-/**
- * 创建 Main 侧桌面应用状态中心。
- *
- * @param dependencies - Runtime 和会话 Driver。
- * @returns 可被 IPC 层调用的 DesktopAppStore。
- * @throws 此方法不会主动抛出错误。
- */
-export function createDesktopAppStore(dependencies: DesktopAppStoreDependencies): DesktopAppStore {
-  return new DefaultDesktopAppStore(dependencies)
-}
-
-class DefaultDesktopAppStore implements DesktopAppStore {
+class DefaultTangyuanRuntime {
   private readonly runtimeDriver: RuntimeResourceDriver
   private readonly sessionDriver: AgentSessionDriver
   private readonly listeners = new Set<AgentEventListener>()
@@ -149,13 +39,13 @@ class DefaultDesktopAppStore implements DesktopAppStore {
   private sessions: AgentSessionSummary[] = []
 
   /**
-   * 创建默认 DesktopAppStore。
+   * 创建默认 TangyuanRuntime。
    *
    * @param dependencies - Runtime 和会话 Driver。
-   * @returns DefaultDesktopAppStore 实例。
+   * @returns TangyuanRuntime 实例。
    * @throws 此构造方法不会主动抛出错误。
    */
-  constructor(dependencies: DesktopAppStoreDependencies) {
+  constructor(dependencies: TangyuanRuntimeDependencies) {
     this.runtimeDriver = dependencies.runtimeDriver
     this.sessionDriver = dependencies.sessionDriver
     this.sessionDriver.subscribe((event) => {
@@ -165,7 +55,7 @@ class DefaultDesktopAppStore implements DesktopAppStore {
   }
 
   /**
-   * 读取当前运行时快照并写入 Store 缓存。
+   * 读取当前运行时快照并写入 Runtime 缓存。
    *
    * @returns 当前 RuntimeSnapshot。
    * @throws 当 RuntimeResourceDriver 读取失败时，Promise 会 reject。
@@ -176,7 +66,7 @@ class DefaultDesktopAppStore implements DesktopAppStore {
   }
 
   /**
-   * 刷新运行时资源并写入 Store 缓存。
+   * 刷新运行时资源并写入 Runtime 缓存。
    *
    * @returns 刷新后的 RuntimeSnapshot。
    * @throws 当 RuntimeResourceDriver 刷新失败时，Promise 会 reject。
@@ -187,70 +77,80 @@ class DefaultDesktopAppStore implements DesktopAppStore {
   }
 
   /**
-   * 验证并保存运行时配置，再写入 Store 缓存。
+   * 验证并保存运行时配置，再写入 Runtime 缓存。
    *
    * @param configuration - Provider、模型和 API Key。
    * @returns 保存后的 RuntimeSnapshot。
    * @throws 当 RuntimeResourceDriver 缺少保存能力或验证失败时，Promise 会 reject。
    */
-  async saveRuntimeConfiguration(configuration: RuntimeConfiguration): Promise<RuntimeSnapshot> {
+  async saveRuntimeConfiguration(
+    configuration: RuntimeConfiguration,
+  ): Promise<RuntimeSnapshot> {
     if (!this.runtimeDriver.saveConfiguration) {
       throw new Error('当前运行时不支持保存配置。')
     }
 
-    this.runtimeSnapshot = await this.runtimeDriver.saveConfiguration(configuration)
+    this.runtimeSnapshot =
+      await this.runtimeDriver.saveConfiguration(configuration)
     return this.runtimeSnapshot
   }
 
   /**
-   * 取消正在进行的运行时配置验证，再刷新 Store 缓存。
+   * 取消正在进行的运行时配置验证，再刷新 Runtime 缓存。
    *
    * @param request - 需要取消的验证标识。
    * @returns 取消后的 RuntimeSnapshot。
    * @throws 当 RuntimeResourceDriver 缺少取消能力或取消失败时，Promise 会 reject。
    */
   async cancelRuntimeConfigurationVerification(
-    request: CancelConfigurationVerificationRequest
+    request: CancelConfigurationVerificationRequest,
   ): Promise<RuntimeSnapshot> {
     if (!this.runtimeDriver.cancelConfigurationVerification) {
       throw new Error('当前运行时不支持取消配置验证。')
     }
 
-    this.runtimeSnapshot = await this.runtimeDriver.cancelConfigurationVerification(request)
+    this.runtimeSnapshot =
+      await this.runtimeDriver.cancelConfigurationVerification(request)
     return this.runtimeSnapshot
   }
 
   /**
-   * 读取默认 Agent 的会话摘要列表并写入 Store 缓存。
+   * 读取默认 Agent 的会话摘要列表并写入 Runtime 缓存。
    *
    * @returns 会话摘要列表。
    * @throws 当 AgentSessionDriver 读取失败时，Promise 会 reject。
    */
   async listSessions(): Promise<AgentSessionSummary[]> {
     const driverSessions = await this.sessionDriver.listSessions({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
     })
     this.sessions = driverSessions.map((session) => ({
       ...session,
-      state: this.activeRunIds.has(session.sessionId) ? 'running' : session.state
+      state: this.activeRunIds.has(session.sessionId)
+        ? 'running'
+        : session.state,
     }))
     return this.sessions
   }
 
   /**
-   * 创建会话并把结果合并到 Store 缓存。
+   * 创建会话并把结果合并到 Runtime 缓存。
    *
    * @param request - 新会话所属 Agent 和标题。
    * @returns 创建后的会话摘要。
    * @throws 当 AgentSessionDriver 创建失败时，Promise 会 reject。
    */
-  async createSession(request: CreateSessionRequest): Promise<AgentSessionSummary> {
+  async createSession(
+    request: CreateSessionRequest,
+  ): Promise<AgentSessionSummary> {
     await this.assertRuntimeReady()
 
     const session = await this.sessionDriver.createSession(request)
     this.sessions = [
       session,
-      ...this.sessions.filter((candidate) => candidate.sessionId !== session.sessionId)
+      ...this.sessions.filter(
+        (candidate) => candidate.sessionId !== session.sessionId,
+      ),
     ]
     return session
   }
@@ -262,7 +162,9 @@ class DefaultDesktopAppStore implements DesktopAppStore {
    * @returns 当前会话消息列表。
    * @throws 当 AgentSessionDriver 读取失败时，Promise 会 reject。
    */
-  async getMessages(request: GetSessionMessagesRequest): Promise<AgentMessage[]> {
+  async getMessages(
+    request: GetSessionMessagesRequest,
+  ): Promise<AgentMessage[]> {
     if (this.messagesBySession.has(request.sessionId)) {
       return [...(this.messagesBySession.get(request.sessionId) ?? [])]
     }
@@ -274,7 +176,7 @@ class DefaultDesktopAppStore implements DesktopAppStore {
   }
 
   /**
-   * 向指定会话发送消息，并返回发送完成后的最新 transcript。
+   * 向指定会话发送消息，并返回发送完成后的最新对话消息。
    *
    * @param request - 会话所属 Agent、会话标识和用户消息内容。
    * @returns 发送完成后的当前会话消息列表。
@@ -284,10 +186,14 @@ class DefaultDesktopAppStore implements DesktopAppStore {
     await this.assertRuntimeReady()
 
     const session =
-      this.sessions.find((candidate) => candidate.sessionId === request.sessionId) ??
-      (await this.findSession(request.sessionId))
+      this.sessions.find(
+        (candidate) => candidate.sessionId === request.sessionId,
+      ) ?? (await this.findSession(request.sessionId))
 
-    if (this.activeRunIds.has(request.sessionId) || session?.state === 'running') {
+    if (
+      this.activeRunIds.has(request.sessionId) ||
+      session?.state === 'running'
+    ) {
       throw new Error('当前会话正在运行，请等待完成或先取消本次响应。')
     }
 
@@ -295,7 +201,7 @@ class DefaultDesktopAppStore implements DesktopAppStore {
 
     return this.getMessages({
       agentId: request.agentId,
-      sessionId: request.sessionId
+      sessionId: request.sessionId,
     })
   }
 
@@ -310,7 +216,9 @@ class DefaultDesktopAppStore implements DesktopAppStore {
     await this.sessionDriver.cancelRun(request)
     this.activeRunIds.delete(request.sessionId)
     await this.listSessions()
-    const session = this.sessions.find((candidate) => candidate.sessionId === request.sessionId)
+    const session = this.sessions.find(
+      (candidate) => candidate.sessionId === request.sessionId,
+    )
 
     if (!session) {
       throw new Error(`找不到会话 ${request.sessionId}。`)
@@ -320,7 +228,7 @@ class DefaultDesktopAppStore implements DesktopAppStore {
   }
 
   /**
-   * 订阅 Store 转发的 Agent 标准事件。
+   * 订阅 Runtime 转发的 Agent 标准事件。
    *
    * @param listener - 事件监听回调。
    * @returns 可取消订阅的句柄。
@@ -332,7 +240,7 @@ class DefaultDesktopAppStore implements DesktopAppStore {
     return {
       unsubscribe: () => {
         this.listeners.delete(listener)
-      }
+      },
     }
   }
 
@@ -344,16 +252,17 @@ class DefaultDesktopAppStore implements DesktopAppStore {
    */
   async cancelAllActiveRuns(): Promise<void> {
     const runningSessions = this.sessions.filter(
-      (session) => session.state === 'running' || this.activeRunIds.has(session.sessionId)
+      (session) =>
+        session.state === 'running' || this.activeRunIds.has(session.sessionId),
     )
 
     await Promise.all(
       runningSessions.map((session) =>
         this.cancelRun({
           agentId: session.agentId,
-          sessionId: session.sessionId
-        })
-      )
+          sessionId: session.sessionId,
+        }),
+      ),
     )
   }
 
@@ -368,7 +277,7 @@ class DefaultDesktopAppStore implements DesktopAppStore {
 
     if (snapshot.status !== 'ready') {
       throw new Error(
-        '发送消息前，请先配置 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。'
+        '发送消息前，请先配置 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。',
       )
     }
   }
@@ -380,8 +289,12 @@ class DefaultDesktopAppStore implements DesktopAppStore {
    * @returns 找到时返回会话摘要，否则返回 undefined。
    * @throws 当 Driver 读取会话列表失败时，Promise 会 reject。
    */
-  private async findSession(sessionId: string): Promise<AgentSessionSummary | undefined> {
-    const cachedSession = this.sessions.find((session) => session.sessionId === sessionId)
+  private async findSession(
+    sessionId: string,
+  ): Promise<AgentSessionSummary | undefined> {
+    const cachedSession = this.sessions.find(
+      (session) => session.sessionId === sessionId,
+    )
 
     if (cachedSession) {
       return cachedSession
@@ -393,7 +306,7 @@ class DefaultDesktopAppStore implements DesktopAppStore {
   }
 
   /**
-   * 把 Driver 事件归并到 Store 的本地缓存。
+   * 把 Driver 事件归并到 Runtime 的本地缓存。
    *
    * @param event - Driver 发出的标准事件。
    * @returns 无返回值。
@@ -447,7 +360,7 @@ class DefaultDesktopAppStore implements DesktopAppStore {
         sessionId: event.sessionId,
         role: 'system',
         content: event.error.message,
-        createdAt: event.occurredAt
+        createdAt: event.occurredAt,
       })
       return
     }
@@ -471,7 +384,9 @@ class DefaultDesktopAppStore implements DesktopAppStore {
   private upsertSession(session: AgentSessionSummary): void {
     this.sessions = [
       session,
-      ...this.sessions.filter((candidate) => candidate.sessionId !== session.sessionId)
+      ...this.sessions.filter(
+        (candidate) => candidate.sessionId !== session.sessionId,
+      ),
     ]
   }
 
@@ -487,15 +402,17 @@ class DefaultDesktopAppStore implements DesktopAppStore {
   private upsertSessionState(
     sessionId: string,
     state: AgentSessionSummary['state'],
-    updatedAt: string
+    updatedAt: string,
   ): void {
     this.sessions = this.sessions.map((session) =>
-      session.sessionId === sessionId ? { ...session, state, updatedAt } : session
+      session.sessionId === sessionId
+        ? { ...session, state, updatedAt }
+        : session,
     )
   }
 
   /**
-   * 新增或替换 transcript 消息。
+   * 新增或替换对话消息。
    *
    * @param message - 需要写入缓存的消息。
    * @returns 无返回值。
@@ -503,10 +420,12 @@ class DefaultDesktopAppStore implements DesktopAppStore {
    */
   private upsertMessage(message: AgentMessage): void {
     const messages = this.messagesBySession.get(message.sessionId) ?? []
-    const messageExists = messages.some((candidate) => candidate.messageId === message.messageId)
+    const messageExists = messages.some(
+      (candidate) => candidate.messageId === message.messageId,
+    )
     const nextMessages = messageExists
       ? messages.map((candidate) =>
-          candidate.messageId === message.messageId ? message : candidate
+          candidate.messageId === message.messageId ? message : candidate,
         )
       : [...messages, message]
     this.messagesBySession.set(message.sessionId, nextMessages)
@@ -519,9 +438,13 @@ class DefaultDesktopAppStore implements DesktopAppStore {
    * @returns 无返回值。
    * @throws 此方法不会主动抛出错误。
    */
-  private appendDelta(event: Extract<AgentEvent, { type: 'message-delta' }>): void {
+  private appendDelta(
+    event: Extract<AgentEvent, { type: 'message-delta' }>,
+  ): void {
     const messages = this.messagesBySession.get(event.sessionId) ?? []
-    const messageIndex = messages.findIndex((message) => message.messageId === event.messageId)
+    const messageIndex = messages.findIndex(
+      (message) => message.messageId === event.messageId,
+    )
 
     if (messageIndex === -1) {
       this.messagesBySession.set(event.sessionId, [
@@ -532,17 +455,22 @@ class DefaultDesktopAppStore implements DesktopAppStore {
           sessionId: event.sessionId,
           role: 'agent',
           content: event.delta,
-          createdAt: event.occurredAt
-        }
+          createdAt: event.occurredAt,
+        },
       ])
       return
     }
 
     const nextMessages = [...messages]
     const currentMessage = nextMessages[messageIndex]
+
+    if (!currentMessage) {
+      return
+    }
+
     nextMessages[messageIndex] = {
       ...currentMessage,
-      content: `${currentMessage.content}${event.delta}`
+      content: `${currentMessage.content}${event.delta}`,
     }
     this.messagesBySession.set(event.sessionId, nextMessages)
   }
@@ -554,19 +482,21 @@ class DefaultDesktopAppStore implements DesktopAppStore {
    * @returns 无返回值。
    * @throws 此方法不会主动抛出错误。
    */
-  private upsertActivityMessage(event: Extract<AgentEvent, { type: 'activity-updated' }>): void {
+  private upsertActivityMessage(
+    event: Extract<AgentEvent, { type: 'activity-updated' }>,
+  ): void {
     this.upsertMessage({
       messageId: `${event.sessionId}-${event.runId}-${event.activity.kind}`,
       agentId: event.agentId,
       sessionId: event.sessionId,
       role: 'system',
       content: event.activity.label,
-      createdAt: event.occurredAt
+      createdAt: event.occurredAt,
     })
   }
 
   /**
-   * 向 Store 订阅者广播标准事件。
+   * 向 Runtime 订阅者广播标准事件。
    *
    * @param event - 需要广播的标准事件。
    * @returns 无返回值。
@@ -578,3 +508,34 @@ class DefaultDesktopAppStore implements DesktopAppStore {
     }
   }
 }
+
+/**
+ * 使用可控 Driver 创建测试用 TangyuanRuntime。
+ *
+ * @param dependencies - 测试提供的运行时资源与会话 Driver。
+ * @returns 通过公开 TangyuanRuntime 方法观察行为的测试实例。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function createTangyuanRuntimeForTesting(
+  dependencies: TangyuanRuntimeDependencies,
+): TangyuanRuntime {
+  return new DefaultTangyuanRuntime(dependencies)
+}
+
+/**
+ * Electron Main 可以调用的 TangyuanRuntime 高层能力集合。
+ */
+export type TangyuanRuntime = Pick<
+  DefaultTangyuanRuntime,
+  | 'getRuntimeSnapshot'
+  | 'refreshRuntime'
+  | 'saveRuntimeConfiguration'
+  | 'cancelRuntimeConfigurationVerification'
+  | 'listSessions'
+  | 'createSession'
+  | 'getMessages'
+  | 'sendMessage'
+  | 'cancelRun'
+  | 'subscribe'
+  | 'cancelAllActiveRuns'
+>

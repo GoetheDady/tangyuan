@@ -1,14 +1,16 @@
 import {
   DESKTOP_IPC_CHANNELS,
+  agentEventSchema,
+  parseDesktopIpcRequest,
+  parseDesktopIpcResponse,
   type AgentEvent,
   type DesktopIpcChannel,
-  type DesktopIpcRequest,
   type DesktopIpcResponse
-} from '@tangyuan/shared'
-import type { DesktopAppStore } from './DesktopAppStore'
+} from '@tangyuan/contracts'
+import type { TangyuanRuntime } from '@tangyuan/agent-runtime'
 
 /**
- * 描述 DesktopAppStore IPC 注册所需的 Electron ipcMain 子集。
+ * 描述 TangyuanRuntime IPC 注册所需的 Electron ipcMain 子集。
  */
 export interface IpcMainLike {
   /**
@@ -21,10 +23,7 @@ export interface IpcMainLike {
    */
   handle<Channel extends DesktopIpcChannel>(
     channel: Channel,
-    handler: (
-      event: unknown,
-      payload: DesktopIpcRequest<Channel>
-    ) => Promise<DesktopIpcResponse<Channel>>
+    handler: (event: unknown, payload: unknown) => Promise<DesktopIpcResponse<Channel>>
   ): void
 }
 
@@ -34,51 +33,95 @@ export interface IpcMainLike {
 export type AgentEventBroadcaster = (event: AgentEvent) => void
 
 /**
- * 把允许的 IPC channel 连接到 DesktopAppStore。
+ * 把允许的 IPC channel 连接到 TangyuanRuntime。
  *
  * @param ipcMain - Electron ipcMain 或测试替身。
- * @param store - Main 侧应用状态中心。
+ * @param runtime - Main 侧唯一运行时入口。
  * @param broadcastAgentEvent - 可选事件广播方法，用于推送 Agent 标准事件。
  * @returns 无返回值。
  * @throws 当 ipcMain.handle 注册失败时可能抛出错误。
  */
 export function registerDesktopAppIpc(
   ipcMain: IpcMainLike,
-  store: DesktopAppStore,
+  runtime: TangyuanRuntime,
   broadcastAgentEvent?: AgentEventBroadcaster
 ): void {
   if (broadcastAgentEvent) {
-    store.subscribe(broadcastAgentEvent)
+    runtime.subscribe((event) => {
+      broadcastAgentEvent(agentEventSchema.parse(event))
+    })
   }
 
-  ipcMain.handle(DESKTOP_IPC_CHANNELS.runtimeGetSnapshot, async () => {
-    return store.getRuntimeSnapshot()
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.runtimeGetSnapshot, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.runtimeGetSnapshot, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.runtimeGetSnapshot,
+      await runtime.getRuntimeSnapshot()
+    )
   })
-  ipcMain.handle(DESKTOP_IPC_CHANNELS.runtimeRefresh, async () => {
-    return store.refreshRuntime()
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.runtimeRefresh, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.runtimeRefresh, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.runtimeRefresh,
+      await runtime.refreshRuntime()
+    )
   })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration, async (_event, payload) => {
-    return store.saveRuntimeConfiguration(payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration,
+      await runtime.saveRuntimeConfiguration(
+        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration, payload)
+      )
+    )
   })
   ipcMain.handle(
     DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification,
     async (_event, payload) => {
-      return store.cancelRuntimeConfigurationVerification(payload)
+      return parseDesktopIpcResponse(
+        DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification,
+        await runtime.cancelRuntimeConfigurationVerification(
+          parseDesktopIpcRequest(
+            DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification,
+            payload
+          )
+        )
+      )
     }
   )
-  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsList, async () => {
-    return store.listSessions()
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsList, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsList, payload)
+    return parseDesktopIpcResponse(DESKTOP_IPC_CHANNELS.sessionsList, await runtime.listSessions())
   })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsCreate, async (_event, payload) => {
-    return store.createSession(payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsCreate,
+      await runtime.createSession(
+        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsCreate, payload)
+      )
+    )
   })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsGetMessages, async (_event, payload) => {
-    return store.getMessages(payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsGetMessages,
+      await runtime.getMessages(
+        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsGetMessages, payload)
+      )
+    )
   })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsSendMessage, async (_event, payload) => {
-    return store.sendMessage(payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsSendMessage,
+      await runtime.sendMessage(
+        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsSendMessage, payload)
+      )
+    )
   })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsCancelRun, async (_event, payload) => {
-    return store.cancelRun(payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsCancelRun,
+      await runtime.cancelRun(
+        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsCancelRun, payload)
+      )
+    )
   })
 }

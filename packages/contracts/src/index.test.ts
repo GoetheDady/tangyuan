@@ -2,11 +2,67 @@ import { describe, expect, it } from 'vitest'
 import {
   DESKTOP_IPC_CHANNELS,
   TANGYUAN_DEFAULT_AGENT_ID,
+  agentEventSchema,
   createAgentProfileStatus,
+  createSessionRequestSchema,
   createDefaultSessionSummary,
   createRuntimeSnapshot,
+  runtimeSnapshotSchema,
   type RuntimeSnapshotInput,
 } from './index'
+
+describe('contracts schemas', () => {
+  it('accepts serializable Agent events and rejects malformed event payloads', () => {
+    expect(
+      agentEventSchema.parse({
+        type: 'turn-started',
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        runId: 'run-1',
+        occurredAt: '2026-07-16T00:00:00.000Z',
+      }),
+    ).toEqual({
+      type: 'turn-started',
+      agentId: 'tangyuan',
+      sessionId: 'session-1',
+      runId: 'run-1',
+      occurredAt: '2026-07-16T00:00:00.000Z',
+    })
+
+    expect(() =>
+      agentEventSchema.parse({
+        type: 'message-delta',
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        runId: 'run-1',
+        messageId: 'message-1',
+        delta: 42,
+        occurredAt: '2026-07-16T00:00:00.000Z',
+      }),
+    ).toThrow()
+  })
+
+  it('rejects an empty session title at the IPC contract boundary', () => {
+    expect(() =>
+      createSessionRequestSchema.parse({
+        agentId: 'tangyuan',
+        title: '   ',
+      }),
+    ).toThrow()
+  })
+
+  it('rejects malformed runtime responses before they cross IPC', () => {
+    const snapshot = createRuntimeSnapshot(createRuntimeSnapshotInput())
+
+    expect(runtimeSnapshotSchema.parse(snapshot)).toEqual(snapshot)
+    expect(() =>
+      runtimeSnapshotSchema.parse({
+        ...snapshot,
+        status: 'unexpected-status',
+      }),
+    ).toThrow()
+  })
+})
 
 describe('createRuntimeSnapshot', () => {
   it('reports missing configuration until provider, model, and API key are configured', () => {

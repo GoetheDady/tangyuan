@@ -4,7 +4,7 @@ import {
   type AgentEvent,
   type DesktopIpcChannel,
   type DesktopIpcResponse
-} from '@tangyuan/shared'
+} from '@tangyuan/contracts'
 import { describe, expect, it } from 'vitest'
 import { createTangyuanPreloadApi, type IpcInvoke, type IpcSubscribe } from './api'
 

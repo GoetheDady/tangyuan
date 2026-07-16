@@ -11,6 +11,10 @@ import { constants as fsConstants } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
+  createTangyuanRuntimeForTesting,
+  type TangyuanRuntime,
+} from './TangyuanRuntime'
+import {
   TANGYUAN_DEFAULT_AGENT_ID,
   createAgentProfileStatus,
   createDefaultSessionSummary,
@@ -34,7 +38,7 @@ import {
   type RuntimeConfiguration,
   type RuntimeSnapshot,
   type SendMessageRequest,
-} from '@tangyuan/shared'
+} from '@tangyuan/contracts'
 
 export {
   TANGYUAN_DEFAULT_AGENT_ID,
@@ -59,7 +63,24 @@ export {
   type RuntimeConfiguration,
   type RuntimeSnapshot,
   type SendMessageRequest,
-} from '@tangyuan/shared'
+} from '@tangyuan/contracts'
+export { createTangyuanRuntimeForTesting } from './TangyuanRuntime'
+export type { TangyuanRuntime } from './TangyuanRuntime'
+
+/**
+ * 创建 Electron Main 使用的默认 TangyuanRuntime。
+ *
+ * @returns 内部使用同一个 Pi SDK Driver 管理资源与会话的运行时实例。
+ * @throws 此方法不会主动抛出错误；具体初始化错误会由运行时异步方法返回。
+ */
+export function createTangyuanRuntime(): TangyuanRuntime {
+  const driver = new PiSdkDriver()
+
+  return createTangyuanRuntimeForTesting({
+    runtimeDriver: driver,
+    sessionDriver: driver,
+  })
+}
 
 /**
  * 描述 Pi SDK 临时配置验证时使用的固定 prompt。

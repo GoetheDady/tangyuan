@@ -12,7 +12,7 @@ import {
   type RuntimeConfiguration,
   type CancelConfigurationVerificationRequest,
   type SendMessageRequest
-} from '@tangyuan/shared'
+} from '@tangyuan/contracts'
 
 /**
  * 描述 Preload API 内部使用的 IPC 调用方法。

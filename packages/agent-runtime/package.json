@@ -5,8 +5,8 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./src/public.ts",
+      "default": "./src/public.ts"
     }
   },
   "scripts": {
@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.3",
-    "@tangyuan/shared": "workspace:*"
+    "@tangyuan/contracts": "workspace:*"
   },
   "devDependencies": {
     "@tangyuan/eslint-config": "workspace:*",

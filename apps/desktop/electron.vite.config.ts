@@ -6,14 +6,14 @@ export default defineConfig({
   main: {
     build: {
       externalizeDeps: {
-        exclude: ['@tangyuan/agent-runtime', '@tangyuan/shared']
+        exclude: ['@tangyuan/agent-runtime', '@tangyuan/contracts']
       }
     }
   },
   preload: {
     build: {
       externalizeDeps: {
-        exclude: ['@tangyuan/shared']
+        exclude: ['@tangyuan/contracts']
       }
     }
   },

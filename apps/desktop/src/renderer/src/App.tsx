@@ -6,7 +6,7 @@ import type {
   DesktopPreloadApi,
   RuntimeConfiguration,
   RuntimeSnapshot
-} from '@tangyuan/shared'
+} from '@tangyuan/contracts'
 import {
   Ban,
   CheckCircle2,

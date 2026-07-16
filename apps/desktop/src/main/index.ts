@@ -2,17 +2,12 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { mkdir, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { PiSdkDriver } from '@tangyuan/agent-runtime'
-import { DESKTOP_AGENT_EVENT_CHANNEL } from '@tangyuan/shared'
+import { createTangyuanRuntime } from '@tangyuan/agent-runtime'
+import { DESKTOP_AGENT_EVENT_CHANNEL } from '@tangyuan/contracts'
 import icon from '../../resources/icon.png?asset'
-import { createDesktopAppStore } from './DesktopAppStore'
 import { registerDesktopAppIpc } from './ipc'
 
-const piSdkDriver = new PiSdkDriver()
-const desktopAppStore = createDesktopAppStore({
-  runtimeDriver: piSdkDriver,
-  sessionDriver: piSdkDriver
-})
+const tangyuanRuntime = createTangyuanRuntime()
 const smokeTestResultPath = process.env['TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH']
 let isQuittingAfterCancellingRuns = false
 
@@ -75,7 +70,7 @@ async function runPackagedSmokeTest(mainWindow: BrowserWindow): Promise<void> {
       phase: 'electron-ready',
       checkedAt: new Date().toISOString()
     })
-    const runtimeSnapshot = await desktopAppStore.getRuntimeSnapshot()
+    const runtimeSnapshot = await tangyuanRuntime.getRuntimeSnapshot()
     await writeSmokeTestResult({
       ok: false,
       phase: 'runtime-snapshot-loaded',
@@ -232,7 +227,7 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  registerDesktopAppIpc(ipcMain, desktopAppStore, (event) => {
+  registerDesktopAppIpc(ipcMain, tangyuanRuntime, (event) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(DESKTOP_AGENT_EVENT_CHANNEL, event)
     }
@@ -264,7 +259,7 @@ app.on('before-quit', (event) => {
 
   event.preventDefault()
   isQuittingAfterCancellingRuns = true
-  void desktopAppStore.cancelAllActiveRuns().finally(() => {
+  void tangyuanRuntime.cancelAllActiveRuns().finally(() => {
     app.quit()
   })
 })

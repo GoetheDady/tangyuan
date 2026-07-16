@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 /**
  * v1 默认 Agent 的稳定标识。
  */
@@ -15,7 +17,7 @@ export type AgentRunState =
   'idle' | 'running' | 'completed' | 'cancelled' | 'failed'
 
 /**
- * 描述消息在 transcript 里的来源。
+ * 描述消息在对话消息列表里的来源。
  */
 export type AgentMessageRole = 'user' | 'agent' | 'system'
 
@@ -83,7 +85,7 @@ export interface AgentActivity {
 }
 
 /**
- * 描述 Agent 运行过程中发给 DesktopAppStore 和 Renderer 的标准事件。
+ * 描述 Agent 运行过程中发给 TangyuanRuntime 和 Renderer 的标准事件。
  */
 export type AgentEvent =
   | {
@@ -350,6 +352,265 @@ export interface CancelConfigurationVerificationRequest {
   verificationId: string
 }
 
+const nonEmptyIdentifierSchema = z.string().trim().min(1)
+const timestampSchema = z.string().trim().min(1)
+
+/**
+ * 校验跨进程传输的 Agent 消息。
+ */
+export const agentMessageSchema = z.strictObject({
+  messageId: nonEmptyIdentifierSchema,
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+  role: z.enum(['user', 'agent', 'system']),
+  content: z.string(),
+  createdAt: timestampSchema,
+})
+
+/**
+ * 校验跨进程传输的会话摘要。
+ */
+export const agentSessionSummarySchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+  title: z.string(),
+  state: z.enum(['idle', 'running', 'completed', 'cancelled', 'failed']),
+  updatedAt: timestampSchema,
+})
+
+/**
+ * 校验 Agent profile 文件状态。
+ */
+export const agentProfileStatusSchema = z.strictObject({
+  initialized: z.boolean(),
+  bootstrapRequired: z.boolean(),
+  soulUpdatedAt: timestampSchema.nullable(),
+  userUpdatedAt: timestampSchema.nullable(),
+})
+
+/**
+ * 校验当前桌面应用正在操作的 Agent profile。
+ */
+export const agentProfileSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  displayName: z.string(),
+  homePath: z.string(),
+  profile: agentProfileStatusSchema,
+})
+
+/**
+ * 校验可选 Provider 描述。
+ */
+export const providerDescriptorSchema = z.strictObject({
+  providerId: nonEmptyIdentifierSchema,
+  displayName: z.string(),
+})
+
+/**
+ * 校验可选模型描述。
+ */
+export const modelDescriptorSchema = z.strictObject({
+  providerId: nonEmptyIdentifierSchema,
+  modelId: nonEmptyIdentifierSchema,
+  displayName: z.string(),
+})
+
+/**
+ * 校验 API Key 的脱敏配置状态。
+ */
+export const apiKeyStateSchema = z.strictObject({
+  configured: z.boolean(),
+  maskedValue: z.string().nullable(),
+})
+
+/**
+ * 校验运行时 Provider 与 Model 设置。
+ */
+export const runtimeSettingsSchema = z.strictObject({
+  selectedProviderId: z.string().nullable(),
+  selectedModelId: z.string().nullable(),
+})
+
+/**
+ * 校验运行时认证状态。
+ */
+export const runtimeAuthSnapshotSchema = z.strictObject({
+  state: z.enum(['missing-api-key', 'api-key-configured']),
+  apiKey: apiKeyStateSchema,
+})
+
+/**
+ * 校验 Renderer 可以接收的完整运行时快照。
+ */
+export const runtimeSnapshotSchema = z.strictObject({
+  activeAgent: agentProfileSchema,
+  providers: z.array(providerDescriptorSchema),
+  models: z.array(modelDescriptorSchema),
+  settings: runtimeSettingsSchema,
+  auth: runtimeAuthSnapshotSchema,
+  status: z.enum(['missing-config', 'ready']),
+})
+
+/**
+ * 校验可以安全暴露给 Renderer 的 Runtime 错误。
+ */
+export const agentRuntimeErrorPayloadSchema = z.strictObject({
+  code: z.enum([
+    'configuration-missing',
+    'driver-unavailable',
+    'provider-verification-failed',
+    'session-not-found',
+    'run-already-active',
+    'run-cancelled',
+    'unknown',
+  ]),
+  message: z.string(),
+  recoverable: z.boolean(),
+})
+
+/**
+ * 校验不含敏感参数的 Agent 活动摘要。
+ */
+export const agentActivitySchema = z.strictObject({
+  kind: z.enum(['thinking', 'tool']),
+  state: z.enum(['running', 'completed', 'failed']),
+  label: z.string(),
+})
+
+/**
+ * 校验 Main 向 Renderer 推送的标准 Agent 事件。
+ */
+export const agentEventSchema = z.discriminatedUnion('type', [
+  z.strictObject({
+    type: z.literal('session-created'),
+    agentId: nonEmptyIdentifierSchema,
+    session: agentSessionSummarySchema,
+    occurredAt: timestampSchema,
+  }),
+  z.strictObject({
+    type: z.literal('message-appended'),
+    agentId: nonEmptyIdentifierSchema,
+    message: agentMessageSchema,
+    occurredAt: timestampSchema,
+  }),
+  z.strictObject({
+    type: z.literal('turn-started'),
+    agentId: nonEmptyIdentifierSchema,
+    sessionId: nonEmptyIdentifierSchema,
+    runId: nonEmptyIdentifierSchema,
+    occurredAt: timestampSchema,
+  }),
+  z.strictObject({
+    type: z.literal('message-delta'),
+    agentId: nonEmptyIdentifierSchema,
+    sessionId: nonEmptyIdentifierSchema,
+    runId: nonEmptyIdentifierSchema,
+    messageId: nonEmptyIdentifierSchema,
+    delta: z.string(),
+    occurredAt: timestampSchema,
+  }),
+  z.strictObject({
+    type: z.literal('message-completed'),
+    agentId: nonEmptyIdentifierSchema,
+    sessionId: nonEmptyIdentifierSchema,
+    runId: nonEmptyIdentifierSchema,
+    message: agentMessageSchema,
+    occurredAt: timestampSchema,
+  }),
+  z.strictObject({
+    type: z.literal('turn-cancelled'),
+    agentId: nonEmptyIdentifierSchema,
+    sessionId: nonEmptyIdentifierSchema,
+    runId: nonEmptyIdentifierSchema,
+    occurredAt: timestampSchema,
+  }),
+  z.strictObject({
+    type: z.literal('turn-failed'),
+    agentId: nonEmptyIdentifierSchema,
+    sessionId: nonEmptyIdentifierSchema,
+    runId: nonEmptyIdentifierSchema,
+    error: agentRuntimeErrorPayloadSchema,
+    occurredAt: timestampSchema,
+  }),
+  z.strictObject({
+    type: z.literal('activity-updated'),
+    agentId: nonEmptyIdentifierSchema,
+    sessionId: nonEmptyIdentifierSchema,
+    runId: nonEmptyIdentifierSchema,
+    activity: agentActivitySchema,
+    occurredAt: timestampSchema,
+  }),
+  z.strictObject({
+    type: z.literal('run-state-changed'),
+    agentId: nonEmptyIdentifierSchema,
+    sessionId: nonEmptyIdentifierSchema,
+    state: z.enum(['idle', 'running', 'completed', 'cancelled', 'failed']),
+    occurredAt: timestampSchema,
+  }),
+  z.strictObject({
+    type: z.literal('profile-updated'),
+    agentId: nonEmptyIdentifierSchema,
+    target: z.enum(['soul', 'user']),
+    updatedAt: timestampSchema,
+    occurredAt: timestampSchema,
+  }),
+  z.strictObject({
+    type: z.literal('runtime-error'),
+    agentId: nonEmptyIdentifierSchema,
+    error: agentRuntimeErrorPayloadSchema,
+    occurredAt: timestampSchema,
+  }),
+])
+
+/**
+ * 校验创建会话请求。
+ */
+export const createSessionRequestSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  title: z.string().trim().min(1),
+})
+
+/**
+ * 校验读取会话消息请求。
+ */
+export const getSessionMessagesRequestSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+})
+
+/**
+ * 校验发送消息请求，并保留用户输入的原始空白。
+ */
+export const sendMessageRequestSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+  content: z.string().refine((content) => content.trim().length > 0),
+})
+
+/**
+ * 校验取消运行请求。
+ */
+export const cancelRunRequestSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+})
+
+/**
+ * 校验保存 Runtime 配置请求。
+ */
+export const runtimeConfigurationSchema = z.strictObject({
+  providerId: nonEmptyIdentifierSchema,
+  modelId: nonEmptyIdentifierSchema,
+  apiKey: z.string().refine((apiKey) => apiKey.trim().length > 0),
+})
+
+/**
+ * 校验取消配置验证请求。
+ */
+export const cancelConfigurationVerificationRequestSchema = z.strictObject({
+  verificationId: nonEmptyIdentifierSchema,
+})
+
 /**
  * 桌面端允许 Renderer 通过 Preload API 调用的 IPC channel。
  */
@@ -393,6 +654,39 @@ export interface DesktopIpcRequestMap {
 }
 
 /**
+ * 保存每个 IPC channel 对应的运行时请求 schema。
+ */
+export const desktopIpcRequestSchemas = {
+  [DESKTOP_IPC_CHANNELS.runtimeGetSnapshot]: z.undefined(),
+  [DESKTOP_IPC_CHANNELS.runtimeRefresh]: z.undefined(),
+  [DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration]: runtimeConfigurationSchema,
+  [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification]:
+    cancelConfigurationVerificationRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsList]: z.undefined(),
+  [DESKTOP_IPC_CHANNELS.sessionsCreate]: createSessionRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: getSessionMessagesRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: sendMessageRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: cancelRunRequestSchema,
+} satisfies Record<DesktopIpcChannel, z.ZodType>
+
+/**
+ * 在 Main 进程调用 Runtime 前重新校验 IPC 请求。
+ *
+ * @param channel - Renderer 调用的 IPC channel。
+ * @param payload - Electron 传入的未知请求载荷。
+ * @returns 通过对应 schema 校验后的类型化请求。
+ * @throws 当请求载荷不符合 contract 时抛出 ZodError。
+ */
+export function parseDesktopIpcRequest<Channel extends DesktopIpcChannel>(
+  channel: Channel,
+  payload: unknown,
+): DesktopIpcRequest<Channel> {
+  return desktopIpcRequestSchemas[channel].parse(
+    payload,
+  ) as DesktopIpcRequest<Channel>
+}
+
+/**
  * 描述每个 IPC channel 对应的响应载荷。
  */
 export interface DesktopIpcResponseMap {
@@ -405,6 +699,39 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: AgentMessage[]
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: AgentMessage[]
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: AgentSessionSummary
+}
+
+/**
+ * 保存每个 IPC channel 对应的运行时响应 schema。
+ */
+export const desktopIpcResponseSchemas = {
+  [DESKTOP_IPC_CHANNELS.runtimeGetSnapshot]: runtimeSnapshotSchema,
+  [DESKTOP_IPC_CHANNELS.runtimeRefresh]: runtimeSnapshotSchema,
+  [DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration]: runtimeSnapshotSchema,
+  [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification]:
+    runtimeSnapshotSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsList]: z.array(agentSessionSummarySchema),
+  [DESKTOP_IPC_CHANNELS.sessionsCreate]: agentSessionSummarySchema,
+  [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: z.array(agentMessageSchema),
+  [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: z.array(agentMessageSchema),
+  [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: agentSessionSummarySchema,
+} satisfies Record<DesktopIpcChannel, z.ZodType>
+
+/**
+ * 在 Main 进程把响应传给 Renderer 前重新校验 IPC 返回值。
+ *
+ * @param channel - Renderer 调用的 IPC channel。
+ * @param response - Runtime 返回的未知响应载荷。
+ * @returns 通过对应 schema 校验后的类型化响应。
+ * @throws 当响应载荷不符合 contract 时抛出 ZodError。
+ */
+export function parseDesktopIpcResponse<Channel extends DesktopIpcChannel>(
+  channel: Channel,
+  response: unknown,
+): DesktopIpcResponse<Channel> {
+  return desktopIpcResponseSchemas[channel].parse(
+    response,
+  ) as DesktopIpcResponse<Channel>
 }
 
 /**
@@ -487,7 +814,7 @@ export interface DesktopPreloadApi {
   createSession(request: CreateSessionRequest): Promise<AgentSessionSummary>
 
   /**
-   * 读取指定会话的 transcript。
+   * 读取指定会话的对话消息。
    *
    * @param request - 会话所属 Agent 和会话标识。
    * @returns 会话里的消息列表。

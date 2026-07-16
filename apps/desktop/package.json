@@ -28,7 +28,7 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@tangyuan/agent-runtime": "workspace:*",
-    "@tangyuan/shared": "workspace:*",
+    "@tangyuan/contracts": "workspace:*",
     "gsap": "^3.15.0",
     "lucide-react": "^1.23.0",
     "motion": "^12.42.2"

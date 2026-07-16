@@ -8,7 +8,7 @@ import {
   createRuntimeSnapshot,
   type DesktopPreloadApi,
   type RuntimeSnapshot
-} from '@tangyuan/shared'
+} from '@tangyuan/contracts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 

@@ -2,26 +2,29 @@ import type {
   AgentEvent,
   AgentEventListener,
   AgentSessionDriver,
-  RuntimeResourceDriver
-} from '@tangyuan/agent-runtime'
+  RuntimeResourceDriver,
+} from './index'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
   type AgentMessage,
   type RuntimeConfiguration,
-  type RuntimeSnapshot
-} from '@tangyuan/shared'
+  type RuntimeSnapshot,
+} from '@tangyuan/contracts'
 import { describe, expect, it, vi } from 'vitest'
-import { createDesktopAppStore } from './DesktopAppStore'
+import { createTangyuanRuntimeForTesting } from './TangyuanRuntime'
 
-describe('DesktopAppStore', () => {
+describe('TangyuanRuntime', () => {
   it('coordinates runtime snapshot requests through the runtime driver', async () => {
     const snapshot = createSnapshot()
     const runtimeDriver = createRuntimeDriver(snapshot)
     const sessionDriver = createSessionDriver([])
-    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
-    await expect(store.getRuntimeSnapshot()).resolves.toEqual(snapshot)
+    await expect(runtime.getRuntimeSnapshot()).resolves.toEqual(snapshot)
     expect(runtimeDriver.getSnapshot).toHaveBeenCalledOnce()
   })
 
@@ -31,22 +34,28 @@ describe('DesktopAppStore', () => {
       createSnapshot({
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',
-        maskedValue: 'sk-t...7890'
-      })
+        maskedValue: 'sk-t...7890',
+      }),
     )
     const sessionDriver = createSessionDriver([session])
-    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
     await expect(
-      store.createSession({ agentId: TANGYUAN_DEFAULT_AGENT_ID, title: '新会话' })
+      runtime.createSession({
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        title: '新会话',
+      }),
     ).resolves.toEqual(session)
-    await expect(store.listSessions()).resolves.toEqual([session])
+    await expect(runtime.listSessions()).resolves.toEqual([session])
     expect(sessionDriver.createSession).toHaveBeenCalledWith({
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
-      title: '新会话'
+      title: '新会话',
     })
     expect(sessionDriver.listSessions).toHaveBeenCalledWith({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
     })
   })
 
@@ -56,8 +65,8 @@ describe('DesktopAppStore', () => {
       createSnapshot({
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',
-        maskedValue: 'sk-t...7890'
-      })
+        maskedValue: 'sk-t...7890',
+      }),
     )
     const sessionDriver = createSessionDriver([session])
     sessionDriver.getMessages = vi.fn().mockResolvedValue([
@@ -67,39 +76,42 @@ describe('DesktopAppStore', () => {
         sessionId: session.sessionId,
         role: 'user',
         content: '你好',
-        createdAt: '2026-07-08T00:00:00.000Z'
-      }
+        createdAt: '2026-07-08T00:00:00.000Z',
+      },
     ])
-    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
     await expect(
-      store.sendMessage({
+      runtime.sendMessage({
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
-        content: '你好'
-      })
+        content: '你好',
+      }),
     ).resolves.toEqual([
       expect.objectContaining({
         role: 'user',
-        content: '你好'
-      })
+        content: '你好',
+      }),
     ])
 
     expect(sessionDriver.sendMessage).toHaveBeenCalledWith({
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
-      content: '你好'
+      content: '你好',
     })
   })
 
-  it('updates transcript from streaming success events', async () => {
+  it('updates conversation messages from streaming success events', async () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(
       createSnapshot({
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',
-        maskedValue: 'sk-t...7890'
-      })
+        maskedValue: 'sk-t...7890',
+      }),
     )
     const sessionDriver = createSessionDriver([session])
     sessionDriver.sendMessage = vi.fn(async () => {
@@ -108,7 +120,7 @@ describe('DesktopAppStore', () => {
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
-        occurredAt: '2026-07-08T00:00:01.000Z'
+        occurredAt: '2026-07-08T00:00:01.000Z',
       })
       sessionDriver.emit({
         type: 'message-delta',
@@ -117,7 +129,7 @@ describe('DesktopAppStore', () => {
         runId: 'run-1',
         messageId: 'message-agent-1',
         delta: '你',
-        occurredAt: '2026-07-08T00:00:02.000Z'
+        occurredAt: '2026-07-08T00:00:02.000Z',
       })
       sessionDriver.emit({
         type: 'message-delta',
@@ -126,7 +138,7 @@ describe('DesktopAppStore', () => {
         runId: 'run-1',
         messageId: 'message-agent-1',
         delta: '好',
-        occurredAt: '2026-07-08T00:00:03.000Z'
+        occurredAt: '2026-07-08T00:00:03.000Z',
       })
       sessionDriver.emit({
         type: 'message-completed',
@@ -139,34 +151,40 @@ describe('DesktopAppStore', () => {
           sessionId: session.sessionId,
           role: 'agent',
           content: '你好',
-          createdAt: '2026-07-08T00:00:02.000Z'
+          createdAt: '2026-07-08T00:00:02.000Z',
         },
-        occurredAt: '2026-07-08T00:00:04.000Z'
+        occurredAt: '2026-07-08T00:00:04.000Z',
       })
       sessionDriver.emit({
         type: 'run-state-changed',
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         state: 'completed',
-        occurredAt: '2026-07-08T00:00:05.000Z'
+        occurredAt: '2026-07-08T00:00:05.000Z',
       })
     })
-    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
     await expect(
-      store.sendMessage({
+      runtime.sendMessage({
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
-        content: '你好'
-      })
+        content: '你好',
+      }),
     ).resolves.toEqual([
       expect.objectContaining({
         role: 'agent',
-        content: '你好'
-      })
+        content: '你好',
+      }),
     ])
-    await expect(store.listSessions()).resolves.toEqual([
-      expect.objectContaining({ sessionId: session.sessionId, state: 'completed' })
+    await expect(runtime.listSessions()).resolves.toEqual([
+      expect.objectContaining({
+        sessionId: session.sessionId,
+        state: 'completed',
+      }),
     ])
   })
 
@@ -176,8 +194,8 @@ describe('DesktopAppStore', () => {
       createSnapshot({
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',
-        maskedValue: 'sk-t...7890'
-      })
+        maskedValue: 'sk-t...7890',
+      }),
     )
     const sessionDriver = createSessionDriver([session])
     sessionDriver.sendMessage = vi.fn(async () => {
@@ -186,7 +204,7 @@ describe('DesktopAppStore', () => {
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
-        occurredAt: '2026-07-08T00:00:01.000Z'
+        occurredAt: '2026-07-08T00:00:01.000Z',
       })
       sessionDriver.emit({
         type: 'activity-updated',
@@ -196,9 +214,9 @@ describe('DesktopAppStore', () => {
         activity: {
           kind: 'thinking',
           state: 'running',
-          label: '思考中'
+          label: '思考中',
         },
-        occurredAt: '2026-07-08T00:00:02.000Z'
+        occurredAt: '2026-07-08T00:00:02.000Z',
       })
       sessionDriver.emit({
         type: 'activity-updated',
@@ -208,9 +226,9 @@ describe('DesktopAppStore', () => {
         activity: {
           kind: 'tool',
           state: 'failed',
-          label: '工具失败'
+          label: '工具失败',
         },
-        occurredAt: '2026-07-08T00:00:03.000Z'
+        occurredAt: '2026-07-08T00:00:03.000Z',
       })
       sessionDriver.emit({
         type: 'turn-failed',
@@ -220,27 +238,36 @@ describe('DesktopAppStore', () => {
         error: {
           code: 'unknown',
           message: '模型服务暂时不可用',
-          recoverable: true
+          recoverable: true,
         },
-        occurredAt: '2026-07-08T00:00:04.000Z'
+        occurredAt: '2026-07-08T00:00:04.000Z',
       })
       throw new Error('模型服务暂时不可用')
     })
-    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
     await expect(
-      store.sendMessage({
+      runtime.sendMessage({
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
-        content: '你好'
-      })
+        content: '你好',
+      }),
     ).rejects.toThrow('模型服务暂时不可用')
     await expect(
-      store.getMessages({ agentId: TANGYUAN_DEFAULT_AGENT_ID, sessionId: session.sessionId })
+      runtime.getMessages({
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+      }),
     ).resolves.toEqual([
       expect.objectContaining({ role: 'system', content: '思考中' }),
       expect.objectContaining({ role: 'system', content: '工具失败' }),
-      expect.objectContaining({ role: 'system', content: '模型服务暂时不可用' })
+      expect.objectContaining({
+        role: 'system',
+        content: '模型服务暂时不可用',
+      }),
     ])
   })
 
@@ -250,16 +277,20 @@ describe('DesktopAppStore', () => {
       createSnapshot({
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',
-        maskedValue: 'sk-t...7890'
-      })
+        maskedValue: 'sk-t...7890',
+      }),
     )
     const sessionDriver = createSessionDriver([session])
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
     sessionDriver.emit({
       type: 'turn-started',
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
-      occurredAt: '2026-07-08T00:00:01.000Z'
+      occurredAt: '2026-07-08T00:00:01.000Z',
     })
     sessionDriver.emit({
       type: 'message-delta',
@@ -268,24 +299,7 @@ describe('DesktopAppStore', () => {
       runId: 'run-1',
       messageId: 'message-agent-1',
       delta: '已生成片段',
-      occurredAt: '2026-07-08T00:00:02.000Z'
-    })
-    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
-    sessionDriver.emit({
-      type: 'turn-started',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
-      sessionId: session.sessionId,
-      runId: 'run-1',
-      occurredAt: '2026-07-08T00:00:01.000Z'
-    })
-    sessionDriver.emit({
-      type: 'message-delta',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
-      sessionId: session.sessionId,
-      runId: 'run-1',
-      messageId: 'message-agent-1',
-      delta: '已生成片段',
-      occurredAt: '2026-07-08T00:00:02.000Z'
+      occurredAt: '2026-07-08T00:00:02.000Z',
     })
     sessionDriver.cancelRun = vi.fn(async () => {
       sessionDriver.emit({
@@ -293,20 +307,26 @@ describe('DesktopAppStore', () => {
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
-        occurredAt: '2026-07-08T00:00:03.000Z'
+        occurredAt: '2026-07-08T00:00:03.000Z',
       })
     })
 
     await expect(
-      store.cancelRun({ agentId: TANGYUAN_DEFAULT_AGENT_ID, sessionId: session.sessionId })
+      runtime.cancelRun({
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+      }),
     ).resolves.toEqual(expect.objectContaining({ state: 'cancelled' }))
     await expect(
-      store.getMessages({ agentId: TANGYUAN_DEFAULT_AGENT_ID, sessionId: session.sessionId })
+      runtime.getMessages({
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+      }),
     ).resolves.toEqual([
       expect.objectContaining({
         role: 'agent',
-        content: '已生成片段'
-      })
+        content: '已生成片段',
+      }),
     ])
   })
 
@@ -317,8 +337,8 @@ describe('DesktopAppStore', () => {
       createSnapshot({
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',
-        maskedValue: 'sk-t...7890'
-      })
+        maskedValue: 'sk-t...7890',
+      }),
     )
     const sessionDriver = createSessionDriver([sessionOne, sessionTwo])
     const releaseSessionOne = createDeferred<void>()
@@ -329,7 +349,7 @@ describe('DesktopAppStore', () => {
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: request.sessionId,
         runId: `${request.sessionId}-run-1`,
-        occurredAt: '2026-07-08T00:00:01.000Z'
+        occurredAt: '2026-07-08T00:00:01.000Z',
       })
 
       if (request.sessionId === sessionOne.sessionId) {
@@ -342,31 +362,34 @@ describe('DesktopAppStore', () => {
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: request.sessionId,
         state: 'completed',
-        occurredAt: '2026-07-08T00:00:05.000Z'
+        occurredAt: '2026-07-08T00:00:05.000Z',
       })
     })
-    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
-    await store.listSessions()
-    const firstRun = store.sendMessage({
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
+    await runtime.listSessions()
+    const firstRun = runtime.sendMessage({
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
       sessionId: sessionOne.sessionId,
-      content: '第一条'
+      content: '第一条',
     })
     await sessionOneStarted.promise
 
     await expect(
-      store.sendMessage({
+      runtime.sendMessage({
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: sessionOne.sessionId,
-        content: '重复发送'
-      })
+        content: '重复发送',
+      }),
     ).rejects.toThrow('当前会话正在运行')
     await expect(
-      store.sendMessage({
+      runtime.sendMessage({
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: sessionTwo.sessionId,
-        content: '另一个会话'
-      })
+        content: '另一个会话',
+      }),
     ).resolves.toEqual([])
 
     releaseSessionOne.resolve()
@@ -376,14 +399,17 @@ describe('DesktopAppStore', () => {
   it('blocks sending messages when runtime configuration is missing', async () => {
     const runtimeDriver = createRuntimeDriver(createSnapshot())
     const sessionDriver = createSessionDriver([])
-    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
     await expect(
-      store.sendMessage({
+      runtime.sendMessage({
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: 'session-1',
-        content: '你好'
-      })
+        content: '你好',
+      }),
     ).rejects.toThrow('发送消息前，请先配置 Provider')
     expect(sessionDriver.sendMessage).not.toHaveBeenCalled()
   })
@@ -392,34 +418,44 @@ describe('DesktopAppStore', () => {
     const savedSnapshot = createSnapshot({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
-      maskedValue: 'sk-...7890'
+      maskedValue: 'sk-...7890',
     })
     const runtimeDriver = createRuntimeDriver(savedSnapshot)
     const sessionDriver = createSessionDriver([])
-    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
     const configuration: RuntimeConfiguration = {
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
-      apiKey: 'sk-test-secret-7890'
+      apiKey: 'sk-test-secret-7890',
     }
 
-    await expect(store.saveRuntimeConfiguration(configuration)).resolves.toEqual(savedSnapshot)
+    await expect(
+      runtime.saveRuntimeConfiguration(configuration),
+    ).resolves.toEqual(savedSnapshot)
 
     expect(runtimeDriver.saveConfiguration).toHaveBeenCalledWith(configuration)
   })
 
   it('rejects configuration saves when the runtime driver cannot verify settings', async () => {
     const runtimeDriver = createRuntimeDriver(createSnapshot())
-    runtimeDriver.saveConfiguration = vi.fn().mockRejectedValue(new Error('验证失败'))
+    runtimeDriver.saveConfiguration = vi
+      .fn()
+      .mockRejectedValue(new Error('验证失败'))
     const sessionDriver = createSessionDriver([])
-    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
     await expect(
-      store.saveRuntimeConfiguration({
+      runtime.saveRuntimeConfiguration({
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',
-        apiKey: 'sk-test-secret-7890'
-      })
+        apiKey: 'sk-test-secret-7890',
+      }),
     ).rejects.toThrow('验证失败')
   })
 
@@ -427,20 +463,25 @@ describe('DesktopAppStore', () => {
     const snapshot = createSnapshot()
     const runtimeDriver = createRuntimeDriver(snapshot)
     const sessionDriver = createSessionDriver([])
-    const store = createDesktopAppStore({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
     await expect(
-      store.cancelRuntimeConfigurationVerification({ verificationId: 'verify-1' })
+      runtime.cancelRuntimeConfigurationVerification({
+        verificationId: 'verify-1',
+      }),
     ).resolves.toEqual(snapshot)
 
     expect(runtimeDriver.cancelConfigurationVerification).toHaveBeenCalledWith({
-      verificationId: 'verify-1'
+      verificationId: 'verify-1',
     })
   })
 })
 
 /**
- * 创建用于 Store 单元测试的运行时快照。
+ * 创建用于 Runtime 单元测试的运行时快照。
  *
  * @returns 一个缺少配置但包含默认 Agent profile 的 RuntimeSnapshot。
  * @throws 此测试辅助方法不会抛出错误。
@@ -450,9 +491,11 @@ function createSnapshot(
     providerId?: string | null
     modelId?: string | null
     maskedValue?: string | null
-  } = {}
+  } = {},
 ): RuntimeSnapshot {
-  const configured = Boolean(overrides.providerId && overrides.modelId && overrides.maskedValue)
+  const configured = Boolean(
+    overrides.providerId && overrides.modelId && overrides.maskedValue,
+  )
 
   return {
     activeAgent: {
@@ -463,23 +506,23 @@ function createSnapshot(
         initialized: false,
         bootstrapRequired: true,
         soulUpdatedAt: null,
-        userUpdatedAt: null
-      }
+        userUpdatedAt: null,
+      },
     },
     providers: [],
     models: [],
     settings: {
       selectedProviderId: overrides.providerId ?? null,
-      selectedModelId: overrides.modelId ?? null
+      selectedModelId: overrides.modelId ?? null,
     },
     auth: {
       state: configured ? 'api-key-configured' : 'missing-api-key',
       apiKey: {
         configured,
-        maskedValue: overrides.maskedValue ?? null
-      }
+        maskedValue: overrides.maskedValue ?? null,
+      },
     },
-    status: configured ? 'ready' : 'missing-config'
+    status: configured ? 'ready' : 'missing-config',
   }
 }
 
@@ -495,7 +538,7 @@ function createRuntimeDriver(snapshot: RuntimeSnapshot): RuntimeResourceDriver {
     getSnapshot: vi.fn().mockResolvedValue(snapshot),
     refresh: vi.fn().mockResolvedValue(snapshot),
     saveConfiguration: vi.fn().mockResolvedValue(snapshot),
-    cancelConfigurationVerification: vi.fn().mockResolvedValue(snapshot)
+    cancelConfigurationVerification: vi.fn().mockResolvedValue(snapshot),
   }
 }
 
@@ -506,7 +549,9 @@ function createRuntimeDriver(snapshot: RuntimeSnapshot): RuntimeResourceDriver {
  * @returns 一个只用于单元测试的 AgentSessionDriver。
  * @throws 此测试辅助方法不会抛出错误。
  */
-function createSessionDriver(sessions: AgentSessionSummary[]): AgentSessionDriver & {
+function createSessionDriver(
+  sessions: AgentSessionSummary[],
+): AgentSessionDriver & {
   emit(event: AgentEvent): void
   messages: Map<string, AgentMessage[]>
 } {
@@ -518,14 +563,16 @@ function createSessionDriver(sessions: AgentSessionSummary[]): AgentSessionDrive
   return {
     listSessions: vi.fn(async () => currentSessions),
     createSession: vi.fn().mockResolvedValue(firstSession),
-    getMessages: vi.fn(async (request) => messages.get(request.sessionId) ?? []),
+    getMessages: vi.fn(
+      async (request) => messages.get(request.sessionId) ?? [],
+    ),
     sendMessage: vi.fn().mockResolvedValue(undefined),
     cancelRun: vi.fn().mockResolvedValue(undefined),
     subscribe: vi.fn((listener: AgentEventListener) => {
       currentListener = listener
 
       return {
-        unsubscribe: vi.fn()
+        unsubscribe: vi.fn(),
       }
     }),
     messages,
@@ -533,7 +580,9 @@ function createSessionDriver(sessions: AgentSessionSummary[]): AgentSessionDrive
       if (event.type === 'session-created') {
         currentSessions = [
           event.session,
-          ...currentSessions.filter((session) => session.sessionId !== event.session.sessionId)
+          ...currentSessions.filter(
+            (session) => session.sessionId !== event.session.sessionId,
+          ),
         ]
       }
 
@@ -541,7 +590,7 @@ function createSessionDriver(sessions: AgentSessionSummary[]): AgentSessionDrive
         currentSessions = currentSessions.map((session) =>
           session.sessionId === event.sessionId
             ? { ...session, state: event.state, updatedAt: event.occurredAt }
-            : session
+            : session,
         )
       }
 
@@ -549,7 +598,7 @@ function createSessionDriver(sessions: AgentSessionSummary[]): AgentSessionDrive
         currentSessions = currentSessions.map((session) =>
           session.sessionId === event.sessionId
             ? { ...session, state: 'running', updatedAt: event.occurredAt }
-            : session
+            : session,
         )
       }
 
@@ -557,7 +606,7 @@ function createSessionDriver(sessions: AgentSessionSummary[]): AgentSessionDrive
         currentSessions = currentSessions.map((session) =>
           session.sessionId === event.sessionId
             ? { ...session, state: 'cancelled', updatedAt: event.occurredAt }
-            : session
+            : session,
         )
       }
 
@@ -565,12 +614,12 @@ function createSessionDriver(sessions: AgentSessionSummary[]): AgentSessionDrive
         currentSessions = currentSessions.map((session) =>
           session.sessionId === event.sessionId
             ? { ...session, state: 'failed', updatedAt: event.occurredAt }
-            : session
+            : session,
         )
       }
 
       currentListener?.(event)
-    }
+    },
   }
 }
 
@@ -587,7 +636,7 @@ function createSessionSummary(sessionId: string): AgentSessionSummary {
     sessionId,
     title: '新会话',
     state: 'idle',
-    updatedAt: '2026-07-08T00:00:00.000Z'
+    updatedAt: '2026-07-08T00:00:00.000Z',
   }
 }
 
@@ -597,7 +646,10 @@ function createSessionSummary(sessionId: string): AgentSessionSummary {
  * @returns Promise 和对应 resolve 函数。
  * @throws 此测试辅助方法不会主动抛出错误。
  */
-function createDeferred<T>(): { promise: Promise<T>; resolve(value?: T): void } {
+function createDeferred<T>(): {
+  promise: Promise<T>
+  resolve(value?: T): void
+} {
   let resolve!: (value?: T) => void
   const promise = new Promise<T>((innerResolve) => {
     resolve = innerResolve as (value?: T) => void

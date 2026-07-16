@@ -9,9 +9,9 @@ import {
   type DesktopIpcRequest,
   type DesktopIpcResponse,
   type RuntimeSnapshot
-} from '@tangyuan/shared'
+} from '@tangyuan/contracts'
 import { describe, expect, it, vi } from 'vitest'
-import type { DesktopAppStore } from './DesktopAppStore'
+import type { TangyuanRuntime } from '@tangyuan/agent-runtime'
 import { registerDesktopAppIpc, type IpcMainLike } from './ipc'
 
 type IpcHandler<Channel extends DesktopIpcChannel> = (
@@ -20,7 +20,7 @@ type IpcHandler<Channel extends DesktopIpcChannel> = (
 ) => Promise<DesktopIpcResponse<Channel>>
 
 describe('registerDesktopAppIpc', () => {
-  it('connects IPC channels to the DesktopAppStore methods', async () => {
+  it('connects IPC channels to the TangyuanRuntime methods', async () => {
     const handlers = new Map<DesktopIpcChannel, IpcHandler<DesktopIpcChannel>>()
     const ipcMain: IpcMainLike = {
       handle: vi.fn((channel, handler) => {
@@ -29,7 +29,7 @@ describe('registerDesktopAppIpc', () => {
     }
     const snapshot = createMissingConfigurationSnapshot()
     const session = createSessionSummary()
-    const store: DesktopAppStore = {
+    const runtime: TangyuanRuntime = {
       getRuntimeSnapshot: vi.fn().mockResolvedValue(snapshot),
       refreshRuntime: vi.fn().mockResolvedValue(snapshot),
       saveRuntimeConfiguration: vi.fn().mockResolvedValue(snapshot),
@@ -43,7 +43,7 @@ describe('registerDesktopAppIpc', () => {
       cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined)
     }
     const broadcastAgentEvent = vi.fn()
-    store.subscribe = vi.fn((listener) => {
+    runtime.subscribe = vi.fn((listener) => {
       listener(createTurnStartedEvent())
 
       return {
@@ -51,7 +51,7 @@ describe('registerDesktopAppIpc', () => {
       }
     })
 
-    registerDesktopAppIpc(ipcMain, store, broadcastAgentEvent)
+    registerDesktopAppIpc(ipcMain, runtime, broadcastAgentEvent)
 
     expect(ipcMain.handle).toHaveBeenCalledTimes(9)
     expect(broadcastAgentEvent).toHaveBeenCalledWith(createTurnStartedEvent())
@@ -101,31 +101,95 @@ describe('registerDesktopAppIpc', () => {
         sessionId: 'session-1'
       })
     ).resolves.toEqual(session)
-    expect(store.createSession).toHaveBeenCalledWith({
+    expect(runtime.createSession).toHaveBeenCalledWith({
       agentId: 'tangyuan',
       title: '新会话'
     })
-    expect(store.saveRuntimeConfiguration).toHaveBeenCalledWith({
+    expect(runtime.saveRuntimeConfiguration).toHaveBeenCalledWith({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890'
     })
-    expect(store.cancelRuntimeConfigurationVerification).toHaveBeenCalledWith({
+    expect(runtime.cancelRuntimeConfigurationVerification).toHaveBeenCalledWith({
       verificationId: 'verify-1'
     })
-    expect(store.getMessages).toHaveBeenCalledWith({
+    expect(runtime.getMessages).toHaveBeenCalledWith({
       agentId: 'tangyuan',
       sessionId: 'session-1'
     })
-    expect(store.sendMessage).toHaveBeenCalledWith({
+    expect(runtime.sendMessage).toHaveBeenCalledWith({
       agentId: 'tangyuan',
       sessionId: 'session-1',
       content: '你好'
     })
-    expect(store.cancelRun).toHaveBeenCalledWith({
+    expect(runtime.cancelRun).toHaveBeenCalledWith({
       agentId: 'tangyuan',
       sessionId: 'session-1'
     })
+  })
+
+  it('rejects malformed IPC payloads before they reach the runtime', async () => {
+    const handlers = new Map<DesktopIpcChannel, IpcHandler<DesktopIpcChannel>>()
+    const ipcMain: IpcMainLike = {
+      handle: vi.fn((channel, handler) => {
+        handlers.set(channel, handler as IpcHandler<DesktopIpcChannel>)
+      }) as IpcMainLike['handle']
+    }
+    const snapshot = createMissingConfigurationSnapshot()
+    const runtime: TangyuanRuntime = {
+      getRuntimeSnapshot: vi.fn().mockResolvedValue(snapshot),
+      refreshRuntime: vi.fn().mockResolvedValue(snapshot),
+      saveRuntimeConfiguration: vi.fn().mockResolvedValue(snapshot),
+      cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(snapshot),
+      listSessions: vi.fn().mockResolvedValue([]),
+      createSession: vi.fn(),
+      getMessages: vi.fn().mockResolvedValue([]),
+      sendMessage: vi.fn().mockResolvedValue([]),
+      cancelRun: vi.fn(),
+      subscribe: vi.fn(),
+      cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined)
+    }
+
+    registerDesktopAppIpc(ipcMain, runtime)
+
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsCreate)(null, {
+        agentId: 'tangyuan',
+        title: '   '
+      })
+    ).rejects.toThrow()
+    expect(runtime.createSession).not.toHaveBeenCalled()
+  })
+
+  it('rejects malformed runtime responses before they cross IPC', async () => {
+    const handlers = new Map<DesktopIpcChannel, IpcHandler<DesktopIpcChannel>>()
+    const ipcMain: IpcMainLike = {
+      handle: vi.fn((channel, handler) => {
+        handlers.set(channel, handler as IpcHandler<DesktopIpcChannel>)
+      }) as IpcMainLike['handle']
+    }
+    const runtime = {
+      getRuntimeSnapshot: vi.fn().mockResolvedValue({
+        ...createMissingConfigurationSnapshot(),
+        status: 'unexpected-status'
+      }),
+      refreshRuntime: vi.fn(),
+      saveRuntimeConfiguration: vi.fn(),
+      cancelRuntimeConfigurationVerification: vi.fn(),
+      listSessions: vi.fn(),
+      createSession: vi.fn(),
+      getMessages: vi.fn(),
+      sendMessage: vi.fn(),
+      cancelRun: vi.fn(),
+      subscribe: vi.fn(),
+      cancelAllActiveRuns: vi.fn()
+    } as unknown as TangyuanRuntime
+
+    registerDesktopAppIpc(ipcMain, runtime)
+
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
+    ).rejects.toThrow()
   })
 })
 
