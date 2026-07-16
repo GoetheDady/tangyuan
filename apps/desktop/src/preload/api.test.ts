@@ -38,6 +38,7 @@ describe('createTangyuanPreloadApi', () => {
       'getMessages',
       'getRuntimeSnapshot',
       'listSessions',
+      'openExternalLink',
       'refreshRuntime',
       'saveRuntimeConfiguration',
       'sendMessage',
@@ -61,6 +62,7 @@ describe('createTangyuanPreloadApi', () => {
       content: '你好'
     })
     await api.cancelRun({ agentId: 'tangyuan', sessionId: 'session-1' })
+    await api.openExternalLink({ url: 'https://example.com' })
     api.subscribeToAgentEvents(() => undefined)
 
     expect(calls).toEqual([
@@ -104,6 +106,10 @@ describe('createTangyuanPreloadApi', () => {
           agentId: 'tangyuan',
           sessionId: 'session-1'
         }
+      ],
+      [
+        DESKTOP_IPC_CHANNELS.openExternalLink,
+        { url: 'https://example.com' }
       ]
     ])
     expect(subscriptions).toEqual([[DESKTOP_AGENT_EVENT_CHANNEL, 'turn-started']])

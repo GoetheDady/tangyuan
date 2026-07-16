@@ -33,18 +33,25 @@ export interface IpcMainLike {
 export type AgentEventBroadcaster = (event: AgentEvent) => void
 
 /**
+ * 描述 Main 侧安全打开外部链接的方法签名。
+ */
+export type OpenExternalLinkHandler = (url: string) => Promise<void>
+
+/**
  * 把允许的 IPC channel 连接到 TangyuanRuntime。
  *
  * @param ipcMain - Electron ipcMain 或测试替身。
  * @param runtime - Main 侧唯一运行时入口。
  * @param broadcastAgentEvent - 可选事件广播方法，用于推送 Agent 标准事件。
+ * @param openExternalLink - 可选外部链接处理方法，用于安全打开系统浏览器。
  * @returns 无返回值。
  * @throws 当 ipcMain.handle 注册失败时可能抛出错误。
  */
 export function registerDesktopAppIpc(
   ipcMain: IpcMainLike,
   runtime: TangyuanRuntime,
-  broadcastAgentEvent?: AgentEventBroadcaster
+  broadcastAgentEvent?: AgentEventBroadcaster,
+  openExternalLink?: OpenExternalLinkHandler
 ): void {
   if (broadcastAgentEvent) {
     runtime.subscribe((event) => {
@@ -123,5 +130,13 @@ export function registerDesktopAppIpc(
         parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsCancelRun, payload)
       )
     )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.openExternalLink, async (_event, payload) => {
+    if (!openExternalLink) {
+      throw new Error('外部链接功能不可用。')
+    }
+    const request = parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.openExternalLink, payload)
+    await openExternalLink(request.url)
+    return parseDesktopIpcResponse(DESKTOP_IPC_CHANNELS.openExternalLink, undefined)
   })
 }

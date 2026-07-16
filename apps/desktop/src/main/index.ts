@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, session } from 'electron'
 import { mkdir, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -10,6 +10,67 @@ import { registerDesktopAppIpc } from './ipc'
 const tangyuanRuntime = createTangyuanRuntime()
 const smokeTestResultPath = process.env['TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH']
 let isQuittingAfterCancellingRuns = false
+
+/**
+ * 注册严格内容安全策略，禁止远程脚本和任意页面导航。
+ *
+ * 开发模式下允许 Vite HMR WebSocket 和 dev-server 连接。
+ *
+ * @returns 无返回值。
+ * @throws 此方法不会主动抛出错误。
+ */
+function registerContentSecurityPolicy(): void {
+  const isDevServer = is.dev && Boolean(process.env['ELECTRON_RENDERER_URL'])
+
+  // In development the Vite dev server runs on localhost; we need to allow
+  // WebSocket connections for HMR and inline style injection.
+  const connectSrc = isDevServer
+    ? `'self' ${new URL(process.env['ELECTRON_RENDERER_URL']!).origin} ws://localhost:*`
+    : `'self'`
+
+  const styleSrc = isDevServer ? `'self' 'unsafe-inline'` : `'self' 'unsafe-inline'`
+
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self'`,
+    `style-src ${styleSrc}`,
+    "img-src 'self' data:",
+    "font-src 'self' data:",
+    `connect-src ${connectSrc}`,
+    "frame-src 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; ')
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [csp],
+      },
+    })
+  })
+}
+
+/**
+ * 校验 URL 协议，只允许 http/https，防止危险协议注入。
+ *
+ * @param url - 待校验的 URL 字符串。
+ * @returns 通过校验的 URL；协议不允许时返回 null。
+ * @throws 此方法不会主动抛出错误。
+ */
+function parseAndValidateUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return url
+    }
+    return null
+  } catch {
+    return null
+  }
+}
 
 /**
  * 创建并加载桌面主窗口。
@@ -28,7 +89,7 @@ function createWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
   })
 
@@ -37,7 +98,10 @@ function createWindow(): BrowserWindow {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    const parsed = parseAndValidateUrl(details.url)
+    if (parsed) {
+      shell.openExternal(parsed)
+    }
     return { action: 'deny' }
   })
 
@@ -169,7 +233,7 @@ function classifySmokeTestPage(pageText: string): 'configuration' | 'workbench' 
     return 'configuration'
   }
 
-  if (pageText.includes('Pi 智能体工具包会话闭环基础') && pageText.includes('新会话')) {
+  if (pageText.includes('大语言模型对话') && pageText.includes('新会话')) {
     return 'workbench'
   }
 
@@ -220,6 +284,11 @@ app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
+  // Enforce strict Content-Security-Policy: no remote scripts, no arbitrary navigation.
+  // In development the Vite dev-server connect-src is opened via the CSP frame-src
+  // and connect-src exceptions derived from ELECTRON_RENDERER_URL.
+  registerContentSecurityPolicy()
+
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
@@ -227,11 +296,22 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  registerDesktopAppIpc(ipcMain, tangyuanRuntime, (event) => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      window.webContents.send(DESKTOP_AGENT_EVENT_CHANNEL, event)
+  registerDesktopAppIpc(
+    ipcMain,
+    tangyuanRuntime,
+    (event) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send(DESKTOP_AGENT_EVENT_CHANNEL, event)
+      }
+    },
+    async (url) => {
+      const validated = parseAndValidateUrl(url)
+      if (!validated) {
+        throw new Error(`不允许打开非 http/https 链接。`)
+      }
+      await shell.openExternal(validated)
     }
-  })
+  )
 
   const mainWindow = createWindow()
   void runPackagedSmokeTest(mainWindow)

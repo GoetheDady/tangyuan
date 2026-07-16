@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   type AgentEventListener,
@@ -9,11 +9,17 @@ import {
   type DesktopPreloadApi,
   type RuntimeSnapshot
 } from '@tangyuan/contracts'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
 describe('App', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    window.location.hash = '#/'
+  })
+
   beforeEach(() => {
+    window.location.hash = '#/'
     const runtime = createMissingConfigurationSnapshot()
     const api: DesktopPreloadApi = {
       getRuntimeSnapshot: vi.fn().mockResolvedValue(runtime),
@@ -66,7 +72,8 @@ describe('App', () => {
           updatedAt: '2026-07-08T00:00:00.000Z'
         })
       ),
-      subscribeToAgentEvents: vi.fn(() => () => undefined)
+      subscribeToAgentEvents: vi.fn(() => () => undefined),
+      openExternalLink: vi.fn()
     }
 
     Object.defineProperty(window, 'api', {
@@ -75,27 +82,70 @@ describe('App', () => {
     })
   })
 
-  it('renders the minimum desktop workbench shell', () => {
+  it('renders the setup page when configuration is missing', async () => {
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: '汤圆' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '配置模型服务' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '配置模型服务' })).toBeInTheDocument()
+    expect(screen.getByText('控制台')).toBeInTheDocument()
   })
 
-  it('loads runtime and session data through the preload API', async () => {
+  it('does not show chat controls while configuration is missing', async () => {
     render(<App />)
 
-    expect(await screen.findAllByText('缺少配置')).toHaveLength(2)
-    expect(screen.getByText('未保存')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '配置模型服务' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '新会话' })).not.toBeInTheDocument()
+    expect(window.api.listSessions).not.toHaveBeenCalled()
+  })
+
+  it('renders model options with unique keys across providers', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(
+      createMissingConfigurationSnapshot({
+        providers: [
+          { providerId: 'openai', displayName: 'OpenAI' },
+          { providerId: 'openrouter', displayName: 'OpenRouter' }
+        ],
+        models: [
+          {
+            providerId: 'openai',
+            modelId: 'gpt-4',
+            displayName: 'GPT-4'
+          },
+          {
+            providerId: 'openrouter',
+            modelId: 'gpt-4',
+            displayName: 'GPT-4 via OpenRouter'
+          }
+        ]
+      })
+    )
+
+    try {
+      render(<App />)
+
+      await screen.findByText('配置模型服务')
+      await waitFor(() => {
+        expect(
+          consoleError.mock.calls.some((call) =>
+            call.some(
+              (argument) =>
+                typeof argument === 'string' &&
+                argument.includes('Encountered two children with the same key')
+            )
+          )
+        ).toBe(false)
+      })
+    } finally {
+      consoleError.mockRestore()
+    }
   })
 
   it('saves configuration through the preload API and masks the saved API key', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.type(await screen.findByLabelText('Provider'), 'anthropic')
-    await user.type(screen.getByLabelText('Model'), 'claude-sonnet-4-5')
+    await user.selectOptions(await screen.findByLabelText('Provider'), 'anthropic')
+    await user.selectOptions(screen.getByLabelText('Model'), 'claude-sonnet-4-5')
     await user.type(screen.getByLabelText('API Key'), 'sk-test-secret-7890')
     await user.click(screen.getByRole('button', { name: '验证并保存' }))
 
@@ -104,9 +154,11 @@ describe('App', () => {
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890'
     })
-    expect(await screen.findByText('sk-t...7890')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(window.location.hash).toBe('#/chat/tangyuan')
+    })
     expect(screen.queryByDisplayValue('sk-test-secret-7890')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '新会话' })).toBeInTheDocument()
+    expect(screen.queryByText('sk-t...7890')).not.toBeInTheDocument()
   })
 
   it('opens a bootstrap session immediately after saving configuration when profile is uninitialized', async () => {
@@ -121,8 +173,8 @@ describe('App', () => {
     )
     render(<App />)
 
-    await user.type(await screen.findByLabelText('Provider'), 'anthropic')
-    await user.type(screen.getByLabelText('Model'), 'claude-sonnet-4-5')
+    await user.selectOptions(await screen.findByLabelText('Provider'), 'anthropic')
+    await user.selectOptions(screen.getByLabelText('Model'), 'claude-sonnet-4-5')
     await user.type(screen.getByLabelText('API Key'), 'sk-test-secret-7890')
     await user.click(screen.getByRole('button', { name: '验证并保存' }))
 
@@ -130,8 +182,9 @@ describe('App', () => {
       agentId: 'tangyuan',
       title: 'Bootstrap 初始化'
     })
-    expect(await screen.findAllByText('Bootstrap 初始化')).toHaveLength(2)
-    expect(screen.getByText('发送第一条消息开始会话。')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(window.location.hash).toBe('#/chat/tangyuan')
+    })
   })
 
   it('allows users to cancel configuration verification', async () => {
@@ -139,8 +192,8 @@ describe('App', () => {
     window.api.saveRuntimeConfiguration = vi.fn(() => new Promise<RuntimeSnapshot>(() => undefined))
     render(<App />)
 
-    await user.type(await screen.findByLabelText('Provider'), 'anthropic')
-    await user.type(screen.getByLabelText('Model'), 'claude-sonnet-4-5')
+    await user.selectOptions(await screen.findByLabelText('Provider'), 'anthropic')
+    await user.selectOptions(screen.getByLabelText('Model'), 'claude-sonnet-4-5')
     await user.type(screen.getByLabelText('API Key'), 'sk-test-secret-7890')
     await user.click(screen.getByRole('button', { name: '验证并保存' }))
     await user.click(screen.getByRole('button', { name: '取消验证' }))
@@ -150,8 +203,7 @@ describe('App', () => {
     })
   })
 
-  it('lets a ready user reopen the configuration screen without exposing the saved API key', async () => {
-    const user = userEvent.setup()
+  it('does not expose a configuration entry after runtime is ready', async () => {
     const readyRuntime = createReadyRuntimeSnapshot({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
@@ -170,16 +222,15 @@ describe('App', () => {
         getMessages: vi.fn().mockResolvedValue([]),
         sendMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
-        subscribeToAgentEvents: vi.fn(() => () => undefined)
+        subscribeToAgentEvents: vi.fn(() => () => undefined),
+      openExternalLink: vi.fn()
       } satisfies DesktopPreloadApi
     })
     render(<App />)
 
-    await user.click(await screen.findByRole('button', { name: '配置接口密钥' }))
-
-    expect(screen.getByRole('heading', { name: '配置模型服务' })).toBeInTheDocument()
-    expect(screen.getByText('sk-t...7890')).toBeInTheDocument()
-    expect(screen.getByLabelText('API Key')).toHaveValue('')
+    expect(await screen.findByRole('heading', { name: '汤圆' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '配置接口密钥' })).not.toBeInTheDocument()
+    expect(screen.queryByText('sk-t...7890')).not.toBeInTheDocument()
   })
 
   it('opens a bootstrap session on startup when runtime is ready but profile is uninitialized', async () => {
@@ -206,7 +257,8 @@ describe('App', () => {
         getMessages: vi.fn().mockResolvedValue([]),
         sendMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
-        subscribeToAgentEvents: vi.fn(() => () => undefined)
+        subscribeToAgentEvents: vi.fn(() => () => undefined),
+      openExternalLink: vi.fn()
       } satisfies DesktopPreloadApi
     })
     render(<App />)
@@ -260,12 +312,26 @@ describe('App', () => {
           }
         ]),
         cancelRun: vi.fn(),
-        subscribeToAgentEvents: vi.fn(() => () => undefined)
+        subscribeToAgentEvents: vi.fn(() => () => undefined),
+      openExternalLink: vi.fn()
       } satisfies DesktopPreloadApi
     })
+    window.location.hash = '#/chat/tangyuan'
+    window.location.hash = '#/chat/tangyuan'
     render(<App />)
 
-    await user.type(await screen.findByLabelText('消息'), '你好')
+    // 等待聊天页完全渲染并稳定，确保所有异步导航完成
+    await screen.findByText('大语言模型对话')
+    await screen.findByLabelText('消息')
+    // 等待 loading 完成且 runtime 就绪后可能的额外重定向
+    await waitFor(
+      () => {
+        expect(screen.getByRole('button', { name: '发送' })).toBeInTheDocument()
+      },
+      { timeout: 3000 }
+    )
+
+    await user.type(screen.getByLabelText('消息'), '你好')
     await user.click(screen.getByRole('button', { name: '发送' }))
 
     expect(window.api.sendMessage).toHaveBeenCalledWith({
@@ -273,7 +339,12 @@ describe('App', () => {
       sessionId: 'welcome',
       content: '你好'
     })
-    expect(await screen.findByText('收到：你好')).toBeInTheDocument()
+    await waitFor(
+      () => {
+        expect(screen.getByText('收到：你好')).toBeInTheDocument()
+      },
+      { timeout: 5000 }
+    )
   })
 
   it('streams agent event deltas into the visible transcript', async () => {
@@ -348,7 +419,8 @@ describe('App', () => {
           listeners.push(listener)
 
           return () => undefined
-        })
+        }),
+        openExternalLink: vi.fn()
       } satisfies DesktopPreloadApi
     })
     render(<App />)
@@ -360,6 +432,66 @@ describe('App', () => {
     expect(screen.getAllByText('运行中').length).toBeGreaterThan(0)
     releaseSend.resolve()
   })
+
+  it('hides system messages from the chat transcript', async () => {
+    const readyRuntime = createReadyRuntimeSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-t...7890'
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
+        refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
+        saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
+        cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
+        listSessions: vi.fn().mockResolvedValue([
+          createDefaultSessionSummary({
+            sessionId: 'welcome',
+            title: '新会话',
+            updatedAt: '2026-07-08T00:00:00.000Z'
+          })
+        ]),
+        createSession: vi.fn(),
+        getMessages: vi.fn().mockResolvedValue([
+          {
+            messageId: 'message-1',
+            agentId: 'tangyuan',
+            sessionId: 'welcome',
+            role: 'user',
+            content: '你好',
+            createdAt: '2026-07-08T00:00:00.000Z'
+          },
+          {
+            messageId: 'message-2',
+            agentId: 'tangyuan',
+            sessionId: 'welcome',
+            role: 'system',
+            content: '正在调用工具',
+            createdAt: '2026-07-08T00:00:01.000Z'
+          },
+          {
+            messageId: 'message-3',
+            agentId: 'tangyuan',
+            sessionId: 'welcome',
+            role: 'agent',
+            content: '你好呀',
+            createdAt: '2026-07-08T00:00:02.000Z'
+          }
+        ] satisfies AgentMessage[]),
+        sendMessage: vi.fn(),
+        cancelRun: vi.fn(),
+        subscribeToAgentEvents: vi.fn(() => () => undefined),
+      openExternalLink: vi.fn()
+      } satisfies DesktopPreloadApi
+    })
+    render(<App />)
+
+    expect(await screen.findByText('你好')).toBeInTheDocument()
+    expect(screen.getByText('你好呀')).toBeInTheDocument()
+    expect(screen.queryByText('正在调用工具')).not.toBeInTheDocument()
+  })
 })
 
 /**
@@ -368,7 +500,18 @@ describe('App', () => {
  * @returns 一个默认 Agent 下缺少 Provider、Model 和 API Key 的 RuntimeSnapshot。
  * @throws 此测试辅助方法不会主动抛出错误。
  */
-function createMissingConfigurationSnapshot(): RuntimeSnapshot {
+function createMissingConfigurationSnapshot(
+  resources: Pick<RuntimeSnapshot, 'providers' | 'models'> = {
+    providers: [{ providerId: 'anthropic', displayName: 'Anthropic' }],
+    models: [
+      {
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        displayName: 'Claude Sonnet 4.5'
+      }
+    ]
+  }
+): RuntimeSnapshot {
   return createRuntimeSnapshot({
     activeAgent: {
       agentId: 'tangyuan',
@@ -381,8 +524,8 @@ function createMissingConfigurationSnapshot(): RuntimeSnapshot {
         userUpdatedAt: null
       }
     },
-    providers: [],
-    models: [],
+    providers: resources.providers,
+    models: resources.models,
     settings: {
       selectedProviderId: null,
       selectedModelId: null

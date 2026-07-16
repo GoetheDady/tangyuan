@@ -9,6 +9,7 @@ import {
   type DesktopIpcResponse,
   type DesktopPreloadApi,
   type GetSessionMessagesRequest,
+  type OpenExternalLinkRequest,
   type RuntimeConfiguration,
   type CancelConfigurationVerificationRequest,
   type SendMessageRequest
@@ -74,6 +75,9 @@ export function createTangyuanPreloadApi(
     },
     subscribeToAgentEvents: (listener: AgentEventListener) => {
       return subscribe(DESKTOP_AGENT_EVENT_CHANNEL, listener)
+    },
+    openExternalLink: async (request: OpenExternalLinkRequest) => {
+      await invoke(DESKTOP_IPC_CHANNELS.openExternalLink, request)
     }
   }
 }

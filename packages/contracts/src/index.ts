@@ -612,6 +612,20 @@ export const cancelConfigurationVerificationRequestSchema = z.strictObject({
 })
 
 /**
+ * 描述 Renderer 请求 Main 安全打开外部链接的请求载荷。
+ */
+export interface OpenExternalLinkRequest {
+  url: string
+}
+
+/**
+ * Renderer 请求 Main 安全打开外部链接的 Zod schema。
+ */
+export const openExternalLinkRequestSchema = z.strictObject({
+  url: z.string().min(1),
+})
+
+/**
  * 桌面端允许 Renderer 通过 Preload API 调用的 IPC channel。
  */
 export const DESKTOP_IPC_CHANNELS = {
@@ -625,6 +639,7 @@ export const DESKTOP_IPC_CHANNELS = {
   sessionsGetMessages: 'tangyuan:sessions:get-messages',
   sessionsSendMessage: 'tangyuan:sessions:send-message',
   sessionsCancelRun: 'tangyuan:sessions:cancel-run',
+  openExternalLink: 'tangyuan:open-external-link',
 } as const
 
 /**
@@ -651,6 +666,7 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: GetSessionMessagesRequest
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: SendMessageRequest
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: CancelRunRequest
+  [DESKTOP_IPC_CHANNELS.openExternalLink]: OpenExternalLinkRequest
 }
 
 /**
@@ -667,6 +683,7 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: getSessionMessagesRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: sendMessageRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: cancelRunRequestSchema,
+  [DESKTOP_IPC_CHANNELS.openExternalLink]: openExternalLinkRequestSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -699,6 +716,7 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: AgentMessage[]
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: AgentMessage[]
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: AgentSessionSummary
+  [DESKTOP_IPC_CHANNELS.openExternalLink]: void
 }
 
 /**
@@ -715,6 +733,7 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: z.array(agentMessageSchema),
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: z.array(agentMessageSchema),
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: agentSessionSummarySchema,
+  [DESKTOP_IPC_CHANNELS.openExternalLink]: z.void(),
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -848,6 +867,15 @@ export interface DesktopPreloadApi {
    * @throws 此方法不会主动抛出错误。
    */
   subscribeToAgentEvents(listener: AgentEventListener): () => void
+
+  /**
+   * 请求 Main 进程校验协议后使用系统浏览器安全打开外部链接。
+   *
+   * @param request - 待打开的外部 URL。
+   * @returns 无返回值；协议不允许或 URL 无效时 Promise 会 reject。
+   * @throws 当 URL 协议不是 http/https 时 Promise 会 reject。
+   */
+  openExternalLink(request: OpenExternalLinkRequest): Promise<void>
 }
 
 /**

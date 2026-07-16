@@ -43,6 +43,7 @@ describe('registerDesktopAppIpc', () => {
       cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined)
     }
     const broadcastAgentEvent = vi.fn()
+    const openExternalLink = vi.fn().mockResolvedValue(undefined)
     runtime.subscribe = vi.fn((listener) => {
       listener(createTurnStartedEvent())
 
@@ -51,9 +52,9 @@ describe('registerDesktopAppIpc', () => {
       }
     })
 
-    registerDesktopAppIpc(ipcMain, runtime, broadcastAgentEvent)
+    registerDesktopAppIpc(ipcMain, runtime, broadcastAgentEvent, openExternalLink)
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(9)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(10)
     expect(broadcastAgentEvent).toHaveBeenCalledWith(createTurnStartedEvent())
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
@@ -101,6 +102,12 @@ describe('registerDesktopAppIpc', () => {
         sessionId: 'session-1'
       })
     ).resolves.toEqual(session)
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.openExternalLink)(null, {
+        url: 'https://example.com'
+      })
+    ).resolves.toBeUndefined()
+    expect(openExternalLink).toHaveBeenCalledWith('https://example.com')
     expect(runtime.createSession).toHaveBeenCalledWith({
       agentId: 'tangyuan',
       title: '新会话'

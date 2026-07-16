@@ -190,6 +190,7 @@ describe('DESKTOP_IPC_CHANNELS', () => {
       sessionsGetMessages: 'tangyuan:sessions:get-messages',
       sessionsSendMessage: 'tangyuan:sessions:send-message',
       sessionsCancelRun: 'tangyuan:sessions:cancel-run',
+      openExternalLink: 'tangyuan:open-external-link',
     })
   })
 })
