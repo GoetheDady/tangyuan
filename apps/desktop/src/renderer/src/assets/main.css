@@ -1,49 +1,102 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-:root {
-  --color-background: #fbf7ef;
-  --color-surface: #fffdf8;
-  --color-surface-soft: #f1e9de;
-  --color-text: #211b16;
-  --color-text-muted: #7d7166;
-  --color-border: #ded2c2;
-  --color-brand: #1f1a15;
-  --color-brand-soft: #3a322a;
-  --color-success: #5f8b70;
-  --color-danger: #b66c63;
-  --color-focus: #8b7563;
+@theme inline {
+  /* 背景与表面：糯米白、瓷白、浅米灰 */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  /* 品牌与动作：黑芝麻墨黑为主色 */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  /* 弱化与辅助：冷灰 */
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  /* 状态语义：朱砂红用于破坏，玉绿/琥珀/青瓷用于成功/警告/信息 */
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+
+  /* 边框、输入与焦点 */
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* 圆角 */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* 阴影（仅用于确有层级关系的浮层） */
+  --shadow-xs: 0 1px 2px 0 rgb(33 27 22 / 0.04);
+  --shadow-sm:
+    0 1px 3px 0 rgb(33 27 22 / 0.06), 0 1px 2px -1px rgb(33 27 22 / 0.05);
+  --shadow:
+    0 3px 6px -1px rgb(33 27 22 / 0.07), 0 2px 4px -2px rgb(33 27 22 / 0.05);
 }
 
-* {
-  box-sizing: border-box;
-}
+@layer base {
+  :root {
+    /* 汤圆“黑芝麻汤圆”单一主题，OKLCH 语义变量，无暗色模式 */
+    --background: oklch(0.977 0.011 84.6); /* 糯米白 */
+    --foreground: oklch(0.227 0.013 61.9); /* 芝麻深黑 */
+    --card: oklch(0.994 0.007 88.7); /* 瓷白·米浆白 */
+    --card-foreground: oklch(0.227 0.013 61.9);
+    --popover: oklch(0.994 0.007 88.7);
+    --popover-foreground: oklch(0.227 0.013 61.9);
+    --primary: oklch(0.222 0.012 67.1); /* 黑芝麻墨黑 */
+    --primary-foreground: oklch(0.977 0.011 84.6); /* 糯米白 */
+    --secondary: oklch(0.937 0.017 76.1); /* 浅米灰 */
+    --secondary-foreground: oklch(0.227 0.013 61.9);
+    --muted: oklch(0.937 0.017 76.1); /* 浅米灰·冷灰 */
+    --muted-foreground: oklch(0.556 0.022 64.8); /* 温灰褐 */
+    --accent: oklch(0.937 0.017 76.1);
+    --accent-foreground: oklch(0.227 0.013 61.9);
+    --destructive: oklch(0.611 0.096 27.6); /* 朱砂红·红豆色 */
+    --destructive-foreground: oklch(0.977 0.011 84.6);
+    --success: oklch(0.597 0.064 157); /* 玉绿·豆青色 */
+    --warning: oklch(0.72 0.15 78); /* 琥珀 */
+    --info: oklch(0.62 0.09 205); /* 青瓷蓝绿 */
+    --border: oklch(0.869 0.025 75.2); /* 米灰线 */
+    --input: oklch(0.869 0.025 75.2);
+    --ring: oklch(0.578 0.038 61.2); /* 糯米深边·焦点 */
+    --radius: 0.5rem;
+  }
 
-html,
-body,
-#root {
-  min-height: 100vh;
-}
+  * {
+    box-sizing: border-box;
+  }
 
-body {
-  margin: 0;
-  background: var(--color-background);
-  color: var(--color-text);
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-  user-select: none;
-}
+  html,
+  body,
+  #root {
+    min-height: 100vh;
+  }
 
-button,
-input,
-textarea,
-select {
-  font: inherit;
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family:
+      Inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
+    user-select: none;
+  }
 }

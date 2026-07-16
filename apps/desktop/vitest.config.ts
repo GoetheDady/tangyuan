@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      '@': new URL('./src/renderer/src', import.meta.url).pathname,
       '@renderer': new URL('./src/renderer/src', import.meta.url).pathname
     }
   },
