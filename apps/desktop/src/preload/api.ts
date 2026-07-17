@@ -2,17 +2,31 @@ import {
   DESKTOP_AGENT_EVENT_CHANNEL,
   DESKTOP_IPC_CHANNELS,
   type AgentEventListener,
+  type ApproveBashRequest,
+  type ArchiveAgentRequest,
   type CancelRunRequest,
+  type ClaimAgentDirectoryRequest,
   type CreateSessionRequest,
   type DesktopIpcChannel,
   type DesktopIpcPayloadArgs,
   type DesktopIpcResponse,
   type DesktopPreloadApi,
   type GetSessionMessagesRequest,
+  type GetSessionModelInfoRequest,
+  type GetSoulRequest,
+  type ListAgentSkillsRequest,
   type OpenExternalLinkRequest,
+  type RecoverAgentRequest,
+  type RejectBashRequest,
   type RuntimeConfiguration,
   type CancelConfigurationVerificationRequest,
-  type SendMessageRequest
+  type SendMessageRequest,
+  type SetSessionModelRequest,
+  type SetSessionThinkingLevelRequest,
+  type SkillOperationParams,
+  type UpdateAgentConfigRequest,
+  type UpdateSoulRequest,
+  type UpdateUserProfileRequest
 } from '@tangyuan/contracts'
 
 /**
@@ -76,6 +90,9 @@ export function createTangyuanPreloadApi(
     subscribeToAgentEvents: (listener: AgentEventListener) => {
       return subscribe(DESKTOP_AGENT_EVENT_CHANNEL, listener)
     },
+    listAgents: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.agentsList)
+    },
     restoreFromBackup: async () => {
       return invoke(DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup)
     },
@@ -84,6 +101,78 @@ export function createTangyuanPreloadApi(
     },
     openExternalLink: async (request: OpenExternalLinkRequest) => {
       await invoke(DESKTOP_IPC_CHANNELS.openExternalLink, request)
+    },
+    updateAgentConfig: async (request: UpdateAgentConfigRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.agentsUpdateConfig, request)
+    },
+    archiveAgent: async (request: ArchiveAgentRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.agentsArchive, request)
+    },
+    recoverAgent: async (request: RecoverAgentRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.agentsRecover, request)
+    },
+    reconcileAgentDirectories: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.agentsReconcile)
+    },
+    claimAgentDirectory: async (request: ClaimAgentDirectoryRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.agentsClaimDirectory, request)
+    },
+    rebuildTangyuanHome: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.agentsRebuildTangyuan)
+    },
+    getSessionModelInfo: async (request: GetSessionModelInfoRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsGetModelInfo, request)
+    },
+    setSessionModel: async (request: SetSessionModelRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsSetModel, request)
+    },
+    setSessionThinkingLevel: async (request: SetSessionThinkingLevelRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsSetThinkingLevel, request)
+    },
+    getSoul: async (request: GetSoulRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.profileGetSoul, request)
+    },
+    getUserProfile: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.profileGetUser)
+    },
+    updateSoul: async (request: UpdateSoulRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.profileUpdateSoul, request)
+    },
+    updateUserProfile: async (request: UpdateUserProfileRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.profileUpdateUser, request)
+    },
+    listAgentSkills: async (request: ListAgentSkillsRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.skillsListAgent, request)
+    },
+    listSharedSkills: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.skillsListShared)
+    },
+    installSkill: async (params: SkillOperationParams) => {
+      return invoke(DESKTOP_IPC_CHANNELS.skillsInstall, params)
+    },
+    deleteSkill: async (params: SkillOperationParams) => {
+      return invoke(DESKTOP_IPC_CHANNELS.skillsDelete, params)
+    },
+    approveSkillOperation: async (request: ApproveBashRequest) => {
+      await invoke(DESKTOP_IPC_CHANNELS.skillsApproveOperation, request)
+    },
+    rejectSkillOperation: async (request: RejectBashRequest) => {
+      await invoke(DESKTOP_IPC_CHANNELS.skillsRejectOperation, request)
+    },
+    getPendingSkillApprovals: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals)
+    },
+    getSkillInstallRecords: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.skillsGetInstallRecords)
+    },
+    approveBash: async (request: ApproveBashRequest) => {
+      await invoke(DESKTOP_IPC_CHANNELS.sessionsApproveBash, request)
+    },
+    rejectBash: async (request: RejectBashRequest) => {
+      await invoke(DESKTOP_IPC_CHANNELS.sessionsRejectBash, request)
+    },
+    getPendingApprovals: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals)
     }
   }
 }

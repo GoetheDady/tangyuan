@@ -1,5 +1,6 @@
 import {
   access,
+  copyFile,
   mkdir,
   readFile,
   readdir,
@@ -17,10 +18,10 @@ import {
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   createAgentProfileStatus,
-  createDefaultSessionSummary,
   createRuntimeSnapshot,
   migrateConfigV1ToV2,
   persistedConfigurationV2Schema,
+  type AgentConfig,
   type AgentEvent,
   type AgentEventListener,
   type AgentEventSubscription,
@@ -30,12 +31,14 @@ import {
   type AgentMessage,
   type AgentRunState,
   type AgentSessionSummary,
+  type AgentSummary,
   type CancelConfigurationVerificationRequest,
   type CancelRunRequest,
   type ConfigEncryptionAdapter,
   type ConfigRecoveryState,
   type CreateSessionRequest,
   type GetSessionMessagesRequest,
+  type GetSessionModelInfoRequest,
   type InternalProviderCredentials,
   type InternalRuntimeConfig,
   type ListSessionsRequest,
@@ -43,17 +46,25 @@ import {
   type PersistedConfigurationV1,
   type PersistedConfigurationV2,
   type ProviderAuthSnapshot,
+  type ProfileMaintenanceResult,
   type ProviderCredentials,
   type ProviderDescriptor,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
   type SendMessageRequest,
+  type SessionModelInfo,
+  type SetSessionModelRequest,
+  type SetSessionThinkingLevelRequest,
+  type SkillSummary,
+  type SkillOperationParams,
+  type SkillInstallRecord,
+  type SoulContent,
+  type UserProfileContent,
 } from '@tangyuan/contracts'
 
 export {
   TANGYUAN_DEFAULT_AGENT_ID,
   createAgentProfileStatus,
-  createDefaultSessionSummary,
   type AgentEvent,
   type AgentEventListener,
   type AgentEventSubscription,
@@ -63,6 +74,7 @@ export {
   type AgentMessage,
   type AgentRunState,
   type AgentSessionSummary,
+  type AgentSummary,
   type CancelConfigurationVerificationRequest,
   type CancelRunRequest,
   type ConfigEncryptionAdapter,
@@ -75,6 +87,7 @@ export {
   type RuntimeConfiguration,
   type RuntimeSnapshot,
   type SendMessageRequest,
+  type SkillSummary,
 } from '@tangyuan/contracts'
 export { createTangyuanRuntimeForTesting } from './TangyuanRuntime'
 export type { TangyuanRuntime } from './TangyuanRuntime'
@@ -88,12 +101,35 @@ export type { TangyuanRuntime } from './TangyuanRuntime'
 export function createTangyuanRuntime(
   options?: PiSdkDriverOptions,
 ): TangyuanRuntime {
-  const driver = new PiSdkDriver(options)
+  // eslint-disable-next-line prefer-const -- assigned after driver/runtime creation
+  let gatewayInstance: ToolApprovalGateway | undefined
 
-  return createTangyuanRuntimeForTesting({
+  const driver = new PiSdkDriver({
+    ...options,
+    toolApprovalGateway: {
+      requestBashApproval: (params) => {
+        if (!gatewayInstance) {
+          return Promise.resolve({ approved: false })
+        }
+        return gatewayInstance.requestBashApproval(params)
+      },
+      validateFilePath: (params) => {
+        if (!gatewayInstance) {
+          return { allowed: false, reason: '审批网关未初始化。' }
+        }
+        return gatewayInstance.validateFilePath(params)
+      },
+    },
+  })
+
+  const runtime = createTangyuanRuntimeForTesting({
     runtimeDriver: driver,
     sessionDriver: driver,
   })
+
+  gatewayInstance = runtime.createToolApprovalGateway()
+
+  return runtime
 }
 
 /**
@@ -115,12 +151,57 @@ export interface PiSdkVerificationRequest extends RuntimeConfiguration {
 }
 
 /**
+ * 工具审批与文件路径校验网关。
+ *
+ * 由 TangyuanRuntime 实现，注入到 PiSdkDriver 的自定义工具中，
+ * 用于在执行 bash 前创建审批、在校验文件路径时判断是否允许访问。
+ */
+export interface ToolApprovalGateway {
+  /**
+   * 请求用户批准一次 Bash 执行。
+   *
+   * @param params - 审批所需上下文（Agent、session、run、命令、工作目录、风险说明）。
+   * @returns 用户批准后 resolve `{ approved: true }`，拒绝后 resolve `{ approved: false }`。
+   * @throws 此方法不会主动抛出错误；审批超时或取消通过 approved: false 表示。
+   */
+  requestBashApproval(params: {
+    agentId: string
+    sessionId: string
+    runId: string
+    command: string
+    cwd: string
+    riskDescription: string
+  }): Promise<{ approved: boolean }>
+
+  /**
+   * 校验文件路径是否允许当前 Agent 访问。
+   *
+   * @param params - 校验上下文（Agent、路径、操作类型）。
+   * @returns allowed 为 true 表示允许访问；为 false 时 reason 包含拒绝原因。
+   * @throws 此方法不会主动抛出错误。
+   */
+  validateFilePath(params: {
+    agentId: string
+    path: string
+    operation: 'read' | 'write' | 'edit'
+  }): { allowed: boolean; reason?: string }
+}
+
+/**
  * 描述创建真实 Pi SDK 会话时需要的参数。
  */
 export interface PiSdkCreateSessionRequest extends RuntimeConfiguration {
   sessionId: string
   sdkSessionFile: string
   cwd: string
+  /** Agent 专属 Skills 目录路径（用于 DefaultResourceLoader）。 */
+  agentSkillsPath: string
+  /** 共享 Skills 目录路径（用于 DefaultResourceLoader）。 */
+  sharedSkillsPath: string
+  /** 仅在 tangyuan session 中提供，用于 create_agent 工具回调。 */
+  onCreateAgent?: (displayName: string) => Promise<AgentSummary>
+  /** 工具审批与路径校验网关（用于 bash 审批和文件路径保护）。 */
+  toolApprovalGateway?: ToolApprovalGateway
 }
 
 /**
@@ -130,6 +211,12 @@ export interface PiSdkOpenSessionRequest extends RuntimeConfiguration {
   sessionId: string
   sdkSessionFile: string
   cwd: string
+  /** Agent 专属 Skills 目录路径（用于 DefaultResourceLoader）。 */
+  agentSkillsPath: string
+  /** 共享 Skills 目录路径（用于 DefaultResourceLoader）。 */
+  sharedSkillsPath: string
+  /** 工具审批与路径校验网关（用于 bash 审批和文件路径保护）。 */
+  toolApprovalGateway?: ToolApprovalGateway
 }
 
 /**
@@ -173,6 +260,7 @@ export type PiSdkStreamEvent =
   | {
       type: 'tool-started'
       toolName: string
+      toolInput?: unknown
     }
   | {
       type: 'tool-completed'
@@ -233,6 +321,42 @@ export interface PiSdkSessionHandle {
    * @throws 此方法不应主动抛出错误。
    */
   dispose(): void
+
+  /**
+   * 切换当前会话的模型。
+   *
+   * @param providerId - 目标 Provider 标识。
+   * @param modelId - 目标模型标识。
+   * @param apiKey - 目标 Provider 的 API Key（跨 Provider 切换时需要）。
+   * @returns 无返回值。
+   * @throws 当模型不存在或未配置凭据时，Promise 会 reject。
+   */
+  setModel?(providerId: string, modelId: string, apiKey?: string): Promise<void>
+
+  /**
+   * 切换当前会话的 Thinking Level。
+   *
+   * @param level - 目标 Thinking Level。
+   * @returns 无返回值。
+   * @throws 当会话不支持 Thinking 时可能会 reject。
+   */
+  setThinkingLevel?(level: string): Promise<void>
+
+  /**
+   * 读取当前会话的模型和 Thinking Level 信息。
+   *
+   * @returns 当前会话的模型信息。
+   * @throws 当会话信息无法读取时，Promise 会 reject。
+   */
+  getModelInfo?(): Promise<SessionModelInfo>
+
+  /**
+   * 重新加载 ResourceLoader（Skill 变更后刷新系统提示词）。
+   *
+   * @returns 无返回值。
+   * @throws 当 reload 失败时，Promise 会 reject。
+   */
+  reload?(): Promise<void>
 }
 
 /**
@@ -409,6 +533,224 @@ export interface AgentSessionDriver {
   cancelRun(request: CancelRunRequest): Promise<void>
 
   /**
+   * 创建一个新 Agent。
+   *
+   * @param displayName - 新 Agent 的展示名称。
+   * @returns 新创建的 Agent 摘要。
+   * @throws 当目录创建、配置写入或加密失败时，Promise 会 reject。
+   */
+  createAgent?(displayName: string): Promise<AgentSummary>
+
+  /**
+   * 更新指定 Agent 的默认 Provider 和 Model 配置。
+   *
+   * @param agentId - Agent 标识。
+   * @param patch - 要更新的配置字段。
+   * @returns 更新后的 AgentSummary。
+   * @throws 当 Agent 不存在或配置保存失败时，Promise 会 reject。
+   */
+  updateAgentConfig?(
+    agentId: AgentId,
+    patch: Partial<Pick<AgentConfig, 'defaultProviderId' | 'defaultModelId'>>,
+  ): Promise<AgentSummary>
+
+  /**
+   * 归档指定的自定义 Agent。
+   *
+   * @param agentId - Agent 标识。
+   * @returns 归档后的 AgentSummary。
+   * @throws 当 Agent 是汤圆或配置保存失败时，Promise 会 reject。
+   */
+  archiveAgent?(agentId: AgentId): Promise<AgentSummary>
+
+  /**
+   * 恢复已归档的 Agent。
+   *
+   * @param agentId - Agent 标识。
+   * @returns 恢复后的 AgentSummary。
+   * @throws 当 Agent 不存在或配置保存失败时，Promise 会 reject。
+   */
+  recoverAgent?(agentId: AgentId): Promise<AgentSummary>
+
+  /**
+   * 执行目录对账，对照配置与磁盘目录状态。
+   *
+   * @returns 对账报告，包含更新后的 Agent 列表和未归属目录。
+   * @throws 当配置读取或目录扫描失败时，Promise 会 reject。
+   */
+  reconcileAgentDirectories?(): Promise<{
+    agents: AgentSummary[]
+    unclaimedDirectories: import('@tangyuan/contracts').UnclaimedDirectory[]
+  }>
+
+  /**
+   * 认领未归属的 Agent 目录。
+   *
+   * @param agentId - 目录对应的 agentId。
+   * @param displayName - Agent 展示名称。
+   * @returns 认领后的 AgentSummary。
+   * @throws 当目录不存在或配置保存失败时，Promise 会 reject。
+   */
+  claimAgentDirectory?(
+    agentId: string,
+    displayName: string,
+  ): Promise<AgentSummary>
+
+  /**
+   * 按固定模板重建汤圆目录结构。
+   *
+   * @returns 重建后的 AgentSummary。
+   * @throws 当目录创建或文件写入失败时，Promise 会 reject。
+   */
+  rebuildTangyuanHome?(): Promise<AgentSummary>
+
+  /**
+   * 读取当前 Session 的模型和 Thinking Level 信息。
+   *
+   * @param request - Agent 和 Session 标识。
+   * @returns Session 模型信息。
+   * @throws 当 Session 不存在或读取失败时，Promise 会 reject。
+   */
+  getSessionModelInfo?(
+    request: GetSessionModelInfoRequest,
+  ): Promise<SessionModelInfo>
+
+  /**
+   * 切换当前 Session 的 Provider 和 Model。
+   *
+   * @param request - Agent、Session 标识和目标 Provider/Model。
+   * @returns 切换后的模型信息。
+   * @throws 当 Session 不存在或模型切换失败时，Promise 会 reject。
+   */
+  setSessionModel?(request: SetSessionModelRequest): Promise<SessionModelInfo>
+
+  /**
+   * 切换当前 Session 的 Thinking Level。
+   *
+   * @param request - Agent、Session 标识和目标 Thinking Level。
+   * @returns 切换后的模型信息。
+   * @throws 当 Session 不存在或不支持 Thinking 时，Promise 会 reject。
+   */
+  setSessionThinkingLevel?(
+    request: SetSessionThinkingLevelRequest,
+  ): Promise<SessionModelInfo>
+
+  /**
+   * 读取指定 Agent 的 soul（身份/角色）内容。
+   *
+   * @param agentId - Agent 标识。
+   * @returns Agent 的 soul 内容和更新时间。
+   * @throws 当 Agent 不存在或文件读取失败时，Promise 会 reject。
+   */
+  getSoul?(agentId: AgentId): Promise<import('@tangyuan/contracts').SoulContent>
+
+  /**
+   * 读取共享 user profile 内容。
+   *
+   * @returns 共享 user profile 内容和更新时间。
+   * @throws 当文件不存在或读取失败时，Promise 会 reject。
+   */
+  getUserProfile?(): Promise<import('@tangyuan/contracts').UserProfileContent>
+
+  /**
+   * 更新指定 Agent 的 soul（含权限校验和备份验证）。
+   *
+   * @param agentId - 目标 Agent 标识。
+   * @param content - 新 soul 内容。
+   * @param requestedByAgentId - 发起更新请求的 Agent 标识（用于权限校验）。
+   * @returns profile 维护结果。
+   * @throws 当文件操作失败时，Promise 会 reject。
+   */
+  updateSoul?(
+    agentId: AgentId,
+    content: string,
+    requestedByAgentId: AgentId,
+  ): Promise<import('@tangyuan/contracts').ProfileMaintenanceResult>
+
+  /**
+   * 更新共享 user profile（含备份验证和敏感信息过滤）。
+   *
+   * @param content - 新 user profile 内容。
+   * @returns profile 维护结果。
+   * @throws 当文件操作失败时，Promise 会 reject。
+   */
+  updateUserProfile?(
+    content: string,
+  ): Promise<import('@tangyuan/contracts').ProfileMaintenanceResult>
+
+  /**
+   * 列出指定 Agent 实际生效的 Skill 列表（含冲突诊断）。
+   *
+   * @param agentId - Agent 标识。
+   * @returns Skill 摘要列表，专属覆盖共享后的最终结果。
+   * @throws 当 Skill 目录不存在或解析失败时，Promise 会 reject。
+   */
+  listAgentSkills?(
+    agentId: AgentId,
+  ): Promise<import('@tangyuan/contracts').SkillSummary[]>
+
+  /**
+   * 列出共享 Skill 列表。
+   *
+   * @returns 共享 Skill 摘要列表。
+   * @throws 当共享 Skill 目录不存在或解析失败时，Promise 会 reject。
+   */
+  listSharedSkills?(): Promise<import('@tangyuan/contracts').SkillSummary[]>
+
+  /**
+   * 重新加载指定 Agent 所有活跃 session 的 ResourceLoader。
+   *
+   * 用于 Agent 专属 Skill 变更后刷新该 Agent 的会话。
+   *
+   * @param agentId - Agent 标识。
+   * @returns 无返回值。
+   * @throws 当 reload 失败时，Promise 会 reject。
+   */
+  reloadAgentSessions?(agentId: AgentId): Promise<void>
+
+  /**
+   * 重新加载全部活跃 session 的 ResourceLoader。
+   *
+   * 用于共享 Skill 变更后刷新所有 Agent 的会话。
+   *
+   * @returns 无返回值。
+   * @throws 当 reload 失败时，Promise 会 reject。
+   */
+  reloadAllSessions?(): Promise<void>
+
+  /**
+   * 安装或更新 Skill（含 SKILL.md 校验和原子写入）。
+   *
+   * @param params - Skill 操作参数。
+   * @returns 更新后的 Skill 摘要列表。
+   * @throws 当校验失败或文件操作失败时，Promise 会 reject。
+   */
+  installSkill?(
+    params: import('@tangyuan/contracts').SkillOperationParams,
+  ): Promise<import('@tangyuan/contracts').SkillSummary[]>
+
+  /**
+   * 删除 Skill（含备份）。
+   *
+   * @param params - Skill 操作参数。
+   * @returns 更新后的 Skill 摘要列表。
+   * @throws 当文件操作失败时，Promise 会 reject。
+   */
+  deleteSkill?(
+    params: import('@tangyuan/contracts').SkillOperationParams,
+  ): Promise<import('@tangyuan/contracts').SkillSummary[]>
+
+  /**
+   * 读取 Skill 安装记录。
+   *
+   * @returns 安装记录列表。
+   * @throws 当读取失败时，Promise 会 reject。
+   */
+  getSkillInstallRecords?(): Promise<
+    import('@tangyuan/contracts').SkillInstallRecord[]
+  >
+
+  /**
    * 订阅 Agent Driver 发出的标准事件。
    *
    * @param listener - 接收标准事件的回调。
@@ -523,6 +865,8 @@ export interface PiSdkDriverOptions {
   userDataPath?: string
   gateway?: PiSdkGateway
   encryptionAdapter?: ConfigEncryptionAdapter
+  /** 工具审批与路径校验网关（用于 bash 审批和文件路径保护）。 */
+  toolApprovalGateway?: ToolApprovalGateway
 }
 
 /**
@@ -552,6 +896,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private readonly activeRunIds = new Map<string, string>()
   private readonly runSequenceBySession = new Map<string, number>()
   private configurationVerificationController: AbortController | null = null
+  private toolApprovalGateway: ToolApprovalGateway | undefined
 
   /**
    * 创建 Pi SDK Driver 骨架。
@@ -567,6 +912,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     this.userDataPath = options.userDataPath ?? join(this.fsRoot, '.tangyuan')
     this.gateway = options.gateway ?? new RealPiSdkGateway()
     this.encryptionAdapter = options.encryptionAdapter ?? null
+    this.toolApprovalGateway = options.toolApprovalGateway
   }
 
   /**
@@ -678,39 +1024,70 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    *
    * @param request - 新会话所属 Agent 和标题。
    * @returns 创建后的会话摘要。
-   * @throws 当 request.agentId 不是默认 Agent 时，Promise 会 reject。
+   * @throws 当配置损坏、Agent 不存在或已归档、运行时配置不完整时，Promise 会 reject。
    */
   async createSession(
     request: CreateSessionRequest,
   ): Promise<AgentSessionSummary> {
-    if (request.agentId !== TANGYUAN_DEFAULT_AGENT_ID) {
+    const readResult = await this.readPersistedConfiguration()
+
+    if (readResult.recoveryState !== 'ok') {
       throw new AgentRuntimeError({
-        code: 'session-not-found',
-        message: 'v1 只支持默认 tangyuan Agent（智能体）。',
+        code: 'configuration-missing',
+        message: '配置文件已损坏，请先恢复或重置配置。',
         recoverable: true,
       })
     }
 
-    const [configuration, existingEntries] = await Promise.all([
-      this.readRequiredRuntimeConfiguration(),
+    const agentConfig = readResult.config?.agents[request.agentId]
+
+    if (!agentConfig || agentConfig.status === 'archived') {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `Agent「${request.agentId}」不存在或已归档。`,
+        recoverable: true,
+      })
+    }
+
+    const [configuration] = await Promise.all([
+      this.readRequiredRuntimeConfiguration(request.agentId),
       this.loadSessionIndex(),
     ])
-    const sessionId = this.createNextSessionId(existingEntries)
+    const sessionId = this.createNextSessionId()
     const now = this.now()
     const sdkSessionFile = this.resolveSdkSessionFile(sessionId)
+    const cwd =
+      request.agentId === TANGYUAN_DEFAULT_AGENT_ID
+        ? this.resolveAgentHomePath()
+        : this.resolveAgentWorkspacePath(request.agentId)
     await mkdir(dirname(sdkSessionFile), { recursive: true })
-    const handle = await this.gateway.createSession({
+    const baseRequest = {
       ...configuration,
       sessionId,
       sdkSessionFile,
-      cwd: this.resolveAgentHomePath(),
-    })
+      cwd,
+      agentSkillsPath: this.resolveAgentSkillsPath(request.agentId),
+      sharedSkillsPath: this.resolveSharedSkillsPath(),
+    }
+    const createSessionRequest: PiSdkCreateSessionRequest = this
+      .toolApprovalGateway
+      ? { ...baseRequest, toolApprovalGateway: this.toolApprovalGateway }
+      : baseRequest
+
+    if (request.agentId === TANGYUAN_DEFAULT_AGENT_ID) {
+      createSessionRequest.onCreateAgent = async (displayName: string) =>
+        this.createAgent(displayName)
+    }
+
+    const handle = await this.gateway.createSession(createSessionRequest)
     const persistedSdkSessionFile = handle.sdkSessionFile ?? sdkSessionFile
-    const session = createDefaultSessionSummary({
+    const session: AgentSessionSummary = {
+      agentId: request.agentId,
       sessionId,
       title: request.title,
       updatedAt: now,
-    })
+      state: 'idle',
+    }
     const indexEntry: PersistedSessionIndexEntry = {
       sessionId,
       sdkSessionFile: persistedSdkSessionFile,
@@ -846,7 +1223,10 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
     try {
       const profileStatusBeforeRun = await this.ensureDefaultAgentHome()
-      const prompt = await this.buildPromptWithProfileContext(content)
+      const prompt = await this.buildPromptWithProfileContext(
+        content,
+        request.agentId,
+      )
       let accumulatedReply = ''
       const agentReply = await handle.prompt(prompt, {
         onEvent: (event) => {
@@ -1059,7 +1439,10 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     ])
 
     const runtimeConfig = readResult.config
-      ? this.extractAgentRuntimeConfig(readResult.config, TANGYUAN_DEFAULT_AGENT_ID)
+      ? this.extractAgentRuntimeConfig(
+          readResult.config,
+          TANGYUAN_DEFAULT_AGENT_ID,
+        )
       : null
     const hasBackup = await this.hasBackupFile()
 
@@ -1083,6 +1466,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         homePath: this.agentHomePath,
         profile: createAgentProfileStatus(homeStatus),
       },
+      agents: await this.buildAgentSummaries(readResult.config),
       providers: resources.providers,
       models: resources.models,
       settings: {
@@ -1120,6 +1504,1384 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     return `${trimmed.slice(0, 4)}...${trimmed.slice(-4)}`
+  }
+
+  /**
+   * 从内部配置构建所有 Agent 摘要列表。
+   *
+   * @param config - 解密后的内部运行时配置；为 null 时只返回默认 tangyuan。
+   * @returns Agent 摘要列表，tangyuan 始终排在第一位。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private async buildAgentSummaries(
+    config: InternalRuntimeConfig | null,
+  ): Promise<AgentSummary[]> {
+    const tangyuanHomeExists = await this.pathExists(
+      join(this.resolveAgentHomePath(TANGYUAN_DEFAULT_AGENT_ID), 'soul.md'),
+    )
+
+    const tangyuanSummary: AgentSummary = {
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      displayName:
+        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.displayName ?? '汤圆',
+      status: config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.status ?? 'active',
+      defaultProviderId:
+        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.defaultProviderId ?? null,
+      defaultModelId:
+        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.defaultModelId ?? null,
+      homePath: this.agentHomePath,
+      archivedAt: config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.archivedAt ?? null,
+      directoryStatus: tangyuanHomeExists ? 'healthy' : 'damaged',
+    }
+
+    if (!config) {
+      return [tangyuanSummary]
+    }
+
+    const otherAgents = await Promise.all(
+      Object.entries(config.agents)
+        .filter(([agentId]) => agentId !== TANGYUAN_DEFAULT_AGENT_ID)
+        .map(async ([agentId, agentConfig]) => {
+          const homePath = this.resolveAgentHomePath(agentId)
+          const soulExists = await this.pathExists(join(homePath, 'soul.md'))
+
+          return {
+            agentId,
+            displayName: agentConfig.displayName,
+            status: agentConfig.status,
+            defaultProviderId: agentConfig.defaultProviderId,
+            defaultModelId: agentConfig.defaultModelId,
+            homePath,
+            archivedAt: agentConfig.archivedAt,
+            directoryStatus: soulExists
+              ? ('healthy' as const)
+              : ('damaged' as const),
+          }
+        }),
+    )
+
+    return [tangyuanSummary, ...otherAgents]
+  }
+
+  /**
+   * 列出所有已配置的 Agent 摘要。
+   *
+   * @returns Agent 摘要列表。
+   * @throws 当配置读取失败时，Promise 会 reject。
+   */
+  async listAgents(): Promise<AgentSummary[]> {
+    const readResult = await this.readPersistedConfiguration()
+    return await this.buildAgentSummaries(readResult.config)
+  }
+
+  /**
+   * 原子创建一个新 Agent。
+   *
+   * @param displayName - 新 Agent 的展示名称。
+   * @returns 新创建的 Agent 摘要。
+   * @throws 当配置读取、目录创建、文件写入或加密失败时，Promise 会 reject。
+   */
+  async createAgent(displayName: string): Promise<AgentSummary> {
+    const agentId = crypto.randomUUID()
+    const now = this.now()
+    const homePath = this.resolveAgentHomePath(agentId)
+    const workspacePath = this.resolveAgentWorkspacePath(agentId)
+
+    // 1. 读取当前配置并继承 tangyuan 的 Provider/Model
+    const readResult = await this.readPersistedConfiguration()
+    const config = readResult.config ?? this.createDefaultInternalConfig()
+    const tangyuanConfig = this.extractAgentRuntimeConfig(
+      config,
+      TANGYUAN_DEFAULT_AGENT_ID,
+    )
+
+    // 2. 原子创建目录和初始文件
+    await mkdir(homePath, { recursive: true })
+
+    try {
+      await Promise.all([
+        mkdir(join(homePath, 'soul.history'), { recursive: true }),
+        mkdir(join(homePath, 'memory'), { recursive: true }),
+        mkdir(join(homePath, 'skills'), { recursive: true }),
+        mkdir(workspacePath, { recursive: true }),
+      ])
+
+      const soulContent = [
+        `# ${displayName}`,
+        '',
+        `创建时间：${now}`,
+        '',
+        '## 身份',
+        `${displayName}是用户创建的 Agent。`,
+        '',
+        '## 职责',
+        '待用户在对话中定义。',
+        '',
+        '## 规则',
+        '遵循用户指令，在执行危险操作前先确认。',
+        '使用中文回复，简洁清晰。',
+        '',
+      ].join('\n')
+      await writeFile(join(homePath, 'soul.md'), soulContent, 'utf8')
+
+      // 3. 更新配置
+      config.agents[agentId] = {
+        displayName,
+        defaultProviderId: tangyuanConfig?.providerId ?? null,
+        defaultModelId: tangyuanConfig?.modelId ?? null,
+        status: 'active',
+        archivedAt: null,
+      }
+      await this.writePersistedConfiguration(config)
+
+      const summary: AgentSummary = {
+        agentId,
+        displayName,
+        status: 'active',
+        defaultProviderId: tangyuanConfig?.providerId ?? null,
+        defaultModelId: tangyuanConfig?.modelId ?? null,
+        homePath,
+        archivedAt: null,
+        directoryStatus: 'healthy',
+      }
+
+      this.emit({
+        type: 'agent-created',
+        agentId,
+        agent: summary,
+        occurredAt: now,
+      })
+
+      return summary
+    } catch (error) {
+      // 失败回滚：清理已创建的目录
+      await import('node:fs/promises').then(({ rm }) =>
+        rm(homePath, { recursive: true, force: true }),
+      )
+      throw error
+    }
+  }
+
+  /**
+   * 更新指定 Agent 的默认 Provider 和 Model 配置。
+   *
+   * @param agentId - Agent 标识。
+   * @param patch - 要更新的配置字段。
+   * @returns 更新后的 AgentSummary。
+   * @throws 当 Agent 不存在或配置保存失败时，Promise 会 reject。
+   */
+  async updateAgentConfig(
+    agentId: AgentId,
+    patch: Partial<Pick<AgentConfig, 'defaultProviderId' | 'defaultModelId'>>,
+  ): Promise<AgentSummary> {
+    const readResult = await this.readPersistedConfiguration()
+    const config = readResult.config
+
+    if (!config || !config.agents[agentId]) {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `Agent ${agentId} 不存在或已归档。`,
+        recoverable: true,
+      })
+    }
+
+    const currentAgent = config.agents[agentId]
+
+    if (currentAgent.status !== 'active') {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `Agent ${agentId} 已归档，无法修改配置。`,
+        recoverable: true,
+      })
+    }
+
+    const updatedAgent = {
+      ...currentAgent,
+      ...(patch.defaultProviderId !== undefined
+        ? { defaultProviderId: patch.defaultProviderId }
+        : {}),
+      ...(patch.defaultModelId !== undefined
+        ? { defaultModelId: patch.defaultModelId }
+        : {}),
+    }
+    config.agents[agentId] = updatedAgent
+    await this.writePersistedConfiguration(config)
+
+    const homePath = this.resolveAgentHomePath(agentId)
+    const soulExists = await this.pathExists(join(homePath, 'soul.md'))
+
+    const summary: AgentSummary = {
+      agentId,
+      displayName: updatedAgent.displayName,
+      status: updatedAgent.status,
+      defaultProviderId: updatedAgent.defaultProviderId,
+      defaultModelId: updatedAgent.defaultModelId,
+      homePath,
+      archivedAt: updatedAgent.archivedAt,
+      directoryStatus: soulExists ? 'healthy' : 'damaged',
+    }
+
+    this.emit({
+      type: 'agent-config-updated',
+      agentId,
+      agent: summary,
+      occurredAt: this.now(),
+    })
+
+    return summary
+  }
+
+  /**
+   * 归档指定的自定义 Agent（默认汤圆不可归档）。
+   *
+   * @param agentId - Agent 标识。
+   * @returns 归档后的 AgentSummary。
+   * @throws 当 Agent 是汤圆、不存在或配置保存失败时，Promise 会 reject。
+   */
+  async archiveAgent(agentId: AgentId): Promise<AgentSummary> {
+    if (agentId === TANGYUAN_DEFAULT_AGENT_ID) {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: '默认 Agent「汤圆」不可归档。',
+        recoverable: true,
+      })
+    }
+
+    const readResult = await this.readPersistedConfiguration()
+    const config = readResult.config
+
+    if (!config || !config.agents[agentId]) {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `Agent ${agentId} 不存在。`,
+        recoverable: true,
+      })
+    }
+
+    const currentAgent = config.agents[agentId]
+    const now = this.now()
+
+    const updatedAgent: AgentConfig = {
+      ...currentAgent,
+      status: 'archived',
+      archivedAt: now,
+    }
+    config.agents[agentId] = updatedAgent
+    await this.writePersistedConfiguration(config)
+
+    const homePath = this.resolveAgentHomePath(agentId)
+    const soulExists = await this.pathExists(join(homePath, 'soul.md'))
+
+    const summary: AgentSummary = {
+      agentId,
+      displayName: updatedAgent.displayName,
+      status: updatedAgent.status,
+      defaultProviderId: updatedAgent.defaultProviderId,
+      defaultModelId: updatedAgent.defaultModelId,
+      homePath,
+      archivedAt: updatedAgent.archivedAt,
+      directoryStatus: soulExists ? 'healthy' : 'damaged',
+    }
+
+    this.emit({
+      type: 'agent-archived',
+      agentId,
+      agent: summary,
+      occurredAt: now,
+    })
+
+    return summary
+  }
+
+  /**
+   * 恢复已归档的 Agent 到活跃状态。
+   *
+   * @param agentId - Agent 标识。
+   * @returns 恢复后的 AgentSummary。
+   * @throws 当 Agent 不存在或配置保存失败时，Promise 会 reject。
+   */
+  async recoverAgent(agentId: AgentId): Promise<AgentSummary> {
+    const readResult = await this.readPersistedConfiguration()
+    const config = readResult.config
+
+    if (!config || !config.agents[agentId]) {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `Agent ${agentId} 不存在。`,
+        recoverable: true,
+      })
+    }
+
+    const currentAgent = config.agents[agentId]
+    const now = this.now()
+
+    const updatedAgent: AgentConfig = {
+      ...currentAgent,
+      status: 'active',
+      archivedAt: null,
+    }
+    config.agents[agentId] = updatedAgent
+    await this.writePersistedConfiguration(config)
+
+    const homePath = this.resolveAgentHomePath(agentId)
+    const soulExists = await this.pathExists(join(homePath, 'soul.md'))
+
+    const summary: AgentSummary = {
+      agentId,
+      displayName: updatedAgent.displayName,
+      status: updatedAgent.status,
+      defaultProviderId: updatedAgent.defaultProviderId,
+      defaultModelId: updatedAgent.defaultModelId,
+      homePath,
+      archivedAt: updatedAgent.archivedAt,
+      directoryStatus: soulExists ? 'healthy' : 'damaged',
+    }
+
+    this.emit({
+      type: 'agent-recovered',
+      agentId,
+      agent: summary,
+      occurredAt: now,
+    })
+
+    return summary
+  }
+
+  /**
+   * 执行目录对账：对照配置检查 Agent 目录存在性，扫描发现未归属目录。
+   *
+   * @returns 对账报告，包含更新后的 Agent 列表和未归属目录。
+   * @throws 当配置读取或目录扫描失败时，Promise 会 reject。
+   */
+  async reconcileAgentDirectories(): Promise<{
+    agents: AgentSummary[]
+    unclaimedDirectories: import('@tangyuan/contracts').UnclaimedDirectory[]
+  }> {
+    const readResult = await this.readPersistedConfiguration()
+    const config = readResult.config
+
+    const agents = await this.buildAgentSummaries(config)
+
+    // 扫描 agents 目录，发现磁盘上有但配置中没有的目录
+    const agentsDir = dirname(
+      this.resolveAgentHomePath(TANGYUAN_DEFAULT_AGENT_ID),
+    )
+    const unclaimedDirectories: import('@tangyuan/contracts').UnclaimedDirectory[] =
+      []
+
+    try {
+      const entries = await readdir(agentsDir, { withFileTypes: true })
+      const configAgentIds = new Set(
+        config?.agents ? Object.keys(config.agents) : [],
+      )
+
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue
+        const agentId = entry.name
+
+        // 跳过 tangyuan（始终在配置中）
+        if (agentId === TANGYUAN_DEFAULT_AGENT_ID) continue
+        // 跳过已有配置条的目录
+        if (configAgentIds.has(agentId)) continue
+
+        const homePath = this.resolveAgentHomePath(agentId)
+        const hasSoul = await this.pathExists(join(homePath, 'soul.md'))
+
+        unclaimedDirectories.push({
+          agentId,
+          homePath,
+          hasSoul,
+        })
+      }
+    } catch {
+      // 目录不存在，没有未归属项
+    }
+
+    return { agents, unclaimedDirectories }
+  }
+
+  /**
+   * 认领一个未归属的 Agent 目录，为其创建配置条目。
+   *
+   * @param agentId - 目录名称（作为 agentId）。
+   * @param displayName - Agent 展示名称。
+   * @returns 认领后的 AgentSummary。
+   * @throws 当目录不存在或配置保存失败时，Promise 会 reject。
+   */
+  async claimAgentDirectory(
+    agentId: string,
+    displayName: string,
+  ): Promise<AgentSummary> {
+    const homePath = this.resolveAgentHomePath(agentId)
+    const soulExists = await this.pathExists(join(homePath, 'soul.md'))
+
+    if (!soulExists) {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `目录 ${agentId} 不存在或缺少 soul.md，无法认领。`,
+        recoverable: true,
+      })
+    }
+
+    const readResult = await this.readPersistedConfiguration()
+    const config = readResult.config ?? this.createDefaultInternalConfig()
+
+    // 继承 tangyuan 的 Provider/Model
+    const tangyuanConfig = this.extractAgentRuntimeConfig(
+      config,
+      TANGYUAN_DEFAULT_AGENT_ID,
+    )
+
+    config.agents[agentId] = {
+      displayName,
+      defaultProviderId: tangyuanConfig?.providerId ?? null,
+      defaultModelId: tangyuanConfig?.modelId ?? null,
+      status: 'active',
+      archivedAt: null,
+    }
+    await this.writePersistedConfiguration(config)
+
+    const summary: AgentSummary = {
+      agentId,
+      displayName,
+      status: 'active',
+      defaultProviderId: tangyuanConfig?.providerId ?? null,
+      defaultModelId: tangyuanConfig?.modelId ?? null,
+      homePath,
+      archivedAt: null,
+      directoryStatus: 'healthy',
+    }
+
+    return summary
+  }
+
+  /**
+   * 按固定模板重建默认汤圆的目录结构。
+   *
+   * @returns 重建后的 AgentSummary。
+   * @throws 当目录创建或文件写入失败时，Promise 会 reject。
+   */
+  async rebuildTangyuanHome(): Promise<AgentSummary> {
+    const homePath = this.resolveAgentHomePath(TANGYUAN_DEFAULT_AGENT_ID)
+    const now = this.now()
+
+    // 确保目录结构存在
+    await mkdir(homePath, { recursive: true })
+    await Promise.all([
+      mkdir(join(homePath, 'soul.history'), { recursive: true }),
+      mkdir(join(homePath, 'user.history'), { recursive: true }),
+      mkdir(join(homePath, 'memory'), { recursive: true }),
+      mkdir(join(homePath, 'skills'), { recursive: true }),
+      mkdir(join(homePath, 'workspace'), { recursive: true }),
+    ])
+
+    // 写出模板 soul.md
+    const soulContent = [
+      '# 汤圆',
+      '',
+      `重建时间：${now}`,
+      '',
+      '## 身份',
+      '汤圆是默认 Agent，负责凭据管理和创建其他 Agent。',
+      '',
+      '## 职责',
+      '- 帮助用户配置模型服务凭据',
+      '- 通过对话创建和管理其他 Agent',
+      '- 维护共享用户资料',
+      '',
+      '## 规则',
+      '遵循用户指令，在执行危险操作前先确认。',
+      '使用中文回复，简洁清晰。',
+      '',
+    ].join('\n')
+    await writeFile(join(homePath, 'soul.md'), soulContent, 'utf8')
+
+    const readResult = await this.readPersistedConfiguration()
+    const config = readResult.config
+
+    const summary: AgentSummary = {
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      displayName:
+        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.displayName ?? '汤圆',
+      status: config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.status ?? 'active',
+      defaultProviderId:
+        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.defaultProviderId ?? null,
+      defaultModelId:
+        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.defaultModelId ?? null,
+      homePath,
+      archivedAt: config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.archivedAt ?? null,
+      directoryStatus: 'healthy',
+    }
+
+    return summary
+  }
+
+  /**
+   * 读取指定 Agent 的 soul 内容。
+   *
+   * @param agentId - Agent 标识。
+   * @returns Agent 的 soul 内容和更新时间。
+   * @throws 当文件读取失败时，Promise 会 reject。
+   */
+  async getSoul(agentId: AgentId): Promise<SoulContent> {
+    const soulPath = this.resolveSoulPath(agentId)
+
+    // 确保 agent home 目录和 soul 文件存在
+    await this.ensureAgentHome(agentId)
+
+    const content = await this.safeReadFile(soulPath)
+    const updatedAt = (await this.getMtimeIso(soulPath)) ?? this.now()
+
+    return { agentId, content, updatedAt }
+  }
+
+  /**
+   * 读取共享 user profile 内容。
+   *
+   * @returns 共享 user profile 内容和更新时间。
+   * @throws 当文件读取失败时，Promise 会 reject。
+   */
+  async getUserProfile(): Promise<UserProfileContent> {
+    const userPath = this.resolveUserProfilePath()
+
+    // 若共享 user.md 不存在，尝试从旧路径迁移
+    if (!(await this.pathExists(userPath))) {
+      await this.migrateLegacyUserProfile()
+    }
+
+    // 确保共享 profile 目录和文件存在
+    await mkdir(this.resolveSharedProfilePath(), { recursive: true })
+    await mkdir(this.resolveUserHistoryPath(), { recursive: true })
+
+    if (!(await this.pathExists(userPath))) {
+      await writeFile(userPath, '', 'utf8')
+    }
+
+    const content = await this.safeReadFile(userPath)
+    const updatedAt = (await this.getMtimeIso(userPath)) ?? this.now()
+
+    return { content, updatedAt }
+  }
+
+  /**
+   * 列出指定 Agent 实际生效的 Skill 列表（含冲突诊断）。
+   *
+   * 使用 Pi Agent DefaultResourceLoader 加载两层目录，
+   * Agent 专属目录排在共享目录前以实现同名覆盖。
+   *
+   * @param agentId - Agent 标识。
+   * @returns Skill 摘要列表，专属覆盖共享后的最终结果。
+   * @throws 当 Pi SDK ResourceLoader 加载失败时，Promise 会 reject。
+   */
+  async listAgentSkills(agentId: AgentId): Promise<SkillSummary[]> {
+    const agentSkillsPath = this.resolveAgentSkillsPath(agentId)
+    const sharedSkillsPath = this.resolveSharedSkillsPath()
+
+    // 确保目录存在
+    await mkdir(agentSkillsPath, { recursive: true })
+    await mkdir(sharedSkillsPath, { recursive: true })
+
+    const { DefaultResourceLoader } =
+      await import('@earendil-works/pi-coding-agent')
+
+    const loader = new DefaultResourceLoader({
+      cwd: this.resolveAgentWorkspacePath(agentId),
+      agentDir: this.resolveAgentHomePath(agentId),
+      noSkills: true,
+      additionalSkillPaths: [agentSkillsPath, sharedSkillsPath],
+    })
+
+    await loader.reload()
+
+    const { skills, diagnostics } = loader.getSkills()
+
+    return this.mapSkillsToSummaries(skills, diagnostics)
+  }
+
+  /**
+   * 列出共享 Skill 列表。
+   *
+   * @returns 共享 Skill 摘要列表。
+   * @throws 当 Pi SDK ResourceLoader 加载失败时，Promise 会 reject。
+   */
+  async listSharedSkills(): Promise<SkillSummary[]> {
+    const sharedSkillsPath = this.resolveSharedSkillsPath()
+
+    await mkdir(sharedSkillsPath, { recursive: true })
+
+    const { DefaultResourceLoader } =
+      await import('@earendil-works/pi-coding-agent')
+
+    const loader = new DefaultResourceLoader({
+      cwd: this.resolveAgentWorkspacePath(TANGYUAN_DEFAULT_AGENT_ID),
+      agentDir: this.resolveAgentHomePath(),
+      noSkills: true,
+      additionalSkillPaths: [sharedSkillsPath],
+    })
+
+    await loader.reload()
+
+    const { skills, diagnostics } = loader.getSkills()
+
+    return this.mapSkillsToSummaries(skills, diagnostics)
+  }
+
+  /**
+   * 将 Pi SDK Skill 和诊断信息映射为汤圆的 SkillSummary 列表。
+   *
+   * @param skills - Pi SDK 解析出的 Skill 列表（已按 first-wins 排序）。
+   * @param diagnostics - Pi SDK 的加载诊断信息（包含冲突）。
+   * @returns 带有来源和冲突标注的 SkillSummary 列表。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private mapSkillsToSummaries(
+    skills: Array<{
+      name: string
+      description: string
+      filePath: string
+      baseDir: string
+      sourceInfo?: { path: string; source: string }
+      disableModelInvocation?: boolean
+    }>,
+    diagnostics: Array<{
+      type: string
+      message: string
+      path?: string
+      collision?: {
+        resourceType: string
+        name: string
+        winnerPath: string
+        loserPath: string
+      }
+    }>,
+  ): SkillSummary[] {
+    const agentSkillsPath = this.resolveAgentSkillsPath(
+      TANGYUAN_DEFAULT_AGENT_ID,
+    )
+    const sharedSkillsPath = this.resolveSharedSkillsPath()
+
+    // 从 diagnostics 中提取冲突信息（按 loserPath 索引）
+    const collisionsByLoserPath = new Map<
+      string,
+      { overriddenPath: string; overriddenSource: 'shared' | 'agent' }
+    >()
+    for (const diagnostic of diagnostics) {
+      if (
+        diagnostic.type === 'collision' &&
+        diagnostic.collision?.resourceType === 'skill'
+      ) {
+        const loserSource = diagnostic.collision.loserPath.startsWith(
+          agentSkillsPath.replace(TANGYUAN_DEFAULT_AGENT_ID, ''),
+        )
+          ? 'agent'
+          : diagnostic.collision.loserPath.startsWith(sharedSkillsPath)
+            ? 'shared'
+            : 'agent'
+        collisionsByLoserPath.set(diagnostic.collision.loserPath, {
+          overriddenPath: diagnostic.collision.winnerPath,
+          overriddenSource: loserSource,
+        })
+      }
+    }
+
+    return skills.map((skill) => {
+      const source: 'shared' | 'agent' = skill.filePath.startsWith(
+        agentSkillsPath.replace(TANGYUAN_DEFAULT_AGENT_ID, ''),
+      )
+        ? 'agent'
+        : skill.filePath.startsWith(sharedSkillsPath)
+          ? 'shared'
+          : 'agent'
+
+      const conflict = collisionsByLoserPath.get(skill.filePath)
+
+      const summary: SkillSummary = {
+        name: skill.name,
+        description: skill.description ?? '',
+        source,
+        path: skill.filePath,
+        hasScripts: false, // Pi SDK Skill 类型不直接暴露此信息，MVP 默认 false
+      }
+
+      if (conflict) {
+        summary.conflict = {
+          overriddenPath: conflict.overriddenPath,
+          overriddenSource: conflict.overriddenSource,
+        }
+      }
+
+      return summary
+    })
+  }
+
+  /**
+   * 重新加载指定 Agent 所有活跃 session 的 ResourceLoader。
+   *
+   * 用于 Agent 专属 Skill 变更后刷新该 Agent 的会话。
+   *
+   * @param agentId - Agent 标识。
+   * @returns 无返回值。
+   * @throws 当某个 session 的 reload 失败时，Promise 会 reject。
+   */
+  async reloadAgentSessions(agentId: string): Promise<void> {
+    const promises: Promise<void>[] = []
+
+    for (const [sessionId, handle] of this.sessionHandles) {
+      const indexEntry = this.sessionIndex.get(sessionId)
+      if (indexEntry?.agentId === agentId && handle.reload) {
+        promises.push(handle.reload())
+      }
+    }
+
+    await Promise.all(promises)
+  }
+
+  /**
+   * 重新加载全部活跃 session 的 ResourceLoader。
+   *
+   * 用于共享 Skill 变更后刷新所有 Agent 的会话。
+   *
+   * @returns 无返回值。
+   * @throws 当某个 session 的 reload 失败时，Promise 会 reject。
+   */
+  async reloadAllSessions(): Promise<void> {
+    const promises: Promise<void>[] = []
+
+    for (const handle of this.sessionHandles.values()) {
+      if (handle.reload) {
+        promises.push(handle.reload())
+      }
+    }
+
+    await Promise.all(promises)
+  }
+
+  /**
+   * 安装或更新 Skill（含 SKILL.md 校验和原子写入）。
+   *
+   * @param params - Skill 操作参数。
+   * @returns 更新后的 Skill 摘要列表。
+   * @throws 当校验失败或文件操作失败时，Promise 会 reject。
+   */
+  async installSkill(params: SkillOperationParams): Promise<SkillSummary[]> {
+    const sourceDir = params.skillDirPath
+    if (!sourceDir) {
+      throw new Error('安装 Skill 需要提供 skillDirPath。')
+    }
+
+    // 校验源目录
+    await this.validateSkillDirectory(sourceDir, params.skillName)
+
+    const targetDir = this.resolveSkillTargetDir(
+      params.source,
+      params.targetAgentId,
+    )
+
+    // 确保目标目录存在
+    await mkdir(targetDir, { recursive: true })
+
+    const skillTargetDir = join(targetDir, params.skillName)
+
+    // 使用安全临时目录进行原子替换
+    const { mkdtemp } = await import('node:fs/promises')
+    const { tmpdir } = await import('node:os')
+
+    const tempRoot = join(tmpdir(), 'tangyuan-skill-')
+    const tempDir = await mkdtemp(tempRoot)
+    const tempSkillDir = join(tempDir, params.skillName)
+
+    try {
+      // 复制源内容到临时目录
+      await this.copyDirectoryContents(sourceDir, tempSkillDir)
+
+      // 原子 rename 到目标位置
+      // 如果已存在旧版本，先移除
+      try {
+        await rename(
+          skillTargetDir,
+          join(
+            targetDir,
+            `.tangyuan-trash`,
+            `${params.skillName}-${this.now().replace(/:/g, '-')}`,
+          ),
+        )
+      } catch {
+        // 目录不存在则忽略
+      }
+
+      // 确保 trash 目录存在
+      await mkdir(join(targetDir, '.tangyuan-trash'), { recursive: true })
+
+      await rename(tempSkillDir, skillTargetDir)
+    } catch (error) {
+      // 清理临时目录
+      try {
+        await import('node:fs/promises').then((fs) =>
+          fs.rm(tempDir, { recursive: true, force: true }),
+        )
+      } catch {
+        // 清理失败忽略
+      }
+      throw error
+    }
+
+    // 更新安装记录
+    await this.recordSkillInstall(params)
+
+    // 返回更新后的列表
+    if (params.source === 'shared') {
+      return this.listSharedSkills()
+    }
+    return this.listAgentSkills(params.targetAgentId ?? params.agentId)
+  }
+
+  /**
+   * 删除 Skill（含备份到 trash）。
+   *
+   * @param params - Skill 操作参数。
+   * @returns 更新后的 Skill 摘要列表。
+   * @throws 当文件操作失败时，Promise 会 reject。
+   */
+  async deleteSkill(params: SkillOperationParams): Promise<SkillSummary[]> {
+    const targetDir = this.resolveSkillTargetDir(
+      params.source,
+      params.targetAgentId,
+    )
+    const skillDir = join(targetDir, params.skillName)
+
+    // 检查目录是否存在
+    try {
+      await stat(skillDir)
+    } catch {
+      throw new Error(`Skill "${params.skillName}" 不存在于 ${targetDir}`)
+    }
+
+    // 移动到 trash 目录（保留可恢复信息）
+    const trashDir = join(targetDir, '.tangyuan-trash')
+    await mkdir(trashDir, { recursive: true })
+
+    const trashName = `${params.skillName}-${this.now().replace(/:/g, '-')}`
+    const trashPath = join(trashDir, trashName)
+
+    await rename(skillDir, trashPath)
+
+    // 更新安装记录
+    await this.markSkillDeleted(params)
+
+    // 返回更新后的列表
+    if (params.source === 'shared') {
+      return this.listSharedSkills()
+    }
+    return this.listAgentSkills(params.targetAgentId ?? params.agentId)
+  }
+
+  /**
+   * 读取 Skill 安装记录。
+   *
+   * @returns 安装记录列表。
+   * @throws 当读取失败时，Promise 会 reject。
+   */
+  async getSkillInstallRecords(): Promise<SkillInstallRecord[]> {
+    const allRecords: SkillInstallRecord[] = []
+
+    // 读取共享 Skill 记录
+    allRecords.push(...(await this.readInstallRecords('shared')))
+
+    // 读取所有 Agent 的专属 Skill 记录
+    const agentsDir = join(dirname(this.resolveAgentHomePath()))
+    try {
+      const agentDirs = await readdir(agentsDir)
+      for (const agentId of agentDirs) {
+        const agentRecords = await this.readInstallRecords('agent', agentId)
+        allRecords.push(...agentRecords)
+      }
+    } catch {
+      // agents 目录不存在时忽略
+    }
+
+    return allRecords
+  }
+
+  /**
+   * 解析 Skill 安装的目标目录。
+   *
+   * @param source - 共享或专属。
+   * @param agentId - 专属时的 Agent 标识。
+   * @returns 目标目录绝对路径。
+   */
+  private resolveSkillTargetDir(
+    source: 'shared' | 'agent',
+    agentId?: string,
+  ): string {
+    if (source === 'shared') {
+      return this.resolveSharedSkillsPath()
+    }
+
+    if (!agentId) {
+      throw new Error('专属 Skill 操作需要提供 agentId。')
+    }
+
+    return this.resolveAgentSkillsPath(agentId)
+  }
+
+  /**
+   * 校验 Skill 源目录是否包含合法的 SKILL.md。
+   *
+   * @param dirPath - 源目录路径。
+   * @param expectedName - 期望的 Skill 名称。
+   * @returns 无返回值。
+   * @throws 当 SKILL.md 缺失或缺少 description 时抛出错误。
+   */
+  private async validateSkillDirectory(
+    dirPath: string,
+    expectedName: string,
+  ): Promise<void> {
+    const skillMdPath = join(dirPath, 'SKILL.md')
+
+    try {
+      await access(skillMdPath, fsConstants.R_OK)
+    } catch {
+      throw new Error(`Skill 目录缺少 SKILL.md 文件：${skillMdPath}`)
+    }
+
+    const content = await readFile(skillMdPath, 'utf8')
+
+    // 校验 description 字段存在（v3 frontmatter 格式）
+    const descriptionMatch = content.match(/^description:\s*(.+)$/m)
+    if (!descriptionMatch || !descriptionMatch[1]?.trim()) {
+      throw new Error(
+        `Skill "${expectedName}" 的 SKILL.md 缺少 description 字段，拒绝安装。`,
+      )
+    }
+  }
+
+  /**
+   * 递归复制目录内容。
+   *
+   * @param sourceDir - 源目录。
+   * @param destDir - 目标目录。
+   * @returns 无返回值。
+   * @throws 当复制失败时，Promise 会 reject。
+   */
+  private async copyDirectoryContents(
+    sourceDir: string,
+    destDir: string,
+  ): Promise<void> {
+    await mkdir(destDir, { recursive: true })
+
+    const entries = await readdir(sourceDir, { withFileTypes: true })
+
+    for (const entry of entries) {
+      const srcPath = join(sourceDir, entry.name)
+      const destPath = join(destDir, entry.name)
+
+      if (entry.isDirectory()) {
+        await this.copyDirectoryContents(srcPath, destPath)
+      } else {
+        await copyFile(srcPath, destPath)
+      }
+    }
+  }
+
+  /**
+   * 读取指定来源的 Skill 安装记录。
+   *
+   * @param source - 共享或专属。
+   * @param agentId - 专属时的 Agent 标识。
+   * @returns 安装记录列表。
+   */
+  private async readInstallRecords(
+    source: 'shared' | 'agent',
+    agentId?: string,
+  ): Promise<SkillInstallRecord[]> {
+    const recordsPath = this.resolveInstallRecordsPath(source, agentId)
+
+    try {
+      const content = await readFile(recordsPath, 'utf8')
+      const data = JSON.parse(content)
+
+      if (data && Array.isArray(data.skills)) {
+        return data.skills as SkillInstallRecord[]
+      }
+
+      return []
+    } catch {
+      return []
+    }
+  }
+
+  /**
+   * 写入 Skill 安装记录（追加或更新）。
+   *
+   * @param params - Skill 操作参数。
+   * @returns 无返回值。
+   * @throws 当写入失败时，Promise 会 reject。
+   */
+  private async recordSkillInstall(
+    params: SkillOperationParams,
+  ): Promise<void> {
+    const recordsPath = this.resolveInstallRecordsPath(
+      params.source,
+      params.targetAgentId,
+    )
+    const existing = await this.readInstallRecords(
+      params.source,
+      params.targetAgentId,
+    )
+
+    const now = this.now()
+    const existingIndex = existing.findIndex(
+      (record) => record.skillName === params.skillName,
+    )
+
+    const record: SkillInstallRecord = {
+      skillName: params.skillName,
+      source: params.source,
+      ...(params.targetAgentId !== undefined
+        ? { targetAgentId: params.targetAgentId }
+        : {}),
+      installedAt:
+        existingIndex >= 0
+          ? (existing[existingIndex] as SkillInstallRecord).installedAt
+          : now,
+      updatedAt: now,
+      status: 'active',
+    }
+
+    if (existingIndex >= 0) {
+      existing[existingIndex] = record
+    } else {
+      existing.push(record)
+    }
+
+    await mkdir(dirname(recordsPath), { recursive: true })
+    await writeFile(
+      recordsPath,
+      JSON.stringify({ skills: existing }, null, 2),
+      'utf8',
+    )
+  }
+
+  /**
+   * 标记 Skill 为已删除。
+   *
+   * @param params - Skill 操作参数。
+   * @returns 无返回值。
+   * @throws 当写入失败时，Promise 会 reject。
+   */
+  private async markSkillDeleted(params: SkillOperationParams): Promise<void> {
+    const recordsPath = this.resolveInstallRecordsPath(
+      params.source,
+      params.targetAgentId,
+    )
+    const existing = await this.readInstallRecords(
+      params.source,
+      params.targetAgentId,
+    )
+
+    const existingIndex = existing.findIndex(
+      (record) => record.skillName === params.skillName,
+    )
+
+    if (existingIndex >= 0) {
+      const current = existing[existingIndex] as SkillInstallRecord
+      existing[existingIndex] = {
+        skillName: current.skillName,
+        source: current.source,
+        ...(current.targetAgentId !== undefined
+          ? { targetAgentId: current.targetAgentId }
+          : {}),
+        installedAt: current.installedAt,
+        updatedAt: this.now(),
+        status: 'deleted',
+      }
+    } else {
+      existing.push({
+        skillName: params.skillName,
+        source: params.source,
+        ...(params.targetAgentId !== undefined
+          ? { targetAgentId: params.targetAgentId }
+          : {}),
+        installedAt: this.now(),
+        updatedAt: this.now(),
+        status: 'deleted',
+      } as SkillInstallRecord)
+    }
+
+    await mkdir(dirname(recordsPath), { recursive: true })
+    await writeFile(
+      recordsPath,
+      JSON.stringify({ skills: existing }, null, 2),
+      'utf8',
+    )
+  }
+
+  /**
+   * 解析 Skill 安装记录文件路径。
+   *
+   * @param source - 共享或专属。
+   * @param agentId - 专属时的 Agent 标识。
+   * @returns 记录文件绝对路径。
+   */
+  private resolveInstallRecordsPath(
+    source: 'shared' | 'agent',
+    agentId?: string,
+  ): string {
+    if (source === 'shared') {
+      return join(this.resolveSharedSkillsPath(), '.tangyuan-records.json')
+    }
+
+    if (!agentId) {
+      throw new Error('Agent 专属 Skill 记录需要提供 agentId。')
+    }
+
+    return join(this.resolveAgentSkillsPath(agentId), '.tangyuan-records.json')
+  }
+
+  /**
+   * 更新指定 Agent 的 soul（含权限校验和备份验证）。
+   *
+   * @param agentId - 目标 Agent 标识。
+   * @param content - 新 soul 内容。
+   * @param requestedByAgentId - 发起更新请求的 Agent 标识。
+   * @returns profile 维护结果。
+   * @throws 当文件操作失败时，Promise 会 reject。
+   */
+  async updateSoul(
+    agentId: AgentId,
+    content: string,
+    requestedByAgentId: AgentId,
+  ): Promise<ProfileMaintenanceResult> {
+    // 权限校验：Agent 只能更新自己的 soul
+    // 汤圆可以在创建时写入其他 Agent 的初始 soul（由 createAgent 调用）
+    if (
+      agentId !== requestedByAgentId &&
+      requestedByAgentId !== TANGYUAN_DEFAULT_AGENT_ID
+    ) {
+      return {
+        target: 'soul',
+        success: false,
+        reason: `Agent "${requestedByAgentId}" 无权修改 Agent "${agentId}" 的 soul。只有 Agent 自身或汤圆可以修改。`,
+      }
+    }
+
+    const soulPath = this.resolveSoulPath(agentId)
+    const historyPath = this.resolveSoulHistoryPath(agentId)
+
+    // 确保目录存在
+    await this.ensureAgentHome(agentId)
+
+    // 读取更新前内容
+    const previousContent = (await this.pathExists(soulPath))
+      ? await this.safeReadFile(soulPath)
+      : ''
+    const previousHistoryFiles = await this.readDirectoryFileSet(historyPath)
+
+    // 如果内容没变，跳过
+    if (previousContent === content) {
+      return { target: 'soul', success: true }
+    }
+
+    // 检查是否已备份：非空内容需要至少一个备份文件
+    const hasBackup = previousContent === '' || previousHistoryFiles.size > 0
+
+    if (!hasBackup) {
+      return {
+        target: 'soul',
+        success: false,
+        reason: `更新 soul 失败：缺少更新前备份，请先将旧内容备份到 soul.history/ 目录。`,
+      }
+    }
+
+    // 敏感信息过滤
+    const readResult = await this.readPersistedConfiguration()
+    const runtimeConfig = readResult.config
+      ? this.extractAgentRuntimeConfig(readResult.config, agentId)
+      : null
+    const redactedContent = this.redactSensitiveProfileContent(
+      content,
+      runtimeConfig?.apiKey ?? null,
+    )
+
+    // 写入
+    await writeFile(soulPath, redactedContent, 'utf8')
+
+    // 广播事件
+    const updatedAt = (await this.getMtimeIso(soulPath)) ?? this.now()
+    this.emitProfileUpdated('soul', updatedAt)
+
+    return { target: 'soul', success: true }
+  }
+
+  /**
+   * 更新共享 user profile（含备份验证和敏感信息过滤）。
+   *
+   * @param content - 新 user profile 内容。
+   * @returns profile 维护结果。
+   * @throws 当文件操作失败时，Promise 会 reject。
+   */
+  async updateUserProfile(content: string): Promise<ProfileMaintenanceResult> {
+    const userPath = this.resolveUserProfilePath()
+    const historyPath = this.resolveUserHistoryPath()
+
+    // 确保目录存在
+    await mkdir(this.resolveSharedProfilePath(), { recursive: true })
+    await mkdir(historyPath, { recursive: true })
+
+    // 若共享 user.md 不存在，尝试从旧路径迁移
+    if (!(await this.pathExists(userPath))) {
+      await this.migrateLegacyUserProfile()
+    }
+
+    // 读取更新前内容
+    const previousContent = (await this.pathExists(userPath))
+      ? await this.safeReadFile(userPath)
+      : ''
+    const previousHistoryFiles = await this.readDirectoryFileSet(historyPath)
+
+    // 如果内容没变，跳过
+    if (previousContent === content) {
+      return { target: 'user', success: true }
+    }
+
+    // 检查是否已备份：非空内容需要至少一个备份文件
+    const hasBackup = previousContent === '' || previousHistoryFiles.size > 0
+
+    if (!hasBackup) {
+      return {
+        target: 'user',
+        success: false,
+        reason: `更新 user profile 失败：缺少更新前备份，请先将旧内容备份到 user.history/ 目录。`,
+      }
+    }
+
+    // 敏感信息过滤
+    const readResult = await this.readPersistedConfiguration()
+    const runtimeConfig = readResult.config
+      ? this.extractAgentRuntimeConfig(
+          readResult.config,
+          TANGYUAN_DEFAULT_AGENT_ID,
+        )
+      : null
+    const redactedContent = this.redactSensitiveProfileContent(
+      content,
+      runtimeConfig?.apiKey ?? null,
+    )
+
+    // 写入
+    await writeFile(userPath, redactedContent, 'utf8')
+
+    // 广播事件
+    const updatedAt = (await this.getMtimeIso(userPath)) ?? this.now()
+    this.emitProfileUpdated('user', updatedAt)
+
+    return { target: 'user', success: true }
+  }
+
+  /**
+   * 读取当前 Session 的模型和 Thinking Level 信息。
+   *
+   * @param request - Agent 和 Session 标识。
+   * @returns Session 模型信息。
+   * @throws 当 Session 不存在或读取失败时，Promise 会 reject。
+   */
+  async getSessionModelInfo(
+    request: GetSessionModelInfoRequest,
+  ): Promise<SessionModelInfo> {
+    this.assertKnownSession(request.sessionId, request.agentId)
+    const handle = await this.ensureSessionHandle(request.sessionId)
+
+    if (!handle.getModelInfo) {
+      throw new AgentRuntimeError({
+        code: 'driver-unavailable',
+        message: '当前会话不支持读取模型信息。',
+        recoverable: true,
+      })
+    }
+
+    return handle.getModelInfo()
+  }
+
+  /**
+   * 切换当前 Session 的 Provider 和 Model。
+   *
+   * @param request - Agent、Session 标识和目标 Provider/Model。
+   * @returns 切换后的模型信息。
+   * @throws 当 Session 不存在或模型切换失败时，Promise 会 reject。
+   */
+  async setSessionModel(
+    request: SetSessionModelRequest,
+  ): Promise<SessionModelInfo> {
+    this.assertKnownSession(request.sessionId, request.agentId)
+    const handle = await this.ensureSessionHandle(request.sessionId)
+
+    if (!handle.setModel) {
+      throw new AgentRuntimeError({
+        code: 'driver-unavailable',
+        message: '当前会话不支持切换模型。',
+        recoverable: true,
+      })
+    }
+
+    // 读取目标 Provider 的 API Key 用于跨 Provider 切换
+    const indexEntry = this.getKnownSessionIndexEntry(request.sessionId)
+    const configuration = await this.readRequiredRuntimeConfiguration(
+      indexEntry.agentId,
+    )
+    const targetApiKey =
+      request.providerId !== configuration.providerId
+        ? await this.readProviderApiKey(request.providerId)
+        : undefined
+
+    await handle.setModel(request.providerId, request.modelId, targetApiKey)
+    await this.updateSessionIndexEntry(request.sessionId, {
+      provider: request.providerId,
+      model: request.modelId,
+    })
+
+    if (!handle.getModelInfo) {
+      throw new AgentRuntimeError({
+        code: 'driver-unavailable',
+        message: '当前会话不支持读取模型信息。',
+        recoverable: true,
+      })
+    }
+
+    return handle.getModelInfo()
+  }
+
+  /**
+   * 切换当前 Session 的 Thinking Level。
+   *
+   * @param request - Agent、Session 标识和目标 Thinking Level。
+   * @returns 切换后的模型信息。
+   * @throws 当 Session 不存在或不支持 Thinking 时，Promise 会 reject。
+   */
+  async setSessionThinkingLevel(
+    request: SetSessionThinkingLevelRequest,
+  ): Promise<SessionModelInfo> {
+    this.assertKnownSession(request.sessionId, request.agentId)
+    const handle = await this.ensureSessionHandle(request.sessionId)
+
+    if (!handle.setThinkingLevel) {
+      throw new AgentRuntimeError({
+        code: 'driver-unavailable',
+        message: '当前会话不支持切换 Thinking Level。',
+        recoverable: true,
+      })
+    }
+
+    await handle.setThinkingLevel(request.level)
+
+    if (!handle.getModelInfo) {
+      throw new AgentRuntimeError({
+        code: 'driver-unavailable',
+        message: '当前会话不支持读取模型信息。',
+        recoverable: true,
+      })
+    }
+
+    return handle.getModelInfo()
   }
 
   /**
@@ -1169,13 +2931,15 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
       // 检测是否为 v1 格式（无 schemaVersion）
       if (typeof parsedConfig.schemaVersion !== 'number') {
-        return this.migrateAndReadConfig(parsedConfig as unknown as PersistedConfigurationV1)
+        return this.migrateAndReadConfig(
+          parsedConfig as unknown as PersistedConfigurationV1,
+        )
       }
 
       // v2 格式：校验 schema
       const parseResult = persistedConfigurationV2Schema.safeParse(parsedConfig)
       if (!parseResult.success) {
-    return {
+        return {
           config: null,
           recoveryState: 'corrupted',
           hasBackup: await this.hasBackupFile(),
@@ -1253,7 +3017,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @returns 解密后的 Provider、模型和 API Key。
    * @throws 当配置不存在或完整性问题时抛出 AgentRuntimeError。
    */
-  private async readRequiredRuntimeConfiguration(): Promise<RuntimeConfiguration> {
+  private async readRequiredRuntimeConfiguration(
+    agentId: string = TANGYUAN_DEFAULT_AGENT_ID,
+  ): Promise<RuntimeConfiguration> {
     const readResult = await this.readPersistedConfiguration()
 
     if (readResult.recoveryState !== 'ok') {
@@ -1275,14 +3041,13 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
     const runtimeConfig = this.extractAgentRuntimeConfig(
       readResult.config,
-      TANGYUAN_DEFAULT_AGENT_ID,
+      agentId,
     )
 
     if (!runtimeConfig) {
       throw new AgentRuntimeError({
         code: 'configuration-missing',
-        message:
-          '创建会话前，请先配置 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。',
+        message: `Agent「${agentId}」尚未配置 Provider 和 Model，请先在控制台中为该 Agent 设置默认模型。`,
         recoverable: true,
       })
     }
@@ -1322,7 +3087,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     // 原子写入
     await writeFile(tmpPath, serialized, 'utf8')
     await rename(tmpPath, configPath)
-
   }
 
   /**
@@ -1433,6 +3197,21 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       modelId: agent.defaultModelId,
       apiKey: provider.apiKey,
     }
+  }
+
+  /**
+   * 从持久化配置中读取指定 Provider 的 API Key。
+   *
+   * @param providerId - Provider 标识。
+   * @returns 明文 API Key；Provider 未配置凭据时返回 undefined。
+   * @throws 当配置文件读取或解密失败时，Promise 会 reject。
+   */
+  private async readProviderApiKey(
+    providerId: string,
+  ): Promise<string | undefined> {
+    const readResult = await this.readPersistedConfiguration()
+    const provider = readResult.config?.providers[providerId]
+    return provider?.apiKey
   }
 
   /**
@@ -1584,14 +3363,16 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         rm(`${configPath}.tmp`, { force: true }),
       ),
     ])
-
   }
 
   /**
-   * 读取本地会话索引；索引不存在时尝试从 Pi SDK 原生 session 重建。
+   * 读取本地会话索引；索引不存在或损坏时尝试从 Pi SDK 原生 session 重建。
+   *
+   * 孤儿清理（Pi session 文件已不存在但索引中仍有记录）在重建时自动完成 ——
+   * 重建只会包含 Pi SDK 返回的现有 session。
    *
    * @returns 当前可展示的会话索引条目。
-   * @throws 当索引 JSON 损坏或 SDK 列表读取失败时，Promise 会 reject。
+   * @throws 当索引 JSON 损坏且 SDK 列表读取也失败时，Promise 会 reject。
    */
   private async loadSessionIndex(): Promise<PersistedSessionIndexEntry[]> {
     const indexPath = this.resolveSessionIndexPath()
@@ -1612,12 +3393,17 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         return this.rebuildSessionIndexFromSdk()
       }
 
-      throw error
+      // 索引 JSON 损坏时也触发重建
+      return this.rebuildSessionIndexFromSdk()
     }
   }
 
   /**
-   * 在本地索引缺失时，从 Pi SDK 原生 session 列表重建基础索引。
+   * 在本地索引缺失或损坏时，扫描所有 Agent 的 Pi SDK 原生 session 重建全局索引。
+   *
+   * Pi session 是会话的唯一真相来源；title、时间戳等字段派生自 Pi session 数据。
+   * 重建时会尝试读取旧索引，为仍然存在的 session 保留 Tangyuan 扩展数据
+   * （lastMessagePreview、status）；旧索引中存在但 Pi session 已删除的条目会被清理。
    *
    * @returns 从 SDK 恢复出的索引条目。
    * @throws 当运行时配置或 SDK session 列表读取失败时，Promise 会 reject。
@@ -1626,36 +3412,87 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     PersistedSessionIndexEntry[]
   > {
     const readResult = await this.readPersistedConfiguration()
-    const runtimeConfig = readResult.config
-      ? this.extractAgentRuntimeConfig(readResult.config, TANGYUAN_DEFAULT_AGENT_ID)
-      : null
 
-    if (!runtimeConfig) {
+    if (!readResult.config) {
       this.replaceSessionIndex([])
+      await this.writeSessionIndex()
       return []
     }
 
-    const sdkSessions = await this.gateway.listSessions({
-      cwd: this.resolveAgentHomePath(),
-      sessionDir: this.resolveSdkSessionDir(),
-    })
-    const entries = sdkSessions.map((session) => ({
-      sessionId: session.sessionId,
-      sdkSessionFile: session.sdkSessionFile,
-      title: session.title?.trim() || session.sessionId,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
-      provider: runtimeConfig.providerId,
-      model: runtimeConfig.modelId,
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
-      lastMessagePreview: '',
-      status: 'idle' as const,
-    }))
+    // 读取旧索引以保留扩展数据
+    const oldEntries = await this.tryReadOldIndex()
+    const allEntries: PersistedSessionIndexEntry[] = []
+    const agents = Object.entries(readResult.config.agents).filter(
+      ([, agentConfig]) => agentConfig.status === 'active',
+    )
 
-    this.replaceSessionIndex(entries)
+    for (const [agentId] of agents) {
+      const runtimeConfig = this.extractAgentRuntimeConfig(
+        readResult.config,
+        agentId,
+      )
+      const cwd =
+        agentId === TANGYUAN_DEFAULT_AGENT_ID
+          ? this.resolveAgentHomePath()
+          : this.resolveAgentWorkspacePath(agentId)
+
+      try {
+        const sdkSessions = await this.gateway.listSessions({
+          cwd,
+          sessionDir: this.resolveSdkSessionDir(),
+        })
+
+        for (const session of sdkSessions) {
+          const oldEntry = oldEntries.get(session.sessionId)
+
+          allEntries.push({
+            sessionId: session.sessionId,
+            sdkSessionFile: session.sdkSessionFile,
+            title: session.title?.trim() || session.sessionId,
+            createdAt: session.createdAt,
+            updatedAt: session.updatedAt,
+            provider: runtimeConfig?.providerId ?? '',
+            model: runtimeConfig?.modelId ?? '',
+            agentId,
+            // 保留旧扩展数据，不存在则使用默认值
+            lastMessagePreview: oldEntry?.lastMessagePreview ?? '',
+            status: oldEntry?.status ?? 'idle',
+          })
+        }
+      } catch {
+        // 单个 Agent 的 session 列表读取失败时跳过该 Agent
+      }
+    }
+
+    this.replaceSessionIndex(allEntries)
     await this.writeSessionIndex()
 
-    return entries
+    return allEntries
+  }
+
+  /**
+   * 尝试读取旧版本地会话索引，用于重建时保留扩展数据。
+   *
+   * @returns 以 sessionId 为键的旧索引条目映射。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private async tryReadOldIndex(): Promise<
+    Map<string, PersistedSessionIndexEntry>
+  > {
+    try {
+      const indexPath = this.resolveSessionIndexPath()
+      const rawIndex = await readFile(indexPath, 'utf8')
+      const parsedIndex = JSON.parse(rawIndex) as Partial<PersistedSessionIndex>
+      const entries = Array.isArray(parsedIndex.sessions)
+        ? parsedIndex.sessions.flatMap((entry) =>
+            this.normalizeSessionIndexEntry(entry),
+          )
+        : []
+
+      return new Map(entries.map((entry) => [entry.sessionId, entry]))
+    } catch {
+      return new Map()
+    }
   }
 
   /**
@@ -1782,16 +3619,27 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       return existingHandle
     }
 
-    const [configuration, indexEntry] = await Promise.all([
-      this.readRequiredRuntimeConfiguration(),
-      Promise.resolve(this.getKnownSessionIndexEntry(sessionId)),
-    ])
-    const handle = await this.gateway.openSession({
+    const indexEntry = this.getKnownSessionIndexEntry(sessionId)
+    const configuration = await this.readRequiredRuntimeConfiguration(
+      indexEntry.agentId,
+    )
+    const cwd =
+      indexEntry.agentId === TANGYUAN_DEFAULT_AGENT_ID
+        ? this.resolveAgentHomePath()
+        : this.resolveAgentWorkspacePath(indexEntry.agentId)
+    const openRequest = {
       ...configuration,
       sessionId,
       sdkSessionFile: indexEntry.sdkSessionFile,
-      cwd: this.resolveAgentHomePath(),
-    })
+      cwd,
+      agentSkillsPath: this.resolveAgentSkillsPath(indexEntry.agentId),
+      sharedSkillsPath: this.resolveSharedSkillsPath(),
+    }
+    const handle = await this.gateway.openSession(
+      this.toolApprovalGateway
+        ? { ...openRequest, toolApprovalGateway: this.toolApprovalGateway }
+        : openRequest,
+    )
     this.sessionHandles.set(sessionId, handle)
 
     return handle
@@ -1918,13 +3766,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @returns 形如 session-N 的新会话标识。
    * @throws 此方法不会主动抛出错误。
    */
-  private createNextSessionId(entries: PersistedSessionIndexEntry[]): string {
-    const maxNumericId = entries.reduce((maxId, entry) => {
-      const match = /^session-(\d+)$/.exec(entry.sessionId)
-      return match ? Math.max(maxId, Number(match[1])) : maxId
-    }, 0)
-
-    return `session-${maxNumericId + 1}`
+  private createNextSessionId(): string {
+    return crypto.randomUUID()
   }
 
   /**
@@ -1950,6 +3793,87 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
+   * 确保指定 Agent Home 目录结构存在。
+   *
+   * @param agentId - Agent 标识。
+   * @returns 无返回值。
+   * @throws 当目录创建失败时，Promise 会 reject。
+   */
+  private async ensureAgentHome(agentId: AgentId): Promise<void> {
+    const homePath = this.resolveAgentHomePath(agentId)
+    const soulHistoryPath = this.resolveSoulHistoryPath(agentId)
+
+    await mkdir(homePath, { recursive: true })
+    await mkdir(soulHistoryPath, { recursive: true })
+    await mkdir(join(homePath, 'memory'), { recursive: true })
+    await mkdir(join(homePath, 'skills'), { recursive: true })
+    await mkdir(join(homePath, 'workspace'), { recursive: true })
+
+    // 确保 soul.md 存在
+    const soulPath = this.resolveSoulPath(agentId)
+
+    if (!(await this.pathExists(soulPath))) {
+      const displayName =
+        agentId === TANGYUAN_DEFAULT_AGENT_ID ? '汤圆' : agentId
+      const soulContent = [
+        `# ${displayName}`,
+        '',
+        `创建时间：${this.now()}`,
+        '',
+        '## 身份',
+        agentId === TANGYUAN_DEFAULT_AGENT_ID
+          ? '汤圆是默认 Agent，负责凭据管理和创建其他 Agent。'
+          : `${displayName} 是用户创建的 Agent。`,
+        '',
+        '## 规则',
+        '遵循用户指令，在执行危险操作前先确认。',
+        '',
+      ].join('\n')
+      await writeFile(soulPath, soulContent, 'utf8')
+    }
+  }
+
+  /**
+   * 从旧 tangyuan Agent 目录迁移 user.md 到共享 profile 路径。
+   *
+   * @returns 无返回值。
+   * @throws 当文件读取、复制或写入失败时，Promise 会 reject。
+   */
+  private async migrateLegacyUserProfile(): Promise<void> {
+    const legacyUserPath = join(
+      this.resolveAgentHomePath(TANGYUAN_DEFAULT_AGENT_ID),
+      'user.md',
+    )
+    const legacyHistoryPath = join(
+      this.resolveAgentHomePath(TANGYUAN_DEFAULT_AGENT_ID),
+      'user.history',
+    )
+    const targetPath = this.resolveUserProfilePath()
+    const targetHistoryPath = this.resolveUserHistoryPath()
+
+    if (!(await this.pathExists(legacyUserPath))) {
+      return
+    }
+
+    // 迁移 user.md
+    await mkdir(this.resolveSharedProfilePath(), { recursive: true })
+    await copyFile(legacyUserPath, targetPath)
+
+    // 迁移 user.history/ 目录下的文件
+    if (await this.pathExists(legacyHistoryPath)) {
+      await mkdir(targetHistoryPath, { recursive: true })
+      const historyFiles = await this.readDirectoryFileSet(legacyHistoryPath)
+
+      for (const fileName of historyFiles) {
+        await copyFile(
+          join(legacyHistoryPath, fileName),
+          join(targetHistoryPath, fileName),
+        )
+      }
+    }
+  }
+
+  /**
    * 确保默认 Agent Home 及 bootstrap 相关文件存在。
    *
    * @returns 默认 Agent Home 的文件状态。
@@ -1959,7 +3883,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     const absoluteHomePath = this.resolveAgentHomePath()
     const bootstrapPath = join(absoluteHomePath, 'bootstrap.md')
     const soulPath = join(absoluteHomePath, 'soul.md')
-    const userPath = join(absoluteHomePath, 'user.md')
+    const userPath = this.resolveUserProfilePath()
     const soulHistoryPath = join(absoluteHomePath, 'soul.history')
     const userHistoryPath = join(absoluteHomePath, 'user.history')
     const memoryPath = join(absoluteHomePath, 'memory')
@@ -1972,6 +3896,16 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       mkdir(memoryPath, { recursive: true }),
       mkdir(skillsPath, { recursive: true }),
     ])
+
+    // 确保共享 profile 和 skills 目录存在
+    await mkdir(this.resolveSharedProfilePath(), { recursive: true })
+    await mkdir(this.resolveUserHistoryPath(), { recursive: true })
+    await mkdir(this.resolveSharedSkillsPath(), { recursive: true })
+
+    // 若共享 user.md 不存在，尝试从旧路径迁移
+    if (!(await this.pathExists(userPath))) {
+      await this.migrateLegacyUserProfile()
+    }
 
     const [bootstrapFileExists, soulFileExists, userFileExists] =
       await Promise.all([
@@ -2061,7 +3995,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     try {
-      const profileSnapshot = await this.readProfileMaintenanceSnapshot()
+      const profileSnapshot = await this.readProfileMaintenanceSnapshot(
+        input.agentId,
+      )
       const maintenancePrompt = this.buildProfileMaintenancePrompt({
         userContent: input.userContent,
         agentContent: input.agentContent,
@@ -2073,7 +4009,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
       const readResult = await this.readPersistedConfiguration()
       const runtimeConfig = readResult.config
-        ? this.extractAgentRuntimeConfig(readResult.config, TANGYUAN_DEFAULT_AGENT_ID)
+        ? this.extractAgentRuntimeConfig(readResult.config, input.agentId)
         : null
       await this.applyProfileMaintenanceResults({
         agentId: input.agentId,
@@ -2136,19 +4072,19 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @returns soul.md、user.md 及其历史目录的快照。
    * @throws 当 profile 文件或历史目录无法读取时，Promise 会 reject。
    */
-  private async readProfileMaintenanceSnapshot(): Promise<ProfileMaintenanceSnapshot> {
-    const absoluteHomePath = this.resolveAgentHomePath()
-
+  private async readProfileMaintenanceSnapshot(
+    agentId: AgentId = TANGYUAN_DEFAULT_AGENT_ID,
+  ): Promise<ProfileMaintenanceSnapshot> {
     return {
       soul: await this.readProfileMaintenanceFileSnapshot({
         target: 'soul',
-        path: join(absoluteHomePath, 'soul.md'),
-        historyPath: join(absoluteHomePath, 'soul.history'),
+        path: this.resolveSoulPath(agentId),
+        historyPath: this.resolveSoulHistoryPath(agentId),
       }),
       user: await this.readProfileMaintenanceFileSnapshot({
         target: 'user',
-        path: join(absoluteHomePath, 'user.md'),
-        historyPath: join(absoluteHomePath, 'user.history'),
+        path: this.resolveUserProfilePath(),
+        historyPath: this.resolveUserHistoryPath(),
       }),
     }
   }
@@ -2187,20 +4123,63 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     previousSnapshot: ProfileMaintenanceSnapshot
     apiKey: string | null
   }): Promise<void> {
-    await Promise.all([
-      this.applyProfileMaintenanceFileResult({
-        agentId: input.agentId,
-        sessionId: input.sessionId,
-        previousFile: input.previousSnapshot.soul,
-        apiKey: input.apiKey,
-      }),
-      this.applyProfileMaintenanceFileResult({
-        agentId: input.agentId,
-        sessionId: input.sessionId,
-        previousFile: input.previousSnapshot.user,
-        apiKey: input.apiKey,
-      }),
-    ])
+    // soul: LLM 写入 agent home 目录下的 soul.md
+    await this.applyProfileMaintenanceFileResult({
+      agentId: input.agentId,
+      sessionId: input.sessionId,
+      previousFile: input.previousSnapshot.soul,
+      apiKey: input.apiKey,
+    })
+
+    // user: LLM 可能写入 agent home 或共享 profile 路径
+    // 先检查 agent home 下的 user.md（旧位置），再同步到共享路径
+    const agentHomeUserPath = join(
+      this.resolveAgentHomePath(input.agentId),
+      'user.md',
+    )
+    const agentHomeUserHistoryPath = join(
+      this.resolveAgentHomePath(input.agentId),
+      'user.history',
+    )
+
+    if (await this.pathExists(agentHomeUserPath)) {
+      const agentHomeUserContent = await this.safeReadFile(agentHomeUserPath)
+
+      if (agentHomeUserContent !== input.previousSnapshot.user.content) {
+        // LLM 修改了 agent home 下的 user.md，同步到共享路径
+        const sharedUserPath = this.resolveUserProfilePath()
+
+        // 确保共享路径存在
+        await mkdir(this.resolveSharedProfilePath(), { recursive: true })
+        await mkdir(this.resolveUserHistoryPath(), { recursive: true })
+
+        // 应用相同的校验逻辑到 agent home 的 user.md
+        await this.applyProfileMaintenanceFileResult({
+          agentId: input.agentId,
+          sessionId: input.sessionId,
+          previousFile: {
+            ...input.previousSnapshot.user,
+            path: agentHomeUserPath,
+            historyPath: agentHomeUserHistoryPath,
+          },
+          apiKey: input.apiKey,
+        })
+
+        // 同步到共享路径
+        const updatedContent = await this.safeReadFile(agentHomeUserPath)
+        if (updatedContent !== input.previousSnapshot.user.content) {
+          await writeFile(sharedUserPath, updatedContent, 'utf8')
+        }
+      }
+    }
+
+    // 同时校验共享路径下的 user.md
+    await this.applyProfileMaintenanceFileResult({
+      agentId: input.agentId,
+      sessionId: input.sessionId,
+      previousFile: input.previousSnapshot.user,
+      apiKey: input.apiKey,
+    })
   }
 
   /**
@@ -2340,6 +4319,25 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
+   * 安全读取文件内容，文件不存在时返回空字符串。
+   *
+   * @param path - 需要读取的文件路径。
+   * @returns 文件内容；文件不存在时返回空字符串。
+   * @throws 当文件读取失败且不是 ENOENT 时，Promise 会 reject。
+   */
+  private async safeReadFile(path: string): Promise<string> {
+    try {
+      return await readFile(path, 'utf8')
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        return ''
+      }
+
+      throw error
+    }
+  }
+
+  /**
    * 从 profile 内容中移除敏感凭据。
    *
    * @param content - Agent 写入的 profile 原始内容。
@@ -2444,11 +4442,18 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    */
   private async buildPromptWithProfileContext(
     userContent: string,
+    agentId: AgentId = TANGYUAN_DEFAULT_AGENT_ID,
   ): Promise<string> {
-    const absoluteHomePath = this.resolveAgentHomePath()
+    const absoluteHomePath = this.resolveAgentHomePath(agentId)
     const soulPath = join(absoluteHomePath, 'soul.md')
-    const userPath = join(absoluteHomePath, 'user.md')
+    const userPath = this.resolveUserProfilePath()
     const bootstrapPath = join(absoluteHomePath, 'bootstrap.md')
+
+    // 确保共享 user profile 存在
+    if (!(await this.pathExists(userPath))) {
+      await this.migrateLegacyUserProfile()
+    }
+
     const [soulFileExists, userFileExists] = await Promise.all([
       this.pathExists(soulPath),
       this.pathExists(userPath),
@@ -2502,15 +4507,114 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
-   * 把用户家目录下的相对默认 Agent Home 转成绝对路径。
+   * 把用户家目录下的 Agent Home 转成绝对路径。
    *
-   * @returns 默认 Agent Home 的绝对路径。
+   * @param agentId - 需要解析路径的 Agent 标识；省略时返回默认 tangyuan 路径。
+   * @returns 指定 Agent Home 的绝对路径。
    * @throws 此方法不会主动抛出错误。
    */
-  private resolveAgentHomePath(): string {
-    return this.agentHomePath.startsWith('~')
+  private resolveAgentHomePath(
+    agentId: string = TANGYUAN_DEFAULT_AGENT_ID,
+  ): string {
+    const resolvedDefault = this.agentHomePath.startsWith('~')
       ? join(this.fsRoot, this.agentHomePath.slice(2))
       : this.agentHomePath
+
+    if (agentId === TANGYUAN_DEFAULT_AGENT_ID) {
+      return resolvedDefault
+    }
+
+    return join(dirname(resolvedDefault), agentId)
+  }
+
+  /**
+   * 解析指定 Agent 的 workspace 绝对路径。
+   *
+   * @param agentId - Agent 标识。
+   * @returns workspace 目录的绝对路径。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private resolveAgentWorkspacePath(agentId: string): string {
+    return join(this.resolveAgentHomePath(agentId), 'workspace')
+  }
+
+  /**
+   * 解析共享 Skills 目录的绝对路径。
+   *
+   * @returns ~/.tangyuan/skills/ 绝对路径。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private resolveSharedSkillsPath(): string {
+    // 共享 skills: ~/.tangyuan/skills/
+    // agentHomePath: ~/.tangyuan/agents/tangyuan
+    const tangyuanDir = dirname(this.resolveAgentHomePath()) // ~/.tangyuan/agents
+    return join(dirname(tangyuanDir), 'skills') // ~/.tangyuan/skills
+  }
+
+  /**
+   * 解析指定 Agent 专属 Skills 目录的绝对路径。
+   *
+   * @param agentId - Agent 标识。
+   * @returns ~/.tangyuan/agents/<agentId>/skills/ 绝对路径。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private resolveAgentSkillsPath(agentId: string): string {
+    return join(this.resolveAgentHomePath(agentId), 'skills')
+  }
+
+  /**
+   * 解析共享 profile 目录的绝对路径。
+   *
+   * @returns ~/.tangyuan/profile/ 绝对路径。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private resolveSharedProfilePath(): string {
+    // 共享 profile: ~/.tangyuan/profile/
+    // agentHomePath: ~/.tangyuan/agents/tangyuan
+    const tangyuanDir = dirname(this.resolveAgentHomePath()) // ~/.tangyuan/agents
+    return join(dirname(tangyuanDir), 'profile') // ~/.tangyuan/profile
+  }
+
+  /**
+   * 解析共享 user profile 文件的绝对路径。
+   *
+   * @returns ~/.tangyuan/profile/user.md 绝对路径。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private resolveUserProfilePath(): string {
+    return join(this.resolveSharedProfilePath(), 'user.md')
+  }
+
+  /**
+   * 解析共享 user profile 历史目录的绝对路径。
+   *
+   * @returns ~/.tangyuan/profile/user.history/ 绝对路径。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private resolveUserHistoryPath(): string {
+    return join(this.resolveSharedProfilePath(), 'user.history')
+  }
+
+  /**
+   * 解析指定 Agent 的 soul 文件绝对路径。
+   *
+   * @param agentId - Agent 标识。
+   * @returns agent home 下 soul.md 的绝对路径。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private resolveSoulPath(agentId: AgentId): string {
+    return join(this.resolveAgentHomePath(agentId), 'soul.md')
+  }
+
+  /**
+   * 解析指定 Agent 的 soul 历史目录绝对路径。
+   *
+   * @param agentId - Agent 标识。
+   * @returns agent home 下 soul.history/ 的绝对路径。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private resolveSoulHistoryPath(agentId: AgentId): string {
+    return join(this.resolveAgentHomePath(agentId), 'soul.history')
   }
 
   /**
@@ -2629,7 +4733,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     role: AgentMessage['role']
     content: string
   }): AgentMessage {
-    this.assertKnownSession(input.sessionId)
+    this.assertKnownSession(input.sessionId, input.agentId)
 
     const messages = this.messages.get(input.sessionId) ?? []
     const message: AgentMessage = {
@@ -2766,7 +4870,16 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     sessionId: string,
     state: AgentRunState,
   ): AgentSessionSummary {
-    const session = this.assertKnownSession(sessionId)
+    const session = this.sessions.get(sessionId)
+
+    if (!session) {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `找不到会话 ${sessionId}。`,
+        recoverable: true,
+      })
+    }
+
     const nextSession = {
       ...session,
       state,
@@ -2969,8 +5082,13 @@ class RealPiSdkGateway implements PiSdkGateway {
     request: PiSdkCreateSessionRequest | PiSdkOpenSessionRequest,
     mode: 'create' | 'open',
   ): Promise<PiSdkSessionHandle> {
-    const { AuthStorage, ModelRegistry, SessionManager, createAgentSession } =
-      await import('@earendil-works/pi-coding-agent')
+    const {
+      AuthStorage,
+      ModelRegistry,
+      SessionManager,
+      createAgentSession,
+      DefaultResourceLoader,
+    } = await import('@earendil-works/pi-coding-agent')
     const authStorage = AuthStorage.inMemory()
     authStorage.setRuntimeApiKey(request.providerId, request.apiKey)
 
@@ -2992,12 +5110,158 @@ class RealPiSdkGateway implements PiSdkGateway {
             request.cwd,
           )
 
+    // 为当前 Agent session 创建受控 ResourceLoader：
+    // - 关闭 Pi 默认 Skill 自动发现（noSkills: true）
+    // - 只加载 Agent 专属和共享两层 Skill 目录
+    // - Agent 专属目录排第一以实现同名覆盖（Pi first-wins）
+    const resourceLoader = new DefaultResourceLoader({
+      cwd: request.cwd,
+      agentDir: dirname(request.agentSkillsPath), // Agent home 目录
+      noSkills: true,
+      additionalSkillPaths: [request.agentSkillsPath, request.sharedSkillsPath],
+    })
+    await resourceLoader.reload()
+
+    const customTools: Array<Record<string, unknown>> = []
+
+    if ('onCreateAgent' in request && request.onCreateAgent) {
+      const onCreateAgent = request.onCreateAgent
+      customTools.push({
+        name: 'create_agent',
+        label: '创建 Agent',
+        description:
+          '创建一个新的 Agent。新 Agent 将继承当前 Provider 和 Model，拥有独立的工作空间和身份文件。调用前必须确认已从用户处收集到 displayName。信息不足时应继续询问用户。',
+        promptSnippet: 'create_agent(displayName: string) → 创建新 Agent',
+        promptGuidelines: [
+          '创建 Agent 前应确认 displayName 已从用户处收集',
+          '信息不足时应继续询问用户后再调用此工具',
+          '创建完成后告知用户新 Agent 的 ID 和名称',
+        ],
+        parameters: {
+          type: 'object',
+          properties: {
+            displayName: { type: 'string', minLength: 1 },
+          },
+          required: ['displayName'],
+          additionalProperties: false,
+        },
+        async execute(_toolCallId: string, params: { displayName: string }) {
+          const result = await onCreateAgent(params.displayName)
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `已创建 Agent「${result.displayName}」（ID: ${result.agentId}）。用户可以在 Agent 列表中切换到新 Agent 开始对话。`,
+              },
+            ],
+          }
+        },
+      })
+    }
+
+    // 注册带审批和路径保护的自定义工具
+    const approvalGateway = request.toolApprovalGateway
+    if (approvalGateway) {
+      const approvalRunContext = {
+        agentId: request.sessionId ? '' : '',
+        sessionId: request.sessionId,
+        cwd: request.cwd,
+      }
+
+      // 自定义 bash 工具（带审批）
+      customTools.push({
+        name: 'bash',
+        label: '运行命令（需审批）',
+        description:
+          '在当前工作目录中执行 bash 命令。每次执行前需要用户审批。命令将以当前 macOS 用户权限运行。',
+        promptSnippet: 'bash(command: string) → 执行 bash 命令',
+        promptGuidelines: [
+          '执行前会请求用户审批，仅本次有效',
+          '命令将以当前 macOS 用户权限执行',
+          '如果用户拒绝，命令不会执行',
+        ],
+        parameters: {
+          type: 'object',
+          properties: {
+            command: { type: 'string', minLength: 1 },
+          },
+          required: ['command'],
+          additionalProperties: false,
+        },
+        async execute(_toolCallId: string, params: { command: string }) {
+          const riskDescription = describeBashRisk(params.command)
+          const result = await approvalGateway.requestBashApproval({
+            agentId: approvalRunContext.agentId || 'tangyuan',
+            sessionId: approvalRunContext.sessionId,
+            runId: '',
+            command: params.command,
+            cwd: approvalRunContext.cwd,
+            riskDescription,
+          })
+
+          if (!result.approved) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: '用户拒绝了此命令的执行。',
+                },
+              ],
+            }
+          }
+
+          // 批准后执行命令
+          try {
+            const { exec } = await import('node:child_process')
+            const { promisify } = await import('node:util')
+            const execAsync = promisify(exec)
+            const { stdout, stderr } = await execAsync(params.command, {
+              cwd: approvalRunContext.cwd,
+              timeout: 120_000,
+            })
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: stdout + (stderr ? `\nstderr:\n${stderr}` : ''),
+                },
+              ],
+            }
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : '命令执行失败'
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `命令执行失败：${message}`,
+                },
+              ],
+            }
+          }
+        },
+      })
+    }
+
+    // 使用 excludedToolNames 排除内置工具（当存在审批网关时由自定义工具接管）
+    const excludedToolNames: string[] = []
+    if (approvalGateway) {
+      excludedToolNames.push('bash')
+    }
+
     const { session } = await createAgentSession({
       cwd: request.cwd,
       authStorage,
       modelRegistry,
       model,
       sessionManager,
+      resourceLoader,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- custom tools use simplified execute signatures
+      customTools: customTools.length > 0 ? (customTools as any) : undefined,
+      ...(excludedToolNames.length > 0
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mapping to Pi SDK's excludeTools option
+          { excludedToolNames: excludedToolNames as any }
+        : {}),
     })
 
     return {
@@ -3021,6 +5285,57 @@ class RealPiSdkGateway implements PiSdkGateway {
       },
       dispose: () => {
         session.dispose()
+      },
+      setModel: async (
+        providerId: string,
+        modelId: string,
+        apiKey?: string,
+      ) => {
+        if (apiKey) {
+          authStorage.setRuntimeApiKey(providerId, apiKey)
+        }
+
+        const newModel = modelRegistry.find(providerId, modelId)
+
+        if (!newModel) {
+          throw new Error(`找不到模型 ${providerId}/${modelId}`)
+        }
+
+        await session.setModel(newModel)
+      },
+      setThinkingLevel: async (level: string) => {
+        // ThinkingLevel 类型来自 @earendil-works/pi-agent-core:
+        // "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
+        session.setThinkingLevel(
+          level as 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh',
+        )
+      },
+      getModelInfo: async () => {
+        const currentModel = session.model
+        const thinkingLevel = session.thinkingLevel
+        const supportsThinking = session.supportsThinking()
+        const supportedThinkingLevels = supportsThinking
+          ? session.getAvailableThinkingLevels()
+          : []
+
+        return {
+          providerId: currentModel?.provider ?? '',
+          modelId: currentModel?.id ?? '',
+          displayName: currentModel?.name ?? currentModel?.id ?? '',
+          thinkingLevel: supportsThinking ? thinkingLevel : null,
+          supportedThinkingLevels,
+          supportsThinking,
+        }
+      },
+      reload: async () => {
+        await resourceLoader.reload()
+        // session.reload() 重建系统提示词，使 Skill 变更立即生效
+        if (
+          typeof (session as { reload?: () => Promise<void> }).reload ===
+          'function'
+        ) {
+          await (session as { reload: () => Promise<void> }).reload()
+        }
       },
     }
   }
@@ -3280,7 +5595,18 @@ function normalizePiSdkSessionEvent(event: unknown): PiSdkStreamEvent[] {
     event.type === 'tool_execution_start' &&
     typeof event.toolName === 'string'
   ) {
-    return [{ type: 'tool-started', toolName: event.toolName }]
+    const toolInput = isRecord(event.toolInput)
+      ? event.toolInput
+      : isRecord(event.input)
+        ? event.input
+        : undefined
+    return [
+      {
+        type: 'tool-started' as const,
+        toolName: event.toolName,
+        ...(toolInput !== undefined ? { toolInput } : {}),
+      },
+    ]
   }
 
   if (
@@ -3307,4 +5633,55 @@ function normalizePiSdkSessionEvent(event: unknown): PiSdkStreamEvent[] {
  */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+/**
+ * 分析 bash 命令的风险等级并生成中文风险说明。
+ *
+ * @param command - 待执行的 bash 命令。
+ * @returns 面向用户的中文风险说明。
+ * @throws 此方法不会主动抛出错误。
+ */
+function describeBashRisk(command: string): string {
+  const highRiskPatterns: Array<{ pattern: RegExp; label: string }> = [
+    { pattern: /\brm\s+-rf\b/, label: '递归强制删除' },
+    { pattern: /\bsudo\b/, label: '提权操作' },
+    { pattern: /\bcurl\b.*\|\s*(ba)?sh\b/, label: '远程脚本直接执行' },
+    { pattern: /\bwget\b.*\|\s*(ba)?sh\b/, label: '远程脚本直接执行' },
+    { pattern: /\bdd\s+if=/, label: '磁盘直接写入' },
+    { pattern: /\bmkfs\b/, label: '格式化文件系统' },
+    { pattern: />\s*\/dev\//, label: '设备文件写入' },
+    { pattern: /\bchmod\s+777/, label: '危险权限修改' },
+    { pattern: /\bpasswd\b/, label: '密码修改' },
+  ]
+
+  const mediumRiskPatterns: Array<{ pattern: RegExp; label: string }> = [
+    { pattern: /\brm\b/, label: '删除文件' },
+    { pattern: /\bmv\b/, label: '移动/重命名文件' },
+    { pattern: /\bchmod\b/, label: '修改权限' },
+    { pattern: /\bchown\b/, label: '修改所有者' },
+    { pattern: /\bkill\b/, label: '终止进程' },
+    { pattern: /\bpkill\b/, label: '终止进程' },
+    { pattern: /\bnpm\s+(install|uninstall)\b.*-g/, label: '全局包管理' },
+    { pattern: /\bpip\s+install\b/, label: 'Python 包安装' },
+    { pattern: /\bgit\s+push\b.*--force/, label: '强制推送' },
+  ]
+
+  const highHits = highRiskPatterns
+    .filter((p) => p.pattern.test(command))
+    .map((p) => p.label)
+
+  const mediumHits = mediumRiskPatterns
+    .filter((p) => p.pattern.test(command))
+    .map((p) => p.label)
+
+  if (highHits.length > 0) {
+    return `高风险命令：${highHits.join('、')}。命令将以当前 macOS 用户权限执行，可能造成不可逆的系统影响。`
+  }
+
+  if (mediumHits.length > 0) {
+    return `中风险命令：${mediumHits.join('、')}。命令将以当前 macOS 用户权限执行，请确认操作意图。`
+  }
+
+  return `命令将以当前 macOS 用户权限执行。`
 }

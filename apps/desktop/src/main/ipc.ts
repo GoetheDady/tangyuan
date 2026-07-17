@@ -131,6 +131,80 @@ export function registerDesktopAppIpc(
       )
     )
   })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.agentsList, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.agentsList, payload)
+    return parseDesktopIpcResponse(DESKTOP_IPC_CHANNELS.agentsList, await runtime.listAgents())
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.agentsUpdateConfig, async (_event, payload) => {
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.agentsUpdateConfig,
+      await runtime.updateAgentConfig(
+        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.agentsUpdateConfig, payload)
+      )
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.agentsArchive, async (_event, payload) => {
+    const { agentId } = parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.agentsArchive, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.agentsArchive,
+      await runtime.archiveAgent(agentId)
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.agentsRecover, async (_event, payload) => {
+    const { agentId } = parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.agentsRecover, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.agentsRecover,
+      await runtime.recoverAgent(agentId)
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.agentsReconcile, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.agentsReconcile, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.agentsReconcile,
+      await runtime.reconcileAgentDirectories()
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.agentsClaimDirectory, async (_event, payload) => {
+    const { agentId, displayName } = parseDesktopIpcRequest(
+      DESKTOP_IPC_CHANNELS.agentsClaimDirectory,
+      payload
+    )
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.agentsClaimDirectory,
+      await runtime.claimAgentDirectory(agentId, displayName)
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.agentsRebuildTangyuan, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.agentsRebuildTangyuan, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.agentsRebuildTangyuan,
+      await runtime.rebuildTangyuanHome()
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsGetModelInfo, async (_event, payload) => {
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsGetModelInfo,
+      await runtime.getSessionModelInfo(
+        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsGetModelInfo, payload)
+      )
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsSetModel, async (_event, payload) => {
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsSetModel,
+      await runtime.setSessionModel(
+        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsSetModel, payload)
+      )
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsSetThinkingLevel, async (_event, payload) => {
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsSetThinkingLevel,
+      await runtime.setSessionThinkingLevel(
+        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsSetThinkingLevel, payload)
+      )
+    )
+  })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup, async (_event, payload) => {
     parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup, payload)
     return parseDesktopIpcResponse(
@@ -145,6 +219,51 @@ export function registerDesktopAppIpc(
       await runtime.resetConfiguration()
     )
   })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.profileGetSoul, async (_event, payload) => {
+    const { agentId } = parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.profileGetSoul, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.profileGetSoul,
+      await runtime.getSoul(agentId)
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.profileGetUser, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.profileGetUser, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.profileGetUser,
+      await runtime.getUserProfile()
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.profileUpdateSoul, async (_event, payload) => {
+    const { agentId, content } = parseDesktopIpcRequest(
+      DESKTOP_IPC_CHANNELS.profileUpdateSoul,
+      payload
+    )
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.profileUpdateSoul,
+      await runtime.updateSoul(agentId, content)
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.profileUpdateUser, async (_event, payload) => {
+    const { content } = parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.profileUpdateUser, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.profileUpdateUser,
+      await runtime.updateUserProfile(content)
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.skillsListAgent, async (_event, payload) => {
+    const { agentId } = parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.skillsListAgent, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.skillsListAgent,
+      await runtime.listAgentSkills(agentId)
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.skillsListShared, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.skillsListShared, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.skillsListShared,
+      await runtime.listSharedSkills()
+    )
+  })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.openExternalLink, async (_event, payload) => {
     if (!openExternalLink) {
       throw new Error('外部链接功能不可用。')
@@ -152,5 +271,75 @@ export function registerDesktopAppIpc(
     const request = parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.openExternalLink, payload)
     await openExternalLink(request.url)
     return parseDesktopIpcResponse(DESKTOP_IPC_CHANNELS.openExternalLink, undefined)
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsApproveBash, async (_event, payload) => {
+    const { approvalId } = parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsApproveBash, payload)
+    await runtime.approveBash(approvalId)
+    return parseDesktopIpcResponse(DESKTOP_IPC_CHANNELS.sessionsApproveBash, undefined)
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsRejectBash, async (_event, payload) => {
+    const { approvalId } = parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsRejectBash, payload)
+    await runtime.rejectBash(approvalId)
+    return parseDesktopIpcResponse(DESKTOP_IPC_CHANNELS.sessionsRejectBash, undefined)
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals,
+      runtime.getPendingApprovals()
+    )
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.skillsInstall, async (_event, payload) => {
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.skillsInstall,
+      await runtime.installSkill(
+        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.skillsInstall, payload)
+      )
+    )
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.skillsDelete, async (_event, payload) => {
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.skillsDelete,
+      await runtime.deleteSkill(parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.skillsDelete, payload))
+    )
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.skillsApproveOperation, async (_event, payload) => {
+    const { approvalId } = parseDesktopIpcRequest(
+      DESKTOP_IPC_CHANNELS.skillsApproveOperation,
+      payload
+    )
+    await runtime.approveSkillOperation(approvalId)
+    return parseDesktopIpcResponse(DESKTOP_IPC_CHANNELS.skillsApproveOperation, undefined)
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.skillsRejectOperation, async (_event, payload) => {
+    const { approvalId } = parseDesktopIpcRequest(
+      DESKTOP_IPC_CHANNELS.skillsRejectOperation,
+      payload
+    )
+    await runtime.rejectSkillOperation(approvalId)
+    return parseDesktopIpcResponse(DESKTOP_IPC_CHANNELS.skillsRejectOperation, undefined)
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals,
+      runtime.getPendingSkillApprovals()
+    )
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.skillsGetInstallRecords, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.skillsGetInstallRecords, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.skillsGetInstallRecords,
+      await runtime.getSkillInstallRecords()
+    )
   })
 }

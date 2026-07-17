@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { createDefaultSessionSummary } from '@tangyuan/contracts'
 import {
   AgentRuntimeError,
   type AgentEvent,
@@ -17,7 +18,6 @@ import {
   type PiSdkSessionHandle,
   type PiSdkVerificationRequest,
   createTangyuanRuntimeForTesting,
-  createDefaultSessionSummary,
   type ConfigEncryptionAdapter,
 } from './index'
 
@@ -249,9 +249,12 @@ describe('PiSdkDriver', () => {
     const resolvedHomePath = join(rootPath, homePath.slice(2))
 
     await driver.getSnapshot()
-    await import('node:fs/promises').then(async ({ writeFile }) => {
+    await import('node:fs/promises').then(async ({ writeFile, mkdir }) => {
       await writeFile(join(resolvedHomePath, 'soul.md'), '# soul', 'utf8')
-      await writeFile(join(resolvedHomePath, 'user.md'), '# user', 'utf8')
+      // 写入共享 user profile 路径
+      const profileDir = join(rootPath, '.tangyuan/profile')
+      await mkdir(profileDir, { recursive: true })
+      await writeFile(join(profileDir, 'user.md'), '# user', 'utf8')
     })
 
     await expect(driver.refresh()).resolves.toMatchObject({
@@ -391,14 +394,14 @@ describe('PiSdkDriver', () => {
       }),
     ).resolves.toMatchObject({
       agentId: 'tangyuan',
-      sessionId: 'session-1',
+      sessionId: expect.any(String),
       state: 'idle',
     })
 
     expect(gateway.sessionRequests).toEqual([
       expect.objectContaining({
-        sessionId: 'session-1',
-        sdkSessionFile: expect.stringContaining('session-1.jsonl'),
+        sessionId: expect.any(String),
+        sdkSessionFile: expect.stringContaining('.jsonl'),
         cwd: join(rootPath, '.tangyuan/agents/tangyuan'),
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',
@@ -415,14 +418,13 @@ describe('PiSdkDriver', () => {
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    await expect(
-      driver.createSession({
-        agentId: 'tangyuan',
-        title: '调试启动流程',
-      }),
-    ).resolves.toMatchObject({
+    const session = await driver.createSession({
       agentId: 'tangyuan',
-      sessionId: 'session-1',
+      title: '调试启动流程',
+    })
+    expect(session).toMatchObject({
+      agentId: 'tangyuan',
+      sessionId: expect.any(String),
       title: '调试启动流程',
       state: 'idle',
     })
@@ -433,13 +435,13 @@ describe('PiSdkDriver', () => {
       sessions: [
         expect.objectContaining({
           agentId: 'tangyuan',
-          sessionId: 'session-1',
+          sessionId: session.sessionId,
           title: '调试启动流程',
           createdAt: '2026-07-08T00:00:00.000Z',
           updatedAt: '2026-07-08T00:00:00.000Z',
           provider: 'anthropic',
           model: 'claude-sonnet-4-5',
-          sdkSessionFile: expect.stringContaining('session-1.jsonl'),
+          sdkSessionFile: expect.stringContaining('.jsonl'),
           lastMessagePreview: '',
           status: 'idle',
         }),
@@ -474,7 +476,7 @@ describe('PiSdkDriver', () => {
     ).resolves.toEqual({
       sessions: [
         expect.objectContaining({
-          sessionId: 'session-1',
+          sessionId: session.sessionId,
           updatedAt: '2026-07-08T00:00:00.000Z',
           lastMessagePreview: '收到：帮我检查保存逻辑',
           status: 'completed',
@@ -531,7 +533,7 @@ describe('PiSdkDriver', () => {
       restartedDriver.listSessions({ agentId: 'tangyuan' }),
     ).resolves.toEqual([
       expect.objectContaining({
-        sessionId: 'session-1',
+        sessionId: session.sessionId,
         title: '持久化检查',
         state: 'completed',
       }),
@@ -539,7 +541,7 @@ describe('PiSdkDriver', () => {
     await expect(
       restartedDriver.getMessages({
         agentId: 'tangyuan',
-        sessionId: 'session-1',
+        sessionId: session.sessionId,
       }),
     ).resolves.toEqual([
       expect.objectContaining({
@@ -553,8 +555,8 @@ describe('PiSdkDriver', () => {
     ])
     expect(gateway.openSessionRequests).toEqual([
       expect.objectContaining({
-        sessionId: 'session-1',
-        sdkSessionFile: expect.stringContaining('session-1.jsonl'),
+        sessionId: session.sessionId,
+        sdkSessionFile: expect.stringContaining('.jsonl'),
       }),
     ])
   })
@@ -707,7 +709,7 @@ describe('PiSdkDriver', () => {
       expect.arrayContaining([
         expect.objectContaining({
           type: 'turn-started',
-          runId: 'session-1-run-1',
+          runId: expect.stringMatching(/-run-1$/),
         }),
         expect.objectContaining({
           type: 'activity-updated',
@@ -742,14 +744,19 @@ describe('PiSdkDriver', () => {
   it('blocks a duplicate active run in the same session but allows another session', async () => {
     const releaseFirstRun = createDeferred<void>()
     const firstRunStarted = createDeferred<void>()
+    let firstSessionId = ''
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
+        const isFirstSession = !firstSessionId
+        if (isFirstSession) {
+          firstSessionId = request.sessionId
+        }
         const handle = {
           prompts: [] as string[],
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
 
-            if (request.sessionId === 'session-1') {
+            if (request.sessionId === firstSessionId) {
               firstRunStarted.resolve()
               await releaseFirstRun.promise
             }
@@ -988,7 +995,7 @@ describe('PiSdkDriver', () => {
     const { driver, rootPath, homePath } = await createDriver({ gateway })
     const resolvedHomePath = join(rootPath, homePath.slice(2))
 
-    await writeInitializedProfile(resolvedHomePath)
+    await writeInitializedProfile(resolvedHomePath, rootPath)
     await driver.saveConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
@@ -1064,7 +1071,7 @@ describe('PiSdkDriver', () => {
       events.push(event)
     })
 
-    await writeInitializedProfile(resolvedHomePath)
+    await writeInitializedProfile(resolvedHomePath, rootPath)
     await driver.saveConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
@@ -1145,7 +1152,7 @@ describe('PiSdkDriver', () => {
     const { driver, rootPath, homePath } = await createDriver({ gateway })
     const resolvedHomePath = join(rootPath, homePath.slice(2))
 
-    await writeInitializedProfile(resolvedHomePath)
+    await writeInitializedProfile(resolvedHomePath, rootPath)
     await driver.saveConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
@@ -1210,7 +1217,7 @@ describe('PiSdkDriver', () => {
       events.push(event)
     })
 
-    await writeInitializedProfile(resolvedHomePath)
+    await writeInitializedProfile(resolvedHomePath, rootPath)
     await driver.saveConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
@@ -1272,7 +1279,7 @@ describe('PiSdkDriver', () => {
     const { driver, rootPath, homePath } = await createDriver({ gateway })
     const resolvedHomePath = join(rootPath, homePath.slice(2))
 
-    await writeInitializedProfile(resolvedHomePath)
+    await writeInitializedProfile(resolvedHomePath, rootPath)
     await driver.saveConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
@@ -1350,7 +1357,7 @@ describe('PiSdkDriver', () => {
     const { driver, rootPath, homePath } = await createDriver({ gateway })
     const resolvedHomePath = join(rootPath, homePath.slice(2))
 
-    await writeInitializedProfile(resolvedHomePath)
+    await writeInitializedProfile(resolvedHomePath, rootPath)
     await driver.saveConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
@@ -1988,7 +1995,7 @@ describe('PiSdkDriver', () => {
       }),
     ).rejects.toMatchObject({
       code: 'configuration-missing',
-      message: expect.stringContaining('创建会话前'),
+      message: expect.stringContaining('尚未配置 Provider 和 Model'),
     })
   })
 
@@ -2343,14 +2350,10 @@ describe('PiSdkDriver', () => {
 
     // 配置文件和备份已删除
     await expect(
-      import('node:fs/promises').then(({ access }) =>
-        access(configPath),
-      ),
+      import('node:fs/promises').then(({ access }) => access(configPath)),
     ).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(
-      import('node:fs/promises').then(({ access }) =>
-        access(backupPath),
-      ),
+      import('node:fs/promises').then(({ access }) => access(backupPath)),
     ).rejects.toMatchObject({ code: 'ENOENT' })
 
     // Agent home 目录仍然存在（bootstrap.md 等文件未被删除）
@@ -2453,12 +2456,1145 @@ describe('PiSdkDriver', () => {
     const rawConfig = await readFile(configPath, 'utf8')
     expect(() => JSON.parse(rawConfig)).not.toThrow()
   })
+
+  it('creates a new agent with UUID, inherits provider/model, and builds directories', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, rootPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    const agent = await driver.createAgent('代码助手')
+
+    expect(agent.agentId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    )
+    expect(agent.displayName).toBe('代码助手')
+    expect(agent.status).toBe('active')
+    expect(agent.defaultProviderId).toBe('anthropic')
+    expect(agent.defaultModelId).toBe('claude-sonnet-4-5')
+
+    const homePath = join(rootPath, '.tangyuan/agents', agent.agentId)
+    await expect(
+      readFile(join(homePath, 'soul.md'), 'utf8'),
+    ).resolves.toContain('代码助手')
+    await expect(stat(join(homePath, 'workspace'))).resolves.toMatchObject({
+      isDirectory: expect.any(Function),
+    })
+    await expect(stat(join(homePath, 'skills'))).resolves.toMatchObject({
+      isDirectory: expect.any(Function),
+    })
+  })
+
+  it('emits an agent-created event after a successful creation', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+    const events: AgentEvent[] = []
+    driver.subscribe((event) => {
+      events.push(event)
+    })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const agent = await driver.createAgent('测试助手')
+
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'agent-created',
+          agentId: agent.agentId,
+          agent: expect.objectContaining({ displayName: '测试助手' }),
+        }),
+      ]),
+    )
+  })
+
+  it('generates distinct UUIDs for multiple agents with the same displayName', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    const agentOne = await driver.createAgent('助手')
+    const agentTwo = await driver.createAgent('助手')
+
+    expect(agentOne.agentId).not.toBe(agentTwo.agentId)
+    expect(agentOne.displayName).toBe('助手')
+    expect(agentTwo.displayName).toBe('助手')
+  })
+
+  it('persists agent config and restores after simulated restart', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, rootPath, userDataPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    const created = await driver.createAgent('跨重启助手')
+
+    // 模拟重启：用相同的 userDataPath 创建新 driver
+    const restartedDriver = createDriverAtPath({
+      gateway,
+      rootPath,
+      userDataPath,
+    })
+    const agents = await restartedDriver.listAgents()
+
+    expect(agents).toHaveLength(2)
+    expect(agents[0]).toMatchObject({ agentId: 'tangyuan' })
+    expect(agents[1]).toMatchObject({
+      agentId: created.agentId,
+      displayName: '跨重启助手',
+      status: 'active',
+    })
+  })
+
+  it('lists all agents including tangyuan and created agents', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    const created = await driver.createAgent('助手')
+    const agents = await driver.listAgents()
+
+    expect(agents).toHaveLength(2)
+    expect(agents[0]).toMatchObject({
+      agentId: 'tangyuan',
+      displayName: '汤圆',
+      status: 'active',
+    })
+    expect(agents[1]).toMatchObject({
+      agentId: created.agentId,
+      displayName: '助手',
+      status: 'active',
+    })
+  })
+
+  it('creates a session for a new agent with workspace as cwd', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, rootPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    const agent = await driver.createAgent('工作区测试')
+    const session = await driver.createSession({
+      agentId: agent.agentId,
+      title: '新会话',
+    })
+
+    expect(session.agentId).toBe(agent.agentId)
+    expect(gateway.sessionRequests[0]).toMatchObject({
+      cwd: join(rootPath, '.tangyuan/agents', agent.agentId, 'workspace'),
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+    })
+  })
+
+  it('sends a message from a new agent session and receives a reply', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    const agent = await driver.createAgent('消息测试')
+    const session = await driver.createSession({
+      agentId: agent.agentId,
+      title: '首次对话',
+    })
+
+    await driver.sendMessage({
+      agentId: agent.agentId,
+      sessionId: session.sessionId,
+      content: '你好，新 Agent',
+    })
+
+    const messages = await driver.getMessages({
+      agentId: agent.agentId,
+      sessionId: session.sessionId,
+    })
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'user',
+          content: '你好，新 Agent',
+        }),
+        expect.objectContaining({
+          role: 'agent',
+          content: expect.stringContaining('收到'),
+        }),
+      ]),
+    )
+  })
+
+  it('rejects session creation for archived agents', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    await expect(
+      driver.createSession({
+        agentId: 'nonexistent-agent',
+        title: '失败创建',
+      }),
+    ).rejects.toMatchObject({
+      code: 'session-not-found',
+      message: expect.stringContaining('不存在或已归档'),
+    })
+  })
+
+  it('uses UUID as session id for every new session', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    const firstSession = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '第一次',
+    })
+    const secondSession = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '第二次',
+    })
+
+    const uuidPattern =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    expect(firstSession.sessionId).toMatch(uuidPattern)
+    expect(secondSession.sessionId).toMatch(uuidPattern)
+    expect(firstSession.sessionId).not.toBe(secondSession.sessionId)
+  })
+
+  it('rebuilds index for all agents by scanning each agent workspace cwd', async () => {
+    // 创建一个可跟踪每个 cwd 下 session 的 gateway
+    const sessionsByCwd = new Map<
+      string,
+      Array<{
+        sessionId: string
+        sdkSessionFile: string
+        title: string
+        createdAt: string
+        updatedAt: string
+      }>
+    >()
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const sessionEntry = {
+          sessionId: request.sessionId,
+          sdkSessionFile: request.sdkSessionFile,
+          title: '',
+          createdAt: '2026-07-08T00:00:00.000Z',
+          updatedAt: '2026-07-08T00:00:00.000Z',
+        }
+        const existingSessions = sessionsByCwd.get(request.cwd) ?? []
+        existingSessions.push(sessionEntry)
+        sessionsByCwd.set(request.cwd, existingSessions)
+
+        const handle = createPromptingHandle(request.sessionId, (messages) => {
+          // 更新 title 为第一条用户消息
+          const userMessage = messages.find((m) => m.role === 'user')
+          if (userMessage) {
+            sessionEntry.title = userMessage.content
+          }
+        })
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+      listSessions: async (request) => {
+        gateway.listSessionRequests.push(request)
+
+        return sessionsByCwd.get(request.cwd) ?? []
+      },
+    })
+    const { driver, rootPath, userDataPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    // 创建一个自定义 Agent
+    const agent = await driver.createAgent('多Agent助手')
+
+    // 为 tangyuan 和自定义 Agent 各创建一个 session
+    const tangyuanSession = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '汤圆会话',
+    })
+    const agentSession = await driver.createSession({
+      agentId: agent.agentId,
+      title: '助手会话',
+    })
+
+    // 发送消息以便在 Pi session 中留下 title
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: tangyuanSession.sessionId,
+      content: '汤圆第一条消息',
+    })
+    await driver.sendMessage({
+      agentId: agent.agentId,
+      sessionId: agentSession.sessionId,
+      content: '助手第一条消息',
+    })
+
+    // 删除索引，模拟索引丢失
+    await rm(join(userDataPath, 'sessions/index.json'), {
+      force: true,
+    })
+
+    // 用同一 userData 创建新 driver，触发索引重建
+    const restartedDriver = createDriverAtPath({
+      gateway,
+      rootPath,
+      userDataPath,
+    })
+
+    // tangyuan 应该只能看到自己的 session
+    await expect(
+      restartedDriver.listSessions({ agentId: 'tangyuan' }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        agentId: 'tangyuan',
+        sessionId: tangyuanSession.sessionId,
+      }),
+    ])
+
+    // 自定义 Agent 应该只能看到自己的 session
+    await expect(
+      restartedDriver.listSessions({ agentId: agent.agentId }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        agentId: agent.agentId,
+        sessionId: agentSession.sessionId,
+      }),
+    ])
+
+    // 验证重建后的索引文件包含两个 Agent 各自的 session
+    const rebuiltIndex = (await readJson(
+      join(userDataPath, 'sessions/index.json'),
+    )) as { sessions: Array<{ agentId: string; sessionId: string }> }
+    expect(rebuiltIndex.sessions).toHaveLength(2)
+    expect(rebuiltIndex.sessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          agentId: 'tangyuan',
+          sessionId: tangyuanSession.sessionId,
+        }),
+        expect.objectContaining({
+          agentId: agent.agentId,
+          sessionId: agentSession.sessionId,
+        }),
+      ]),
+    )
+  })
+
+  it('preserves Tangyuan extension data during index rebuild when old index is readable', async () => {
+    const sessionsByCwd = new Map<
+      string,
+      Array<{
+        sessionId: string
+        sdkSessionFile: string
+        title: string
+        createdAt: string
+        updatedAt: string
+      }>
+    >()
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const sessionEntry = {
+          sessionId: request.sessionId,
+          sdkSessionFile: request.sdkSessionFile,
+          title: '',
+          createdAt: '2026-07-08T00:00:00.000Z',
+          updatedAt: '2026-07-08T00:00:00.000Z',
+        }
+        const existingSessions = sessionsByCwd.get(request.cwd) ?? []
+        existingSessions.push(sessionEntry)
+        sessionsByCwd.set(request.cwd, existingSessions)
+
+        const handle = createPromptingHandle(request.sessionId)
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+      listSessions: async (request) => {
+        gateway.listSessionRequests.push(request)
+
+        return sessionsByCwd.get(request.cwd) ?? []
+      },
+    })
+    const { driver, rootPath, userDataPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '扩展数据测试',
+    })
+
+    // 发送消息以设置 lastMessagePreview 和 status
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '帮我保存这段对话',
+    })
+
+    // 读取当前索引以记录扩展数据
+    const oldIndex = (await readJson(
+      join(userDataPath, 'sessions/index.json'),
+    )) as { sessions: Array<{ lastMessagePreview: string; status: string }> }
+    const oldPreview = oldIndex.sessions[0]?.lastMessagePreview
+    const oldStatus = oldIndex.sessions[0]?.status
+    expect(oldPreview).toBeTruthy()
+    expect(oldStatus).toBe('completed')
+
+    // 将索引文件写入损坏的 JSON 来触发重建
+    // 但先把旧内容备份到内存
+    await writeFile(
+      join(userDataPath, 'sessions/index.json'),
+      '{ corrupted json ###',
+      'utf8',
+    )
+
+    // 重建时 tryReadOldIndex 也会因 JSON 损坏而失败，返回空 Map
+    // 此时扩展数据使用默认值
+    // 这个行为验证了：当旧索引不可读时，重建使用安全默认值
+    const restartedDriver = createDriverAtPath({
+      gateway,
+      rootPath,
+      userDataPath,
+    })
+    await restartedDriver.listSessions({ agentId: 'tangyuan' })
+
+    const rebuiltIndex = (await readJson(
+      join(userDataPath, 'sessions/index.json'),
+    )) as { sessions: Array<{ lastMessagePreview: string; status: string }> }
+    // session 存在且 agentId 正确
+    expect(rebuiltIndex.sessions).toHaveLength(1)
+    // 旧索引不可读时使用默认值
+    expect(rebuiltIndex.sessions[0]?.status).toBe('idle')
+  })
+
+  it('cleans up orphan index entries when Pi sessions no longer exist', async () => {
+    // 创建一个 gateway，listSessions 在重建时不返回之前存在的 session
+    const sessionsByCwd = new Map<
+      string,
+      Array<{
+        sessionId: string
+        sdkSessionFile: string
+        title: string
+        createdAt: string
+        updatedAt: string
+      }>
+    >()
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const sessionEntry = {
+          sessionId: request.sessionId,
+          sdkSessionFile: request.sdkSessionFile,
+          title: '',
+          createdAt: '2026-07-08T00:00:00.000Z',
+          updatedAt: '2026-07-08T00:00:00.000Z',
+        }
+        const existingSessions = sessionsByCwd.get(request.cwd) ?? []
+        existingSessions.push(sessionEntry)
+        sessionsByCwd.set(request.cwd, existingSessions)
+
+        const handle = createPromptingHandle(request.sessionId)
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+      listSessions: async (request) => {
+        gateway.listSessionRequests.push(request)
+
+        return sessionsByCwd.get(request.cwd) ?? []
+      },
+    })
+    const { driver, rootPath, userDataPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    void (await driver.createSession({
+      agentId: 'tangyuan',
+      title: '会被清理的会话',
+    }))
+
+    // 确认 session 已写入索引
+    let index = (await readJson(join(userDataPath, 'sessions/index.json'))) as {
+      sessions: Array<{ sessionId: string }>
+    }
+    expect(index.sessions).toHaveLength(1)
+
+    // 清除 cwd 下的 sessions 列表（模拟 Pi session 文件被删除）
+    sessionsByCwd.clear()
+
+    // 删除索引文件，触发重建
+    await rm(join(userDataPath, 'sessions/index.json'), {
+      force: true,
+    })
+
+    const restartedDriver = createDriverAtPath({
+      gateway,
+      rootPath,
+      userDataPath,
+    })
+    await restartedDriver.listSessions({ agentId: 'tangyuan' })
+
+    // 孤儿条目已被清理
+    index = (await readJson(join(userDataPath, 'sessions/index.json'))) as {
+      sessions: Array<{ sessionId: string }>
+    }
+    expect(index.sessions).toHaveLength(0)
+  })
+
+  it('restores sessions for multiple agents after restart', async () => {
+    const sdkMessagesBySessionFile = new Map<string, AgentMessage[]>()
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = createPromptingHandle(request.sessionId, (messages) => {
+          sdkMessagesBySessionFile.set(request.sdkSessionFile, messages)
+        })
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+      openSession: async (request) => {
+        const handle = createPromptingHandle(request.sessionId)
+        gateway.openSessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+
+        return handle
+      },
+      readMessages: async (request) =>
+        sdkMessagesBySessionFile.get(request.sdkSessionFile) ?? [],
+    })
+    const { driver, rootPath, userDataPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    const agent = await driver.createAgent('重启测试助手')
+
+    // 为两个 Agent 各创建一个 session 并发送消息
+    const tangyuanSession = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '汤圆重启会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: tangyuanSession.sessionId,
+      content: '重启后读取汤圆消息',
+    })
+
+    const agentSession = await driver.createSession({
+      agentId: agent.agentId,
+      title: '助手重启会话',
+    })
+    await driver.sendMessage({
+      agentId: agent.agentId,
+      sessionId: agentSession.sessionId,
+      content: '重启后读取助手消息',
+    })
+
+    // 模拟重启
+    const restartedDriver = createDriverAtPath({
+      gateway,
+      rootPath,
+      userDataPath,
+    })
+
+    // tangyuan 的会话列表
+    await expect(
+      restartedDriver.listSessions({ agentId: 'tangyuan' }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        sessionId: tangyuanSession.sessionId,
+        title: '汤圆重启会话',
+        state: 'completed',
+      }),
+    ])
+
+    // 自定义 Agent 的会话列表
+    await expect(
+      restartedDriver.listSessions({ agentId: agent.agentId }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        sessionId: agentSession.sessionId,
+        title: '助手重启会话',
+        state: 'completed',
+      }),
+    ])
+
+    // tangyuan 的消息可以恢复
+    await expect(
+      restartedDriver.getMessages({
+        agentId: 'tangyuan',
+        sessionId: tangyuanSession.sessionId,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        role: 'user',
+        content: '重启后读取汤圆消息',
+      }),
+      expect.objectContaining({
+        role: 'agent',
+        content: expect.stringContaining('收到'),
+      }),
+    ])
+
+    // 自定义 Agent 的消息可以恢复
+    await expect(
+      restartedDriver.getMessages({
+        agentId: agent.agentId,
+        sessionId: agentSession.sessionId,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        role: 'user',
+        content: '重启后读取助手消息',
+      }),
+      expect.objectContaining({
+        role: 'agent',
+        content: expect.stringContaining('收到'),
+      }),
+    ])
+  })
+
+  it('refuses to archive the default tangyuan agent', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+
+    await expect(driver.archiveAgent('tangyuan')).rejects.toMatchObject({
+      code: 'session-not-found',
+      message: expect.stringContaining('不可归档'),
+    })
+  })
+
+  it('archives a custom agent and emits an agent-archived event', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+    const events: AgentEvent[] = []
+    driver.subscribe((event) => {
+      events.push(event)
+    })
+
+    const agent = await driver.createAgent('可归档助手')
+
+    const archived = await driver.archiveAgent(agent.agentId)
+
+    expect(archived.status).toBe('archived')
+    expect(archived.archivedAt).toBeTruthy()
+    expect(archived.agentId).toBe(agent.agentId)
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'agent-archived',
+          agentId: agent.agentId,
+        }),
+      ]),
+    )
+  })
+
+  it('recovers an archived agent and emits an agent-recovered event', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+    const events: AgentEvent[] = []
+    driver.subscribe((event) => {
+      events.push(event)
+    })
+
+    const agent = await driver.createAgent('归档后恢复')
+    await driver.archiveAgent(agent.agentId)
+
+    events.length = 0
+    const recovered = await driver.recoverAgent(agent.agentId)
+
+    expect(recovered.status).toBe('active')
+    expect(recovered.archivedAt).toBeNull()
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'agent-recovered',
+          agentId: agent.agentId,
+        }),
+      ]),
+    )
+  })
+
+  it('reconcileAgentDirectories returns healthy agents and detects unclaimed directories', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+
+    const agent = await driver.createAgent('对账测试助手')
+
+    const result = await driver.reconcileAgentDirectories()
+
+    expect(result.agents.some((a) => a.agentId === agent.agentId)).toBe(true)
+    expect(result.agents.some((a) => a.directoryStatus === 'healthy')).toBe(
+      true,
+    )
+    expect(Array.isArray(result.unclaimedDirectories)).toBe(true)
+  })
+
+  it('marks an agent as damaged when its home directory is missing soul.md', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+    const { rm } = await import('node:fs/promises')
+
+    const agent = await driver.createAgent('即将损坏')
+    // Remove soul.md to simulate damaged state
+    const soulPath = join(agent.homePath, 'soul.md')
+    await rm(soulPath)
+
+    const result = await driver.reconcileAgentDirectories()
+    const damaged = result.agents.find((a) => a.agentId === agent.agentId)
+
+    expect(damaged).toBeTruthy()
+    expect(damaged?.directoryStatus).toBe('damaged')
+  })
+
+  it('rebuilds tangyuan home directory from template', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, rootPath } = await createDriver({ gateway })
+    const { rm, access } = await import('node:fs/promises')
+    const { constants: fsConstants } = await import('node:fs')
+
+    // Remove tangyuan soul.md
+    const soulPath = join(rootPath, '.tangyuan/agents/tangyuan/soul.md')
+    await rm(soulPath, { force: true })
+
+    const summary = await driver.rebuildTangyuanHome()
+
+    expect(summary.directoryStatus).toBe('healthy')
+    expect(summary.agentId).toBe('tangyuan')
+
+    // Verify soul.md was recreated
+    await expect(access(soulPath, fsConstants.F_OK)).resolves.toBeUndefined()
+  })
+
+  it('claims an unclaimed directory and creates config entry', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, rootPath } = await createDriver({ gateway })
+    const { mkdir, writeFile } = await import('node:fs/promises')
+
+    // 手动创建一个未归属目录
+    const unclaimedPath = join(rootPath, '.tangyuan/agents/unclaimed-agent')
+    await mkdir(unclaimedPath, { recursive: true })
+    await writeFile(
+      join(unclaimedPath, 'soul.md'),
+      '# 未归属 Agent\n\n创建时间：2026-01-01T00:00:00.000Z\n',
+      'utf8',
+    )
+
+    // 先用对账发现它
+    const reconcileResult = await driver.reconcileAgentDirectories()
+    const found = reconcileResult.unclaimedDirectories.find(
+      (d) => d.agentId === 'unclaimed-agent',
+    )
+    expect(found).toBeTruthy()
+
+    // 认领它
+    const claimed = await driver.claimAgentDirectory(
+      'unclaimed-agent',
+      '认领的助手',
+    )
+
+    expect(claimed.agentId).toBe('unclaimed-agent')
+    expect(claimed.displayName).toBe('认领的助手')
+    expect(claimed.status).toBe('active')
+    expect(claimed.directoryStatus).toBe('healthy')
+
+    // 确认 listAgents 包含认领后 Agent
+    const agents = await driver.listAgents()
+    expect(agents.some((a) => a.agentId === 'unclaimed-agent')).toBe(true)
+  })
+
+  // ===== profile 测试 =====
+
+  it('reads soul content from the correct agent path', async () => {
+    const { driver, rootPath } = await createDriver()
+    const { writeFile } = await import('node:fs/promises')
+
+    // 先初始化 driver
+    await driver.getSnapshot()
+    // 写入一个已知的 soul.md
+    const resolvedHomePath = join(rootPath, '.tangyuan/agents/tangyuan')
+    await writeFile(
+      join(resolvedHomePath, 'soul.md'),
+      '# 汤圆\n自定义 soul 内容。',
+      'utf8',
+    )
+
+    const soul = await driver.getSoul('tangyuan')
+
+    expect(soul.agentId).toBe('tangyuan')
+    expect(soul.content).toBe('# 汤圆\n自定义 soul 内容。')
+    expect(soul.updatedAt).toBeTruthy()
+  })
+
+  it('reads shared user profile from the shared profile path', async () => {
+    const { driver, rootPath } = await createDriver()
+    const { mkdir, writeFile } = await import('node:fs/promises')
+
+    // 先初始化 driver
+    await driver.getSnapshot()
+    // 写入共享 user profile
+    const profileDir = join(rootPath, '.tangyuan/profile')
+    await mkdir(profileDir, { recursive: true })
+    await mkdir(join(profileDir, 'user.history'), { recursive: true })
+    await writeFile(
+      join(profileDir, 'user.md'),
+      '# User\n共享用户偏好。',
+      'utf8',
+    )
+
+    const userProfile = await driver.getUserProfile()
+
+    expect(userProfile.content).toBe('# User\n共享用户偏好。')
+    expect(userProfile.updatedAt).toBeTruthy()
+  })
+
+  it('migrates legacy user.md from tangyuan agent directory to shared profile path', async () => {
+    const { driver, rootPath } = await createDriver()
+    const { writeFile, readFile } = await import('node:fs/promises')
+
+    // 先初始化 driver 创建目录
+    await driver.getSnapshot()
+
+    // 模拟旧结构：在 tangyuan agent 目录下写入 user.md
+    const agentDir = join(rootPath, '.tangyuan/agents/tangyuan')
+    await writeFile(
+      join(agentDir, 'user.md'),
+      '# Legacy User\n旧用户资料。',
+      'utf8',
+    )
+
+    // 读取 user profile 应触发迁移
+    const userProfile = await driver.getUserProfile()
+
+    expect(userProfile.content).toBe('# Legacy User\n旧用户资料。')
+
+    // 验证文件已迁移到共享路径
+    const sharedPath = join(rootPath, '.tangyuan/profile/user.md')
+    const migratedContent = await readFile(sharedPath, 'utf8')
+    expect(migratedContent).toBe('# Legacy User\n旧用户资料。')
+  })
+
+  it('updates an agent soul and emits a profile-updated event', async () => {
+    const { driver, rootPath } = await createDriver()
+    const { writeFile } = await import('node:fs/promises')
+
+    await driver.getSnapshot()
+
+    // 写入初始 soul
+    const resolvedHomePath = join(rootPath, '.tangyuan/agents/tangyuan')
+    await writeFile(
+      join(resolvedHomePath, 'soul.md'),
+      '# 汤圆\n旧 soul。',
+      'utf8',
+    )
+
+    // 监听事件
+    const events: AgentEvent[] = []
+    driver.subscribe((event) => {
+      events.push(event)
+    })
+
+    // 备份（模拟 Agent 先备份再更新）
+    const historyDir = join(resolvedHomePath, 'soul.history')
+    const { writeFile: fsWriteFile } = await import('node:fs/promises')
+    await fsWriteFile(
+      join(historyDir, '2026-07-17-backup.md'),
+      '# 汤圆\n旧 soul。',
+      'utf8',
+    )
+
+    const result = await driver.updateSoul(
+      'tangyuan',
+      '# 汤圆\n新 soul 内容。',
+      'tangyuan',
+    )
+
+    expect(result.success).toBe(true)
+    expect(result.target).toBe('soul')
+
+    // 验证文件已更新
+    const { readFile } = await import('node:fs/promises')
+    const updatedContent = await readFile(
+      join(resolvedHomePath, 'soul.md'),
+      'utf8',
+    )
+    expect(updatedContent).toBe('# 汤圆\n新 soul 内容。')
+
+    // 验证事件已发出
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'profile-updated',
+          target: 'soul',
+        }),
+      ]),
+    )
+  })
+
+  it('rejects soul update from another agent (access control)', async () => {
+    const { driver } = await createDriver()
+
+    await driver.getSnapshot()
+
+    // Agent B 尝试更新 Agent A 的 soul
+    const result = await driver.updateSoul('agent-a', '# New soul', 'agent-b')
+
+    expect(result.success).toBe(false)
+    expect(result.reason).toContain('无权修改')
+    expect(result.reason).toContain('agent-a')
+  })
+
+  it('allows tangyuan to update another agent soul (for creation)', async () => {
+    const { driver, rootPath } = await createDriver()
+    const { mkdir, writeFile } = await import('node:fs/promises')
+
+    await driver.getSnapshot()
+
+    // 为 agent-b 创建目录结构
+    const agentBPath = join(rootPath, '.tangyuan/agents/agent-b')
+    await mkdir(agentBPath, { recursive: true })
+    await mkdir(join(agentBPath, 'soul.history'), { recursive: true })
+    await mkdir(join(agentBPath, 'memory'), { recursive: true })
+    await mkdir(join(agentBPath, 'skills'), { recursive: true })
+
+    // 备份
+    await writeFile(join(agentBPath, 'soul.history/backup.md'), '', 'utf8')
+
+    // 汤圆（tangyuan）更新 agent-b 的 soul
+    const result = await driver.updateSoul(
+      'agent-b',
+      '# Agent B\n新创建 Agent 的初始 soul。',
+      'tangyuan',
+    )
+
+    expect(result.success).toBe(true)
+
+    // 验证文件已创建
+    const { readFile } = await import('node:fs/promises')
+    const content = await readFile(join(agentBPath, 'soul.md'), 'utf8')
+    expect(content).toContain('新创建 Agent')
+  })
+
+  it('filters sensitive content from soul updates', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, rootPath } = await createDriver({ gateway })
+    const { writeFile } = await import('node:fs/promises')
+
+    await driver.getSnapshot()
+
+    // 先保存一个 API Key 配置
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    // 重新获取 driver 状态
+    const resolvedHomePath = join(rootPath, '.tangyuan/agents/tangyuan')
+    await writeFile(
+      join(resolvedHomePath, 'soul.md'),
+      '# 汤圆\n旧 soul。',
+      'utf8',
+    )
+
+    // 备份
+    const historyDir = join(resolvedHomePath, 'soul.history')
+    await writeFile(join(historyDir, 'backup.md'), '# 汤圆\n旧 soul。', 'utf8')
+
+    // 尝试写入含 API Key 的内容
+    const result = await driver.updateSoul(
+      'tangyuan',
+      '# 汤圆\n我的 API Key 是 sk-test-secret-7890。',
+      'tangyuan',
+    )
+
+    expect(result.success).toBe(true)
+
+    // 验证敏感内容已脱敏
+    const { readFile } = await import('node:fs/promises')
+    const content = await readFile(join(resolvedHomePath, 'soul.md'), 'utf8')
+    expect(content).not.toContain('sk-test-secret-7890')
+    expect(content).toContain('[已隐藏敏感凭据]')
+  })
+
+  it('rejects soul update when no backup exists', async () => {
+    const { driver, rootPath } = await createDriver()
+    const { writeFile } = await import('node:fs/promises')
+
+    await driver.getSnapshot()
+
+    // 写入初始 soul（不创建备份）
+    const resolvedHomePath = join(rootPath, '.tangyuan/agents/tangyuan')
+    await writeFile(
+      join(resolvedHomePath, 'soul.md'),
+      '# 汤圆\n旧 soul。',
+      'utf8',
+    )
+
+    // 尝试更新 soul 但未备份
+    const result = await driver.updateSoul(
+      'tangyuan',
+      '# 汤圆\n新 soul（无备份）。',
+      'tangyuan',
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.reason).toContain('备份')
+  })
+
+  it('updates shared user profile and emits a profile-updated event', async () => {
+    const { driver, rootPath } = await createDriver()
+    const { mkdir, writeFile } = await import('node:fs/promises')
+
+    await driver.getSnapshot()
+
+    // 确保共享 profile 目录存在并写入初始 user.md
+    const profileDir = join(rootPath, '.tangyuan/profile')
+    await mkdir(profileDir, { recursive: true })
+    await mkdir(join(profileDir, 'user.history'), { recursive: true })
+    await writeFile(join(profileDir, 'user.md'), '# User\n旧偏好。', 'utf8')
+
+    // 监听事件
+    const events: AgentEvent[] = []
+    driver.subscribe((event) => {
+      events.push(event)
+    })
+
+    // 备份
+    await writeFile(
+      join(profileDir, 'user.history/backup.md'),
+      '# User\n旧偏好。',
+      'utf8',
+    )
+
+    const result = await driver.updateUserProfile('# User\n新用户偏好。')
+
+    expect(result.success).toBe(true)
+    expect(result.target).toBe('user')
+
+    // 验证文件已更新
+    const { readFile } = await import('node:fs/promises')
+    const content = await readFile(join(profileDir, 'user.md'), 'utf8')
+    expect(content).toBe('# User\n新用户偏好。')
+
+    // 验证事件已发出
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'profile-updated',
+          target: 'user',
+        }),
+      ]),
+    )
+  })
+
+  it('filters sensitive content from user profile updates', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, rootPath } = await createDriver({ gateway })
+    const { mkdir, writeFile } = await import('node:fs/promises')
+
+    await driver.getSnapshot()
+
+    // 先保存配置
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    // 确保共享 profile 目录存在
+    const profileDir = join(rootPath, '.tangyuan/profile')
+    await mkdir(profileDir, { recursive: true })
+    await mkdir(join(profileDir, 'user.history'), { recursive: true })
+    await writeFile(join(profileDir, 'user.md'), '# User\n旧偏好。', 'utf8')
+
+    // 备份
+    await writeFile(
+      join(profileDir, 'user.history/backup.md'),
+      '# User\n旧偏好。',
+      'utf8',
+    )
+
+    // 尝试写入含敏感信息的内容
+    const result = await driver.updateUserProfile(
+      '# User\npassword: my-secret-pwd',
+    )
+
+    expect(result.success).toBe(true)
+
+    // 验证敏感内容已脱敏
+    const { readFile } = await import('node:fs/promises')
+    const content = await readFile(join(profileDir, 'user.md'), 'utf8')
+    expect(content).not.toContain('my-secret-pwd')
+    expect(content).toContain('[已隐藏敏感凭据]')
+  })
 })
 
-async function createDriver(options: {
-  gateway?: PiSdkGateway
-  encryptionAdapter?: ConfigEncryptionAdapter | null
-} = {}) {
+async function createDriver(
+  options: {
+    gateway?: PiSdkGateway
+    encryptionAdapter?: ConfigEncryptionAdapter | null
+  } = {},
+) {
   const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-agent-runtime-'))
   const userDataPath = join(rootPath, 'Library/Application Support/Tangyuan')
   tempDirs.push(rootPath)
@@ -2482,11 +3618,13 @@ async function createDriver(options: {
  * 写入已初始化的默认 profile 文件和历史目录，用于测试常规维护回合。
  *
  * @param resolvedHomePath - 已解析到临时文件系统里的 Agent Home 绝对路径。
+ * @param rootPath - 临时文件系统根路径，用于写入共享 user profile。
  * @returns 无返回值。
  * @throws 当目录创建或文件写入失败时，Promise 会 reject。
  */
 async function writeInitializedProfile(
   resolvedHomePath: string,
+  rootPath?: string,
 ): Promise<void> {
   await import('node:fs/promises').then(async ({ mkdir }) => {
     await mkdir(join(resolvedHomePath, 'soul.history'), { recursive: true })
@@ -2497,6 +3635,20 @@ async function writeInitializedProfile(
     '# Soul\n只说中文。',
     'utf8',
   )
+  // 写入共享 user profile 路径（新架构）
+  if (rootPath) {
+    const profileDir = join(rootPath, '.tangyuan/profile')
+    await import('node:fs/promises').then(async ({ mkdir }) => {
+      await mkdir(profileDir, { recursive: true })
+      await mkdir(join(profileDir, 'user.history'), { recursive: true })
+    })
+    await writeFile(
+      join(profileDir, 'user.md'),
+      '# User\n用户喜欢简洁回答。',
+      'utf8',
+    )
+  }
+  // 同时保留 agent 目录下的 user.md 用于兼容旧测试
   await writeFile(
     join(resolvedHomePath, 'user.md'),
     '# User\n用户喜欢简洁回答。',
@@ -2551,7 +3703,10 @@ function createFakeEncryptionAdapter(): ConfigEncryptionAdapter {
       if (!ciphertext.startsWith('encrypted:')) {
         throw new Error('Invalid fake ciphertext')
       }
-      return Buffer.from(ciphertext.slice('encrypted:'.length), 'base64').toString('utf8')
+      return Buffer.from(
+        ciphertext.slice('encrypted:'.length),
+        'base64',
+      ).toString('utf8')
     },
     isAvailable: () => true,
   }

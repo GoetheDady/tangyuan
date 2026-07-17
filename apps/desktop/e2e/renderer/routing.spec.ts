@@ -3,7 +3,7 @@ import {
   createReadyRuntimeSnapshot,
   createMissingConfigSnapshot,
   createTestSessions,
-  createPreloadApiInitScript,
+  createPreloadApiInitScript
 } from '../fixtures/preload-mock'
 
 test.describe('路由导航', () => {
@@ -43,7 +43,11 @@ test.describe('路由导航', () => {
     await page.goto('/#/console/agents')
 
     await expect(page.getByRole('heading', { name: 'Agent 管理' })).toBeVisible()
-    await expect(page.getByText('Agent 列表即将上线')).toBeVisible()
+    // 默认 Agent "汤圆" 始终存在，显示活跃状态
+    await expect(page.getByRole('heading', { name: '汤圆', level: 3 })).toBeVisible()
+    // 默认 Agent "汤圆" 显示 Agent ID 和活跃状态
+    await expect(page.getByText('ID：tangyuan')).toBeVisible()
+    await expect(page.getByText('活跃')).toBeVisible()
   })
 
   test('直接访问 /#/console/agents/:agentId 渲染 Agent 详情页', async ({ page }) => {

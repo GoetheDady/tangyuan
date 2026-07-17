@@ -4,13 +4,25 @@ import {
   DESKTOP_IPC_CHANNELS,
   TANGYUAN_DEFAULT_AGENT_ID,
   agentEventSchema,
+  agentSkillsStatusSchema,
   createAgentProfileStatus,
   createSessionRequestSchema,
   createDefaultSessionSummary,
   createRuntimeSnapshot,
+  getSoulRequestSchema,
+  listAgentSkillsRequestSchema,
   migrateConfigV1ToV2,
   persistedConfigurationV2Schema,
+  profileMaintenanceResultSchema,
   runtimeSnapshotSchema,
+  skillSummarySchema,
+  skillApprovalRequestSchema,
+  skillOperationParamsSchema,
+  skillInstallRecordSchema,
+  soulContentSchema,
+  updateSoulRequestSchema,
+  updateUserProfileRequestSchema,
+  userProfileContentSchema,
   type PersistedConfigurationV1,
   type ProviderAuthSnapshot,
   type RuntimeSnapshotInput,
@@ -45,6 +57,24 @@ describe('contracts schemas', () => {
         occurredAt: '2026-07-16T00:00:00.000Z',
       }),
     ).toThrow()
+  })
+
+  it('accepts run-state-changed events with the queued state', () => {
+    expect(
+      agentEventSchema.parse({
+        type: 'run-state-changed',
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        state: 'queued',
+        occurredAt: '2026-07-17T00:00:00.000Z',
+      }),
+    ).toEqual({
+      type: 'run-state-changed',
+      agentId: 'tangyuan',
+      sessionId: 'session-1',
+      state: 'queued',
+      occurredAt: '2026-07-17T00:00:00.000Z',
+    })
   })
 
   it('rejects an empty session title at the IPC contract boundary', () => {
@@ -289,6 +319,31 @@ describe('DESKTOP_IPC_CHANNELS', () => {
       sessionsGetMessages: 'tangyuan:sessions:get-messages',
       sessionsSendMessage: 'tangyuan:sessions:send-message',
       sessionsCancelRun: 'tangyuan:sessions:cancel-run',
+      sessionsApproveBash: 'tangyuan:sessions:approve-bash',
+      sessionsRejectBash: 'tangyuan:sessions:reject-bash',
+      sessionsGetPendingApprovals: 'tangyuan:sessions:get-pending-approvals',
+      agentsArchive: 'tangyuan:agents:archive',
+      agentsClaimDirectory: 'tangyuan:agents:claim-directory',
+      agentsList: 'tangyuan:agents:list',
+      agentsRebuildTangyuan: 'tangyuan:agents:rebuild-tangyuan',
+      agentsReconcile: 'tangyuan:agents:reconcile',
+      agentsRecover: 'tangyuan:agents:recover',
+      agentsUpdateConfig: 'tangyuan:agents:update-config',
+      sessionsGetModelInfo: 'tangyuan:sessions:get-model-info',
+      sessionsSetModel: 'tangyuan:sessions:set-model',
+      sessionsSetThinkingLevel: 'tangyuan:sessions:set-thinking-level',
+      profileGetSoul: 'tangyuan:profile:get-soul',
+      profileGetUser: 'tangyuan:profile:get-user',
+      profileUpdateSoul: 'tangyuan:profile:update-soul',
+      profileUpdateUser: 'tangyuan:profile:update-user',
+      skillsListAgent: 'tangyuan:skills:list-agent',
+      skillsListShared: 'tangyuan:skills:list-shared',
+      skillsInstall: 'tangyuan:skills:install',
+      skillsDelete: 'tangyuan:skills:delete',
+      skillsApproveOperation: 'tangyuan:skills:approve-operation',
+      skillsRejectOperation: 'tangyuan:skills:reject-operation',
+      skillsGetPendingApprovals: 'tangyuan:skills:get-pending-approvals',
+      skillsGetInstallRecords: 'tangyuan:skills:get-install-records',
       openExternalLink: 'tangyuan:open-external-link',
     })
   })
@@ -304,8 +359,7 @@ describe('DESKTOP_IPC_CHANNELS', () => {
 function createRuntimeSnapshotInput(
   overrides: Partial<RuntimeSnapshotInput> = {},
 ): RuntimeSnapshotInput {
-  const selectedProviderId =
-    overrides.settings?.selectedProviderId ?? 'openai'
+  const selectedProviderId = overrides.settings?.selectedProviderId ?? 'openai'
   const apiKeyConfigured = overrides.auth?.apiKey?.configured ?? true
 
   const defaultConfiguredProviders: Record<string, ProviderAuthSnapshot> =
@@ -415,7 +469,10 @@ describe('migrateConfigV1ToV2', () => {
       providers: Object.fromEntries(
         Object.entries(internal.providers).map(([id, creds]) => [
           id,
-          { encryptedApiKey: `encrypted:${creds.apiKey}`, updatedAt: creds.updatedAt },
+          {
+            encryptedApiKey: `encrypted:${creds.apiKey}`,
+            updatedAt: creds.updatedAt,
+          },
         ]),
       ),
       agents: internal.agents,
@@ -443,5 +500,329 @@ describe('createAgentProfileStatus', () => {
       soulUpdatedAt: '2026-07-08T00:00:00.000Z',
       userUpdatedAt: '2026-07-08T00:00:00.000Z',
     })
+  })
+})
+
+describe('profile schemas', () => {
+  it('accepts valid soul content', () => {
+    expect(
+      soulContentSchema.parse({
+        agentId: 'agent-1',
+        content: '# Soul\n\nAgent identity rules.',
+        updatedAt: '2026-07-17T00:00:00.000Z',
+      }),
+    ).toEqual({
+      agentId: 'agent-1',
+      content: '# Soul\n\nAgent identity rules.',
+      updatedAt: '2026-07-17T00:00:00.000Z',
+    })
+  })
+
+  it('accepts valid user profile content', () => {
+    expect(
+      userProfileContentSchema.parse({
+        content: '# User\n\nUser preferences.',
+        updatedAt: '2026-07-17T00:00:00.000Z',
+      }),
+    ).toEqual({
+      content: '# User\n\nUser preferences.',
+      updatedAt: '2026-07-17T00:00:00.000Z',
+    })
+  })
+
+  it('accepts successful profile maintenance result', () => {
+    expect(
+      profileMaintenanceResultSchema.parse({
+        target: 'soul',
+        success: true,
+      }),
+    ).toEqual({ target: 'soul', success: true })
+  })
+
+  it('accepts failed profile maintenance result with reason', () => {
+    expect(
+      profileMaintenanceResultSchema.parse({
+        target: 'user',
+        success: false,
+        reason: '缺少更新前备份',
+      }),
+    ).toEqual({ target: 'user', success: false, reason: '缺少更新前备份' })
+  })
+
+  it('rejects empty soul content in update request', () => {
+    expect(() =>
+      updateSoulRequestSchema.parse({
+        agentId: 'agent-1',
+        content: '   ',
+      }),
+    ).toThrow()
+  })
+
+  it('accepts valid update soul request', () => {
+    expect(
+      updateSoulRequestSchema.parse({
+        agentId: 'agent-1',
+        content: 'New soul content.',
+      }),
+    ).toEqual({ agentId: 'agent-1', content: 'New soul content.' })
+  })
+
+  it('rejects empty user profile content in update request', () => {
+    expect(() =>
+      updateUserProfileRequestSchema.parse({
+        content: '   ',
+      }),
+    ).toThrow()
+  })
+
+  it('accepts valid update user profile request', () => {
+    expect(
+      updateUserProfileRequestSchema.parse({
+        content: 'New user profile.',
+      }),
+    ).toEqual({ content: 'New user profile.' })
+  })
+
+  it('rejects get soul request without agentId', () => {
+    expect(() =>
+      getSoulRequestSchema.parse({
+        agentId: '',
+      }),
+    ).toThrow()
+  })
+
+  it('accepts valid get soul request', () => {
+    expect(
+      getSoulRequestSchema.parse({
+        agentId: 'agent-1',
+      }),
+    ).toEqual({ agentId: 'agent-1' })
+  })
+
+  it('accepts valid skill summary with agent source', () => {
+    expect(
+      skillSummarySchema.parse({
+        name: 'my-skill',
+        description: 'A useful skill.',
+        source: 'agent',
+        path: '/skills/my-skill/SKILL.md',
+        hasScripts: false,
+      }),
+    ).toEqual({
+      name: 'my-skill',
+      description: 'A useful skill.',
+      source: 'agent',
+      path: '/skills/my-skill/SKILL.md',
+      hasScripts: false,
+    })
+  })
+
+  it('accepts skill summary with conflict info', () => {
+    expect(
+      skillSummarySchema.parse({
+        name: 'shared-skill',
+        description: 'Description.',
+        source: 'agent',
+        path: '/agents/a1/skills/shared-skill/SKILL.md',
+        conflict: {
+          overriddenPath: '/skills/shared-skill/SKILL.md',
+          overriddenSource: 'shared',
+        },
+        hasScripts: true,
+      }),
+    ).toEqual({
+      name: 'shared-skill',
+      description: 'Description.',
+      source: 'agent',
+      path: '/agents/a1/skills/shared-skill/SKILL.md',
+      conflict: {
+        overriddenPath: '/skills/shared-skill/SKILL.md',
+        overriddenSource: 'shared',
+      },
+      hasScripts: true,
+    })
+  })
+
+  it('rejects skill summary with invalid source', () => {
+    expect(() =>
+      skillSummarySchema.parse({
+        name: 'skill',
+        description: 'desc',
+        source: 'invalid',
+        path: '/path',
+        hasScripts: false,
+      }),
+    ).toThrow()
+  })
+
+  it('accepts valid agent skills status', () => {
+    expect(
+      agentSkillsStatusSchema.parse({
+        agentId: 'agent-1',
+        skills: [
+          {
+            name: 'skill-1',
+            description: 'A skill.',
+            source: 'agent',
+            path: '/agents/a1/skills/skill-1/SKILL.md',
+            hasScripts: false,
+          },
+        ],
+        sharedSkillsCount: 3,
+        agentSkillsCount: 1,
+        conflictsCount: 0,
+      }),
+    ).toEqual({
+      agentId: 'agent-1',
+      skills: [
+        {
+          name: 'skill-1',
+          description: 'A skill.',
+          source: 'agent',
+          path: '/agents/a1/skills/skill-1/SKILL.md',
+          hasScripts: false,
+        },
+      ],
+      sharedSkillsCount: 3,
+      agentSkillsCount: 1,
+      conflictsCount: 0,
+    })
+  })
+
+  it('accepts valid list agent skills request', () => {
+    expect(listAgentSkillsRequestSchema.parse({ agentId: 'agent-1' })).toEqual({
+      agentId: 'agent-1',
+    })
+  })
+
+  it('rejects list agent skills request without agentId', () => {
+    expect(() => listAgentSkillsRequestSchema.parse({ agentId: '' })).toThrow()
+  })
+})
+
+describe('Skill schemas', () => {
+  it('accepts a valid skill approval request', () => {
+    expect(
+      skillApprovalRequestSchema.parse({
+        approvalId: 'approval-1',
+        agentId: 'tangyuan',
+        operation: 'install',
+        source: 'shared',
+        skillName: 'code-review',
+        description: 'Review code changes',
+        hasScripts: false,
+        status: 'pending',
+        createdAt: '2026-07-17T00:00:00.000Z',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('accepts a skill approval request with conflict info', () => {
+    expect(
+      skillApprovalRequestSchema.parse({
+        approvalId: 'approval-2',
+        agentId: 'agent-1',
+        operation: 'install',
+        source: 'agent',
+        targetAgentId: 'agent-1',
+        skillName: 'code-review',
+        description: 'Review code changes',
+        hasScripts: true,
+        conflict: {
+          overriddenPath: '/shared/skills/code-review',
+          overriddenSource: 'shared',
+        },
+        status: 'pending',
+        createdAt: '2026-07-17T00:00:00.000Z',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('rejects skill approval request with invalid operation', () => {
+    expect(() =>
+      skillApprovalRequestSchema.parse({
+        approvalId: 'approval-1',
+        agentId: 'tangyuan',
+        operation: 'invalid',
+        source: 'shared',
+        skillName: 'test',
+        description: '',
+        hasScripts: false,
+        status: 'pending',
+        createdAt: '2026-07-17T00:00:00.000Z',
+      }),
+    ).toThrow()
+  })
+
+  it('accepts valid skill operation params for install', () => {
+    expect(
+      skillOperationParamsSchema.parse({
+        operation: 'install',
+        source: 'shared',
+        agentId: 'tangyuan',
+        skillName: 'test-skill',
+        skillDirPath: '/tmp/test-skill',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('accepts valid skill operation params for delete without dir path', () => {
+    expect(
+      skillOperationParamsSchema.parse({
+        operation: 'delete',
+        source: 'agent',
+        agentId: 'agent-1',
+        targetAgentId: 'agent-1',
+        skillName: 'test-skill',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('rejects skill operation params with invalid source', () => {
+    expect(() =>
+      skillOperationParamsSchema.parse({
+        operation: 'install',
+        source: 'invalid',
+        agentId: 'tangyuan',
+        skillName: 'test',
+      }),
+    ).toThrow()
+  })
+
+  it('accepts a valid skill install record', () => {
+    expect(
+      skillInstallRecordSchema.parse({
+        skillName: 'code-review',
+        source: 'shared',
+        installedAt: '2026-07-17T00:00:00.000Z',
+        updatedAt: '2026-07-17T00:00:00.000Z',
+        status: 'active',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('accepts a deleted skill install record', () => {
+    expect(
+      skillInstallRecordSchema.parse({
+        skillName: 'code-review',
+        source: 'agent',
+        targetAgentId: 'agent-1',
+        installedAt: '2026-07-17T00:00:00.000Z',
+        updatedAt: '2026-07-17T00:00:00.000Z',
+        status: 'deleted',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('rejects skill install record with invalid status', () => {
+    expect(() =>
+      skillInstallRecordSchema.parse({
+        skillName: 'test',
+        source: 'shared',
+        installedAt: '2026-07-17T00:00:00.000Z',
+        updatedAt: '2026-07-17T00:00:00.000Z',
+        status: 'removed',
+      }),
+    ).toThrow()
   })
 })

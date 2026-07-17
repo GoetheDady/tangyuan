@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import {
   createReadyRuntimeSnapshot,
   createMissingConfigSnapshot,
-  createPreloadApiInitScript,
+  createPreloadApiInitScript
 } from '../fixtures/preload-mock'
 
 test.describe('配置阻断', () => {
@@ -117,8 +117,8 @@ test.describe('配置阻断', () => {
         sessionId: 'session-1',
         title: '已存在的会话',
         state: 'idle' as const,
-        updatedAt: new Date().toISOString(),
-      },
+        updatedAt: new Date().toISOString()
+      }
     ]
     const initScript = createPreloadApiInitScript(runtime, sessions)
 
@@ -149,9 +149,9 @@ test.describe('配置阻断', () => {
     await page.goto('/#/console/providers')
     await page.waitForSelector('#provider')
 
-    await expect(page.getByText('首次使用前')).toBeVisible()
+    await expect(page.getByText('控制台')).toBeVisible()
     await expect(
-      page.getByText('选择 Provider、模型并验证 API Key。完成后会直接进入聊天主界面。'),
+      page.getByText('选择 Provider、模型并验证 API Key。完成后会直接进入聊天主界面。')
     ).toBeVisible()
   })
 })

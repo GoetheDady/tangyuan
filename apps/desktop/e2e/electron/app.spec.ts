@@ -29,8 +29,8 @@ test.describe('Electron 窗口', () => {
         ...process.env,
         HOME: tempHome,
         // 确保不会触发打包 smoke test 模式
-        TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: '',
-      },
+        TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: ''
+      }
     })
 
     // 等待第一个窗口加载完成
@@ -88,14 +88,20 @@ test.describe('Electron 窗口', () => {
 
     // 根据 smoke test 的分类逻辑：页面应显示 setup 或 chat
     const isSetupPage =
-      bodyText.includes('配置模型服务') && bodyText.includes('Provider') && bodyText.includes('API Key')
-    const isChatPage =
-      bodyText.includes('大语言模型对话') && bodyText.includes('新会话')
+      bodyText.includes('配置模型服务') &&
+      bodyText.includes('Provider') &&
+      bodyText.includes('API Key')
+    const isChatPage = bodyText.includes('大语言模型对话') && bodyText.includes('新会话')
 
     expect(isSetupPage || isChatPage).toBe(true)
   })
 
   test('HashRouter 正确导航', async () => {
+    // 等待 React Router 完成启动时重定向（Navigate 组件在渲染后更新 hash）
+    await mainWindow.waitForFunction(() => {
+      return window.location.hash.length > 0
+    })
+
     const currentUrl = await mainWindow.evaluate(() => {
       return window.location.hash
     })

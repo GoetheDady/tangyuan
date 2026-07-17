@@ -6,6 +6,7 @@ import { createTangyuanRuntime } from '@tangyuan/agent-runtime'
 import type { ConfigEncryptionAdapter } from '@tangyuan/agent-runtime'
 import { DESKTOP_AGENT_EVENT_CHANNEL } from '@tangyuan/contracts'
 import icon from '../../resources/icon.png?asset'
+import { buildContentSecurityPolicy } from './content-security-policy'
 import { registerDesktopAppIpc } from './ipc'
 
 const encryptionAdapter: ConfigEncryptionAdapter = {
@@ -21,7 +22,7 @@ const encryptionAdapter: ConfigEncryptionAdapter = {
     }
     return safeStorage.decryptString(Buffer.from(ciphertext, 'base64'))
   },
-  isAvailable: (): boolean => safeStorage.isEncryptionAvailable(),
+  isAvailable: (): boolean => safeStorage.isEncryptionAvailable()
 }
 
 const tangyuanRuntime = createTangyuanRuntime({ encryptionAdapter })
@@ -37,35 +38,15 @@ let isQuittingAfterCancellingRuns = false
  * @throws 此方法不会主动抛出错误。
  */
 function registerContentSecurityPolicy(): void {
-  const isDevServer = is.dev && Boolean(process.env['ELECTRON_RENDERER_URL'])
-
-  // In development the Vite dev server runs on localhost; we need to allow
-  // WebSocket connections for HMR and inline style injection.
-  const connectSrc = isDevServer
-    ? `'self' ${new URL(process.env['ELECTRON_RENDERER_URL']!).origin} ws://localhost:*`
-    : `'self'`
-
-  const styleSrc = isDevServer ? `'self' 'unsafe-inline'` : `'self' 'unsafe-inline'`
-
-  const csp = [
-    "default-src 'self'",
-    `script-src 'self'`,
-    `style-src ${styleSrc}`,
-    "img-src 'self' data:",
-    "font-src 'self' data:",
-    `connect-src ${connectSrc}`,
-    "frame-src 'none'",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-  ].join('; ')
+  const rendererUrl = is.dev ? process.env['ELECTRON_RENDERER_URL'] : undefined
+  const csp = buildContentSecurityPolicy(rendererUrl)
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [csp],
-      },
+        'Content-Security-Policy': [csp]
+      }
     })
   })
 }

@@ -3,7 +3,7 @@ import {
   createReadyRuntimeSnapshot,
   createTestSessions,
   createLongTestMessage,
-  createPreloadApiInitScript,
+  createPreloadApiInitScript
 } from '../fixtures/preload-mock'
 
 test.describe('长消息布局', () => {

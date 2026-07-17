@@ -2,38 +2,57 @@ import type {
   AgentMessage,
   AgentRunState,
   AgentSessionSummary,
-  RuntimeSnapshot
+  AgentSummary,
+  BashApprovalRequest,
+  ModelDescriptor,
+  RuntimeSnapshot,
+  SessionModelInfo
 } from '@tangyuan/contracts'
-import { MessageSquarePlus, Send, Sparkles, StopCircle } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { MessageSquarePlus, Sparkles, StopCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
+import { Composer } from '@/components/Composer'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Textarea } from '@/components/ui/textarea'
+import { TranscriptMessages } from '@/components/TranscriptMessages'
 
 interface DesktopWorkbenchState {
   runtime: RuntimeSnapshot | null
+  agents: AgentSummary[]
   sessions: AgentSessionSummary[]
   selectedSessionId: string | null
   messages: AgentMessage[]
   composerText: string
   isLoading: boolean
   isSendingMessage: boolean
+  pendingApprovals: BashApprovalRequest[]
 }
 
 interface DesktopWorkbenchAction {
   setRuntime(value: RuntimeSnapshot | null): void
+  setAgents(value: AgentSummary[] | ((currentValue: AgentSummary[]) => AgentSummary[])): void
   setSessions(
     value: AgentSessionSummary[] | ((currentValue: AgentSessionSummary[]) => AgentSessionSummary[])
   ): void
-  setSelectedSessionId(value: string | null | ((currentValue: string | null) => string | null)): void
+  setSelectedSessionId(
+    value: string | null | ((currentValue: string | null) => string | null)
+  ): void
   setMessages(value: AgentMessage[] | ((currentValue: AgentMessage[]) => AgentMessage[])): void
   setComposerText(value: string): void
   setIsLoading(value: boolean): void
   setIsSendingMessage(value: boolean): void
+  setPendingApprovals(
+    value: BashApprovalRequest[] | ((currentValue: BashApprovalRequest[]) => BashApprovalRequest[])
+  ): void
 }
 
 interface DesktopWorkbenchContext extends DesktopWorkbenchState, DesktopWorkbenchAction {}
@@ -53,10 +72,10 @@ export function ChatGuard(props: { context: DesktopWorkbenchContext }): React.JS
   }
 
   if (props.context.runtime?.status !== 'ready') {
-    const redirectTarget = agentId
-      ? `/chat/${agentId}`
-      : '/chat/tangyuan'
-    return <Navigate to={`/console/providers?redirect=${encodeURIComponent(redirectTarget)}`} replace />
+    const redirectTarget = agentId ? `/chat/${agentId}` : '/chat/tangyuan'
+    return (
+      <Navigate to={`/console/providers?redirect=${encodeURIComponent(redirectTarget)}`} replace />
+    )
   }
 
   return <ChatPage context={props.context} />
@@ -75,13 +94,16 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
   const navigate = useNavigate()
   const activeAgentId = agentId ?? context.runtime?.activeAgent.agentId ?? 'tangyuan'
 
-  // 当 URL 中的 agentId 与运行时 activeAgent 不同时保持同步
-  useEffect(() => {
-    if (agentId && agentId !== context.runtime?.activeAgent.agentId) {
-      // MVP 只支持当前 activeAgent，后续多 Agent 时扩展
-      navigate(`/chat/${context.runtime?.activeAgent.agentId ?? 'tangyuan'}`, { replace: true })
-    }
-  }, [agentId, context.runtime?.activeAgent.agentId, navigate])
+  const activeAgent = useMemo(
+    () =>
+      context.agents.find((agent) => agent.agentId === activeAgentId) ??
+      context.runtime?.activeAgent,
+    [context.agents, activeAgentId, context.runtime?.activeAgent]
+  )
+  const activeAgentDisplayName =
+    'displayName' in (activeAgent ?? {})
+      ? (activeAgent as AgentSummary).displayName
+      : ((activeAgent as { displayName?: string })?.displayName ?? '汤圆')
 
   // 当 URL 中无 agentId 时补充默认值
   useEffect(() => {
@@ -90,6 +112,89 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     }
   }, [agentId, activeAgentId, sessionId, navigate])
 
+  const [sessionModelInfo, setSessionModelInfo] = useState<SessionModelInfo | null>(null)
+  const [isLoadingModelInfo, setIsLoadingModelInfo] = useState(false)
+  const [isSwitchingModel, setIsSwitchingModel] = useState(false)
+
+  // 当选中 session 变化时加载模型信息
+  useEffect(() => {
+    const currentSessionId = sessionId ?? context.selectedSessionId
+
+    if (!currentSessionId || !activeAgentId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 依赖变化时同步重置状态是预期行为
+      setSessionModelInfo(null)
+      return
+    }
+
+    setIsLoadingModelInfo(true)
+
+    void window.api
+      .getSessionModelInfo({
+        agentId: activeAgentId,
+        sessionId: currentSessionId
+      })
+      .then((info) => {
+        setSessionModelInfo(info)
+      })
+      .catch(() => {
+        // 模型信息不可用时静默处理
+        setSessionModelInfo(null)
+      })
+      .finally(() => {
+        setIsLoadingModelInfo(false)
+      })
+  }, [sessionId, context.selectedSessionId, activeAgentId])
+
+  // 根据 runtime 中的模型数据计算 selectableModels
+  const selectableModels = useMemo<ModelDescriptor[]>(() => {
+    if (!context.runtime || !sessionModelInfo) return []
+
+    return context.runtime.models.filter(
+      (model) => model.providerId === sessionModelInfo.providerId
+    )
+  }, [context.runtime, sessionModelInfo])
+
+  async function handleSessionModelChange(providerId: string, modelId: string): Promise<void> {
+    const currentSessionId = sessionId ?? context.selectedSessionId
+
+    if (!currentSessionId || !activeAgentId) return
+
+    setIsSwitchingModel(true)
+
+    try {
+      const info = await window.api.setSessionModel({
+        agentId: activeAgentId,
+        sessionId: currentSessionId,
+        providerId,
+        modelId
+      })
+      setSessionModelInfo(info)
+      toast.success(`已切换到 ${info.displayName}`)
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : '切换模型失败')
+    } finally {
+      setIsSwitchingModel(false)
+    }
+  }
+
+  async function handleThinkingLevelChange(level: string): Promise<void> {
+    const currentSessionId = sessionId ?? context.selectedSessionId
+
+    if (!currentSessionId || !activeAgentId) return
+
+    try {
+      const info = await window.api.setSessionThinkingLevel({
+        agentId: activeAgentId,
+        sessionId: currentSessionId,
+        level
+      })
+      setSessionModelInfo(info)
+      toast.success(`已切换到 Thinking Level: ${level}`)
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : '切换 Thinking Level 失败')
+    }
+  }
+
   const selectedSession = useMemo(
     () =>
       context.sessions.find((session) => session.sessionId === context.selectedSessionId) ??
@@ -97,21 +202,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
       null,
     [context.sessions, context.selectedSessionId]
   )
-  const visibleMessages = useMemo(
-    () => context.messages.filter(isDialogMessage),
-    [context.messages]
-  )
   const isSelectedSessionRunning = selectedSession?.state === 'running'
-
-  // 当 URL 中有 sessionId 时自动选中对应会话
-  useEffect(() => {
-    if (sessionId && sessionId !== context.selectedSessionId) {
-      const targetSession = context.sessions.find((s) => s.sessionId === sessionId)
-      if (targetSession) {
-        void openSession(targetSession)
-      }
-    }
-  }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * 创建默认 Agent 的新会话并放到列表顶部。
@@ -157,6 +248,16 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
       toast.error(error instanceof Error ? error.message : '读取会话消息失败')
     }
   }
+
+  // 当 URL 中有 sessionId 时自动选中对应会话
+  useEffect(() => {
+    if (sessionId && sessionId !== context.selectedSessionId) {
+      const targetSession = context.sessions.find((s) => s.sessionId === sessionId)
+      if (targetSession) {
+        void openSession(targetSession)
+      }
+    }
+  }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * 向当前会话发送用户消息。
@@ -237,13 +338,38 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
               <div className="grid size-9 place-items-center rounded-md bg-primary text-primary-foreground">
                 <Sparkles size={18} aria-hidden="true" />
               </div>
-              <div>
-                <h1 className="text-base font-semibold leading-5">
-                  {context.runtime?.activeAgent.displayName ?? '汤圆'}
-                </h1>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <h1 className="truncate text-base font-semibold leading-5">
+                    {activeAgentDisplayName}
+                  </h1>
+                </div>
                 <p className="text-xs text-muted-foreground">大语言模型对话</p>
               </div>
             </div>
+            {context.agents.length > 1 ? (
+              <div className="mt-3">
+                <select
+                  className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                  value={activeAgentId}
+                  onChange={(event) => {
+                    const nextAgentId = event.target.value
+                    navigate(`/chat/${nextAgentId}`, { replace: true })
+                    context.setSelectedSessionId(null)
+                    context.setMessages([])
+                    void window.api.listSessions().then((sessions) => {
+                      context.setSessions(sessions.filter((s) => s.agentId === nextAgentId))
+                    })
+                  }}
+                >
+                  {context.agents.map((agent) => (
+                    <option key={agent.agentId} value={agent.agentId}>
+                      {agent.displayName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </div>
 
           <div className="p-4">
@@ -276,7 +402,14 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                       navigate(`/chat/${activeAgentId}/${session.sessionId}`, { replace: true })
                     }}
                   >
-                    <span className="block truncate font-medium">{session.title}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="block truncate font-medium">{session.title}</span>
+                      {context.pendingApprovals.filter(
+                        (a) => a.sessionId === session.sessionId && a.status === 'pending'
+                      ).length > 0 && (
+                        <span className="inline-flex size-2 shrink-0 rounded-full bg-red-500" />
+                      )}
+                    </div>
                     <span className="mt-0.5 block text-xs text-muted-foreground">
                       {formatRunState(session.state)}
                     </span>
@@ -315,82 +448,162 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
             ) : null}
           </header>
 
-          <div
-            className="min-h-0 flex-1 overflow-y-auto px-8 py-7"
-            data-testid="message-scroll-area"
-          >
-            <div className="mx-auto flex max-w-3xl flex-col gap-5">
-              {visibleMessages.length ? (
-                visibleMessages.map((message) => (
-                  <article
-                    key={message.messageId}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[76%] min-w-0 rounded-lg px-4 py-3 text-sm leading-6 shadow-sm ${
-                        message.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'border bg-card text-card-foreground'
-                      }`}
-                    >
-                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <div className="grid min-h-[45vh] place-items-center text-center">
-                  <div>
-                    <div className="mx-auto mb-4 grid size-11 place-items-center rounded-md border bg-card">
-                      <Sparkles size={20} aria-hidden="true" />
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedSession ? '发送第一条消息开始会话。' : '创建新会话后开始。'}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+          <div className="min-h-0 flex-1 px-8 py-7">
+            <TranscriptMessages
+              messages={context.messages}
+              isStreaming={isSelectedSessionRunning}
+              sessionId={selectedSession?.sessionId ?? null}
+            />
           </div>
 
+          {/* 审批卡片区域 */}
+          {selectedSession && context.pendingApprovals.length > 0 && (
+            <div className="border-t bg-muted/20 px-8 py-4">
+              <div className="mx-auto max-w-3xl space-y-3">
+                {context.pendingApprovals
+                  .filter(
+                    (a) => a.sessionId === selectedSession.sessionId && a.status === 'pending'
+                  )
+                  .map((approval) => (
+                    <div
+                      key={approval.approvalId}
+                      className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 dark:border-yellow-700 dark:bg-yellow-950"
+                    >
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="rounded bg-yellow-200 px-2 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-800 dark:text-yellow-200">
+                          待审批
+                        </span>
+                        <span className="text-sm font-medium text-foreground">
+                          Bash 命令执行审批
+                        </span>
+                      </div>
+                      <pre className="mb-2 overflow-x-auto rounded bg-muted p-2 text-xs">
+                        <code>{approval.command}</code>
+                      </pre>
+                      <p className="mb-1 text-xs text-muted-foreground">工作目录：{approval.cwd}</p>
+                      <p className="mb-3 text-xs text-muted-foreground">
+                        {approval.riskDescription}
+                      </p>
+                      <p className="mb-3 text-xs text-red-600 dark:text-red-400">
+                        此命令将以当前 macOS 用户权限执行，请确认操作安全。
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                          onClick={() => {
+                            void window.api.approveBash({
+                              approvalId: approval.approvalId
+                            })
+                          }}
+                        >
+                          允许本次
+                        </button>
+                        <button
+                          className="inline-flex items-center rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            void window.api.rejectBash({
+                              approvalId: approval.approvalId
+                            })
+                          }}
+                        >
+                          拒绝
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
           <footer className="border-t bg-background px-8 py-4">
-            <form
-              className="mx-auto max-w-3xl"
-              onSubmit={(event) => {
-                event.preventDefault()
+            {/* Session 模型信息栏 */}
+            {selectedSession && sessionModelInfo && (
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">当前模型：</span>
+                {/* Provider 选择器 */}
+                <Select
+                  value={sessionModelInfo.providerId}
+                  onValueChange={() => {
+                    // 切换 Provider 时不清除 model，需等待用户选择新 model
+                  }}
+                  disabled={isSwitchingModel || isSelectedSessionRunning}
+                >
+                  <SelectTrigger className="h-7 w-auto gap-1 border-0 bg-muted px-2 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {context.runtime?.providers.map((provider) => (
+                      <SelectItem key={provider.providerId} value={provider.providerId}>
+                        {provider.displayName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <span className="text-muted-foreground">/</span>
+
+                {/* Model 选择器 */}
+                <Select
+                  value={sessionModelInfo.modelId}
+                  onValueChange={(modelId) => {
+                    if (sessionModelInfo.providerId) {
+                      void handleSessionModelChange(sessionModelInfo.providerId, modelId)
+                    }
+                  }}
+                  disabled={isSwitchingModel || isSelectedSessionRunning}
+                >
+                  <SelectTrigger className="h-7 w-auto gap-1 border-0 bg-muted px-2 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectableModels.map((model) => (
+                      <SelectItem key={model.modelId} value={model.modelId}>
+                        {model.displayName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Thinking Level 选择器 */}
+                {sessionModelInfo.supportsThinking &&
+                  sessionModelInfo.supportedThinkingLevels.length > 0 && (
+                    <>
+                      <span className="text-muted-foreground">·</span>
+                      <Select
+                        value={sessionModelInfo.thinkingLevel ?? 'off'}
+                        onValueChange={(level) => {
+                          void handleThinkingLevelChange(level)
+                        }}
+                        disabled={isSwitchingModel || isSelectedSessionRunning}
+                      >
+                        <SelectTrigger className="h-7 w-auto gap-1 border-0 bg-muted px-2 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sessionModelInfo.supportedThinkingLevels.map((level) => (
+                            <SelectItem key={level} value={level}>
+                              Thinking: {level}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
+
+                {isLoadingModelInfo && <span className="text-muted-foreground">加载中...</span>}
+              </div>
+            )}
+
+            <Composer
+              value={context.composerText}
+              onChange={context.setComposerText}
+              onSubmit={() => {
                 void sendMessage()
               }}
-            >
-              <div className="rounded-lg border bg-card p-2 shadow-sm">
-                <Label htmlFor="composer" className="sr-only">
-                  消息
-                </Label>
-                <Textarea
-                  id="composer"
-                  className="max-h-40 min-h-20 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
-                  placeholder="给汤圆发送消息"
-                  value={context.composerText}
-                  onChange={(event) => {
-                    context.setComposerText(event.target.value)
-                  }}
-                  disabled={context.isSendingMessage || isSelectedSessionRunning}
-                />
-                <div className="flex items-center justify-end">
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={
-                      context.isSendingMessage ||
-                      isSelectedSessionRunning ||
-                      !selectedSession ||
-                      !context.composerText.trim()
-                    }
-                  >
-                    <Send aria-hidden="true" />
-                    {context.isSendingMessage || isSelectedSessionRunning ? '发送中' : '发送'}
-                  </Button>
-                </div>
-              </div>
-            </form>
+              disabled={context.isSendingMessage || isSelectedSessionRunning || !selectedSession}
+              placeholder={`给${activeAgentDisplayName}发送消息`}
+              isSending={context.isSendingMessage || isSelectedSessionRunning}
+            />
           </footer>
         </section>
       </div>
@@ -422,6 +635,7 @@ export function LoadingScreen(): React.JSX.Element {
 function formatRunState(state: AgentRunState): string {
   const labels: Record<AgentRunState, string> = {
     idle: '空闲',
+    queued: '排队中',
     running: '运行中',
     completed: '已完成',
     cancelled: '已取消',
@@ -429,15 +643,4 @@ function formatRunState(state: AgentRunState): string {
   }
 
   return labels[state]
-}
-
-/**
- * 判断消息是否属于聊天主界面可展示的对话消息。
- *
- * @param message - transcript 中的单条消息。
- * @returns 用户消息或模型消息返回 true，系统消息返回 false。
- * @throws 此方法不会主动抛出错误。
- */
-function isDialogMessage(message: AgentMessage): boolean {
-  return message.role === 'user' || message.role === 'agent'
 }

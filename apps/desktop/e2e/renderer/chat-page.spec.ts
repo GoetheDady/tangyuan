@@ -3,7 +3,7 @@ import {
   createReadyRuntimeSnapshot,
   createTestSessions,
   createTestMessages,
-  createPreloadApiInitScript,
+  createPreloadApiInitScript
 } from '../fixtures/preload-mock'
 
 test.describe('聊天页', () => {
@@ -50,7 +50,7 @@ test.describe('聊天页', () => {
     // 用户消息和 Agent 回复都应渲染
     await expect(page.getByText('你好汤圆，请帮我写一段代码。')).toBeVisible()
     await expect(
-      page.getByText('你好！我很乐意帮你写代码。请告诉我你需要什么功能，我会为你生成相应的代码。'),
+      page.getByText('你好！我很乐意帮你写代码。请告诉我你需要什么功能，我会为你生成相应的代码。')
     ).toBeVisible()
   })
 

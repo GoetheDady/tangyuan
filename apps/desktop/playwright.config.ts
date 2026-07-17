@@ -22,18 +22,18 @@ export default defineConfig({
       testMatch: 'renderer/**/*.spec.ts',
       use: {
         bypassCSP: true,
-        baseURL: 'http://127.0.0.1:4173',
+        baseURL: 'http://127.0.0.1:4173'
       },
       webServer: {
         command: 'pnpm exec serve out/renderer -l 4173 --no-clipboard',
         port: 4173,
-        reuseExistingServer: !process.env['CI'],
-      },
+        reuseExistingServer: !process.env['CI']
+      }
     },
     {
       name: 'electron',
-      testMatch: 'electron/**/*.spec.ts',
+      testMatch: 'electron/**/*.spec.ts'
       // Electron 项目不使用 baseURL/webServer，在测试 fixture 中直接调用 electron.launch()
-    },
-  ],
+    }
+  ]
 })

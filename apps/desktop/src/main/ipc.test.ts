@@ -43,6 +43,87 @@ describe('registerDesktopAppIpc', () => {
       cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined),
       restoreFromBackup: vi.fn().mockResolvedValue(snapshot),
       resetConfiguration: vi.fn().mockResolvedValue(snapshot),
+      listAgents: vi.fn().mockResolvedValue(snapshot.agents),
+      createAgent: vi.fn(),
+      updateAgentConfig: vi.fn().mockResolvedValue(snapshot.agents[0]),
+      archiveAgent: vi.fn().mockResolvedValue(snapshot.agents[0]),
+      recoverAgent: vi.fn().mockResolvedValue(snapshot.agents[0]),
+      reconcileAgentDirectories: vi
+        .fn()
+        .mockResolvedValue({ agents: snapshot.agents, unclaimedDirectories: [] }),
+      claimAgentDirectory: vi.fn().mockResolvedValue(snapshot.agents[0]),
+      rebuildTangyuanHome: vi.fn().mockResolvedValue(snapshot.agents[0]),
+      getSessionModelInfo: vi.fn().mockResolvedValue({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        displayName: 'Claude Sonnet 4.5',
+        thinkingLevel: null,
+        supportedThinkingLevels: [],
+        supportsThinking: false
+      }),
+      setSessionModel: vi.fn().mockResolvedValue({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        displayName: 'Claude Sonnet 4.5',
+        thinkingLevel: null,
+        supportedThinkingLevels: [],
+        supportsThinking: false
+      }),
+      setSessionThinkingLevel: vi.fn().mockResolvedValue({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        displayName: 'Claude Sonnet 4.5',
+        thinkingLevel: 'medium',
+        supportedThinkingLevels: ['low', 'medium', 'high'],
+        supportsThinking: true
+      }),
+      getSoul: vi.fn().mockResolvedValue({
+        agentId: 'tangyuan',
+        content: '# Soul content',
+        updatedAt: '2026-07-08T00:00:00.000Z'
+      }),
+      getUserProfile: vi.fn().mockResolvedValue({
+        content: '# User profile',
+        updatedAt: '2026-07-08T00:00:00.000Z'
+      }),
+      updateSoul: vi.fn().mockResolvedValue({
+        target: 'soul',
+        success: true
+      }),
+      updateUserProfile: vi.fn().mockResolvedValue({
+        target: 'user',
+        success: true
+      }),
+      reloadAgentSessions: vi.fn().mockResolvedValue(undefined),
+      reloadAllSessions: vi.fn().mockResolvedValue(undefined),
+      listAgentSkills: vi.fn().mockResolvedValue([
+        {
+          name: 'skill-1',
+          description: 'A skill.',
+          source: 'agent',
+          path: '/path/SKILL.md',
+          hasScripts: false
+        }
+      ]),
+      listSharedSkills: vi.fn().mockResolvedValue([
+        {
+          name: 'shared-skill',
+          description: 'A shared skill.',
+          source: 'shared',
+          path: '/skills/shared/SKILL.md',
+          hasScripts: false
+        }
+      ]),
+      approveBash: vi.fn().mockResolvedValue(undefined),
+      rejectBash: vi.fn().mockResolvedValue(undefined),
+      getPendingApprovals: vi.fn().mockReturnValue([]),
+      createToolApprovalGateway: vi.fn(),
+      installSkill: vi.fn().mockResolvedValue([]),
+      deleteSkill: vi.fn().mockResolvedValue([]),
+      approveSkillOperation: vi.fn().mockResolvedValue(undefined),
+      rejectSkillOperation: vi.fn().mockResolvedValue(undefined),
+      getPendingSkillApprovals: vi.fn().mockReturnValue([]),
+      getSkillInstallRecords: vi.fn().mockResolvedValue([])
     }
     const broadcastAgentEvent = vi.fn()
     const openExternalLink = vi.fn().mockResolvedValue(undefined)
@@ -56,7 +137,7 @@ describe('registerDesktopAppIpc', () => {
 
     registerDesktopAppIpc(ipcMain, runtime, broadcastAgentEvent, openExternalLink)
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(12)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(37)
     expect(broadcastAgentEvent).toHaveBeenCalledWith(createTurnStartedEvent())
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
@@ -135,6 +216,70 @@ describe('registerDesktopAppIpc', () => {
       agentId: 'tangyuan',
       sessionId: 'session-1'
     })
+
+    // Profile channel tests
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.profileGetSoul)(null, {
+        agentId: 'tangyuan'
+      })
+    ).resolves.toEqual({
+      agentId: 'tangyuan',
+      content: '# Soul content',
+      updatedAt: '2026-07-08T00:00:00.000Z'
+    })
+    expect(runtime.getSoul).toHaveBeenCalledWith('tangyuan')
+
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.profileGetUser)(null, undefined)
+    ).resolves.toEqual({
+      content: '# User profile',
+      updatedAt: '2026-07-08T00:00:00.000Z'
+    })
+    expect(runtime.getUserProfile).toHaveBeenCalledOnce()
+
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.profileUpdateSoul)(null, {
+        agentId: 'tangyuan',
+        content: 'New soul'
+      })
+    ).resolves.toEqual({ target: 'soul', success: true })
+    expect(runtime.updateSoul).toHaveBeenCalledWith('tangyuan', 'New soul')
+
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.profileUpdateUser)(null, {
+        content: 'New user profile'
+      })
+    ).resolves.toEqual({ target: 'user', success: true })
+    expect(runtime.updateUserProfile).toHaveBeenCalledWith('New user profile')
+
+    // Skills channel tests
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.skillsListAgent)(null, {
+        agentId: 'agent-1'
+      })
+    ).resolves.toEqual([
+      {
+        name: 'skill-1',
+        description: 'A skill.',
+        source: 'agent',
+        path: '/path/SKILL.md',
+        hasScripts: false
+      }
+    ])
+    expect(runtime.listAgentSkills).toHaveBeenCalledWith('agent-1')
+
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.skillsListShared)(null, undefined)
+    ).resolves.toEqual([
+      {
+        name: 'shared-skill',
+        description: 'A shared skill.',
+        source: 'shared',
+        path: '/skills/shared/SKILL.md',
+        hasScripts: false
+      }
+    ])
+    expect(runtime.listSharedSkills).toHaveBeenCalledOnce()
   })
 
   it('rejects malformed IPC payloads before they reach the runtime', async () => {
@@ -159,6 +304,71 @@ describe('registerDesktopAppIpc', () => {
       cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined),
       restoreFromBackup: vi.fn().mockResolvedValue(snapshot),
       resetConfiguration: vi.fn().mockResolvedValue(snapshot),
+      listAgents: vi.fn().mockResolvedValue([]),
+      createAgent: vi.fn(),
+      updateAgentConfig: vi.fn().mockResolvedValue(snapshot.agents[0]),
+      archiveAgent: vi.fn().mockResolvedValue(snapshot.agents[0]),
+      recoverAgent: vi.fn().mockResolvedValue(snapshot.agents[0]),
+      reconcileAgentDirectories: vi
+        .fn()
+        .mockResolvedValue({ agents: snapshot.agents, unclaimedDirectories: [] }),
+      claimAgentDirectory: vi.fn().mockResolvedValue(snapshot.agents[0]),
+      rebuildTangyuanHome: vi.fn().mockResolvedValue(snapshot.agents[0]),
+      getSessionModelInfo: vi.fn().mockResolvedValue({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        displayName: 'Claude Sonnet 4.5',
+        thinkingLevel: null,
+        supportedThinkingLevels: [],
+        supportsThinking: false
+      }),
+      setSessionModel: vi.fn().mockResolvedValue({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        displayName: 'Claude Sonnet 4.5',
+        thinkingLevel: null,
+        supportedThinkingLevels: [],
+        supportsThinking: false
+      }),
+      setSessionThinkingLevel: vi.fn().mockResolvedValue({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        displayName: 'Claude Sonnet 4.5',
+        thinkingLevel: 'medium',
+        supportedThinkingLevels: ['low', 'medium', 'high'],
+        supportsThinking: true
+      }),
+      getSoul: vi.fn().mockResolvedValue({
+        agentId: 'tangyuan',
+        content: '',
+        updatedAt: ''
+      }),
+      getUserProfile: vi.fn().mockResolvedValue({
+        content: '',
+        updatedAt: ''
+      }),
+      updateSoul: vi.fn().mockResolvedValue({
+        target: 'soul' as const,
+        success: true
+      }),
+      updateUserProfile: vi.fn().mockResolvedValue({
+        target: 'user' as const,
+        success: true
+      }),
+      listAgentSkills: vi.fn().mockResolvedValue([]),
+      listSharedSkills: vi.fn().mockResolvedValue([]),
+      reloadAgentSessions: vi.fn().mockResolvedValue(undefined),
+      reloadAllSessions: vi.fn().mockResolvedValue(undefined),
+      approveBash: vi.fn().mockResolvedValue(undefined),
+      rejectBash: vi.fn().mockResolvedValue(undefined),
+      getPendingApprovals: vi.fn().mockReturnValue([]),
+      createToolApprovalGateway: vi.fn(),
+      installSkill: vi.fn().mockResolvedValue([]),
+      deleteSkill: vi.fn().mockResolvedValue([]),
+      approveSkillOperation: vi.fn().mockResolvedValue(undefined),
+      rejectSkillOperation: vi.fn().mockResolvedValue(undefined),
+      getPendingSkillApprovals: vi.fn().mockReturnValue([]),
+      getSkillInstallRecords: vi.fn().mockResolvedValue([])
     }
 
     registerDesktopAppIpc(ipcMain, runtime)
@@ -193,7 +403,17 @@ describe('registerDesktopAppIpc', () => {
       sendMessage: vi.fn(),
       cancelRun: vi.fn(),
       subscribe: vi.fn(),
-      cancelAllActiveRuns: vi.fn()
+      cancelAllActiveRuns: vi.fn(),
+      approveBash: vi.fn(),
+      rejectBash: vi.fn(),
+      getPendingApprovals: vi.fn(),
+      createToolApprovalGateway: vi.fn(),
+      installSkill: vi.fn(),
+      deleteSkill: vi.fn(),
+      approveSkillOperation: vi.fn(),
+      rejectSkillOperation: vi.fn(),
+      getPendingSkillApprovals: vi.fn(),
+      getSkillInstallRecords: vi.fn()
     } as unknown as TangyuanRuntime
 
     registerDesktopAppIpc(ipcMain, runtime)

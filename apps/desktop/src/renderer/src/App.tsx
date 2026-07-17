@@ -2,6 +2,8 @@ import type {
   AgentEvent,
   AgentMessage,
   AgentSessionSummary,
+  AgentSummary,
+  BashApprovalRequest,
   DesktopPreloadApi,
   RuntimeSnapshot
 } from '@tangyuan/contracts'
@@ -16,24 +18,32 @@ import { ConsoleAgentDetailPage } from '@/pages/ConsoleAgentDetailPage'
 
 interface DesktopWorkbenchState {
   runtime: RuntimeSnapshot | null
+  agents: AgentSummary[]
   sessions: AgentSessionSummary[]
   selectedSessionId: string | null
   messages: AgentMessage[]
   composerText: string
   isLoading: boolean
   isSendingMessage: boolean
+  pendingApprovals: BashApprovalRequest[]
 }
 
 interface DesktopWorkbenchAction {
   setRuntime(value: RuntimeSnapshot | null): void
+  setAgents(value: AgentSummary[] | ((currentValue: AgentSummary[]) => AgentSummary[])): void
   setSessions(
     value: AgentSessionSummary[] | ((currentValue: AgentSessionSummary[]) => AgentSessionSummary[])
   ): void
-  setSelectedSessionId(value: string | null | ((currentValue: string | null) => string | null)): void
+  setSelectedSessionId(
+    value: string | null | ((currentValue: string | null) => string | null)
+  ): void
   setMessages(value: AgentMessage[] | ((currentValue: AgentMessage[]) => AgentMessage[])): void
   setComposerText(value: string): void
   setIsLoading(value: boolean): void
   setIsSendingMessage(value: boolean): void
+  setPendingApprovals(
+    value: BashApprovalRequest[] | ((currentValue: BashApprovalRequest[]) => BashApprovalRequest[])
+  ): void
 }
 
 export interface DesktopWorkbenchContext extends DesktopWorkbenchState, DesktopWorkbenchAction {}
@@ -52,7 +62,7 @@ function App(): React.JSX.Element {
         position="top-center"
         closeButton
         toastOptions={{
-          duration: 3000,
+          duration: 3000
         }}
       />
     </HashRouter>
@@ -68,28 +78,34 @@ function App(): React.JSX.Element {
 function DesktopRoutes(): React.JSX.Element {
   const navigate = useNavigate()
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null)
+  const [agents, setAgents] = useState<AgentSummary[]>([])
   const [sessions, setSessions] = useState<AgentSessionSummary[]>([])
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<AgentMessage[]>([])
   const [composerText, setComposerText] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [pendingApprovals, setPendingApprovals] = useState<BashApprovalRequest[]>([])
 
   const context: DesktopWorkbenchContext = {
     runtime,
+    agents,
     sessions,
     selectedSessionId,
     messages,
     composerText,
     isLoading,
     isSendingMessage,
+    pendingApprovals,
     setRuntime,
+    setAgents,
     setSessions,
     setSelectedSessionId,
     setMessages,
     setComposerText,
     setIsLoading,
-    setIsSendingMessage
+    setIsSendingMessage,
+    setPendingApprovals
   }
 
   useEffect(() => {
@@ -100,17 +116,15 @@ function DesktopRoutes(): React.JSX.Element {
         if (!isMounted) return
 
         setRuntime(workbench.runtime)
+        setAgents(workbench.agents)
         setSessions(workbench.sessions)
         setSelectedSessionId(
           (currentSessionId) => currentSessionId ?? workbench.sessions[0]?.sessionId ?? null
         )
         setMessages(workbench.messages)
 
-        if (workbench.runtime.status === 'ready') {
-          navigate('/chat/tangyuan', { replace: true })
-        } else {
-          navigate('/console/providers', { replace: true })
-        }
+        // 启动重定向由 StartupRedirect 组件在根路由 '/' 上处理。
+        // 此处不再从任意路由无条件跳转，以保留用户直接访问的深层控制台 URI。
       })
       .catch((error: unknown) => {
         if (!isMounted) return
@@ -131,6 +145,49 @@ function DesktopRoutes(): React.JSX.Element {
 
   useEffect(() => {
     return window.api.subscribeToAgentEvents((event) => {
+      if (event.type === 'agent-created') {
+        setAgents((currentAgents) => {
+          const exists = currentAgents.some((agent) => agent.agentId === event.agent.agentId)
+          if (exists) {
+            return currentAgents.map((agent) =>
+              agent.agentId === event.agent.agentId ? event.agent : agent
+            )
+          }
+          return [...currentAgents, event.agent]
+        })
+        toast.success(`已创建 Agent「${event.agent.displayName}」`)
+        return
+      }
+
+      if (event.type === 'agent-archived') {
+        setAgents((currentAgents) =>
+          currentAgents.map((agent) =>
+            agent.agentId === event.agent.agentId ? event.agent : agent
+          )
+        )
+        toast.success(`已归档 Agent「${event.agent.displayName}」`)
+        return
+      }
+
+      if (event.type === 'agent-recovered') {
+        setAgents((currentAgents) =>
+          currentAgents.map((agent) =>
+            agent.agentId === event.agent.agentId ? event.agent : agent
+          )
+        )
+        toast.success(`已恢复 Agent「${event.agent.displayName}」`)
+        return
+      }
+
+      if (event.type === 'agent-config-updated') {
+        setAgents((currentAgents) =>
+          currentAgents.map((agent) =>
+            agent.agentId === event.agent.agentId ? event.agent : agent
+          )
+        )
+        return
+      }
+
       if (event.type === 'profile-updated') {
         void window.api
           .refreshRuntime()
@@ -140,6 +197,22 @@ function DesktopRoutes(): React.JSX.Element {
           .catch((error: unknown) => {
             toast.error(error instanceof Error ? error.message : '刷新 Profile 状态失败')
           })
+      }
+
+      if (event.type === 'approval-required') {
+        setPendingApprovals((current) => [...current, event.approval])
+        toast.info(`Bash 命令需要审批：${event.approval.command.slice(0, 60)}...`)
+        return
+      }
+
+      if (event.type === 'approval-resolved') {
+        setPendingApprovals((current) => current.filter((a) => a.approvalId !== event.approvalId))
+        if (event.status === 'approved') {
+          toast.success('已批准 Bash 命令执行')
+        } else {
+          toast.info('已拒绝 Bash 命令执行')
+        }
+        return
       }
 
       applyAgentEventToSessions(event, setSessions)
@@ -293,7 +366,9 @@ function getAgentEventSessionId(event: AgentEvent): string | null {
     event.type === 'turn-cancelled' ||
     event.type === 'turn-failed' ||
     event.type === 'activity-updated' ||
-    event.type === 'run-state-changed'
+    event.type === 'run-state-changed' ||
+    event.type === 'approval-required' ||
+    event.type === 'approval-resolved'
   ) {
     return event.sessionId
   }
@@ -312,7 +387,9 @@ function getAgentEventSessionId(event: AgentEvent): string | null {
  * @returns 可用于会话摘要的新状态；无状态变化时返回 null。
  * @throws 此方法不会主动抛出错误。
  */
-function getAgentEventRunState(event: AgentEvent): 'idle' | 'running' | 'completed' | 'cancelled' | 'failed' | null {
+function getAgentEventRunState(
+  event: AgentEvent
+): 'idle' | 'queued' | 'running' | 'completed' | 'cancelled' | 'failed' | null {
   if (event.type === 'turn-started') {
     return 'running'
   }
@@ -409,13 +486,25 @@ function appendTranscriptDelta(
  */
 async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   runtime: RuntimeSnapshot
+  agents: AgentSummary[]
   sessions: AgentSessionSummary[]
   messages: AgentMessage[]
 }> {
   const runtime = await api.getRuntimeSnapshot()
+  const agents = runtime.agents ?? [
+    {
+      agentId: runtime.activeAgent.agentId,
+      displayName: runtime.activeAgent.displayName,
+      status: 'active' as const,
+      defaultProviderId: runtime.settings.selectedProviderId,
+      defaultModelId: runtime.settings.selectedModelId,
+      homePath: runtime.activeAgent.homePath,
+      archivedAt: null
+    }
+  ]
 
   if (runtime.status !== 'ready') {
-    return { runtime, sessions: [], messages: [] }
+    return { runtime, agents, sessions: [], messages: [] }
   }
 
   const sessions = await api.listSessions()
@@ -436,7 +525,7 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
       })
     : []
 
-  return { runtime, sessions: nextSessions, messages }
+  return { runtime, agents, sessions: nextSessions, messages }
 }
 
 export default App

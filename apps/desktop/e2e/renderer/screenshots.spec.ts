@@ -4,7 +4,7 @@ import {
   createMissingConfigSnapshot,
   createTestSessions,
   createTestMessages,
-  createPreloadApiInitScript,
+  createPreloadApiInitScript
 } from '../fixtures/preload-mock'
 
 /**

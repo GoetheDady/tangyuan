@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   type AgentEventListener,
@@ -7,7 +7,7 @@ import {
   createDefaultSessionSummary,
   createRuntimeSnapshot,
   type DesktopPreloadApi,
-  type RuntimeSnapshot,
+  type RuntimeSnapshot
 } from '@tangyuan/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -28,24 +28,23 @@ describe('App', () => {
         createReadyRuntimeSnapshot({
           providerId: 'anthropic',
           modelId: 'claude-sonnet-4-5',
-          maskedValue: 'sk-t...7890',
-        }),
+          maskedValue: 'sk-t...7890'
+        })
       ),
-      cancelRuntimeConfigurationVerification:
-        vi.fn().mockResolvedValue(runtime),
+      cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(runtime),
       listSessions: vi.fn().mockResolvedValue([
         createDefaultSessionSummary({
           sessionId: 'welcome',
           title: '新会话',
-          updatedAt: '2026-07-08T00:00:00.000Z',
-        }),
+          updatedAt: '2026-07-08T00:00:00.000Z'
+        })
       ]),
       createSession: vi.fn().mockResolvedValue(
         createDefaultSessionSummary({
           sessionId: 'session-1',
           title: '新会话',
-          updatedAt: '2026-07-08T00:00:00.000Z',
-        }),
+          updatedAt: '2026-07-08T00:00:00.000Z'
+        })
       ),
       getMessages: vi.fn().mockResolvedValue([]),
       sendMessage: vi.fn().mockResolvedValue([
@@ -55,7 +54,7 @@ describe('App', () => {
           sessionId: 'welcome',
           role: 'user',
           content: '你好',
-          createdAt: '2026-07-08T00:00:00.000Z',
+          createdAt: '2026-07-08T00:00:00.000Z'
         },
         {
           messageId: 'message-2',
@@ -63,72 +62,144 @@ describe('App', () => {
           sessionId: 'welcome',
           role: 'agent',
           content: '收到：你好',
-          createdAt: '2026-07-08T00:00:00.000Z',
-        },
+          createdAt: '2026-07-08T00:00:00.000Z'
+        }
       ]),
       cancelRun: vi.fn().mockResolvedValue(
         createDefaultSessionSummary({
           sessionId: 'welcome',
           title: '新会话',
-          updatedAt: '2026-07-08T00:00:00.000Z',
-        }),
+          updatedAt: '2026-07-08T00:00:00.000Z'
+        })
       ),
       subscribeToAgentEvents: vi.fn(() => () => undefined),
       openExternalLink: vi.fn(),
       restoreFromBackup: vi.fn(),
       resetConfiguration: vi.fn(),
+      listAgents: vi.fn().mockResolvedValue([
+        {
+          agentId: 'tangyuan',
+          displayName: '汤圆',
+          status: 'active' as const,
+          defaultProviderId: null,
+          defaultModelId: null,
+          homePath: '~/.tangyuan/agents/tangyuan',
+          archivedAt: null
+        }
+      ]),
+      updateAgentConfig: vi.fn().mockResolvedValue({
+        agentId: 'tangyuan',
+        displayName: '汤圆',
+        status: 'active' as const,
+        defaultProviderId: 'anthropic',
+        defaultModelId: 'claude-sonnet-4-5',
+        homePath: '~/.tangyuan/agents/tangyuan',
+        archivedAt: null
+      }),
+      getSessionModelInfo: vi.fn().mockResolvedValue({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        displayName: 'Claude Sonnet 4.5',
+        thinkingLevel: null,
+        supportedThinkingLevels: [],
+        supportsThinking: false
+      }),
+      setSessionModel: vi.fn().mockResolvedValue({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        displayName: 'Claude Sonnet 4.5',
+        thinkingLevel: null,
+        supportedThinkingLevels: [],
+        supportsThinking: false
+      }),
+      setSessionThinkingLevel: vi.fn().mockResolvedValue({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        displayName: 'Claude Sonnet 4.5',
+        thinkingLevel: 'medium',
+        supportedThinkingLevels: ['low', 'medium', 'high'],
+        supportsThinking: true
+      }),
+      archiveAgent: vi.fn(),
+      recoverAgent: vi.fn(),
+      reconcileAgentDirectories: vi.fn().mockResolvedValue({
+        agents: [],
+        unclaimedDirectories: []
+      }),
+      claimAgentDirectory: vi.fn(),
+      rebuildTangyuanHome: vi.fn(),
+      getSoul: vi.fn().mockResolvedValue({
+        agentId: 'tangyuan',
+        content: '',
+        updatedAt: ''
+      }),
+      getUserProfile: vi.fn().mockResolvedValue({
+        content: '',
+        updatedAt: ''
+      }),
+      updateSoul: vi.fn().mockResolvedValue({
+        target: 'soul' as const,
+        success: true
+      }),
+      updateUserProfile: vi.fn().mockResolvedValue({
+        target: 'user' as const,
+        success: true
+      }),
+      listAgentSkills: vi.fn().mockResolvedValue([]),
+      listSharedSkills: vi.fn().mockResolvedValue([]),
+      approveBash: vi.fn().mockResolvedValue(undefined),
+      rejectBash: vi.fn().mockResolvedValue(undefined),
+      getPendingApprovals: vi.fn().mockResolvedValue([]),
+      installSkill: vi.fn().mockResolvedValue([]),
+      deleteSkill: vi.fn().mockResolvedValue([]),
+      approveSkillOperation: vi.fn().mockResolvedValue(undefined),
+      rejectSkillOperation: vi.fn().mockResolvedValue(undefined),
+      getPendingSkillApprovals: vi.fn().mockResolvedValue([]),
+      getSkillInstallRecords: vi.fn().mockResolvedValue([])
     }
 
     Object.defineProperty(window, 'api', {
       configurable: true,
-      value: api,
+      value: api
     })
   })
 
   it('renders the setup page when configuration is missing', async () => {
     render(<App />)
 
-    expect(
-      await screen.findByRole('heading', { name: '配置模型服务' }),
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '配置模型服务' })).toBeInTheDocument()
     expect(screen.getByText('控制台')).toBeInTheDocument()
   })
 
   it('does not show chat controls while configuration is missing', async () => {
     render(<App />)
 
-    expect(
-      await screen.findByRole('heading', { name: '配置模型服务' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: '新会话' }),
-    ).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '配置模型服务' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '新会话' })).not.toBeInTheDocument()
     expect(window.api.listSessions).not.toHaveBeenCalled()
   })
 
   it('renders model options with unique keys across providers', async () => {
-    const consoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => undefined)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(
       createMissingConfigurationSnapshot({
         providers: [
           { providerId: 'openai', displayName: 'OpenAI' },
-          { providerId: 'openrouter', displayName: 'OpenRouter' },
+          { providerId: 'openrouter', displayName: 'OpenRouter' }
         ],
         models: [
           {
             providerId: 'openai',
             modelId: 'gpt-4',
-            displayName: 'GPT-4',
+            displayName: 'GPT-4'
           },
           {
             providerId: 'openrouter',
             modelId: 'gpt-4',
-            displayName: 'GPT-4 via OpenRouter',
-          },
-        ],
-      }),
+            displayName: 'GPT-4 via OpenRouter'
+          }
+        ]
+      })
     )
 
     try {
@@ -141,11 +212,9 @@ describe('App', () => {
             call.some(
               (argument) =>
                 typeof argument === 'string' &&
-                argument.includes(
-                  'Encountered two children with the same key',
-                ),
-            ),
-          ),
+                argument.includes('Encountered two children with the same key')
+            )
+          )
         ).toBe(false)
       })
     } finally {
@@ -159,10 +228,10 @@ describe('App', () => {
 
     // 等待 Anthropic 卡片渲染完成
     const modelSelect = (await screen.findByLabelText('Model', {
-      selector: '#model-anthropic',
+      selector: '#model-anthropic'
     })) as HTMLSelectElement
     const apiKeyInput = screen.getByLabelText('API Key', {
-      selector: '#api-key-anthropic',
+      selector: '#api-key-anthropic'
     }) as HTMLInputElement
 
     await user.selectOptions(modelSelect, 'claude-sonnet-4-5')
@@ -172,14 +241,12 @@ describe('App', () => {
     expect(window.api.saveRuntimeConfiguration).toHaveBeenCalledWith({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
-      apiKey: 'sk-test-secret-7890',
+      apiKey: 'sk-test-secret-7890'
     })
     await waitFor(() => {
       expect(window.location.hash).toBe('#/chat/tangyuan')
     })
-    expect(
-      screen.queryByDisplayValue('sk-test-secret-7890'),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByDisplayValue('sk-test-secret-7890')).not.toBeInTheDocument()
     expect(screen.queryByText('sk-t...7890')).not.toBeInTheDocument()
   })
 
@@ -190,16 +257,16 @@ describe('App', () => {
       createDefaultSessionSummary({
         sessionId: 'bootstrap-session',
         title: 'Bootstrap 初始化',
-        updatedAt: '2026-07-08T00:00:00.000Z',
-      }),
+        updatedAt: '2026-07-08T00:00:00.000Z'
+      })
     )
     render(<App />)
 
     const modelSelect = (await screen.findByLabelText('Model', {
-      selector: '#model-anthropic',
+      selector: '#model-anthropic'
     })) as HTMLSelectElement
     const apiKeyInput = screen.getByLabelText('API Key', {
-      selector: '#api-key-anthropic',
+      selector: '#api-key-anthropic'
     }) as HTMLInputElement
 
     await user.selectOptions(modelSelect, 'claude-sonnet-4-5')
@@ -208,7 +275,7 @@ describe('App', () => {
 
     expect(window.api.createSession).toHaveBeenCalledWith({
       agentId: 'tangyuan',
-      title: 'Bootstrap 初始化',
+      title: 'Bootstrap 初始化'
     })
     await waitFor(() => {
       expect(window.location.hash).toBe('#/chat/tangyuan')
@@ -217,16 +284,14 @@ describe('App', () => {
 
   it('allows users to cancel configuration verification', async () => {
     const user = userEvent.setup()
-    window.api.saveRuntimeConfiguration = vi.fn(
-      () => new Promise<RuntimeSnapshot>(() => undefined),
-    )
+    window.api.saveRuntimeConfiguration = vi.fn(() => new Promise<RuntimeSnapshot>(() => undefined))
     render(<App />)
 
     const modelSelect = (await screen.findByLabelText('Model', {
-      selector: '#model-anthropic',
+      selector: '#model-anthropic'
     })) as HTMLSelectElement
     const apiKeyInput = screen.getByLabelText('API Key', {
-      selector: '#api-key-anthropic',
+      selector: '#api-key-anthropic'
     }) as HTMLInputElement
 
     await user.selectOptions(modelSelect, 'claude-sonnet-4-5')
@@ -234,10 +299,8 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: '验证并保存' }))
     await user.click(screen.getByRole('button', { name: '取消验证' }))
 
-    expect(
-      window.api.cancelRuntimeConfigurationVerification,
-    ).toHaveBeenCalledWith({
-      verificationId: 'current',
+    expect(window.api.cancelRuntimeConfigurationVerification).toHaveBeenCalledWith({
+      verificationId: 'current'
     })
   })
 
@@ -246,7 +309,7 @@ describe('App', () => {
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       maskedValue: 'sk-t...7890',
-      profileInitialized: true,
+      profileInitialized: true
     })
     Object.defineProperty(window, 'api', {
       configurable: true,
@@ -254,8 +317,7 @@ describe('App', () => {
         getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
         refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
-        cancelRuntimeConfigurationVerification:
-          vi.fn().mockResolvedValue(readyRuntime),
+        cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
         listSessions: vi.fn().mockResolvedValue([]),
         createSession: vi.fn(),
         getMessages: vi.fn().mockResolvedValue([]),
@@ -265,16 +327,54 @@ describe('App', () => {
         openExternalLink: vi.fn(),
         restoreFromBackup: vi.fn(),
         resetConfiguration: vi.fn(),
-      } satisfies DesktopPreloadApi,
+        listAgents: vi.fn().mockResolvedValue([
+          {
+            agentId: 'tangyuan',
+            displayName: '汤圆',
+            status: 'active' as const,
+            defaultProviderId: null,
+            defaultModelId: null,
+            homePath: '~/.tangyuan/agents/tangyuan',
+            archivedAt: null
+          }
+        ]),
+        updateAgentConfig: vi.fn(),
+        getSessionModelInfo: vi.fn().mockResolvedValue({
+          providerId: 'anthropic',
+          modelId: 'claude-sonnet-4-5',
+          displayName: 'Claude Sonnet 4.5',
+          thinkingLevel: null,
+          supportedThinkingLevels: [],
+          supportsThinking: false
+        }),
+        setSessionModel: vi.fn(),
+        setSessionThinkingLevel: vi.fn(),
+        archiveAgent: vi.fn(),
+        recoverAgent: vi.fn(),
+        reconcileAgentDirectories: vi.fn(),
+        claimAgentDirectory: vi.fn(),
+        rebuildTangyuanHome: vi.fn(),
+        getSoul: vi.fn(),
+        getUserProfile: vi.fn(),
+        updateSoul: vi.fn(),
+        updateUserProfile: vi.fn(),
+        listAgentSkills: vi.fn(),
+        listSharedSkills: vi.fn(),
+        approveBash: vi.fn(),
+        rejectBash: vi.fn(),
+        getPendingApprovals: vi.fn(),
+        installSkill: vi.fn(),
+        deleteSkill: vi.fn(),
+        approveSkillOperation: vi.fn(),
+        rejectSkillOperation: vi.fn(),
+        getPendingSkillApprovals: vi.fn(),
+        getSkillInstallRecords: vi.fn()
+      } satisfies DesktopPreloadApi
     })
     render(<App />)
 
-    expect(
-      await screen.findByRole('heading', { name: '汤圆' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: '配置接口密钥' }),
-    ).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '汤圆' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '配置接口密钥' })).not.toBeInTheDocument()
     expect(screen.queryByText('sk-t...7890')).not.toBeInTheDocument()
   })
 
@@ -282,7 +382,7 @@ describe('App', () => {
     const readyRuntime = createReadyRuntimeSnapshot({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
-      maskedValue: 'sk-t...7890',
+      maskedValue: 'sk-t...7890'
     })
     Object.defineProperty(window, 'api', {
       configurable: true,
@@ -290,15 +390,14 @@ describe('App', () => {
         getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
         refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
-        cancelRuntimeConfigurationVerification:
-          vi.fn().mockResolvedValue(readyRuntime),
+        cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
         listSessions: vi.fn().mockResolvedValue([]),
         createSession: vi.fn().mockResolvedValue(
           createDefaultSessionSummary({
             sessionId: 'bootstrap-session',
             title: 'Bootstrap 初始化',
-            updatedAt: '2026-07-08T00:00:00.000Z',
-          }),
+            updatedAt: '2026-07-08T00:00:00.000Z'
+          })
         ),
         getMessages: vi.fn().mockResolvedValue([]),
         sendMessage: vi.fn().mockResolvedValue([]),
@@ -307,14 +406,56 @@ describe('App', () => {
         openExternalLink: vi.fn(),
         restoreFromBackup: vi.fn(),
         resetConfiguration: vi.fn(),
-      } satisfies DesktopPreloadApi,
+        listAgents: vi.fn().mockResolvedValue([
+          {
+            agentId: 'tangyuan',
+            displayName: '汤圆',
+            status: 'active' as const,
+            defaultProviderId: null,
+            defaultModelId: null,
+            homePath: '~/.tangyuan/agents/tangyuan',
+            archivedAt: null
+          }
+        ]),
+        updateAgentConfig: vi.fn(),
+        getSessionModelInfo: vi.fn().mockResolvedValue({
+          providerId: 'anthropic',
+          modelId: 'claude-sonnet-4-5',
+          displayName: 'Claude Sonnet 4.5',
+          thinkingLevel: null,
+          supportedThinkingLevels: [],
+          supportsThinking: false
+        }),
+        setSessionModel: vi.fn(),
+        setSessionThinkingLevel: vi.fn(),
+        archiveAgent: vi.fn(),
+        recoverAgent: vi.fn(),
+        reconcileAgentDirectories: vi.fn(),
+        claimAgentDirectory: vi.fn(),
+        rebuildTangyuanHome: vi.fn(),
+        getSoul: vi.fn(),
+        getUserProfile: vi.fn(),
+        updateSoul: vi.fn(),
+        updateUserProfile: vi.fn(),
+        listAgentSkills: vi.fn(),
+        listSharedSkills: vi.fn(),
+        approveBash: vi.fn(),
+        rejectBash: vi.fn(),
+        getPendingApprovals: vi.fn(),
+        installSkill: vi.fn(),
+        deleteSkill: vi.fn(),
+        approveSkillOperation: vi.fn(),
+        rejectSkillOperation: vi.fn(),
+        getPendingSkillApprovals: vi.fn(),
+        getSkillInstallRecords: vi.fn()
+      } satisfies DesktopPreloadApi
     })
     render(<App />)
 
     expect(await screen.findAllByText('Bootstrap 初始化')).toHaveLength(2)
     expect(window.api.createSession).toHaveBeenCalledWith({
       agentId: 'tangyuan',
-      title: 'Bootstrap 初始化',
+      title: 'Bootstrap 初始化'
     })
   })
 
@@ -323,7 +464,7 @@ describe('App', () => {
     const readyRuntime = createReadyRuntimeSnapshot({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
-      maskedValue: 'sk-t...7890',
+      maskedValue: 'sk-t...7890'
     })
     Object.defineProperty(window, 'api', {
       configurable: true,
@@ -331,14 +472,13 @@ describe('App', () => {
         getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
         refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
-        cancelRuntimeConfigurationVerification:
-          vi.fn().mockResolvedValue(readyRuntime),
+        cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
         listSessions: vi.fn().mockResolvedValue([
           createDefaultSessionSummary({
             sessionId: 'welcome',
             title: '新会话',
-            updatedAt: '2026-07-08T00:00:00.000Z',
-          }),
+            updatedAt: '2026-07-08T00:00:00.000Z'
+          })
         ]),
         createSession: vi.fn(),
         getMessages: vi.fn().mockResolvedValue([]),
@@ -349,7 +489,7 @@ describe('App', () => {
             sessionId: 'welcome',
             role: 'user',
             content: '你好',
-            createdAt: '2026-07-08T00:00:00.000Z',
+            createdAt: '2026-07-08T00:00:00.000Z'
           },
           {
             messageId: 'message-2',
@@ -357,15 +497,57 @@ describe('App', () => {
             sessionId: 'welcome',
             role: 'agent',
             content: '收到：你好',
-            createdAt: '2026-07-08T00:00:00.000Z',
-          },
+            createdAt: '2026-07-08T00:00:00.000Z'
+          }
         ]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
         openExternalLink: vi.fn(),
         restoreFromBackup: vi.fn(),
         resetConfiguration: vi.fn(),
-      } satisfies DesktopPreloadApi,
+        listAgents: vi.fn().mockResolvedValue([
+          {
+            agentId: 'tangyuan',
+            displayName: '汤圆',
+            status: 'active' as const,
+            defaultProviderId: null,
+            defaultModelId: null,
+            homePath: '~/.tangyuan/agents/tangyuan',
+            archivedAt: null
+          }
+        ]),
+        updateAgentConfig: vi.fn(),
+        getSessionModelInfo: vi.fn().mockResolvedValue({
+          providerId: 'anthropic',
+          modelId: 'claude-sonnet-4-5',
+          displayName: 'Claude Sonnet 4.5',
+          thinkingLevel: null,
+          supportedThinkingLevels: [],
+          supportsThinking: false
+        }),
+        setSessionModel: vi.fn(),
+        setSessionThinkingLevel: vi.fn(),
+        archiveAgent: vi.fn(),
+        recoverAgent: vi.fn(),
+        reconcileAgentDirectories: vi.fn(),
+        claimAgentDirectory: vi.fn(),
+        rebuildTangyuanHome: vi.fn(),
+        getSoul: vi.fn(),
+        getUserProfile: vi.fn(),
+        updateSoul: vi.fn(),
+        updateUserProfile: vi.fn(),
+        listAgentSkills: vi.fn(),
+        listSharedSkills: vi.fn(),
+        approveBash: vi.fn(),
+        rejectBash: vi.fn(),
+        getPendingApprovals: vi.fn(),
+        installSkill: vi.fn(),
+        deleteSkill: vi.fn(),
+        approveSkillOperation: vi.fn(),
+        rejectSkillOperation: vi.fn(),
+        getPendingSkillApprovals: vi.fn(),
+        getSkillInstallRecords: vi.fn()
+      } satisfies DesktopPreloadApi
     })
     window.location.hash = '#/chat/tangyuan'
     window.location.hash = '#/chat/tangyuan'
@@ -375,11 +557,9 @@ describe('App', () => {
     await screen.findByLabelText('消息')
     await waitFor(
       () => {
-        expect(
-          screen.getByRole('button', { name: '发送' }),
-        ).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: '发送' })).toBeInTheDocument()
       },
-      { timeout: 3000 },
+      { timeout: 3000 }
     )
 
     await user.type(screen.getByLabelText('消息'), '你好')
@@ -388,13 +568,13 @@ describe('App', () => {
     expect(window.api.sendMessage).toHaveBeenCalledWith({
       agentId: 'tangyuan',
       sessionId: 'welcome',
-      content: '你好',
+      content: '你好'
     })
     await waitFor(
       () => {
         expect(screen.getByText('收到：你好')).toBeInTheDocument()
       },
-      { timeout: 5000 },
+      { timeout: 5000 }
     )
   })
 
@@ -403,7 +583,7 @@ describe('App', () => {
     const readyRuntime = createReadyRuntimeSnapshot({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
-      maskedValue: 'sk-t...7890',
+      maskedValue: 'sk-t...7890'
     })
     const listeners: AgentEventListener[] = []
     const releaseSend = createDeferred<void>()
@@ -413,14 +593,13 @@ describe('App', () => {
         getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
         refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
-        cancelRuntimeConfigurationVerification:
-          vi.fn().mockResolvedValue(readyRuntime),
+        cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
         listSessions: vi.fn().mockResolvedValue([
           createDefaultSessionSummary({
             sessionId: 'welcome',
             title: '新会话',
-            updatedAt: '2026-07-08T00:00:00.000Z',
-          }),
+            updatedAt: '2026-07-08T00:00:00.000Z'
+          })
         ]),
         createSession: vi.fn(),
         getMessages: vi.fn().mockResolvedValue([]),
@@ -431,7 +610,7 @@ describe('App', () => {
               agentId: 'tangyuan',
               sessionId: 'welcome',
               runId: 'run-1',
-              occurredAt: '2026-07-08T00:00:01.000Z',
+              occurredAt: '2026-07-08T00:00:01.000Z'
             })
             listener({
               type: 'message-delta',
@@ -440,7 +619,7 @@ describe('App', () => {
               runId: 'run-1',
               messageId: 'agent-message-1',
               delta: '你',
-              occurredAt: '2026-07-08T00:00:02.000Z',
+              occurredAt: '2026-07-08T00:00:02.000Z'
             })
             listener({
               type: 'message-delta',
@@ -449,7 +628,7 @@ describe('App', () => {
               runId: 'run-1',
               messageId: 'agent-message-1',
               delta: '好',
-              occurredAt: '2026-07-08T00:00:03.000Z',
+              occurredAt: '2026-07-08T00:00:03.000Z'
             })
           }
 
@@ -462,22 +641,62 @@ describe('App', () => {
               sessionId: 'welcome',
               role: 'agent',
               content: '你好',
-              createdAt: '2026-07-08T00:00:02.000Z',
-            },
+              createdAt: '2026-07-08T00:00:02.000Z'
+            }
           ] satisfies AgentMessage[]
         }),
         cancelRun: vi.fn(),
-        subscribeToAgentEvents: vi.fn(
-          (listener: AgentEventListener) => {
-            listeners.push(listener)
+        subscribeToAgentEvents: vi.fn((listener: AgentEventListener) => {
+          listeners.push(listener)
 
-            return () => undefined
-          },
-        ),
+          return () => undefined
+        }),
         openExternalLink: vi.fn(),
         restoreFromBackup: vi.fn(),
         resetConfiguration: vi.fn(),
-      } satisfies DesktopPreloadApi,
+        listAgents: vi.fn().mockResolvedValue([
+          {
+            agentId: 'tangyuan',
+            displayName: '汤圆',
+            status: 'active' as const,
+            defaultProviderId: null,
+            defaultModelId: null,
+            homePath: '~/.tangyuan/agents/tangyuan',
+            archivedAt: null
+          }
+        ]),
+        updateAgentConfig: vi.fn(),
+        getSessionModelInfo: vi.fn().mockResolvedValue({
+          providerId: 'anthropic',
+          modelId: 'claude-sonnet-4-5',
+          displayName: 'Claude Sonnet 4.5',
+          thinkingLevel: null,
+          supportedThinkingLevels: [],
+          supportsThinking: false
+        }),
+        setSessionModel: vi.fn(),
+        setSessionThinkingLevel: vi.fn(),
+        archiveAgent: vi.fn(),
+        recoverAgent: vi.fn(),
+        reconcileAgentDirectories: vi.fn(),
+        claimAgentDirectory: vi.fn(),
+        rebuildTangyuanHome: vi.fn(),
+        getSoul: vi.fn(),
+        getUserProfile: vi.fn(),
+        updateSoul: vi.fn(),
+        updateUserProfile: vi.fn(),
+        listAgentSkills: vi.fn(),
+        listSharedSkills: vi.fn(),
+        approveBash: vi.fn(),
+        rejectBash: vi.fn(),
+        getPendingApprovals: vi.fn(),
+        installSkill: vi.fn(),
+        deleteSkill: vi.fn(),
+        approveSkillOperation: vi.fn(),
+        rejectSkillOperation: vi.fn(),
+        getPendingSkillApprovals: vi.fn(),
+        getSkillInstallRecords: vi.fn()
+      } satisfies DesktopPreloadApi
     })
     render(<App />)
 
@@ -493,7 +712,7 @@ describe('App', () => {
     const readyRuntime = createReadyRuntimeSnapshot({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
-      maskedValue: 'sk-t...7890',
+      maskedValue: 'sk-t...7890'
     })
     Object.defineProperty(window, 'api', {
       configurable: true,
@@ -501,14 +720,13 @@ describe('App', () => {
         getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
         refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
-        cancelRuntimeConfigurationVerification:
-          vi.fn().mockResolvedValue(readyRuntime),
+        cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
         listSessions: vi.fn().mockResolvedValue([
           createDefaultSessionSummary({
             sessionId: 'welcome',
             title: '新会话',
-            updatedAt: '2026-07-08T00:00:00.000Z',
-          }),
+            updatedAt: '2026-07-08T00:00:00.000Z'
+          })
         ]),
         createSession: vi.fn(),
         getMessages: vi.fn().mockResolvedValue([
@@ -518,7 +736,7 @@ describe('App', () => {
             sessionId: 'welcome',
             role: 'user',
             content: '你好',
-            createdAt: '2026-07-08T00:00:00.000Z',
+            createdAt: '2026-07-08T00:00:00.000Z'
           },
           {
             messageId: 'message-2',
@@ -526,7 +744,7 @@ describe('App', () => {
             sessionId: 'welcome',
             role: 'system',
             content: '正在调用工具',
-            createdAt: '2026-07-08T00:00:01.000Z',
+            createdAt: '2026-07-08T00:00:01.000Z'
           },
           {
             messageId: 'message-3',
@@ -534,8 +752,8 @@ describe('App', () => {
             sessionId: 'welcome',
             role: 'agent',
             content: '你好呀',
-            createdAt: '2026-07-08T00:00:02.000Z',
-          },
+            createdAt: '2026-07-08T00:00:02.000Z'
+          }
         ] satisfies AgentMessage[]),
         sendMessage: vi.fn(),
         cancelRun: vi.fn(),
@@ -543,13 +761,235 @@ describe('App', () => {
         openExternalLink: vi.fn(),
         restoreFromBackup: vi.fn(),
         resetConfiguration: vi.fn(),
-      } satisfies DesktopPreloadApi,
+        listAgents: vi.fn().mockResolvedValue([
+          {
+            agentId: 'tangyuan',
+            displayName: '汤圆',
+            status: 'active' as const,
+            defaultProviderId: null,
+            defaultModelId: null,
+            homePath: '~/.tangyuan/agents/tangyuan',
+            archivedAt: null
+          }
+        ]),
+        updateAgentConfig: vi.fn(),
+        getSessionModelInfo: vi.fn().mockResolvedValue({
+          providerId: 'anthropic',
+          modelId: 'claude-sonnet-4-5',
+          displayName: 'Claude Sonnet 4.5',
+          thinkingLevel: null,
+          supportedThinkingLevels: [],
+          supportsThinking: false
+        }),
+        setSessionModel: vi.fn(),
+        setSessionThinkingLevel: vi.fn(),
+        archiveAgent: vi.fn(),
+        recoverAgent: vi.fn(),
+        reconcileAgentDirectories: vi.fn(),
+        claimAgentDirectory: vi.fn(),
+        rebuildTangyuanHome: vi.fn(),
+        getSoul: vi.fn(),
+        getUserProfile: vi.fn(),
+        updateSoul: vi.fn(),
+        updateUserProfile: vi.fn(),
+        listAgentSkills: vi.fn(),
+        listSharedSkills: vi.fn(),
+        approveBash: vi.fn(),
+        rejectBash: vi.fn(),
+        getPendingApprovals: vi.fn(),
+        installSkill: vi.fn(),
+        deleteSkill: vi.fn(),
+        approveSkillOperation: vi.fn(),
+        rejectSkillOperation: vi.fn(),
+        getPendingSkillApprovals: vi.fn(),
+        getSkillInstallRecords: vi.fn()
+      } satisfies DesktopPreloadApi
     })
     render(<App />)
 
     expect(await screen.findByText('你好')).toBeInTheDocument()
     expect(screen.getByText('你好呀')).toBeInTheDocument()
     expect(screen.queryByText('正在调用工具')).not.toBeInTheDocument()
+  })
+
+  it('renders agent messages with Markdown (code blocks, bold, lists)', async () => {
+    const readyRuntime = createReadyRuntimeSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-t...7890'
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
+        refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
+        saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
+        cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
+        listSessions: vi.fn().mockResolvedValue([
+          createDefaultSessionSummary({
+            sessionId: 'welcome',
+            title: '新会话',
+            updatedAt: '2026-07-08T00:00:00.000Z'
+          })
+        ]),
+        createSession: vi.fn(),
+        getMessages: vi.fn().mockResolvedValue([
+          {
+            messageId: 'message-1',
+            agentId: 'tangyuan',
+            sessionId: 'welcome',
+            role: 'agent',
+            content: '## 你好\n\n这是 **Markdown** 内容，包含 `代码` 和\n\n```\nconst x = 1\n```',
+            createdAt: '2026-07-08T00:00:00.000Z'
+          }
+        ] satisfies AgentMessage[]),
+        sendMessage: vi.fn(),
+        cancelRun: vi.fn(),
+        subscribeToAgentEvents: vi.fn(() => () => undefined),
+        openExternalLink: vi.fn(),
+        restoreFromBackup: vi.fn(),
+        resetConfiguration: vi.fn(),
+        listAgents: vi.fn().mockResolvedValue([
+          {
+            agentId: 'tangyuan',
+            displayName: '汤圆',
+            status: 'active' as const,
+            defaultProviderId: null,
+            defaultModelId: null,
+            homePath: '~/.tangyuan/agents/tangyuan',
+            archivedAt: null
+          }
+        ]),
+        updateAgentConfig: vi.fn(),
+        getSessionModelInfo: vi.fn().mockResolvedValue({
+          providerId: 'anthropic',
+          modelId: 'claude-sonnet-4-5',
+          displayName: 'Claude Sonnet 4.5',
+          thinkingLevel: null,
+          supportedThinkingLevels: [],
+          supportsThinking: false
+        }),
+        setSessionModel: vi.fn(),
+        setSessionThinkingLevel: vi.fn(),
+        archiveAgent: vi.fn(),
+        recoverAgent: vi.fn(),
+        reconcileAgentDirectories: vi.fn(),
+        claimAgentDirectory: vi.fn(),
+        rebuildTangyuanHome: vi.fn(),
+        getSoul: vi.fn(),
+        getUserProfile: vi.fn(),
+        updateSoul: vi.fn(),
+        updateUserProfile: vi.fn(),
+        listAgentSkills: vi.fn(),
+        listSharedSkills: vi.fn(),
+        approveBash: vi.fn(),
+        rejectBash: vi.fn(),
+        getPendingApprovals: vi.fn(),
+        installSkill: vi.fn(),
+        deleteSkill: vi.fn(),
+        approveSkillOperation: vi.fn(),
+        rejectSkillOperation: vi.fn(),
+        getPendingSkillApprovals: vi.fn(),
+        getSkillInstallRecords: vi.fn()
+      } satisfies DesktopPreloadApi
+    })
+    render(<App />)
+
+    // Markdown 标题应渲染
+    expect(await screen.findByText('你好')).toBeInTheDocument()
+    // 代码块内容应在 DOM 中
+    const codeElement = document.querySelector('[data-streamdown="inline-code"]')
+    expect(codeElement).toBeInTheDocument()
+    expect(codeElement?.textContent).toContain('代码')
+  })
+
+  it('renders user messages as plain text without Markdown parsing', async () => {
+    const readyRuntime = createReadyRuntimeSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-t...7890'
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
+        refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
+        saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
+        cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
+        listSessions: vi.fn().mockResolvedValue([
+          createDefaultSessionSummary({
+            sessionId: 'welcome',
+            title: '新会话',
+            updatedAt: '2026-07-08T00:00:00.000Z'
+          })
+        ]),
+        createSession: vi.fn(),
+        getMessages: vi.fn().mockResolvedValue([
+          {
+            messageId: 'message-1',
+            agentId: 'tangyuan',
+            sessionId: 'welcome',
+            role: 'user',
+            content: '# 这不是标题 **不是粗体**',
+            createdAt: '2026-07-08T00:00:00.000Z'
+          }
+        ] satisfies AgentMessage[]),
+        sendMessage: vi.fn(),
+        cancelRun: vi.fn(),
+        subscribeToAgentEvents: vi.fn(() => () => undefined),
+        openExternalLink: vi.fn(),
+        restoreFromBackup: vi.fn(),
+        resetConfiguration: vi.fn(),
+        listAgents: vi.fn().mockResolvedValue([
+          {
+            agentId: 'tangyuan',
+            displayName: '汤圆',
+            status: 'active' as const,
+            defaultProviderId: null,
+            defaultModelId: null,
+            homePath: '~/.tangyuan/agents/tangyuan',
+            archivedAt: null
+          }
+        ]),
+        updateAgentConfig: vi.fn(),
+        getSessionModelInfo: vi.fn().mockResolvedValue({
+          providerId: 'anthropic',
+          modelId: 'claude-sonnet-4-5',
+          displayName: 'Claude Sonnet 4.5',
+          thinkingLevel: null,
+          supportedThinkingLevels: [],
+          supportsThinking: false
+        }),
+        setSessionModel: vi.fn(),
+        setSessionThinkingLevel: vi.fn(),
+        archiveAgent: vi.fn(),
+        recoverAgent: vi.fn(),
+        reconcileAgentDirectories: vi.fn(),
+        claimAgentDirectory: vi.fn(),
+        rebuildTangyuanHome: vi.fn(),
+        getSoul: vi.fn(),
+        getUserProfile: vi.fn(),
+        updateSoul: vi.fn(),
+        updateUserProfile: vi.fn(),
+        listAgentSkills: vi.fn(),
+        listSharedSkills: vi.fn(),
+        approveBash: vi.fn(),
+        rejectBash: vi.fn(),
+        getPendingApprovals: vi.fn(),
+        installSkill: vi.fn(),
+        deleteSkill: vi.fn(),
+        approveSkillOperation: vi.fn(),
+        rejectSkillOperation: vi.fn(),
+        getPendingSkillApprovals: vi.fn(),
+        getSkillInstallRecords: vi.fn()
+      } satisfies DesktopPreloadApi
+    })
+    render(<App />)
+
+    // 用户消息纯文本 - 不应有 streamdown 属性
+    expect(await screen.findByText('# 这不是标题 **不是粗体**')).toBeInTheDocument()
+    const markdownElement = document.querySelector('[data-streamdown]')
+    expect(markdownElement).toBeNull()
   })
 })
 
@@ -566,10 +1006,10 @@ function createMissingConfigurationSnapshot(
       {
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',
-        displayName: 'Claude Sonnet 4.5',
-      },
-    ],
-  },
+        displayName: 'Claude Sonnet 4.5'
+      }
+    ]
+  }
 ): RuntimeSnapshot {
   return createRuntimeSnapshot({
     activeAgent: {
@@ -580,22 +1020,22 @@ function createMissingConfigurationSnapshot(
         initialized: false,
         bootstrapRequired: true,
         soulUpdatedAt: null,
-        userUpdatedAt: null,
-      },
+        userUpdatedAt: null
+      }
     },
     providers: resources.providers,
     models: resources.models,
     settings: {
       selectedProviderId: null,
-      selectedModelId: null,
+      selectedModelId: null
     },
     configuredProviders: {},
     auth: {
       apiKey: {
         configured: false,
-        maskedValue: null,
-      },
-    },
+        maskedValue: null
+      }
+    }
   })
 }
 
@@ -621,35 +1061,33 @@ function createReadyRuntimeSnapshot(input: {
         initialized: input.profileInitialized ?? false,
         bootstrapRequired: !(input.profileInitialized ?? false),
         soulUpdatedAt: null,
-        userUpdatedAt: null,
-      },
+        userUpdatedAt: null
+      }
     },
-    providers: [
-      { providerId: input.providerId, displayName: 'Anthropic' },
-    ],
+    providers: [{ providerId: input.providerId, displayName: 'Anthropic' }],
     models: [
       {
         providerId: input.providerId,
         modelId: input.modelId,
-        displayName: 'Claude Sonnet 4.5',
-      },
+        displayName: 'Claude Sonnet 4.5'
+      }
     ],
     settings: {
       selectedProviderId: input.providerId,
-      selectedModelId: input.modelId,
+      selectedModelId: input.modelId
     },
     configuredProviders: {
       [input.providerId]: {
         configured: true,
-        maskedValue: input.maskedValue,
-      },
+        maskedValue: input.maskedValue
+      }
     },
     auth: {
       apiKey: {
         configured: true,
-        maskedValue: input.maskedValue,
-      },
-    },
+        maskedValue: input.maskedValue
+      }
+    }
   })
 }
 

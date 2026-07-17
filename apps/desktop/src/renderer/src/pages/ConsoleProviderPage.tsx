@@ -1,7 +1,4 @@
-import type {
-  RuntimeConfiguration,
-  RuntimeSnapshot,
-} from '@tangyuan/contracts'
+import type { RuntimeConfiguration, RuntimeSnapshot } from '@tangyuan/contracts'
 import { ArrowRight, Ban, Check, CheckCircle2, RefreshCcw, Sparkles } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -26,11 +23,8 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isVerifyingProvider, setIsVerifyingProvider] = useState<string | null>(
-    null,
-  )
-  const [isRestoringConfiguration, setIsRestoringConfiguration] =
-    useState(false)
+  const [isVerifyingProvider, setIsVerifyingProvider] = useState<string | null>(null)
+  const [isRestoringConfiguration, setIsRestoringConfiguration] = useState(false)
 
   // 每个 Provider 独立表单：modelId 和 apiKey
   const [providerForms, setProviderForms] = useState<
@@ -49,26 +43,27 @@ export function ConsoleProviderPage(): React.JSX.Element {
         // 预填充已配置 Provider 的 modelId
         const forms: Record<string, { modelId: string; apiKey: string }> = {}
         for (const provider of snapshot.providers) {
-          const providerAuth = snapshot.configuredProviders[provider.providerId]
           forms[provider.providerId] = {
             modelId:
               snapshot.settings.selectedProviderId === provider.providerId
                 ? (snapshot.settings.selectedModelId ?? '')
                 : '',
-            apiKey: '',
+            apiKey: ''
           }
         }
         setProviderForms(forms)
       })
       .catch((error: unknown) => {
         if (!isMounted) return
-        toast.error(
-          error instanceof Error ? error.message : '无法读取运行时状态',
-        )
+        toast.error(error instanceof Error ? error.message : '无法读取运行时状态')
       })
       .finally(() => {
         if (isMounted) setIsLoading(false)
       })
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   /**
@@ -83,9 +78,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
       setRuntime(nextRuntime)
       toast.success('已刷新可用模型资源')
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : '刷新运行时资源失败',
-      )
+      toast.error(error instanceof Error ? error.message : '刷新运行时资源失败')
     }
   }
 
@@ -103,27 +96,24 @@ export function ConsoleProviderPage(): React.JSX.Element {
     const configuration: RuntimeConfiguration = {
       providerId,
       modelId: form.modelId,
-      apiKey: form.apiKey,
+      apiKey: form.apiKey
     }
 
     setIsVerifyingProvider(providerId)
 
     try {
-      const nextRuntime =
-        await window.api.saveRuntimeConfiguration(configuration)
+      const nextRuntime = await window.api.saveRuntimeConfiguration(configuration)
       setRuntime(nextRuntime)
       // 清空该 Provider 的 API Key 输入
       setProviderForms((prev) => ({
         ...prev,
-        [providerId]: { ...prev[providerId], apiKey: '' },
+        [providerId]: { ...prev[providerId], apiKey: '' }
       }))
       await openBootstrapSessionIfRequired(nextRuntime)
       toast.success('配置已保存')
       // 不自动跳转，以便用户继续配置其他 Provider
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : '配置验证失败',
-      )
+      toast.error(error instanceof Error ? error.message : '配置验证失败')
     } finally {
       setIsVerifyingProvider(null)
     }
@@ -137,16 +127,13 @@ export function ConsoleProviderPage(): React.JSX.Element {
    */
   const cancelConfigurationVerification = async (): Promise<void> => {
     try {
-      const nextRuntime =
-        await window.api.cancelRuntimeConfigurationVerification({
-          verificationId: 'current',
-        })
+      const nextRuntime = await window.api.cancelRuntimeConfigurationVerification({
+        verificationId: 'current'
+      })
       setRuntime(nextRuntime)
       toast.success('已取消配置验证')
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : '取消配置验证失败',
-      )
+      toast.error(error instanceof Error ? error.message : '取消配置验证失败')
     } finally {
       setIsVerifyingProvider(null)
     }
@@ -156,24 +143,20 @@ export function ConsoleProviderPage(): React.JSX.Element {
   const initialRedirectAttempted = useRef(false)
   useEffect(() => {
     if (initialRedirectAttempted.current) return
-    if (
-      !isLoading &&
-      !isVerifyingProvider &&
-      runtime?.status === 'ready'
-    ) {
+    if (!isLoading && !isVerifyingProvider && runtime?.status === 'ready') {
       initialRedirectAttempted.current = true
       navigate(redirectTarget, { replace: true })
     }
-  }, [
-    isLoading,
-    isVerifyingProvider,
-    runtime?.status,
-    navigate,
-    redirectTarget,
-  ])
+  }, [isLoading, isVerifyingProvider, runtime?.status, navigate, redirectTarget])
 
-  // 获取选中 Provider 的可用模型列表
-  const getModelsForProvider = (providerId: string) =>
+  /**
+   * 获取指定 Provider 可供选择的模型列表。
+   *
+   * @param providerId - Provider 唯一标识。
+   * @returns 属于该 Provider 的模型描述列表；运行时未加载时返回空数组。
+   * @throws 此方法不会主动抛出错误。
+   */
+  const getModelsForProvider = (providerId: string): RuntimeSnapshot['models'] =>
     runtime?.models.filter((m) => m.providerId === providerId) ?? []
 
   // 有凭据的 Provider 列表
@@ -184,7 +167,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
             .filter(([, auth]) => auth.configured)
             .map(([id]) => id)
         : [],
-    [runtime],
+    [runtime]
   )
 
   if (isLoading) {
@@ -226,11 +209,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
                       setRuntime(nextRuntime)
                       toast.success('已从备份恢复配置')
                     } catch (error) {
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : '恢复配置失败',
-                      )
+                      toast.error(error instanceof Error ? error.message : '恢复配置失败')
                     } finally {
                       setIsRestoringConfiguration(false)
                     }
@@ -249,11 +228,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
                     setRuntime(nextRuntime)
                     toast.success('已重置配置')
                   } catch (error) {
-                    toast.error(
-                      error instanceof Error
-                        ? error.message
-                        : '重置配置失败',
-                    )
+                    toast.error(error instanceof Error ? error.message : '重置配置失败')
                   } finally {
                     setIsRestoringConfiguration(false)
                   }
@@ -286,12 +261,9 @@ export function ConsoleProviderPage(): React.JSX.Element {
               <Sparkles size={21} aria-hidden="true" />
             </div>
             <p className="text-sm text-muted-foreground">控制台</p>
-            <h1 className="mt-2 text-3xl font-semibold leading-tight">
-              配置模型服务
-            </h1>
+            <h1 className="mt-2 text-3xl font-semibold leading-tight">配置模型服务</h1>
             <p className="mt-4 max-w-sm text-sm leading-6 text-muted-foreground">
-              为 Provider 配置 API Key
-              并选择汤圆默认模型。完成后会直接进入聊天主界面。
+              为 Provider 配置 API Key 并选择汤圆默认模型。完成后会直接进入聊天主界面。
             </p>
           </section>
 
@@ -307,23 +279,12 @@ export function ConsoleProviderPage(): React.JSX.Element {
                     id="default-provider"
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     value={runtime?.settings.selectedProviderId ?? ''}
-                    disabled={
-                      configuredProviderIds.length === 0 ||
-                      isVerifyingProvider !== null
-                    }
+                    disabled={configuredProviderIds.length === 0 || isVerifyingProvider !== null}
                     onChange={(event) => {
                       const newProviderId = event.target.value
                       if (!newProviderId) return
-                      // 切换到新 Provider 时，同步更新其表单 modelId
-                      const targetForm = providerForms[newProviderId]
-                      const configuration: RuntimeConfiguration = {
-                        providerId: newProviderId,
-                        modelId: targetForm?.modelId ?? '',
-                        apiKey: '',
-                      }
                       // 复用现有 API Key 更新默认设置
-                      const existingAuth =
-                        runtime?.configuredProviders[newProviderId]
+                      const existingAuth = runtime?.configuredProviders[newProviderId]
                       if (!existingAuth?.configured) return
 
                       // 修改默认设置：用空 apiKey 会导致 normalize 拒绝
@@ -336,9 +297,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
                       <option value="">请先配置 Provider 凭据</option>
                     ) : null}
                     {configuredProviderIds.map((id) => {
-                      const provider = runtime?.providers.find(
-                        (p) => p.providerId === id,
-                      )
+                      const provider = runtime?.providers.find((p) => p.providerId === id)
                       return (
                         <option key={id} value={id}>
                           {provider?.displayName ?? id}
@@ -355,9 +314,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
                     value={runtime?.settings.selectedModelId ?? ''}
                     disabled
                   >
-                    <option value="">
-                      {runtime?.settings.selectedModelId ?? '未选择'}
-                    </option>
+                    <option value="">{runtime?.settings.selectedModelId ?? '未选择'}</option>
                   </select>
                 </div>
               </div>
@@ -378,39 +335,24 @@ export function ConsoleProviderPage(): React.JSX.Element {
               ) : (
                 <div className="space-y-3">
                   {runtime.providers.map((provider) => {
-                    const providerAuth =
-                      runtime.configuredProviders[provider.providerId]
+                    const providerAuth = runtime.configuredProviders[provider.providerId]
                     const isConfigured = providerAuth?.configured ?? false
                     const form = providerForms[provider.providerId] ?? {
                       modelId: '',
-                      apiKey: '',
+                      apiKey: ''
                     }
-                    const isVerifyingThis =
-                      isVerifyingProvider === provider.providerId
-                    const isVerifyingOther =
-                      isVerifyingProvider !== null && !isVerifyingThis
+                    const isVerifyingThis = isVerifyingProvider === provider.providerId
+                    const isVerifyingOther = isVerifyingProvider !== null && !isVerifyingThis
                     const models = getModelsForProvider(provider.providerId)
-                    const canSubmit =
-                      Boolean(form.modelId) && form.apiKey.trim().length > 0
+                    const canSubmit = Boolean(form.modelId) && form.apiKey.trim().length > 0
 
                     return (
-                      <div
-                        key={provider.providerId}
-                        className="rounded-md border bg-card p-4"
-                      >
+                      <div key={provider.providerId} className="rounded-md border bg-card p-4">
                         <div className="mb-3 flex items-center justify-between">
-                          <h3 className="text-sm font-medium">
-                            {provider.displayName}
-                          </h3>
-                          <Badge
-                            variant={isConfigured ? 'default' : 'secondary'}
-                          >
+                          <h3 className="text-sm font-medium">{provider.displayName}</h3>
+                          <Badge variant={isConfigured ? 'default' : 'secondary'}>
                             {isConfigured ? (
-                              <Check
-                                size={12}
-                                className="mr-1"
-                                aria-hidden="true"
-                              />
+                              <Check size={12} className="mr-1" aria-hidden="true" />
                             ) : null}
                             {isConfigured ? '已配置' : '未配置'}
                           </Badge>
@@ -424,11 +366,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1.5">
-                            <Label
-                              htmlFor={`model-${provider.providerId}`}
-                            >
-                              Model
-                            </Label>
+                            <Label htmlFor={`model-${provider.providerId}`}>Model</Label>
                             <select
                               id={`model-${provider.providerId}`}
                               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
@@ -438,8 +376,8 @@ export function ConsoleProviderPage(): React.JSX.Element {
                                   ...prev,
                                   [provider.providerId]: {
                                     ...prev[provider.providerId],
-                                    modelId: event.target.value,
-                                  },
+                                    modelId: event.target.value
+                                  }
                                 }))
                               }}
                               disabled={isVerifyingThis}
@@ -456,25 +394,19 @@ export function ConsoleProviderPage(): React.JSX.Element {
                             </select>
                           </div>
                           <div className="space-y-1.5">
-                            <Label
-                              htmlFor={`api-key-${provider.providerId}`}
-                            >
-                              API Key
-                            </Label>
+                            <Label htmlFor={`api-key-${provider.providerId}`}>API Key</Label>
                             <Input
                               id={`api-key-${provider.providerId}`}
                               type="password"
-                              placeholder={
-                                isConfigured ? '留空以保留已保存的密钥' : ''
-                              }
+                              placeholder={isConfigured ? '留空以保留已保存的密钥' : ''}
                               value={form.apiKey}
                               onChange={(event) => {
                                 setProviderForms((prev) => ({
                                   ...prev,
                                   [provider.providerId]: {
                                     ...prev[provider.providerId],
-                                    apiKey: event.target.value,
-                                  },
+                                    apiKey: event.target.value
+                                  }
                                 }))
                               }}
                               disabled={isVerifyingThis}
@@ -485,9 +417,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
                         <div className="mt-3 flex items-center gap-2">
                           <Button
                             size="sm"
-                            disabled={
-                              isVerifyingOther || !canSubmit
-                            }
+                            disabled={isVerifyingOther || !canSubmit}
                             onClick={() => {
                               void saveConfiguration(provider.providerId)
                             }}
@@ -547,8 +477,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              配置通过真实 Provider 验证后才会保存。API Key
-              仅加密保存在本机。
+              配置通过真实 Provider 验证后才会保存。API Key 仅加密保存在本机。
             </p>
           </section>
         </div>
@@ -564,13 +493,8 @@ export function ConsoleProviderPage(): React.JSX.Element {
  * @returns 无返回值。
  * @throws Preload API 错误会透传给调用方，由保存配置流程统一展示。
  */
-async function openBootstrapSessionIfRequired(
-  nextRuntime: RuntimeSnapshot,
-): Promise<void> {
-  if (
-    nextRuntime.status !== 'ready' ||
-    !nextRuntime.activeAgent.profile.bootstrapRequired
-  ) {
+async function openBootstrapSessionIfRequired(nextRuntime: RuntimeSnapshot): Promise<void> {
+  if (nextRuntime.status !== 'ready' || !nextRuntime.activeAgent.profile.bootstrapRequired) {
     return
   }
 
@@ -582,6 +506,6 @@ async function openBootstrapSessionIfRequired(
 
   await window.api.createSession({
     agentId: nextRuntime.activeAgent.agentId,
-    title: 'Bootstrap 初始化',
+    title: 'Bootstrap 初始化'
   })
 }
