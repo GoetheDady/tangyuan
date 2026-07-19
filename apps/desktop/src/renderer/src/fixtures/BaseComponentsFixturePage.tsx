@@ -1,0 +1,228 @@
+import { Bell, CheckCircle2, Info, TriangleAlert } from 'lucide-react'
+import { toast } from 'sonner'
+
+import styles from './BaseComponentsFixturePage.module.css'
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+
+/** 夹具构建产物探针；生产构建不得包含此值。 */
+export const BASE_COMPONENTS_FIXTURE_MARKER = 'base-components-fixture-v1'
+
+/**
+ * 渲染基础组件的高层验收矩阵。
+ *
+ * 该页面只依赖 Renderer 组件和固定脱敏数据，不读取 Preload API 或 Runtime。
+ */
+export default function BaseComponentsFixturePage(): React.JSX.Element {
+  return (
+    <TooltipProvider delayDuration={0}>
+      <main data-fixture-marker={BASE_COMPONENTS_FIXTURE_MARKER} className={styles.page}>
+        <div className={styles.container}>
+          <header className={styles.header}>
+            <Badge variant="outline" className={styles.fixtureBadge}>
+              仅开发与测试构建
+            </Badge>
+            <h1 className={styles.heading}>基础组件验收夹具</h1>
+            <p className={styles.introduction}>
+              以稳定分区展示黑芝麻汤圆主题下的 variant、size、状态与 Portal 场景。
+            </p>
+          </header>
+
+          <FixtureSection
+            id="actions"
+            title="操作组件"
+            description="按钮 variant、size、禁用态与 Tooltip。"
+          >
+            <div className={styles.row}>
+              <Button>主要操作</Button>
+              <Button variant="secondary">次要操作</Button>
+              <Button variant="outline">描边操作</Button>
+              <Button variant="ghost">幽灵操作</Button>
+              <Button variant="destructive">危险操作</Button>
+              <Button variant="link">链接操作</Button>
+              <Button disabled>禁用操作</Button>
+            </div>
+            <Separator />
+            <div className={styles.row}>
+              <Button size="xs">超小</Button>
+              <Button size="sm">小号</Button>
+              <Button>默认</Button>
+              <Button size="lg">大号</Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label="通知说明">
+                    <Bell data-icon="inline-start" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>通知说明</TooltipContent>
+              </Tooltip>
+            </div>
+          </FixtureSection>
+
+          <FixtureSection
+            id="forms"
+            title="表单组件"
+            description="输入、选择、文本域的默认、禁用与无效状态。"
+          >
+            <div className={styles.formGrid}>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-name">显示名称</Label>
+                <Input id="fixture-name" defaultValue="汤圆" />
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-disabled">禁用输入</Label>
+                <Input id="fixture-disabled" value="不可编辑" disabled readOnly />
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-invalid">无效输入</Label>
+                <Input
+                  id="fixture-invalid"
+                  defaultValue="格式待修正"
+                  aria-invalid="true"
+                  aria-describedby="fixture-invalid-help"
+                />
+                <p id="fixture-invalid-help" className={styles.errorText}>
+                  请检查输入格式。
+                </p>
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-provider">模型服务</Label>
+                <Select defaultValue="anthropic">
+                  <SelectTrigger id="fixture-provider">
+                    <SelectValue placeholder="选择模型服务" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>可用服务</SelectLabel>
+                      <SelectItem value="anthropic">Anthropic（测试数据）</SelectItem>
+                      <SelectItem value="openai">OpenAI（测试数据）</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className={styles.field}>
+              <Label htmlFor="fixture-notes">验收说明</Label>
+              <Textarea id="fixture-notes" defaultValue="固定测试数据，不包含真实 API Key。" />
+            </div>
+          </FixtureSection>
+
+          <FixtureSection
+            id="feedback"
+            title="反馈与层级"
+            description="Badge、Alert、Card、AlertDialog Portal 与 Toaster。"
+          >
+            <div className={styles.row}>
+              <Badge>默认</Badge>
+              <Badge variant="secondary">次要</Badge>
+              <Badge variant="outline">描边</Badge>
+              <Badge variant="destructive">危险</Badge>
+            </div>
+            <div className={styles.formGrid}>
+              <Alert>
+                <Info />
+                <AlertTitle>信息提示</AlertTitle>
+                <AlertDescription>组件夹具使用固定、脱敏的验收数据。</AlertDescription>
+              </Alert>
+              <Alert variant="destructive">
+                <TriangleAlert />
+                <AlertTitle>危险提示</AlertTitle>
+                <AlertDescription>此状态仅用于验证破坏性语义层级。</AlertDescription>
+              </Alert>
+            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Level 1 表面</CardTitle>
+                <CardDescription>完整 Card 组合用于检查内容层级与边界。</CardDescription>
+              </CardHeader>
+              <CardContent className={styles.successLine}>
+                <CheckCircle2 className={styles.successIcon} />
+                固定状态：可验收
+              </CardContent>
+              <CardFooter className={styles.cardFooter}>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline">打开确认对话框</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>确认验收动作</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        对话框通过 Portal 渲染；此操作不会读写任何真实配置。
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>取消</AlertDialogCancel>
+                      <AlertDialogAction>确认</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <Button variant="secondary" onClick={() => toast.success('组件验收通知已显示')}>
+                  显示验收通知
+                </Button>
+              </CardFooter>
+            </Card>
+          </FixtureSection>
+        </div>
+      </main>
+    </TooltipProvider>
+  )
+}
+
+function FixtureSection(props: {
+  id: 'actions' | 'forms' | 'feedback'
+  title: string
+  description: string
+  children: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <section
+      data-fixture-section={props.id}
+      aria-labelledby={`fixture-section-${props.id}`}
+      className={styles.section}
+    >
+      <div className={styles.sectionHeader}>
+        <h2 id={`fixture-section-${props.id}`} className={styles.sectionTitle}>
+          {props.title}
+        </h2>
+        <p className={styles.sectionDescription}>{props.description}</p>
+      </div>
+      <div className={styles.sectionContent}>{props.children}</div>
+    </section>
+  )
+}

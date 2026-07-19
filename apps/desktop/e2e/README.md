@@ -1,97 +1,112 @@
 # E2E 测试说明
 
-汤圆桌面端 Playwright 端到端测试。在真实 Chromium 和 Electron 窗口中验证 CSS、路由、Preload/IPC 和窗口行为。
+汤圆桌面端使用真实 Chromium 和 Electron 验证 CSS、路由、Preload/IPC、窗口行为与基础组件验收夹具。
 
 ## 安装
 
 ```bash
-# 在仓库根目录安装依赖（包含 Playwright 浏览器）
 pnpm install
 ```
 
-`pnpm install` 会自动安装 Playwright 所需的 Chromium 浏览器。
+`pnpm install` 会安装 Playwright 所需的 Chromium 浏览器。
 
-## 本地运行
+## 测试边界
 
-### 前提条件
+| 边界                    | 命令                                                 | 是否像素比较 | 构建模式   |
+| ----------------------- | ---------------------------------------------------- | ------------ | ---------- |
+| 常规 Renderer 结构/交互 | `pnpm --filter apps-desktop test:e2e:renderer`       | 否           | production |
+| Electron Preload/IPC    | `pnpm --filter apps-desktop test:e2e:electron`       | 否           | production |
+| 基础组件夹具结构/交互   | `pnpm --filter apps-desktop test:e2e:fixtures`       | 否           | test       |
+| 基础组件夹具视觉回归    | `pnpm --filter apps-desktop test:visual:fixtures`    | 是           | test       |
+| 页面人工截图 artifact   | `pnpm --filter apps-desktop test:artifacts:renderer` | 否，只写 PNG | production |
 
-E2E 测试需要先构建项目。构建产物在 `out/` 目录下：
+像素比较不属于常规 Renderer 回归，避免不同平台的字体和栅格化差异阻断结构/交互测试。视觉 project 固定 Chromium、`1440×1000` viewport、`deviceScaleFactor=1`、浅色模式、`zh-CN`、`Asia/Shanghai`、reduced motion 和固定脱敏数据。
 
-```bash
-# 构建完整的桌面应用
-pnpm --filter apps-desktop build
-```
+## 常规 E2E
 
-### 运行所有 E2E 测试
+完整 E2E 会先生产构建，再依次运行 Renderer、Electron 和组件夹具结构测试；视觉比较仍需独立执行：
 
 ```bash
 pnpm --filter apps-desktop test:e2e
 ```
 
-这会依次运行 Renderer 测试和 Electron 测试。
-
-### 仅运行 Renderer 测试（真实 Chromium）
+只运行某个边界：
 
 ```bash
 pnpm --filter apps-desktop test:e2e:renderer
-```
-
-Renderer 测试在真实 Chromium 浏览器中运行，注入受控的 mock `window.api` 数据来模拟 Preload API。测试覆盖：
-
-- 聊天页完整流程（会话列表、消息展示、Composer 输入、发送按钮状态）
-- 配置阻断流程（runtime 未就绪时自动跳转到配置页、表单联动、校验逻辑）
-- 长消息布局（验证大量消息不会把 Composer 推出视口）
-
-### 仅运行 Electron 测试（真实 Electron 窗口）
-
-```bash
 pnpm --filter apps-desktop test:e2e:electron
+pnpm --filter apps-desktop test:e2e:fixtures
 ```
 
-Electron 测试启动真实 Electron 应用，使用临时 HOME 目录避免污染本机配置。测试覆盖：
+普通 production 构建会额外扫描 `out/renderer`，确认组件夹具模块没有进入正式产物。
 
-- 应用启动和窗口创建
-- Preload API 可用性检查
-- 页面正确渲染（配置页或聊天页）
-- HashRouter 导航行为
+## 基础组件验收夹具
 
-### 调试模式
+开发模式和专用 Playwright test 构建可访问：
+
+```text
+/#/__fixtures__/base-components
+```
+
+夹具只渲染 Renderer 基础组件和固定脱敏数据，不注入 Preload mock、不读取 `window.api`、不加载 Runtime，也不读写真实配置。后续组件 Ticket 应在现有 `data-fixture-section` 分区内增量加入 variant、size、状态和边界场景。
+
+运行结构/键盘/Portal smoke：
 
 ```bash
-# Renderer 测试调试模式（显示浏览器窗口、放慢执行）
+pnpm --filter apps-desktop test:e2e:fixtures
+```
+
+运行视觉回归：
+
+```bash
+pnpm --filter apps-desktop test:visual:fixtures
+```
+
+明确接受视觉变化并更新当前平台基准：
+
+```bash
+pnpm --filter apps-desktop test:visual:fixtures:update
+```
+
+## 人工截图 artifact
+
+`e2e/renderer/artifacts.spec.ts` 只把完整产品页面写成 PNG，供人工验收；它没有 `toHaveScreenshot()` 比较，因此不属于自动视觉回归，也不在常规 Renderer project 中运行。对应的 ARIA 自动断言位于 `accessibility.spec.ts`，仍属于常规 Renderer 回归。
+
+```bash
+pnpm --filter apps-desktop test:artifacts:renderer
+```
+
+## 调试
+
+```bash
 pnpm --filter apps-desktop test:e2e:renderer --debug
-
-# 指定单个测试文件
-pnpm --filter apps-desktop test:e2e:renderer -- e2e/renderer/chat-page.spec.ts
+pnpm --filter apps-desktop exec playwright test e2e/renderer/chat-page.spec.ts --project=chromium-renderer
 ```
 
-### 运行旧版布局检查
+## 目录结构
 
-```bash
-# 现在指向 Playwright 渲染器测试（原 CDP 脚本已迁移）
-pnpm --filter apps-desktop test:layout
-```
-
-## 测试结构
-
-```
+```text
 e2e/
-├── README.md                        # 本文件
+├── BASELINE.md
+├── component-fixtures/
+│   ├── base-components.spec.ts
+│   ├── base-components.visual.spec.ts
+│   └── base-components.visual.spec.ts-snapshots/
 ├── fixtures/
-│   └── preload-mock.ts              # window.api mock 数据工厂
+│   └── preload-mock.ts
 ├── renderer/
-│   ├── chat-page.spec.ts            # 聊天页流程测试
-│   ├── setup-page.spec.ts           # 配置阻断流程测试
-│   ├── layout.spec.ts               # 长消息布局测试
-│   └── screenshots.spec.ts          # 视觉截图与基础无障碍断言
+│   ├── accessibility.spec.ts
+│   ├── artifacts.spec.ts
+│   ├── fixture-production.spec.ts
+│   └── ...
 └── electron/
-    └── app.spec.ts                  # Electron 窗口测试
+    └── app.spec.ts
 ```
 
 ## 注意事项
 
-1. **不读写真实 API Key**：所有 mock 数据使用脱敏值（如 `sk-a...7xq`），Electron 测试使用临时 HOME 目录。
-2. **构建前置**：Renderer 测试需要 `out/renderer/` 构建产物，Electron 测试需要完整应用构建。运行 `test:e2e` 脚本会自动先执行构建。
-3. **CSP 绕过**：Chromium Renderer 测试启用 `bypassCSP` 配置，因为构建产物的 `index.html` 有严格 Content-Security-Policy。
-4. **并行执行**：所有测试默认并行运行（除非在 CI 环境中）。
-5. **打包 smoke test 不受影响**：`pnpm smoke:packaged:mac` 仍可独立运行。
+1. 测试数据必须脱敏，不记录或输出真实 API Key。
+2. Renderer/Electron 常规测试使用 production 构建；组件夹具使用 `mode=test` 构建。
+3. Chromium Renderer 测试启用 `bypassCSP`，因为构建产物有严格 Content-Security-Policy。
+4. Renderer 与组件夹具配置在顶层管理各自的静态服务器；Electron 使用独立配置，不依赖 Renderer web server。
+5. #33 开始前的 14 个既有配置页失败记录见 `BASELINE.md`，不得误报为组件夹具回归。

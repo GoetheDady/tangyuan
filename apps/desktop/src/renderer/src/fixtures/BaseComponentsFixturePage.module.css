@@ -1,0 +1,120 @@
+.page {
+  min-height: 100vh;
+  padding: calc(var(--space-grid) * 5) calc(var(--space-grid) * 4);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.container {
+  display: flex;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  flex-direction: column;
+  gap: calc(var(--space-grid) * 4);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-grid);
+}
+
+.fixtureBadge {
+  align-self: flex-start;
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--text-page-title);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--text-page-title--line-height);
+  letter-spacing: -0.025em;
+}
+
+.introduction {
+  max-width: 48rem;
+  margin: 0;
+  color: var(--muted-foreground);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--space-grid) * 1.5);
+}
+
+.formGrid {
+  display: grid;
+  gap: calc(var(--space-grid) * 3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-grid);
+}
+
+.errorText {
+  margin: 0;
+  color: var(--destructive);
+  font-size: var(--text-body);
+}
+
+.successLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-grid);
+  color: var(--muted-foreground);
+  font-size: var(--text-body);
+}
+
+.successIcon {
+  color: var(--success);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-grid) * 2.5);
+  padding-top: calc(var(--space-grid) * 3);
+  border-top: var(--border-width) solid var(--split);
+}
+
+.sectionHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-micro);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--text-section-heading);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--text-section-heading--line-height);
+}
+
+.sectionDescription {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-body);
+}
+
+.cardFooter,
+.sectionContent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space-grid) * 1.5);
+}
+
+.sectionContent {
+  flex-direction: column;
+  gap: calc(var(--space-grid) * 2.5);
+}
+
+@media (min-width: 48rem) {
+  .formGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -7,14 +7,20 @@ import type {
   DesktopPreloadApi,
   RuntimeSnapshot
 } from '@tangyuan/contracts'
-import { useEffect, useState } from 'react'
-import { HashRouter, Navigate, Route, Routes, useNavigate } from 'react-router'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { toast, Toaster } from 'sonner'
 
 import { ChatGuard, LoadingScreen } from '@/pages/ChatPage'
 import { ConsoleProviderPage } from '@/pages/ConsoleProviderPage'
 import { ConsoleAgentListPage } from '@/pages/ConsoleAgentListPage'
 import { ConsoleAgentDetailPage } from '@/pages/ConsoleAgentDetailPage'
+
+const baseComponentsFixturesEnabled = import.meta.env.DEV || import.meta.env.MODE === 'test'
+const BaseComponentsFixturePage = baseComponentsFixturesEnabled
+  ? lazy(() => import('@/fixtures/BaseComponentsFixturePage'))
+  : null
+const RendererRoutes = baseComponentsFixturesEnabled ? FixtureAwareRendererRoutes : DesktopRoutes
 
 interface DesktopWorkbenchState {
   runtime: RuntimeSnapshot | null
@@ -57,7 +63,7 @@ export interface DesktopWorkbenchContext extends DesktopWorkbenchState, DesktopW
 function App(): React.JSX.Element {
   return (
     <HashRouter>
-      <DesktopRoutes />
+      <RendererRoutes />
       <Toaster
         position="top-center"
         closeButton
@@ -67,6 +73,26 @@ function App(): React.JSX.Element {
       />
     </HashRouter>
   )
+}
+
+/**
+ * 在构建期允许的环境中截获组件夹具路由，否则进入正常桌面应用。
+ *
+ * @returns 组件夹具或桌面端路由树。
+ * @throws 此组件不会主动抛出错误。
+ */
+function FixtureAwareRendererRoutes(): React.JSX.Element {
+  const location = useLocation()
+
+  if (location.pathname === '/__fixtures__/base-components' && BaseComponentsFixturePage) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <BaseComponentsFixturePage />
+      </Suspense>
+    )
+  }
+
+  return <DesktopRoutes />
 }
 
 /**
