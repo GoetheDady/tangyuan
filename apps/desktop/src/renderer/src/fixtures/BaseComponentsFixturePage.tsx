@@ -1,4 +1,5 @@
 import {
+  Archive,
   Bell,
   CheckCircle2,
   CircleX,
@@ -20,6 +21,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogMedia,
   AlertDialogTitle,
   AlertDialogTrigger
 } from '@/components/ui/alert-dialog'
@@ -636,6 +638,58 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
           </FixtureSection>
 
           <FixtureSection
+            id="alert-dialogs"
+            title="AlertDialog 关键确认"
+            description="default、sm、危险操作、长内容与安全默认焦点；所有内容通过 Portal 渲染。"
+          >
+            <div className={styles.alertDialogGrid} data-fixture-alert-dialogs>
+              <AlertDialogFixtureSample
+                label="default · 512px"
+                summary="标准高影响确认，包含明确标题、后果说明和两项操作。"
+                triggerLabel="打开 default 对话框"
+                title="确认验收动作"
+                dialogDescription="对话框通过 Portal 渲染；此操作不会读写任何真实配置。"
+                cancelLabel="取消"
+                actionLabel="确认"
+              />
+              <AlertDialogFixtureSample
+                label="sm · 320px"
+                summary="紧凑确认在窄内容中保持按钮顺序和安全边距。"
+                triggerLabel="打开 sm 对话框"
+                size="sm"
+                title="切换默认模型？"
+                dialogDescription="新会话将使用所选模型。"
+                cancelLabel="取消切换"
+                actionLabel="确认切换"
+              />
+              <AlertDialogFixtureSample
+                label="危险确认 · Cancel 默认焦点"
+                summary="归档属于高影响操作，确认按钮使用 destructive 层级。"
+                triggerLabel="打开危险确认"
+                triggerVariant="destructive"
+                media={<Archive aria-hidden="true" />}
+                title="确认归档这个 Agent？"
+                dialogDescription={
+                  <>归档后将无法创建新会话，但历史记录仍会保留。你之后可以从 Agent 列表中恢复。</>
+                }
+                cancelLabel="取消"
+                actionLabel="归档 Agent"
+                actionVariant="destructive"
+              />
+              <AlertDialogFixtureSample
+                label="长内容 · 自然换行"
+                summary="固定长文案验证标题、说明和操作区不会溢出视口。"
+                triggerLabel="打开长内容对话框"
+                title="确认将“研究资料整理与长期知识维护 Agent”归档？"
+                dialogDescription="归档后，这个 Agent 将从日常使用列表中移除，并且不能继续创建新会话；已有身份设定、Skills、工作空间和历史会话都会保留。你可以稍后在设置页面的已归档列表中恢复它，恢复后即可继续使用。"
+                cancelLabel="暂不归档"
+                actionLabel="确认归档"
+                actionVariant="destructive"
+              />
+            </div>
+          </FixtureSection>
+
+          <FixtureSection
             id="cards"
             title="Card 内容容器"
             description="完整组合、default/compact 密度、长内容、操作 Footer 与整卡交互状态。"
@@ -726,8 +780,67 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
   )
 }
 
+type AlertDialogFixtureSampleProps = {
+  label: string
+  summary: string
+  triggerLabel: string
+  triggerVariant?: 'outline' | 'destructive'
+  size?: 'default' | 'sm'
+  media?: React.ReactNode
+  title: React.ReactNode
+  dialogDescription: React.ReactNode
+  cancelLabel: string
+  actionLabel: string
+  actionVariant?: 'default' | 'destructive'
+}
+
+function AlertDialogFixtureSample({
+  label,
+  summary,
+  triggerLabel,
+  triggerVariant = 'outline',
+  size = 'default',
+  media,
+  title,
+  dialogDescription,
+  cancelLabel,
+  actionLabel,
+  actionVariant = 'default'
+}: AlertDialogFixtureSampleProps): React.JSX.Element {
+  return (
+    <div className={styles.alertDialogSample}>
+      <span className={styles.alertDialogSampleLabel}>{label}</span>
+      <p className={styles.alertDialogSampleDescription}>{summary}</p>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant={triggerVariant}>{triggerLabel}</Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent size={size}>
+          <AlertDialogHeader>
+            {media ? <AlertDialogMedia>{media}</AlertDialogMedia> : null}
+            <AlertDialogTitle>{title}</AlertDialogTitle>
+            <AlertDialogDescription>{dialogDescription}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
+            <AlertDialogAction variant={actionVariant}>{actionLabel}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}
+
 function FixtureSection(props: {
-  id: 'actions' | 'tooltips' | 'separators' | 'forms' | 'selects' | 'feedback' | 'cards'
+  id:
+    | 'actions'
+    | 'tooltips'
+    | 'separators'
+    | 'forms'
+    | 'selects'
+    | 'feedback'
+    | 'alert-dialogs'
+    | 'cards'
   title: string
   description: string
   children: React.ReactNode

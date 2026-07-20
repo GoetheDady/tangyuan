@@ -29,11 +29,12 @@ test.describe('基础组件验收夹具', () => {
     await page.goto(fixturePath)
 
     await expect(page.getByRole('heading', { name: '基础组件验收夹具', level: 1 })).toBeVisible()
-    await expect(page.locator('[data-fixture-section]')).toHaveCount(6)
+    await expect(page.locator('[data-fixture-section]')).toHaveCount(8)
     await expect(page.locator('[data-fixture-section="actions"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="forms"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="selects"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="feedback"]')).toBeVisible()
+    await expect(page.locator('[data-fixture-section="alert-dialogs"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="cards"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="separators"]')).toBeVisible()
     await expect(page.locator('[data-fixture-marker="base-components-fixture-v1"]')).toBeVisible()
@@ -56,6 +57,166 @@ test.describe('基础组件验收夹具', () => {
     await expect(primaryAction).toHaveCSS('outline-style', 'none')
     const boxShadow = await primaryAction.evaluate((element) => getComputedStyle(element).boxShadow)
     expect(boxShadow).not.toBe('none')
+  })
+
+  test('AlertDialog 保持安全的完整键盘焦点生命周期', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const trigger = page.getByRole('button', { name: '打开危险确认' })
+    await trigger.focus()
+    await trigger.press('Enter')
+
+    const dialog = page.getByRole('alertdialog', { name: '确认归档这个 Agent？' })
+    const cancel = page.getByRole('button', { name: '取消' })
+    const action = page.getByRole('button', { name: '归档 Agent' })
+    await expect(dialog).toBeVisible()
+    await expect(cancel).toBeFocused()
+
+    await page.keyboard.press('Shift+Tab')
+    await expect(action).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(cancel).toBeFocused()
+
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(trigger).toBeFocused()
+  })
+
+  test('AlertDialog 使用 Level 3 层级与明确的打开关闭动效', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await page.goto(fixturePath)
+
+    await page.getByRole('button', { name: '打开 default 对话框' }).click()
+    const dialog = page.getByRole('alertdialog', { name: '确认验收动作' })
+    const overlay = page.locator('[data-slot="alert-dialog-overlay"]')
+    await expect(dialog).toBeVisible()
+    await expect(overlay).toBeVisible()
+    await page.waitForTimeout(300)
+
+    const styles = await dialog.evaluate((element) => {
+      const style = getComputedStyle(element)
+      const box = element.getBoundingClientRect()
+      return {
+        animationDuration: style.animationDuration,
+        borderRadius: style.borderRadius,
+        boxShadow: style.boxShadow,
+        padding: style.padding,
+        width: box.width,
+        zIndex: style.zIndex
+      }
+    })
+    const overlayStyles = await overlay.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        animationDuration: style.animationDuration,
+        backgroundColor: style.backgroundColor,
+        zIndex: style.zIndex
+      }
+    })
+
+    expect(styles.animationDuration).toBe('0.24s')
+    expect(styles.borderRadius).toBe('8px')
+    expect(styles.boxShadow).toContain('rgba(33, 27, 22, 0.08) 0px 6px 16px -8px')
+    expect(styles.padding).toBe('24px')
+    expect(styles.width).toBe(512)
+    expect(styles.zIndex).toBe('50')
+    expect(overlayStyles.animationDuration).toBe('0.24s')
+    expect(overlayStyles.backgroundColor).toMatch(
+      /^(?:rgba\(0, 0, 0, 0\.5\)|oklab\(0 0 0 \/ 0\.5\))$/
+    )
+    expect(overlayStyles.zIndex).toBe('50')
+
+    await page.evaluate(() => {
+      const durations: { content?: string; overlay?: string } = {}
+      const targetSlots = [
+        ['content', 'alert-dialog-content'],
+        ['overlay', 'alert-dialog-overlay']
+      ] as const
+
+      for (const [key, slot] of targetSlots) {
+        const element = document.querySelector(`[data-slot="${slot}"]`)
+        if (!(element instanceof HTMLElement)) throw new Error(`缺少 ${slot}`)
+        const observer = new MutationObserver(() => {
+          if (element.dataset.state === 'closed') {
+            durations[key] = getComputedStyle(element).animationDuration
+            observer.disconnect()
+          }
+        })
+        observer.observe(element, { attributes: true, attributeFilter: ['data-state'] })
+      }
+
+      ;(
+        window as typeof window & {
+          __alertDialogClosedAnimationDurations?: typeof durations
+        }
+      ).__alertDialogClosedAnimationDurations = durations
+    })
+
+    await page.keyboard.press('Escape')
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (
+              window as typeof window & {
+                __alertDialogClosedAnimationDurations?: {
+                  content?: string
+                  overlay?: string
+                }
+              }
+            ).__alertDialogClosedAnimationDurations
+        )
+      )
+      .toEqual({ content: '0.1s', overlay: '0.1s' })
+    await expect(dialog).toBeHidden()
+  })
+
+  test('AlertDialog default 与 sm 尺寸符合 Pencil', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    await page.getByRole('button', { name: '打开 default 对话框' }).click()
+    const defaultDialog = page.getByRole('alertdialog', { name: '确认验收动作' })
+    await expect(defaultDialog).toBeVisible()
+    await expect(defaultDialog).toHaveCSS('width', '512px')
+    await page.getByRole('button', { name: '取消' }).click()
+
+    await page.getByRole('button', { name: '打开 sm 对话框' }).click()
+    const smallDialog = page.getByRole('alertdialog', { name: '切换默认模型？' })
+    await expect(smallDialog).toBeVisible()
+    await expect(smallDialog).toHaveCSS('width', '320px')
+    await expect(smallDialog).toHaveAccessibleDescription('新会话将使用所选模型。')
+    await expect(page.getByRole('button', { name: '取消切换' })).toBeFocused()
+  })
+
+  test('AlertDialog default 在 513–639px 视口仍保持 512px 最大宽度', async ({ page }) => {
+    await page.setViewportSize({ width: 600, height: 800 })
+    await page.goto(fixturePath)
+
+    await page.getByRole('button', { name: '打开 default 对话框' }).click()
+    const dialog = page.getByRole('alertdialog', { name: '确认验收动作' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toHaveCSS('width', '512px')
+  })
+
+  test('AlertDialog 在窄窗口保留安全边距且长内容不溢出', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 700 })
+    await page.goto(fixturePath)
+
+    await page.getByRole('button', { name: '打开长内容对话框' }).click()
+    const dialog = page.getByRole('alertdialog', {
+      name: '确认将“研究资料整理与长期知识维护 Agent”归档？'
+    })
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toHaveAccessibleDescription(
+      '归档后，这个 Agent 将从日常使用列表中移除，并且不能继续创建新会话；已有身份设定、Skills、工作空间和历史会话都会保留。你可以稍后在设置页面的已归档列表中恢复它，恢复后即可继续使用。'
+    )
+
+    const box = await dialog.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.x).toBeGreaterThanOrEqual(16)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(344)
+    expect(box!.y).toBeGreaterThanOrEqual(16)
+    expect(box!.y + box!.height).toBeLessThanOrEqual(684)
   })
 
   test('AlertDialog Portal 与 Toaster 可以在真实 Chromium 中交互', async ({ page }) => {

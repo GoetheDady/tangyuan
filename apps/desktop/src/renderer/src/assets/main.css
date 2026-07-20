@@ -243,6 +243,50 @@
   }
 }
 
+@keyframes alert-dialog-overlay-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes alert-dialog-overlay-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes alert-dialog-content-fade-scale-in {
+  from {
+    opacity: 0;
+    scale: 0.95;
+  }
+
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes alert-dialog-content-fade-scale-out {
+  from {
+    opacity: 1;
+    scale: 1;
+  }
+
+  to {
+    opacity: 0;
+    scale: 0.95;
+  }
+}
+
 @keyframes tooltip-content-fade-scale-in {
   from {
     opacity: 0;
@@ -292,6 +336,31 @@
 }
 
 @layer components {
+  [data-slot='alert-dialog-overlay'] {
+    will-change: opacity;
+  }
+
+  [data-slot='alert-dialog-overlay'][data-state='open'] {
+    animation: alert-dialog-overlay-fade-in var(--duration-slow) var(--ease-standard) both;
+  }
+
+  [data-slot='alert-dialog-overlay'][data-state='closed'] {
+    animation: alert-dialog-overlay-fade-out var(--duration-fast) var(--ease-standard) both;
+  }
+
+  [data-slot='alert-dialog-content'] {
+    transform-origin: center;
+    will-change: opacity, scale;
+  }
+
+  [data-slot='alert-dialog-content'][data-state='open'] {
+    animation: alert-dialog-content-fade-scale-in var(--duration-slow) var(--ease-standard) both;
+  }
+
+  [data-slot='alert-dialog-content'][data-state='closed'] {
+    animation: alert-dialog-content-fade-scale-out var(--duration-fast) var(--ease-standard) both;
+  }
+
   [data-slot='tooltip-content'] {
     transform-origin: var(--radix-tooltip-content-transform-origin);
     will-change: opacity, transform;

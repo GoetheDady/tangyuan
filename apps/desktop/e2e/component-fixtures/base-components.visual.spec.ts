@@ -10,6 +10,7 @@ const visualSections = [
   { id: 'forms', snapshot: 'forms.png' },
   { id: 'selects', snapshot: 'selects.png' },
   { id: 'feedback', snapshot: 'feedback.png' },
+  { id: 'alert-dialogs', snapshot: 'alert-dialogs.png' },
   { id: 'cards', snapshot: 'cards.png' }
 ] as const
 
@@ -31,6 +32,37 @@ test.describe('基础组件视觉回归', () => {
         section.snapshot,
         screenshotOptions
       )
+    })
+  }
+
+  const alertDialogScenarios = [
+    {
+      trigger: '打开 default 对话框',
+      title: '确认验收动作',
+      snapshot: 'alert-dialog-default-open.png'
+    },
+    {
+      trigger: '打开 sm 对话框',
+      title: '切换默认模型？',
+      snapshot: 'alert-dialog-sm-open.png'
+    },
+    {
+      trigger: '打开危险确认',
+      title: '确认归档这个 Agent？',
+      snapshot: 'alert-dialog-destructive-open.png'
+    },
+    {
+      trigger: '打开长内容对话框',
+      title: '确认将“研究资料整理与长期知识维护 Agent”归档？',
+      snapshot: 'alert-dialog-long-content-open.png'
+    }
+  ] as const
+
+  for (const scenario of alertDialogScenarios) {
+    test(`AlertDialog ${scenario.title} 保持打开状态视觉基准`, async ({ page }) => {
+      await page.getByRole('button', { name: scenario.trigger }).click()
+      await expect(page.getByRole('alertdialog', { name: scenario.title })).toBeVisible()
+      await expect(page).toHaveScreenshot(scenario.snapshot, screenshotOptions)
     })
   }
 
