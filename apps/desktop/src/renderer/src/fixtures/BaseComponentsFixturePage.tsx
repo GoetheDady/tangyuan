@@ -184,6 +184,92 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
           </FixtureSection>
 
           <FixtureSection
+            id="tooltips"
+            title="Tooltip 辅助说明"
+            description="四个方位、长短文本、图标触发器、偏移覆盖与视口边缘自动避让；悬停触发器查看浮层。"
+          >
+            <div className={styles.tooltipGrid}>
+              <div className={styles.tooltipSample}>
+                <span className={styles.tooltipSampleLabel}>上方 · top</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline">悬停查看上方说明</Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">上方 Tooltip</TooltipContent>
+                </Tooltip>
+              </div>
+
+              <div className={styles.tooltipSample}>
+                <span className={styles.tooltipSampleLabel}>右侧 · right</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline">悬停查看右侧说明</Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">右侧 Tooltip</TooltipContent>
+                </Tooltip>
+              </div>
+
+              <div className={styles.tooltipSample}>
+                <span className={styles.tooltipSampleLabel}>下方 · bottom</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline">悬停查看下方说明</Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">下方 Tooltip</TooltipContent>
+                </Tooltip>
+              </div>
+
+              <div className={styles.tooltipSample}>
+                <span className={styles.tooltipSampleLabel}>左侧 · left</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline">悬停查看左侧说明</Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">左侧 Tooltip</TooltipContent>
+                </Tooltip>
+              </div>
+
+              <div className={styles.tooltipSample}>
+                <span className={styles.tooltipSampleLabel}>长文本与 10px 偏移</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="secondary">查看较长辅助说明</Button>
+                  </TooltipTrigger>
+                  <TooltipContent sideOffset={10} className={styles.tooltipLongContent}>
+                    当前 Agent 将继承默认模型设置；你可以稍后在设置页面为它选择不同模型。
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+
+              <div className={styles.tooltipSample}>
+                <span className={styles.tooltipSampleLabel}>图标触发器</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" aria-label="查看模型继承说明">
+                      <Info aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>继承默认模型</TooltipContent>
+                </Tooltip>
+              </div>
+
+              <div className={`${styles.tooltipSample} ${styles.tooltipEdgeSample}`}>
+                <span className={styles.tooltipSampleLabel}>右侧边缘自动避让</span>
+                <div className={styles.tooltipEdgeTrack}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline">靠近右侧边缘</Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className={styles.tooltipLongContent}>
+                      当右侧空间不足时，Radix 会自动选择可用方位，避免 Tooltip 溢出视口。
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+            </div>
+          </FixtureSection>
+
+          <FixtureSection
             id="separators"
             title="Separator 内容分隔"
             description="1px 语义边框、全宽与内缩水平线、固定高度垂直线，以及文字分隔组合。"
@@ -641,7 +727,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
 }
 
 function FixtureSection(props: {
-  id: 'actions' | 'separators' | 'forms' | 'selects' | 'feedback' | 'cards'
+  id: 'actions' | 'tooltips' | 'separators' | 'forms' | 'selects' | 'feedback' | 'cards'
   title: string
   description: string
   children: React.ReactNode

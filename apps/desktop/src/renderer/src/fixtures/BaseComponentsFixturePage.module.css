@@ -210,6 +210,56 @@
   }
 }
 
+.tooltipGrid {
+  display: grid;
+  gap: calc(var(--space-grid) * 2);
+}
+
+.tooltipSample {
+  display: flex;
+  min-width: 0;
+  min-height: 8rem;
+  padding: calc(var(--space-grid) * 2);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--space-grid) * 1.5);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.tooltipSampleLabel {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.tooltipLongContent {
+  max-width: 16rem;
+  line-height: 1.5;
+}
+
+.tooltipEdgeSample {
+  align-items: stretch;
+}
+
+.tooltipEdgeTrack {
+  display: flex;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+@media (min-width: 48rem) {
+  .tooltipGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tooltipEdgeSample {
+    grid-column: 1 / -1;
+  }
+}
+
 .separatorGrid {
   display: grid;
   gap: calc(var(--space-grid) * 2);

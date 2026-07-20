@@ -243,6 +243,30 @@
   }
 }
 
+@keyframes tooltip-content-fade-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes tooltip-content-fade-scale-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
 @keyframes select-content-drop-in {
   from {
     opacity: 0;
@@ -268,6 +292,20 @@
 }
 
 @layer components {
+  [data-slot='tooltip-content'] {
+    transform-origin: var(--radix-tooltip-content-transform-origin);
+    will-change: opacity, transform;
+  }
+
+  [data-slot='tooltip-content'][data-state='delayed-open'],
+  [data-slot='tooltip-content'][data-state='instant-open'] {
+    animation: tooltip-content-fade-scale-in var(--duration-base) var(--ease-standard) both;
+  }
+
+  [data-slot='tooltip-content'][data-state='closed'] {
+    animation: tooltip-content-fade-scale-out var(--duration-fast) var(--ease-standard) both;
+  }
+
   [data-slot='select-content'] {
     --select-content-enter-scale-x: 1;
     --select-content-enter-scale-y: 0.8;

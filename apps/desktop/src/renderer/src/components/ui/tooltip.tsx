@@ -9,20 +9,45 @@ const Tooltip = TooltipPrimitive.Root
 
 const TooltipTrigger = TooltipPrimitive.Trigger
 
+/**
+ * 渲染通过 Portal 挂载的简短辅助说明，并保留 Radix Tooltip 的定位属性。
+ *
+ * @param props - Radix Tooltip Content 属性、方位、偏移和样式扩展。
+ * @returns 默认优先显示在触发器上方的 Level 2 Tooltip 浮层。
+ * @throws 此组件不会主动抛出错误。
+ */
 const TooltipContent = React.forwardRef<
   React.ComponentRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => (
+>(({ className, side = 'top', sideOffset = 4, asChild = false, children, ...props }, ref) => (
   <TooltipPrimitive.Portal>
     <TooltipPrimitive.Content
       ref={ref}
+      data-slot="tooltip-content"
+      data-level="2"
+      side={side}
       sideOffset={sideOffset}
+      asChild={asChild}
       className={cn(
-        'z-50 overflow-hidden rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+        'z-50 rounded-[6px] bg-primary px-3 py-1.5 text-xs text-primary-foreground shadow-level-2',
         className
       )}
       {...props}
-    />
+    >
+      {asChild ? (
+        children
+      ) : (
+        <>
+          {children}
+          <TooltipPrimitive.Arrow
+            data-slot="tooltip-arrow"
+            width={10}
+            height={5}
+            className="fill-primary"
+          />
+        </>
+      )}
+    </TooltipPrimitive.Content>
   </TooltipPrimitive.Portal>
 ))
 TooltipContent.displayName = TooltipPrimitive.Content.displayName
