@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   Archive,
   Bell,
@@ -36,6 +37,22 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -584,6 +601,14 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
           </FixtureSection>
 
           <FixtureSection
+            id="dropdown-menus"
+            title="DropdownMenu 复合菜单"
+            description="普通操作、分组、危险与禁用项、Checkbox、Radio，以及受控和非受控子菜单。"
+          >
+            <DropdownMenuFixtureMatrix />
+          </FixtureSection>
+
+          <FixtureSection
             id="feedback"
             title="反馈与层级"
             description="Badge、Alert、Card、AlertDialog Portal 与 Toaster。"
@@ -780,6 +805,166 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
   )
 }
 
+function DropdownMenuFixtureMatrix(): React.JSX.Element {
+  const [lastAction, setLastAction] = useState('尚未执行')
+  const [historyKept, setHistoryKept] = useState(true)
+  const [timestampsVisible, setTimestampsVisible] = useState(false)
+  const [uncontrolledDensity, setUncontrolledDensity] = useState('compact')
+  const [controlledDensity, setControlledDensity] = useState('detailed')
+  const [uncontrolledSubmenuState, setUncontrolledSubmenuState] = useState('closed')
+  const [controlledSubmenuOpen, setControlledSubmenuOpen] = useState(false)
+
+  return (
+    <div className={styles.dropdownMenuGrid} data-fixture-dropdown-menus>
+      <div className={styles.dropdownMenuSample} data-testid="dropdown-menu-actions-sample">
+        <span className={styles.dropdownMenuSampleLabel}>普通操作、分组与状态</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">菜单：普通操作</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" data-testid="dropdown-menu-actions-content">
+            <DropdownMenuLabel>Agent 操作</DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuItem onSelect={() => setLastAction('重命名')}>
+                重命名
+                <DropdownMenuShortcut>⌘R</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setLastAction('复制')}>
+                复制
+                <DropdownMenuShortcut>⌘D</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled onSelect={() => setLastAction('禁用项被激活')}>
+                锁定项（不可用）
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuSub
+              onOpenChange={(open) => setUncontrolledSubmenuState(open ? 'open' : 'closed')}
+            >
+              <DropdownMenuSubTrigger>移动到</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent data-testid="dropdown-menu-uncontrolled-sub-content">
+                <DropdownMenuItem onSelect={() => setLastAction('移动到工作空间')}>
+                  工作空间
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setLastAction('移动到归档区')}>
+                  归档区
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onSelect={() => setLastAction('归档 Agent')}>
+              归档 Agent
+              <DropdownMenuShortcut>⌥⌘A</DropdownMenuShortcut>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <output className={styles.dropdownMenuStatus} data-testid="dropdown-menu-last-action">
+          最近操作：{lastAction}
+        </output>
+        <output
+          className={styles.dropdownMenuStatus}
+          data-testid="dropdown-menu-uncontrolled-sub-state"
+        >
+          非受控子菜单：{uncontrolledSubmenuState}
+        </output>
+      </div>
+
+      <div className={styles.dropdownMenuSample} data-testid="dropdown-menu-checkbox-sample">
+        <span className={styles.dropdownMenuSampleLabel}>Checkbox · 非受控与受控</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">菜单：Checkbox</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" data-testid="dropdown-menu-checkbox-content">
+            <DropdownMenuLabel>显示选项</DropdownMenuLabel>
+            <DropdownMenuCheckboxItem
+              defaultChecked
+              onCheckedChange={(checked) => setHistoryKept(checked === true)}
+            >
+              保留历史记录
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={timestampsVisible}
+              onCheckedChange={(checked) => setTimestampsVisible(checked === true)}
+            >
+              显示时间戳
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <output className={styles.dropdownMenuStatus} data-testid="dropdown-menu-history-state">
+          非受控：{historyKept ? 'checked' : 'unchecked'}
+        </output>
+        <output className={styles.dropdownMenuStatus} data-testid="dropdown-menu-timestamps-state">
+          受控：{timestampsVisible ? 'checked' : 'unchecked'}
+        </output>
+      </div>
+
+      <div className={styles.dropdownMenuSample} data-testid="dropdown-menu-radio-sample">
+        <span className={styles.dropdownMenuSampleLabel}>Radio · 非受控与受控</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">菜单：Radio</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" data-testid="dropdown-menu-radio-content">
+            <DropdownMenuLabel>非受控密度</DropdownMenuLabel>
+            <DropdownMenuRadioGroup defaultValue="compact" onValueChange={setUncontrolledDensity}>
+              <DropdownMenuRadioItem value="compact">紧凑</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="comfortable">舒适</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>受控布局</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={controlledDensity} onValueChange={setControlledDensity}>
+              <DropdownMenuRadioItem value="compact">列表布局</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="detailed">详细布局</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <output
+          className={styles.dropdownMenuStatus}
+          data-testid="dropdown-menu-uncontrolled-radio-state"
+        >
+          非受控：{uncontrolledDensity}
+        </output>
+        <output
+          className={styles.dropdownMenuStatus}
+          data-testid="dropdown-menu-controlled-radio-state"
+        >
+          受控：{controlledDensity}
+        </output>
+      </div>
+
+      <div className={styles.dropdownMenuSample} data-testid="dropdown-menu-submenu-sample">
+        <span className={styles.dropdownMenuSampleLabel}>Submenu · 受控</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">菜单：受控子菜单</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" data-testid="dropdown-menu-controlled-root-content">
+            <DropdownMenuItem onSelect={() => setLastAction('查看详情')}>查看详情</DropdownMenuItem>
+            <DropdownMenuSub open={controlledSubmenuOpen} onOpenChange={setControlledSubmenuOpen}>
+              <DropdownMenuSubTrigger>共享到</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent data-testid="dropdown-menu-controlled-sub-content">
+                <DropdownMenuItem onSelect={() => setLastAction('共享到工作空间')}>
+                  工作空间
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setLastAction('共享到文件')}>
+                  文件
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <output
+          className={styles.dropdownMenuStatus}
+          data-testid="dropdown-menu-controlled-sub-state"
+        >
+          受控子菜单：{controlledSubmenuOpen ? 'open' : 'closed'}
+        </output>
+      </div>
+    </div>
+  )
+}
+
 type AlertDialogFixtureSampleProps = {
   label: string
   summary: string
@@ -838,6 +1023,7 @@ function FixtureSection(props: {
     | 'separators'
     | 'forms'
     | 'selects'
+    | 'dropdown-menus'
     | 'feedback'
     | 'alert-dialogs'
     | 'cards'

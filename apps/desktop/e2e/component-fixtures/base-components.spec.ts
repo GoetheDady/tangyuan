@@ -29,10 +29,11 @@ test.describe('基础组件验收夹具', () => {
     await page.goto(fixturePath)
 
     await expect(page.getByRole('heading', { name: '基础组件验收夹具', level: 1 })).toBeVisible()
-    await expect(page.locator('[data-fixture-section]')).toHaveCount(8)
+    await expect(page.locator('[data-fixture-section]')).toHaveCount(9)
     await expect(page.locator('[data-fixture-section="actions"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="forms"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="selects"]')).toBeVisible()
+    await expect(page.locator('[data-fixture-section="dropdown-menus"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="feedback"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="alert-dialogs"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="cards"]')).toBeVisible()
@@ -1059,6 +1060,239 @@ test.describe('基础组件验收夹具', () => {
     // 选项渲染
     await expect(page.getByRole('option', { name: '苹果' })).toBeVisible()
     await expect(page.getByRole('option', { name: '西兰花' })).toBeVisible()
+  })
+
+  test('DropdownMenu 鼠标打开、Portal 挂载与默认定位符合契约', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const trigger = page.getByRole('button', { name: '菜单：普通操作' })
+    await trigger.scrollIntoViewIfNeeded()
+    const triggerBox = await trigger.boundingBox()
+    expect(triggerBox).not.toBeNull()
+    await trigger.click()
+
+    const content = page.getByTestId('dropdown-menu-actions-content')
+    await expect(content).toBeVisible()
+    await expect(content).toHaveAttribute('data-level', '2')
+    await expect(content).toHaveCSS('min-width', '128px')
+    await expect(content).toHaveCSS('border-radius', '6px')
+    await expect(content).toHaveCSS('padding', '4px')
+
+    const livesOutsideFixture = await content.evaluate((element) => {
+      const fixture = document.querySelector('[data-fixture-marker="base-components-fixture-v1"]')
+      return fixture instanceof HTMLElement && !fixture.contains(element)
+    })
+    expect(livesOutsideFixture).toBe(true)
+
+    const contentBox = await content.boundingBox()
+    expect(contentBox).not.toBeNull()
+    expect(Math.abs(contentBox!.y - (triggerBox!.y + triggerBox!.height) - 4)).toBeLessThanOrEqual(
+      1
+    )
+
+    await page.getByRole('menuitem', { name: '重命名 ⌘R' }).click()
+    await expect(page.getByTestId('dropdown-menu-last-action')).toHaveText('最近操作：重命名')
+    await expect(content).toBeHidden()
+    await expect(trigger).toBeFocused()
+  })
+
+  test('DropdownMenu 键盘方向键、Enter、Space 与 Escape 恢复焦点', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const trigger = page.getByRole('button', { name: '菜单：普通操作' })
+    await trigger.focus()
+    await page.keyboard.press('Enter')
+
+    const content = page.getByTestId('dropdown-menu-actions-content')
+    await expect(content).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: '重命名 ⌘R' })).toHaveAttribute(
+      'data-highlighted',
+      ''
+    )
+
+    await page.keyboard.press('ArrowDown')
+    await expect(page.getByRole('menuitem', { name: '复制 ⌘D' })).toHaveAttribute(
+      'data-highlighted',
+      ''
+    )
+    await page.keyboard.press('Enter')
+    await expect(page.getByTestId('dropdown-menu-last-action')).toHaveText('最近操作：复制')
+    await expect(trigger).toBeFocused()
+
+    await page.keyboard.press('Space')
+    await expect(content).toBeVisible()
+    await page.keyboard.press('Space')
+    await expect(page.getByTestId('dropdown-menu-last-action')).toHaveText('最近操作：重命名')
+    await expect(trigger).toBeFocused()
+
+    await page.keyboard.press('Enter')
+    await expect(content).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(content).toBeHidden()
+    await expect(trigger).toBeFocused()
+  })
+
+  test('DropdownMenu 禁用项不可激活且方向键会跳过', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const trigger = page.getByRole('button', { name: '菜单：普通操作' })
+    await trigger.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('menuitem', { name: '重命名 ⌘R' })).toHaveAttribute(
+      'data-highlighted',
+      ''
+    )
+    await page.keyboard.press('ArrowDown')
+    await expect(page.getByRole('menuitem', { name: '复制 ⌘D' })).toHaveAttribute(
+      'data-highlighted',
+      ''
+    )
+    await page.keyboard.press('ArrowDown')
+
+    const disabledItem = page.getByRole('menuitem', { name: '锁定项（不可用）' })
+    await expect(disabledItem).toHaveAttribute('aria-disabled', 'true')
+    await expect(disabledItem).not.toHaveAttribute('data-highlighted')
+    await expect(page.getByRole('menuitem', { name: '移动到' })).toHaveAttribute(
+      'data-highlighted',
+      ''
+    )
+    await expect(page.getByTestId('dropdown-menu-last-action')).toHaveText('最近操作：尚未执行')
+  })
+
+  test('DropdownMenu Checkbox 在受控与非受控场景中更新', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const trigger = page.getByRole('button', { name: '菜单：Checkbox' })
+    await trigger.click()
+    const historyItem = page.getByRole('menuitemcheckbox', { name: '保留历史记录' })
+    await expect(historyItem).toHaveAttribute('aria-checked', 'true')
+    await historyItem.click()
+    await expect(page.getByTestId('dropdown-menu-history-state')).toHaveText('非受控：unchecked')
+
+    await trigger.click()
+    const timestampsItem = page.getByRole('menuitemcheckbox', { name: '显示时间戳' })
+    await expect(timestampsItem).toHaveAttribute('aria-checked', 'false')
+    await timestampsItem.click()
+    await expect(page.getByTestId('dropdown-menu-timestamps-state')).toHaveText('受控：checked')
+
+    await trigger.click()
+    await expect(page.getByRole('menuitemcheckbox', { name: '显示时间戳' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+  })
+
+  test('DropdownMenu Radio 在受控与非受控场景中更新', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const trigger = page.getByRole('button', { name: '菜单：Radio' })
+    await trigger.click()
+    await expect(page.getByRole('menuitemradio', { name: '紧凑' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    await page.getByRole('menuitemradio', { name: '舒适' }).click()
+    await expect(page.getByTestId('dropdown-menu-uncontrolled-radio-state')).toHaveText(
+      '非受控：comfortable'
+    )
+
+    await trigger.click()
+    await expect(page.getByRole('menuitemradio', { name: '详细布局' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    await page.getByRole('menuitemradio', { name: '列表布局' }).click()
+    await expect(page.getByTestId('dropdown-menu-controlled-radio-state')).toHaveText(
+      '受控：compact'
+    )
+  })
+
+  test('DropdownMenu 非受控 Submenu 支持方向键导航与嵌套选择', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const trigger = page.getByRole('button', { name: '菜单：普通操作' })
+    await trigger.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByTestId('dropdown-menu-actions-content')).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: '重命名 ⌘R' })).toHaveAttribute(
+      'data-highlighted',
+      ''
+    )
+    await page.keyboard.press('ArrowDown')
+    await expect(page.getByRole('menuitem', { name: '复制 ⌘D' })).toHaveAttribute(
+      'data-highlighted',
+      ''
+    )
+    await page.keyboard.press('ArrowDown')
+    await expect(page.getByRole('menuitem', { name: '移动到' })).toHaveAttribute(
+      'data-highlighted',
+      ''
+    )
+
+    await page.keyboard.press('ArrowRight')
+    const submenu = page.getByTestId('dropdown-menu-uncontrolled-sub-content')
+    await expect(submenu).toBeVisible()
+    await expect(page.getByTestId('dropdown-menu-uncontrolled-sub-state')).toHaveText(
+      '非受控子菜单：open'
+    )
+    await expect(page.getByRole('menuitem', { name: '工作空间' })).toHaveAttribute(
+      'data-highlighted',
+      ''
+    )
+
+    await page.keyboard.press('ArrowDown')
+    await expect(page.getByRole('menuitem', { name: '归档区' })).toHaveAttribute(
+      'data-highlighted',
+      ''
+    )
+    await page.keyboard.press('Enter')
+    await expect(page.getByTestId('dropdown-menu-last-action')).toHaveText('最近操作：移动到归档区')
+    await expect(trigger).toBeFocused()
+  })
+
+  test('DropdownMenu 受控 Submenu 可打开、定位、关闭并恢复根菜单焦点', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const trigger = page.getByRole('button', { name: '菜单：受控子菜单' })
+    await trigger.focus()
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('ArrowDown')
+    await expect(page.getByRole('menuitem', { name: '共享到' })).toHaveAttribute(
+      'data-highlighted',
+      ''
+    )
+    await page.keyboard.press('ArrowRight')
+
+    const rootContent = page.getByTestId('dropdown-menu-controlled-root-content')
+    const subContent = page.getByTestId('dropdown-menu-controlled-sub-content')
+    await expect(subContent).toBeVisible()
+    await expect(page.getByTestId('dropdown-menu-controlled-sub-state')).toHaveText(
+      '受控子菜单：open'
+    )
+
+    const rootBox = await rootContent.boundingBox()
+    const subBox = await subContent.boundingBox()
+    expect(rootBox).not.toBeNull()
+    expect(subBox).not.toBeNull()
+    const horizontalGap = Math.min(
+      Math.abs(subBox!.x - (rootBox!.x + rootBox!.width)),
+      Math.abs(rootBox!.x - (subBox!.x + subBox!.width))
+    )
+    expect(horizontalGap).toBeLessThanOrEqual(5)
+
+    const viewport = page.viewportSize()!
+    expect(subBox!.x).toBeGreaterThanOrEqual(0)
+    expect(subBox!.x + subBox!.width).toBeLessThanOrEqual(viewport.width)
+    expect(subBox!.y).toBeGreaterThanOrEqual(0)
+    expect(subBox!.y + subBox!.height).toBeLessThanOrEqual(viewport.height)
+
+    await page.keyboard.press('Escape')
+    await expect(subContent).toBeHidden()
+    await expect(rootContent).toBeHidden()
+    await expect(page.getByTestId('dropdown-menu-controlled-sub-state')).toHaveText(
+      '受控子菜单：closed'
+    )
+    await expect(trigger).toBeFocused()
   })
 
   test('Select 长列表 (20 项) 渲染', async ({ page }) => {
