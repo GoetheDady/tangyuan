@@ -1,4 +1,13 @@
-import { Bell, CheckCircle2, Info, TriangleAlert } from 'lucide-react'
+import {
+  Bell,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Info,
+  Search,
+  Settings,
+  TriangleAlert
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import styles from './BaseComponentsFixturePage.module.css'
@@ -66,7 +75,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
           <FixtureSection
             id="actions"
             title="操作组件"
-            description="按钮 variant、size、禁用态与 Tooltip。"
+            description="按钮 variant、size、图标位置、禁用态、invalid 态与 Tooltip。"
           >
             <div className={styles.row}>
               <Button>主要操作</Button>
@@ -91,6 +100,68 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                 </TooltipTrigger>
                 <TooltipContent>通知说明</TooltipContent>
               </Tooltip>
+            </div>
+            <Separator />
+            <div className={styles.row}>
+              <Button>
+                <Search aria-hidden="true" />
+                前置图标
+              </Button>
+              <Button>
+                后置图标
+                <ChevronRight aria-hidden="true" />
+              </Button>
+              <Button variant="secondary">
+                <ChevronLeft aria-hidden="true" />
+                返回
+              </Button>
+              <Button variant="outline" size="icon" aria-label="搜索">
+                <Search />
+              </Button>
+              <Button variant="ghost" size="icon" aria-label="设置">
+                <Settings />
+              </Button>
+              <Button variant="secondary" size="icon" aria-label="通知">
+                <Bell />
+              </Button>
+              <Button variant="outline" size="icon-xs" aria-label="超小图标按钮">
+                <Search />
+              </Button>
+              <Button variant="outline" size="icon-sm" aria-label="小号图标按钮">
+                <Settings />
+              </Button>
+              <Button variant="outline" size="icon-lg" aria-label="大号图标按钮">
+                <Bell />
+              </Button>
+            </div>
+            <Separator />
+            <div className={styles.row}>
+              <Button variant="secondary" disabled>
+                次要禁用
+              </Button>
+              <Button variant="outline" disabled>
+                描边禁用
+              </Button>
+              <Button variant="ghost" disabled>
+                幽灵禁用
+              </Button>
+              <Button variant="destructive" disabled>
+                危险禁用
+              </Button>
+              <Button variant="link" disabled>
+                链接禁用
+              </Button>
+              <Button aria-invalid="true">无效态</Button>
+            </div>
+            <Separator />
+            <div className={styles.row}>
+              <Button className="max-w-[200px] truncate">
+                这段文案会很长很长很长很长很长用来验证按钮的长文本截断表现
+              </Button>
+              <Button variant="secondary" size="lg">
+                <Search aria-hidden="true" />
+                大号带图标
+              </Button>
             </div>
           </FixtureSection>
 
