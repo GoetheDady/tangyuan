@@ -74,6 +74,56 @@ test.describe('基础组件验收夹具', () => {
     await expect(page.getByText('组件验收通知已显示')).toBeVisible()
   })
 
+  test('Badge 全部变体遵守紧凑 Level 0 规格', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const feedback = page.locator('[data-fixture-section="feedback"]')
+    const variants = [
+      ['默认 Badge', 'default'],
+      ['次要 Badge', 'secondary'],
+      ['成功 Badge', 'success'],
+      ['危险 Badge', 'destructive'],
+      ['描边 Badge', 'outline']
+    ] as const
+
+    for (const [name, variant] of variants) {
+      const badge = feedback.getByText(name, { exact: true })
+      await expect(badge).toHaveAttribute('data-variant', variant)
+      await expect(badge).toHaveCSS('height', '22px')
+      await expect(badge).toHaveCSS('border-radius', '6px')
+      await expect(badge).toHaveCSS('padding-left', '7px')
+      await expect(badge).toHaveCSS('padding-right', '7px')
+      await expect(badge).toHaveCSS('font-size', '11px')
+      await expect(badge).toHaveCSS('font-weight', '600')
+      await expect(badge).toHaveCSS('box-shadow', 'none')
+    }
+  })
+
+  test('Badge 长文本与图标组合保持高度和对齐', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const longBadge = page.getByTestId('badge-long-text')
+    await expect(longBadge).toHaveCSS('height', '22px')
+    await expect(longBadge).toHaveCSS('white-space', 'nowrap')
+    await expect(longBadge).toHaveCSS('overflow', 'hidden')
+    expect((await longBadge.boundingBox())?.width).toBeLessThanOrEqual(192)
+
+    const iconBadge = page.getByTestId('badge-icon')
+    const icon = iconBadge.locator('svg')
+    await expect(iconBadge).toHaveCSS('height', '22px')
+    await expect(icon).toHaveCSS('width', '12px')
+    await expect(icon).toHaveCSS('height', '12px')
+
+    const alignment = await iconBadge.evaluate((element) => {
+      const badgeRect = element.getBoundingClientRect()
+      const iconRect = element.querySelector('svg')?.getBoundingClientRect()
+      return iconRect
+        ? Math.abs(iconRect.top + iconRect.height / 2 - (badgeRect.top + badgeRect.height / 2))
+        : Number.POSITIVE_INFINITY
+    })
+    expect(alignment).toBeLessThanOrEqual(1)
+  })
+
   test('六种 variant 全部渲染且可聚焦', async ({ page }) => {
     await page.goto(fixturePath)
 

@@ -350,10 +350,8 @@ export function ConsoleProviderPage(): React.JSX.Element {
                       <div key={provider.providerId} className="rounded-md border bg-card p-4">
                         <div className="mb-3 flex items-center justify-between">
                           <h3 className="text-sm font-medium">{provider.displayName}</h3>
-                          <Badge variant={isConfigured ? 'default' : 'secondary'}>
-                            {isConfigured ? (
-                              <Check size={12} className="mr-1" aria-hidden="true" />
-                            ) : null}
+                          <Badge variant={isConfigured ? 'success' : 'secondary'}>
+                            {isConfigured ? <Check size={12} aria-hidden="true" /> : null}
                             {isConfigured ? '已配置' : '未配置'}
                           </Badge>
                         </div>

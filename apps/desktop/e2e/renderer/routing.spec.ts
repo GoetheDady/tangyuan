@@ -50,6 +50,38 @@ test.describe('路由导航', () => {
     await expect(page.getByText('活跃')).toBeVisible()
   })
 
+  test('设置页面的活跃 Agent 状态使用 success Badge', async ({ page }) => {
+    const runtime = createMissingConfigSnapshot()
+    const initScript = createPreloadApiInitScript(runtime)
+
+    await page.addInitScript({ content: initScript })
+    await page.goto('/#/console/agents')
+
+    const activeBadge = page.locator('[data-slot="badge"]', { hasText: '活跃' })
+    await expect(activeBadge).toHaveAttribute('data-variant', 'success')
+    await expect(activeBadge).toHaveCSS('height', '22px')
+    await expect(activeBadge).toHaveCSS('font-size', '11px')
+    await expect(activeBadge).toHaveCSS('font-weight', '600')
+    await expect(activeBadge).toHaveCSS('box-shadow', 'none')
+  })
+
+  test('设置页面的 Provider 配置状态使用语义 Badge', async ({ page }) => {
+    const runtime = createMissingConfigSnapshot({
+      configuredProviders: {
+        anthropic: { configured: true, maskedValue: 'sk-a...test' }
+      }
+    })
+    const initScript = createPreloadApiInitScript(runtime)
+
+    await page.addInitScript({ content: initScript })
+    await page.goto('/#/console/providers')
+
+    const configuredBadge = page.locator('[data-slot="badge"]', { hasText: '已配置' })
+    await expect(configuredBadge).toHaveAttribute('data-variant', 'success')
+    await expect(configuredBadge.locator('svg')).toHaveCSS('width', '12px')
+    await expect(configuredBadge).toHaveCSS('box-shadow', 'none')
+  })
+
   test('直接访问 /#/console/agents/:agentId 渲染 Agent 详情页', async ({ page }) => {
     const runtime = createMissingConfigSnapshot()
     const initScript = createPreloadApiInitScript(runtime)

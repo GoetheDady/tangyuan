@@ -296,7 +296,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">状态</dt>
                   <dd>
-                    <Badge variant={agent.status === 'active' ? 'default' : 'secondary'}>
+                    <Badge variant={agent.status === 'active' ? 'success' : 'secondary'}>
                       {agent.status === 'active' ? '活跃' : '已归档'}
                     </Badge>
                   </dd>
@@ -413,14 +413,14 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                           <h3 className="truncate text-sm font-medium">{skill.name}</h3>
                           <Badge
                             variant={skill.source === 'agent' ? 'default' : 'secondary'}
-                            className="shrink-0 text-[10px]"
+                            className="shrink-0"
                           >
                             {skill.source === 'agent' ? '专属' : '共享'}
                           </Badge>
                           {skill.conflict ? (
                             <Badge
                               variant="outline"
-                              className="shrink-0 text-[10px] text-amber-600 border-amber-300"
+                              className="shrink-0 text-amber-600 border-amber-300"
                             >
                               已覆盖同名共享 Skill
                             </Badge>
@@ -428,7 +428,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                           {skill.hasScripts ? (
                             <Badge
                               variant="outline"
-                              className="shrink-0 text-[10px] text-orange-600 border-orange-300"
+                              className="shrink-0 text-orange-600 border-orange-300"
                             >
                               含脚本
                             </Badge>
@@ -481,13 +481,13 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                           <h3 className="truncate text-sm font-medium">{record.skillName}</h3>
                           <Badge
                             variant={record.source === 'agent' ? 'default' : 'secondary'}
-                            className="shrink-0 text-[10px]"
+                            className="shrink-0"
                           >
                             {record.source === 'agent' ? '专属' : '共享'}
                           </Badge>
                           <Badge
-                            variant={record.status === 'active' ? 'default' : 'secondary'}
-                            className="shrink-0 text-[10px]"
+                            variant={record.status === 'active' ? 'success' : 'secondary'}
+                            className="shrink-0"
                           >
                             {record.status === 'active' ? '生效中' : '已删除'}
                           </Badge>

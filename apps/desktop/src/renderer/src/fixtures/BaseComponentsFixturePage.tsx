@@ -421,10 +421,21 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
             description="Badge、Alert、Card、AlertDialog Portal 与 Toaster。"
           >
             <div className={styles.row}>
-              <Badge>默认</Badge>
-              <Badge variant="secondary">次要</Badge>
-              <Badge variant="outline">描边</Badge>
-              <Badge variant="destructive">危险</Badge>
+              <Badge>默认 Badge</Badge>
+              <Badge variant="secondary">次要 Badge</Badge>
+              <Badge variant="success">成功 Badge</Badge>
+              <Badge variant="destructive">危险 Badge</Badge>
+              <Badge variant="outline">描边 Badge</Badge>
+            </div>
+            <Separator />
+            <div className={styles.row}>
+              <Badge variant="secondary" className="max-w-48" data-testid="badge-long-text">
+                这是一段很长很长很长很长用来验证高度与溢出的 Badge 文案
+              </Badge>
+              <Badge variant="success" data-testid="badge-icon">
+                <CheckCircle2 aria-hidden="true" />
+                图标组合
+              </Badge>
             </div>
             <div className={styles.formGrid}>
               <Alert>

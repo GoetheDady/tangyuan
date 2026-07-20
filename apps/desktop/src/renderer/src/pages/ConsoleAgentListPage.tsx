@@ -216,14 +216,9 @@ export function ConsoleAgentListPage(): React.JSX.Element {
                     <div className="flex items-center gap-2.5">
                       <h3 className="truncate text-sm font-semibold">{agent.displayName}</h3>
                       {agent.agentId === 'tangyuan' ? (
-                        <Badge variant="secondary" className="text-xs">
-                          默认
-                        </Badge>
+                        <Badge variant="secondary">默认</Badge>
                       ) : null}
-                      <Badge
-                        variant={agent.status === 'active' ? 'default' : 'secondary'}
-                        className="text-xs"
-                      >
+                      <Badge variant={agent.status === 'active' ? 'success' : 'secondary'}>
                         {agent.status === 'active' ? '活跃' : '已归档'}
                       </Badge>
                       {agent.directoryStatus === 'damaged' ? (
