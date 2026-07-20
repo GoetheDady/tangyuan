@@ -77,6 +77,87 @@ test.describe('基础组件验收夹具', () => {
     await expect(page.getByText('组件验收通知已显示')).toBeVisible()
   })
 
+  test('Alert 四种语义共享状态 Token，并保持 8px、1px 与 Level 0 契约', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const alerts = page.locator('[data-fixture-alerts] [data-slot="alert"]')
+    await expect(alerts).toHaveCount(4)
+
+    const variants = ['info', 'success', 'warning', 'destructive'] as const
+    for (const variant of variants) {
+      const alert = page.getByTestId(`alert-${variant}`)
+      await expect(alert).toHaveAttribute('role', 'alert')
+      await expect(alert).toHaveAttribute('data-variant', variant)
+      await expect(alert).toHaveAttribute('data-level', '0')
+      await expect(alert).toHaveCSS('border-radius', '8px')
+      await expect(alert).toHaveCSS('border-width', '1px')
+      await expect(alert).toHaveCSS('box-shadow', 'none')
+
+      const colors = await alert.evaluate((element, semanticVariant) => {
+        const probe = document.createElement('div')
+        probe.style.backgroundColor = `var(--${semanticVariant}-soft)`
+        probe.style.borderColor = `var(--${semanticVariant}-border)`
+        document.body.append(probe)
+
+        const alertStyle = getComputedStyle(element)
+        const probeStyle = getComputedStyle(probe)
+        const result = {
+          backgroundColor: alertStyle.backgroundColor,
+          borderColor: alertStyle.borderColor,
+          semanticBackground: probeStyle.backgroundColor,
+          semanticBorder: probeStyle.borderColor
+        }
+        probe.remove()
+        return result
+      }, variant)
+
+      expect(colors.backgroundColor).toBe(colors.semanticBackground)
+      expect(colors.borderColor).toBe(colors.semanticBorder)
+    }
+  })
+
+  test('Alert 长文案、无图标和操作内容保持对齐与自然换行', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const infoAlert = page.getByTestId('alert-info')
+    const warningAlert = page.getByTestId('alert-warning')
+    const warningTitle = warningAlert.locator('[data-slot="alert-title"]')
+    const warningDescription = warningAlert.locator('[data-slot="alert-description"]')
+
+    await expect(infoAlert.locator(':scope > svg')).toHaveCount(1)
+    await expect(warningAlert.locator(':scope > svg')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '重新验证' })).toBeVisible()
+
+    const alignment = await warningAlert.evaluate((element) => {
+      const title = element.querySelector('[data-slot="alert-title"]')
+      if (!(title instanceof HTMLElement)) throw new Error('缺少 AlertTitle')
+
+      return {
+        alertLeft: element.getBoundingClientRect().left,
+        titleLeft: title.getBoundingClientRect().left,
+        paddingLeft: Number.parseFloat(getComputedStyle(element).paddingLeft),
+        borderLeft: Number.parseFloat(getComputedStyle(element).borderLeftWidth)
+      }
+    })
+    expect(alignment.titleLeft - alignment.alertLeft).toBe(
+      alignment.borderLeft + alignment.paddingLeft
+    )
+
+    const titleLayout = await warningTitle.evaluate((element) => ({
+      height: element.getBoundingClientRect().height,
+      lineHeight: Number.parseFloat(getComputedStyle(element).lineHeight),
+      overflow: getComputedStyle(element).overflow
+    }))
+    expect(titleLayout.height).toBeGreaterThan(titleLayout.lineHeight)
+    expect(titleLayout.overflow).toBe('visible')
+
+    const descriptionLayout = await warningDescription.evaluate((element) => ({
+      height: element.getBoundingClientRect().height,
+      lineHeight: Number.parseFloat(getComputedStyle(element).lineHeight)
+    }))
+    expect(descriptionLayout.height).toBeGreaterThan(descriptionLayout.lineHeight)
+  })
+
   test('Card default/compact 使用稳定的 Level 0、圆角和内边距契约', async ({ page }) => {
     await page.goto(fixturePath)
 

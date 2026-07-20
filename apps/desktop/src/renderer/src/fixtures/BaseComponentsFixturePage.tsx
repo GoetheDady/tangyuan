@@ -1,12 +1,12 @@
 import {
   Bell,
   CheckCircle2,
+  CircleX,
   ChevronLeft,
   ChevronRight,
   Info,
   Search,
-  Settings,
-  TriangleAlert
+  Settings
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -454,16 +454,34 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                 图标组合
               </Badge>
             </div>
-            <div className={styles.formGrid}>
-              <Alert>
-                <Info />
-                <AlertTitle>信息提示</AlertTitle>
-                <AlertDescription>组件夹具使用固定、脱敏的验收数据。</AlertDescription>
+            <div className={styles.alertGrid} data-fixture-alerts>
+              <Alert variant="info" data-testid="alert-info">
+                <Info aria-hidden="true" />
+                <AlertTitle>有可用更新</AlertTitle>
+                <AlertDescription>新版本将在下次启动时自动应用。</AlertDescription>
               </Alert>
-              <Alert variant="destructive">
-                <TriangleAlert />
-                <AlertTitle>危险提示</AlertTitle>
-                <AlertDescription>此状态仅用于验证破坏性语义层级。</AlertDescription>
+              <Alert variant="success" data-testid="alert-success">
+                <CheckCircle2 aria-hidden="true" />
+                <AlertTitle>设置已保存</AlertTitle>
+                <AlertDescription>新的模型配置已经生效。</AlertDescription>
+              </Alert>
+              <Alert variant="warning" data-testid="alert-warning">
+                <AlertTitle>
+                  上下文即将达到上限，这是一段用于验证标题在有限宽度内自然换行且不会被截断的长标题，并继续补充固定文案以确认第二行仍然完整可读
+                </AlertTitle>
+                <AlertDescription>
+                  继续运行可能压缩较早的消息；这段较长说明用于确认没有图标时，文字仍与容器左侧保持正确对齐并自然换行，同时在第二行继续展示完整的状态说明。
+                </AlertDescription>
+              </Alert>
+              <Alert variant="destructive" data-testid="alert-destructive">
+                <CircleX aria-hidden="true" />
+                <AlertTitle>连接失败</AlertTitle>
+                <AlertDescription>
+                  <p>无法验证 Provider 凭据，请检查密钥后重试。</p>
+                  <Button type="button" size="sm" variant="outline">
+                    重新验证
+                  </Button>
+                </AlertDescription>
               </Alert>
             </div>
           </FixtureSection>

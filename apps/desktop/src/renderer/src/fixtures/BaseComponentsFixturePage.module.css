@@ -119,6 +119,7 @@
   }
 }
 
+.alertGrid,
 .cardGrid,
 .cardStateGrid {
   display: grid;
@@ -199,6 +200,7 @@
 }
 
 @media (min-width: 48rem) {
+  .alertGrid,
   .cardGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

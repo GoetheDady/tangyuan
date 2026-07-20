@@ -33,6 +33,13 @@ test.describe('基础组件视觉回归', () => {
     })
   }
 
+  test('Alert 语义与内容组合保持分区视觉基准', async ({ page }) => {
+    await expect(page.locator('[data-fixture-alerts]')).toHaveScreenshot(
+      'alerts.png',
+      screenshotOptions
+    )
+  })
+
   test('Card hover 状态保持视觉基准', async ({ page }) => {
     const card = page.getByTestId('card-interactive-hover')
     const borderBefore = await card.evaluate((element) => getComputedStyle(element).borderColor)
