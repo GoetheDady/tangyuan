@@ -42,6 +42,7 @@ import {
   SelectGroup,
   SelectItem,
   SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
@@ -301,6 +302,105 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
           </FixtureSection>
 
           <FixtureSection
+            id="selects"
+            title="选择器"
+            description="Select Trigger 状态、Item 状态、分组、分隔与长列表滚动。"
+          >
+            <div className={styles.formGrid}>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-select-placeholder">占位选择器</Label>
+                <Select>
+                  <SelectTrigger id="fixture-select-placeholder">
+                    <SelectValue placeholder="请选择一项内容..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="a">选项 A</SelectItem>
+                    <SelectItem value="b">选项 B</SelectItem>
+                    <SelectItem value="c">选项 C</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-select-disabled">禁用选择器</Label>
+                <Select defaultValue="disabled-example">
+                  <SelectTrigger id="fixture-select-disabled" disabled>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="disabled-example">不可用</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-select-invalid">无效选择器</Label>
+                <Select>
+                  <SelectTrigger id="fixture-select-invalid" aria-invalid="true">
+                    <SelectValue placeholder="格式待修正" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="a">选项 A</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-select-long-text">长文本选择器</Label>
+                <Select defaultValue="long-text-value">
+                  <SelectTrigger id="fixture-select-long-text">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="long-text-value">
+                      这段文案会很长很长很长很长用来验证选择器的长文本截断表现
+                    </SelectItem>
+                    <SelectItem value="short">短选项</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-select-grouped">分组与分隔</Label>
+                <Select defaultValue="banana">
+                  <SelectTrigger id="fixture-select-grouped">
+                    <SelectValue placeholder="选择食物" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>水果</SelectLabel>
+                      <SelectItem value="apple">苹果</SelectItem>
+                      <SelectItem value="banana">香蕉</SelectItem>
+                      <SelectItem value="orange">橙子</SelectItem>
+                    </SelectGroup>
+                    <SelectSeparator />
+                    <SelectGroup>
+                      <SelectLabel>蔬菜</SelectLabel>
+                      <SelectItem value="carrot">胡萝卜</SelectItem>
+                      <SelectItem value="broccoli">西兰花</SelectItem>
+                    </SelectGroup>
+                    <SelectSeparator />
+                    <SelectItem value="water" disabled>
+                      水（不可选）
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-select-scroll">长列表滚动</Label>
+                <Select defaultValue="item-1">
+                  <SelectTrigger id="fixture-select-scroll">
+                    <SelectValue placeholder="从 20 项中选择" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 20 }, (_, i) => (
+                      <SelectItem key={i + 1} value={`item-${i + 1}`}>
+                        选项 {String(i + 1).padStart(2, '0')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </FixtureSection>
+
+          <FixtureSection
             id="feedback"
             title="反馈与层级"
             description="Badge、Alert、Card、AlertDialog Portal 与 Toaster。"
@@ -363,7 +463,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
 }
 
 function FixtureSection(props: {
-  id: 'actions' | 'forms' | 'feedback'
+  id: 'actions' | 'forms' | 'selects' | 'feedback'
   title: string
   description: string
   children: React.ReactNode

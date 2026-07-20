@@ -1,6 +1,27 @@
 import { vi } from 'vitest'
 
 /**
+ * Radix UI 依赖 Pointer Events API（hasPointerCapture），jsdom 未实现。
+ * 为 Element 原型补齐该方法，避免 Radix Select/Popover/DropdownMenu 等组件
+ * 在测试中抛出 "target.hasPointerCapture is not a function"。
+ */
+if (typeof Element !== 'undefined' && !Element.prototype.hasPointerCapture) {
+  // @ts-expect-error jsdom 原型补齐
+  Element.prototype.hasPointerCapture = vi.fn().mockReturnValue(false) as (
+    pointerId: number
+  ) => boolean
+}
+
+/**
+ * Radix Select 在 Content 挂载时会调用 scrollIntoView 将选中项滚动到可见区域。
+ * jsdom 不实现此方法，补齐后避免 "scrollIntoView is not a function"。
+ */
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
+  // @ts-expect-error jsdom 原型补齐
+  Element.prototype.scrollIntoView = vi.fn() as (arg?: boolean | ScrollIntoViewOptions) => void
+}
+
+/**
  * 全局 ResizeObserver mock，供 TanStack Virtual 等依赖 ResizeObserver 的库
  * 在 jsdom 环境中使用。
  */

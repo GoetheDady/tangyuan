@@ -27,9 +27,10 @@ test.describe('基础组件验收夹具', () => {
     await page.goto(fixturePath)
 
     await expect(page.getByRole('heading', { name: '基础组件验收夹具', level: 1 })).toBeVisible()
-    await expect(page.locator('[data-fixture-section]')).toHaveCount(3)
+    await expect(page.locator('[data-fixture-section]')).toHaveCount(4)
     await expect(page.locator('[data-fixture-section="actions"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="forms"]')).toBeVisible()
+    await expect(page.locator('[data-fixture-section="selects"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="feedback"]')).toBeVisible()
     await expect(page.locator('[data-fixture-marker="base-components-fixture-v1"]')).toBeVisible()
 
@@ -337,5 +338,213 @@ test.describe('基础组件验收夹具', () => {
     await expect(focusedElement).not.toBeNull()
     const tagName = await focusedElement.evaluate((el) => el.tagName)
     expect(tagName).toBe('TEXTAREA')
+  })
+
+  test('Select 渲染选中值', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const providerSelect = page.getByLabel('模型服务')
+    await expect(providerSelect).toBeVisible()
+    await expect(providerSelect).toHaveText(/Anthropic/)
+  })
+
+  test('Select placeholder 在无默认值时展示', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const placeholderSelect = page.getByLabel('占位选择器')
+    await expect(placeholderSelect).toBeVisible()
+    await expect(placeholderSelect).toHaveText('请选择一项内容...')
+  })
+
+  test('Select disabled 不可交互', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const disabledSelect = page.getByLabel('禁用选择器')
+    await expect(disabledSelect).toBeDisabled()
+  })
+
+  test('Select aria-invalid 渲染', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const invalidSelect = page.getByLabel('无效选择器')
+    await expect(invalidSelect).toBeVisible()
+    await expect(invalidSelect).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  test('Select 长文本触发截断', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const longTextSelect = page.getByLabel('长文本选择器')
+    await expect(longTextSelect).toBeVisible()
+
+    // line-clamp-1 通过 -webkit-line-clamp 实现截断
+    const webkitLineClamp = await longTextSelect.locator('span[style*="pointer-events"]').evaluate(
+      (el) => getComputedStyle(el).webkitLineClamp
+    )
+    expect(webkitLineClamp).toBe('1')
+  })
+
+  test('Select 点击展开 Content 并通过 Portal 渲染', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const providerSelect = page.getByLabel('模型服务')
+    await providerSelect.click()
+
+    // Content 通过 Portal 渲染到 body
+    const listbox = page.getByRole('listbox')
+    await expect(listbox).toBeVisible()
+
+    const option = page.getByRole('option', { name: 'OpenAI（测试数据）' })
+    await expect(option).toBeVisible()
+
+    // 验证 Portal 渲染——选项不在 fixture 容器内
+    const livesOutsideFixture = await option.evaluate((element) => {
+      const fixture = document.querySelector('[data-fixture-marker="base-components-fixture-v1"]')
+      return fixture instanceof HTMLElement && !fixture.contains(element)
+    })
+    expect(livesOutsideFixture).toBe(true)
+  })
+
+  test('Select 打开使用基础动效并遵守减少动效偏好', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const providerSelect = page.getByLabel('模型服务')
+    await providerSelect.click()
+
+    const listbox = page.getByRole('listbox')
+    const animation = await listbox.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        name: style.animationName,
+        duration: style.animationDuration,
+        timingFunction: style.animationTimingFunction,
+        enterScaleY: Number(style.getPropertyValue('--select-content-enter-scale-y')),
+        originY: style.transformOrigin.split(' ')[1]
+      }
+    })
+
+    expect(animation).toEqual({
+      name: 'select-content-drop-in',
+      duration: '0.16s',
+      timingFunction: 'cubic-bezier(0.2, 0, 0, 1)',
+      enterScaleY: 0.8,
+      originY: '0px'
+    })
+
+    await page.keyboard.press('Escape')
+    await expect(listbox).toBeHidden()
+
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await providerSelect.click()
+
+    const reducedAnimation = await page.getByRole('listbox').evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        duration: style.animationDuration,
+        reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      }
+    })
+
+    expect(reducedAnimation).toEqual({
+      duration: '0s',
+      reducedMotion: true
+    })
+  })
+
+  test('Select 键盘 Enter 打开 Content', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const placeholderSelect = page.getByLabel('占位选择器')
+    await placeholderSelect.focus()
+    await expect(placeholderSelect).toBeFocused()
+
+    await page.keyboard.press('Enter')
+
+    const listbox = page.getByRole('listbox')
+    await expect(listbox).toBeVisible()
+  })
+
+  test('Select Escape 关闭 Content', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const providerSelect = page.getByLabel('模型服务')
+    await providerSelect.click()
+
+    const listbox = page.getByRole('listbox')
+    await expect(listbox).toBeVisible()
+
+    await page.keyboard.press('Escape')
+
+    await expect(listbox).toBeHidden()
+  })
+
+  test('Select 方向键导航并 Enter 选择', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const placeholderSelect = page.getByLabel('占位选择器')
+    await placeholderSelect.click()
+
+    // 等待 listbox 出现并获得焦点
+    const listbox = page.getByRole('listbox')
+    await expect(listbox).toBeVisible()
+
+    // 方向键导航到第二个选项（打开时第一项已 highlighted）
+    await page.keyboard.press('ArrowDown')
+    // 验证导航成功：第二项获得 data-highlighted
+    await expect(page.getByRole('option', { name: '选项 B' })).toHaveAttribute(
+      'data-highlighted',
+      ''
+    )
+
+    // Enter 选择
+    await page.keyboard.press('Enter')
+
+    // 选择后 Content 关闭，Trigger 展示选中值
+    await expect(listbox).toBeHidden()
+    await expect(placeholderSelect).toHaveText('选项 B')
+  })
+
+  test('Select 禁用项不可选择', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const groupedSelect = page.getByLabel('分组与分隔')
+    await groupedSelect.click()
+
+    const disabledItem = page.getByRole('option', { name: /水（不可选）/ })
+    await expect(disabledItem).toBeVisible()
+    await expect(disabledItem).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  test('Select 分组 Label 与 Separator 存在', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const groupedSelect = page.getByLabel('分组与分隔')
+    await groupedSelect.click()
+
+    // 分组标签渲染
+    await expect(page.getByText('水果')).toBeVisible()
+    await expect(page.getByText('蔬菜')).toBeVisible()
+
+    // 选项渲染
+    await expect(page.getByRole('option', { name: '苹果' })).toBeVisible()
+    await expect(page.getByRole('option', { name: '西兰花' })).toBeVisible()
+  })
+
+  test('Select 长列表 (20 项) 渲染', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const scrollSelect = page.getByLabel('长列表滚动')
+    await scrollSelect.click()
+
+    const listbox = page.getByRole('listbox')
+    await expect(listbox).toBeVisible()
+
+    // 前 5 项和后 5 项确认
+    await expect(page.getByRole('option', { name: '选项 01' })).toBeVisible()
+    await expect(page.getByRole('option', { name: '选项 20' })).toBeVisible()
+
+    // 20 项全部应有对应的 option role
+    const options = listbox.getByRole('option')
+    await expect(options).toHaveCount(20)
   })
 })
