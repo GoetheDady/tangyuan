@@ -5,6 +5,9 @@ import {
   createPreloadApiInitScript
 } from '../fixtures/preload-mock'
 
+const providerModelSelector = '#model-anthropic'
+const providerApiKeySelector = '#api-key-anthropic'
+
 test.describe('配置阻断', () => {
   test('runtime 未就绪时 /#/chat 重定向到 /#/console/providers', async ({ page }) => {
     const runtime = createMissingConfigSnapshot()
@@ -13,58 +16,46 @@ test.describe('配置阻断', () => {
     await page.addInitScript({ content: initScript })
     await page.goto('/#/chat')
 
-    // 应该被重定向到 setup 页
-    await page.waitForSelector('#provider')
-    await expect(page).toHaveURL(/\/console\/providers/)
     await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
+    await expect(page).toHaveURL(/\/console\/providers/)
+    await expect(page).toHaveURL(/redirect=/)
   })
 
-  test('配置页显示 Provider select 和选项', async ({ page }) => {
+  test('配置页显示 Provider 凭据卡片和对应模型选项', async ({ page }) => {
     const runtime = createMissingConfigSnapshot()
     const initScript = createPreloadApiInitScript(runtime)
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
-    await page.waitForSelector('#provider')
 
-    const providerSelect = page.locator('#provider')
-    await expect(providerSelect).toBeVisible()
-
-    // 应有 "选择模型服务" 占位项和 Anthropic 选项
-    const options = providerSelect.locator('option')
-    await expect(options).toHaveCount(2)
-    await expect(options.nth(1)).toHaveText('Anthropic')
-  })
-
-  test('配置页显示 Model select', async ({ page }) => {
-    const runtime = createMissingConfigSnapshot()
-    const initScript = createPreloadApiInitScript(runtime)
-
-    await page.addInitScript({ content: initScript })
-    await page.goto('/#/console/providers')
-    await page.waitForSelector('#model')
-
-    const modelSelect = page.locator('#model')
+    await expect(page.getByRole('heading', { name: 'Provider 凭据' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Anthropic', level: 3 })).toBeVisible()
+    const modelSelect = page.locator(providerModelSelector)
     await expect(modelSelect).toBeVisible()
+    await expect(modelSelect.locator('option')).toHaveCount(2)
+    await expect(modelSelect.locator('option').nth(1)).toHaveText('Claude Sonnet 4.5')
   })
 
-  test('选择 Provider 后 Model select 过滤对应模型', async ({ page }) => {
+  test('配置页显示 Provider 专属 Model select', async ({ page }) => {
     const runtime = createMissingConfigSnapshot()
     const initScript = createPreloadApiInitScript(runtime)
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
-    await page.waitForSelector('#provider')
 
-    // 初始 Model select 只有占位项
-    const modelSelect = page.locator('#model')
-    let options = modelSelect.locator('option')
-    await expect(options).toHaveCount(1) // 只有"选择模型"
+    await expect(page.locator(providerModelSelector)).toBeVisible()
+  })
 
-    // 选择 Anthropic Provider
-    await page.selectOption('#provider', 'anthropic')
-    options = modelSelect.locator('option')
-    await expect(options).toHaveCount(2) // 占位 + Claude Sonnet 4.5
+  test('Provider 卡片只展示对应的模型', async ({ page }) => {
+    const runtime = createMissingConfigSnapshot()
+    const initScript = createPreloadApiInitScript(runtime)
+
+    await page.addInitScript({ content: initScript })
+    await page.goto('/#/console/providers')
+
+    const options = page.locator(providerModelSelector).locator('option')
+    await expect(options).toHaveCount(2)
+    await expect(options.nth(0)).toHaveText('选择模型')
     await expect(options.nth(1)).toHaveText('Claude Sonnet 4.5')
   })
 
@@ -74,39 +65,33 @@ test.describe('配置阻断', () => {
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
-    await page.waitForSelector('#api-key')
 
-    const apiKeyInput = page.locator('#api-key')
+    const apiKeyInput = page.locator(providerApiKeySelector)
     await expect(apiKeyInput).toBeVisible()
     await expect(apiKeyInput).toHaveAttribute('type', 'password')
   })
 
-  test('所有字段为空时提交按钮 disabled', async ({ page }) => {
+  test('Provider 字段为空时提交按钮 disabled', async ({ page }) => {
     const runtime = createMissingConfigSnapshot()
     const initScript = createPreloadApiInitScript(runtime)
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
-    await page.waitForSelector('#provider')
 
-    const submitButton = page.getByRole('button', { name: '验证并保存' })
-    await expect(submitButton).toBeDisabled()
+    await expect(page.getByRole('button', { name: '验证并保存' })).toBeDisabled()
   })
 
-  test('填写所有字段后提交按钮可用', async ({ page }) => {
+  test('填写 Provider 模型和 API Key 后提交按钮可用', async ({ page }) => {
     const runtime = createMissingConfigSnapshot()
     const initScript = createPreloadApiInitScript(runtime)
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
-    await page.waitForSelector('#provider')
 
-    await page.selectOption('#provider', 'anthropic')
-    await page.selectOption('#model', 'claude-sonnet-4-5')
-    await page.fill('#api-key', 'sk-ant-test-key-not-real')
+    await page.selectOption(providerModelSelector, 'claude-sonnet-4-5')
+    await page.fill(providerApiKeySelector, 'sk-ant-test-key-not-real')
 
-    const submitButton = page.getByRole('button', { name: '验证并保存' })
-    await expect(submitButton).toBeEnabled()
+    await expect(page.getByRole('button', { name: '验证并保存' })).toBeEnabled()
   })
 
   test('runtime 就绪时 /#/console/providers 自动跳转到 /#/chat', async ({ page }) => {
@@ -125,7 +110,6 @@ test.describe('配置阻断', () => {
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
 
-    // 应该自动跳转到聊天页
     await page.waitForSelector('#composer')
     await expect(page).toHaveURL(/\/chat/)
   })
@@ -136,7 +120,6 @@ test.describe('配置阻断', () => {
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
-    await page.waitForSelector('#provider')
 
     await expect(page.getByRole('button', { name: '刷新资源' })).toBeVisible()
   })
@@ -147,11 +130,23 @@ test.describe('配置阻断', () => {
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
-    await page.waitForSelector('#provider')
 
     await expect(page.getByText('控制台')).toBeVisible()
     await expect(
-      page.getByText('选择 Provider、模型并验证 API Key。完成后会直接进入聊天主界面。')
+      page.getByText('为 Provider 配置 API Key 并选择汤圆默认模型。完成后会直接进入聊天主界面。')
     ).toBeVisible()
+  })
+
+  test('初始化配置页面刷新资源继续通过全局 Sonner 队列反馈', async ({ page }) => {
+    const runtime = createMissingConfigSnapshot()
+    const initScript = createPreloadApiInitScript(runtime)
+
+    await page.addInitScript({ content: initScript })
+    await page.goto('/#/console/providers')
+    await page.getByRole('button', { name: '刷新资源' }).click()
+
+    const item = page.locator('[data-sonner-toast][data-type="success"]')
+    await expect(item).toContainText('已刷新可用模型资源')
+    await expect(page.locator('[data-sonner-toaster]')).toHaveAttribute('data-y-position', 'bottom')
   })
 })

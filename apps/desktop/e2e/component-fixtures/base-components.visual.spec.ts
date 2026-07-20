@@ -116,6 +116,47 @@ test.describe('基础组件视觉回归', () => {
     )
   })
 
+  const toastVisualScenarios = [
+    { trigger: '显示 info Toast', type: 'info', snapshot: 'toast-info.png' },
+    { trigger: '显示 success Toast', type: 'success', snapshot: 'toast-success.png' },
+    { trigger: '显示 warning Toast', type: 'warning', snapshot: 'toast-warning.png' },
+    { trigger: '显示 error Toast', type: 'error', snapshot: 'toast-error.png' },
+    { trigger: '显示 loading Toast', type: 'loading', snapshot: 'toast-loading.png' },
+    {
+      trigger: '显示标题与说明 Toast',
+      type: 'error',
+      snapshot: 'toast-title-description.png'
+    },
+    { trigger: '显示操作 Toast', type: 'success', snapshot: 'toast-action.png' },
+    { trigger: '显示取消 Toast', type: 'info', snapshot: 'toast-cancel.png' },
+    {
+      trigger: '显示完整内容 Toast',
+      type: 'success',
+      snapshot: 'toast-full-content.png'
+    }
+  ] as const
+
+  for (const scenario of toastVisualScenarios) {
+    test(`Toast ${scenario.type} · ${scenario.trigger} 保持视觉基准`, async ({ page }) => {
+      await page.getByRole('button', { name: scenario.trigger }).click()
+      const item = page.locator(`[data-sonner-toast][data-type="${scenario.type}"]`).first()
+      await expect(item).toBeVisible()
+      await expect(item).toHaveScreenshot(scenario.snapshot, screenshotOptions)
+    })
+  }
+
+  test('Toast bottom-right 三条堆叠保持位置与视觉基准', async ({ page }) => {
+    await page.getByRole('button', { name: '显示连续 Toast' }).click()
+    const toaster = page.locator('[data-sonner-toaster]')
+    const visibleItems = toaster.locator('[data-sonner-toast][data-visible="true"]')
+    await expect(visibleItems).toHaveCount(3)
+    await toaster.dispatchEvent('mouseover')
+    await expect(visibleItems.first()).toHaveAttribute('data-expanded', 'true')
+    await page.waitForTimeout(300)
+
+    await expect(page).toHaveScreenshot('toast-stack-bottom-right.png', screenshotOptions)
+  })
+
   test('Card hover 状态保持视觉基准', async ({ page }) => {
     const card = page.getByTestId('card-interactive-hover')
     const borderBefore = await card.evaluate((element) => getComputedStyle(element).borderColor)

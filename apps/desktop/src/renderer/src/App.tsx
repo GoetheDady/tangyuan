@@ -9,8 +9,9 @@ import type {
 } from '@tangyuan/contracts'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
-import { toast, Toaster } from 'sonner'
+import { toast } from 'sonner'
 
+import { Toaster } from '@/components/ui/sonner'
 import { ChatGuard, LoadingScreen } from '@/pages/ChatPage'
 import { ConsoleProviderPage } from '@/pages/ConsoleProviderPage'
 import { ConsoleAgentListPage } from '@/pages/ConsoleAgentListPage'
@@ -64,13 +65,7 @@ function App(): React.JSX.Element {
   return (
     <HashRouter>
       <RendererRoutes />
-      <Toaster
-        position="top-center"
-        closeButton
-        toastOptions={{
-          duration: 3000
-        }}
-      />
+      <Toaster />
     </HashRouter>
   )
 }

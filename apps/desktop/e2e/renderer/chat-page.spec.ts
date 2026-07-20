@@ -127,3 +127,22 @@ test.describe('聊天页', () => {
     await expect(agentMessage).toHaveClass(/justify-start/)
   })
 })
+
+test.describe('聊天主界面 Toast 回归', () => {
+  test('停止生成继续通过全局 Sonner 队列反馈', async ({ page }) => {
+    const runtime = createReadyRuntimeSnapshot()
+    const sessions = createTestSessions(1).map((session) => ({
+      ...session,
+      state: 'running' as const
+    }))
+    const initScript = createPreloadApiInitScript(runtime, sessions, createTestMessages())
+
+    await page.addInitScript({ content: initScript })
+    await page.goto('/#/chat/tangyuan')
+    await page.getByRole('button', { name: '停止' }).click()
+
+    const item = page.locator('[data-sonner-toast][data-type="success"]')
+    await expect(item).toContainText('已停止生成')
+    await expect(page.locator('[data-sonner-toaster]')).toHaveAttribute('data-x-position', 'right')
+  })
+})

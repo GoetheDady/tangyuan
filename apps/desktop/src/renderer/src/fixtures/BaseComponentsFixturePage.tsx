@@ -80,6 +80,11 @@ type CardStateFixture = {
   selectedIcon?: boolean
 }
 
+const TOAST_FIXTURE_LOADING_ID = 'fixture-loading-toast'
+const TOAST_FIXTURE_ACTION_ID = 'fixture-action-toast'
+const TOAST_FIXTURE_CANCEL_ID = 'fixture-cancel-toast'
+const TOAST_FIXTURE_FULL_ID = 'fixture-full-toast'
+
 const CARD_STATE_FIXTURES: readonly CardStateFixture[] = [
   { id: 'default', label: '默认' },
   { id: 'hover', label: '悬停' },
@@ -629,6 +634,147 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                 <CheckCircle2 aria-hidden="true" />
                 图标组合
               </Badge>
+            </div>
+            <div className={styles.toastFixture} data-fixture-toasts>
+              <div className={styles.toastFixtureGroup}>
+                <span className={styles.toastFixtureLabel}>语义状态</span>
+                <div className={styles.row}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      toast.dismiss()
+                      toast.info('Bash 命令需要审批')
+                    }}
+                  >
+                    显示 info Toast
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      toast.dismiss()
+                      toast.success('已创建 Agent「助手」')
+                    }}
+                  >
+                    显示 success Toast
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      toast.dismiss()
+                      toast.warning('目录对账发现 3 个异常')
+                    }}
+                  >
+                    显示 warning Toast
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      toast.dismiss()
+                      toast.error('读取运行时状态失败')
+                    }}
+                  >
+                    显示 error Toast
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      toast.dismiss()
+                      toast.loading('正在保存 Agent 配置', { id: TOAST_FIXTURE_LOADING_ID })
+                    }}
+                  >
+                    显示 loading Toast
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      toast.success('Agent 配置已保存', { id: TOAST_FIXTURE_LOADING_ID })
+                    }
+                  >
+                    更新 loading Toast
+                  </Button>
+                </div>
+              </div>
+
+              <div className={styles.toastFixtureGroup}>
+                <span className={styles.toastFixtureLabel}>内容与操作</span>
+                <div className={styles.row}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      toast.dismiss()
+                      toast.error('操作失败', { description: '请检查网络连接后重试。' })
+                    }}
+                  >
+                    显示标题与说明 Toast
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      toast.dismiss()
+                      toast.success('已归档 Agent「助手」', {
+                        id: TOAST_FIXTURE_ACTION_ID,
+                        action: {
+                          label: '撤销归档',
+                          onClick: () =>
+                            toast.success('已撤销 Agent 归档', { id: TOAST_FIXTURE_ACTION_ID })
+                        }
+                      })
+                    }}
+                  >
+                    显示操作 Toast
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      toast.dismiss()
+                      toast.info('即将执行批量操作', {
+                        id: TOAST_FIXTURE_CANCEL_ID,
+                        cancel: {
+                          label: '取消操作',
+                          onClick: () =>
+                            toast.info('已取消批量操作', { id: TOAST_FIXTURE_CANCEL_ID })
+                        }
+                      })
+                    }}
+                  >
+                    显示取消 Toast
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      toast.dismiss()
+                      toast.success('Agent 配置已保存', {
+                        id: TOAST_FIXTURE_FULL_ID,
+                        description: '新的默认模型将在下次会话中生效。',
+                        action: {
+                          label: '查看详情',
+                          onClick: () => toast.info('已打开配置详情', { id: TOAST_FIXTURE_FULL_ID })
+                        },
+                        cancel: {
+                          label: '稍后处理',
+                          onClick: () => toast.info('已稍后处理', { id: TOAST_FIXTURE_FULL_ID })
+                        }
+                      })
+                    }}
+                  >
+                    显示完整内容 Toast
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      toast.dismiss()
+                      for (const index of [1, 2, 3, 4]) {
+                        toast.info(`队列通知 ${index}`, {
+                          id: `fixture-queue-toast-${index}`,
+                          duration: Number.POSITIVE_INFINITY
+                        })
+                      }
+                    }}
+                  >
+                    显示连续 Toast
+                  </Button>
+                </div>
+              </div>
             </div>
             <div className={styles.alertGrid} data-fixture-alerts>
               <Alert variant="info" data-testid="alert-info">

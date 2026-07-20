@@ -240,6 +240,151 @@ test.describe('基础组件验收夹具', () => {
     await expect(page.getByText('组件验收通知已显示')).toBeVisible()
   })
 
+  test('Toast 使用唯一 Sonner 队列展示全部语义并匹配 Alert Token', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const feedback = page.locator('[data-fixture-section="feedback"]')
+    const toastSemanticScenarios = [
+      { trigger: '显示 info Toast', type: 'info', alert: 'alert-info', target: 'svg' },
+      { trigger: '显示 success Toast', type: 'success', alert: 'alert-success', target: 'svg' },
+      {
+        trigger: '显示 warning Toast',
+        type: 'warning',
+        alert: 'alert-warning',
+        target: '[data-slot=alert-title]'
+      },
+      { trigger: '显示 error Toast', type: 'error', alert: 'alert-destructive', target: 'svg' },
+      { trigger: '显示 loading Toast', type: 'loading', alert: 'alert-info', target: 'svg' }
+    ] as const
+
+    for (const scenario of toastSemanticScenarios) {
+      await feedback.getByRole('button', { name: scenario.trigger }).click()
+      const item = page.locator(`[data-sonner-toast][data-type="${scenario.type}"]`).first()
+      await expect(item).toBeVisible()
+
+      const colors = await Promise.all([
+        item.locator('[data-icon] svg').evaluate((element) => getComputedStyle(element).color),
+        page
+          .getByTestId(scenario.alert)
+          .locator(scenario.target)
+          .first()
+          .evaluate((element) => getComputedStyle(element).color)
+      ])
+      expect(colors[0]).toBe(colors[1])
+    }
+
+    const toaster = page.locator('[data-sonner-toaster]')
+    await expect(toaster).toHaveAttribute('data-y-position', 'bottom')
+    await expect(toaster).toHaveAttribute('data-x-position', 'right')
+    await expect(page.getByRole('button', { name: '关闭通知' }).first()).toBeVisible()
+  })
+
+  test('Toast 保持 8px 圆角、14px 内边距、Level 3 阴影与统一内容排版', async ({ page }) => {
+    await page.goto(fixturePath)
+    await page.getByRole('button', { name: '显示标题与说明 Toast' }).click()
+
+    const item = page.locator('[data-sonner-toast][data-type="error"]')
+    await expect(item).toBeVisible()
+    const geometry = await item.evaluate((element) => {
+      const styles = getComputedStyle(element)
+      return {
+        borderRadius: styles.borderRadius,
+        padding: styles.padding,
+        minWidth: styles.minWidth,
+        boxShadow: styles.boxShadow
+      }
+    })
+
+    expect(geometry.borderRadius).toBe('8px')
+    expect(geometry.padding).toBe('14px')
+    expect(Number.parseFloat(geometry.minWidth)).toBeGreaterThanOrEqual(356)
+    expect(geometry.boxShadow).not.toBe('none')
+    await expect(item.locator('[data-title]')).toHaveCSS('font-size', '14px')
+    await expect(item.locator('[data-description]')).toHaveCSS('font-size', '12px')
+  })
+
+  test('Toast 按 Pencil 使用 240ms 进入与 150ms 退出动效', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await page.goto(fixturePath)
+    await page.getByRole('button', { name: '显示 success Toast' }).click()
+
+    const item = page.locator('[data-sonner-toast][data-type="success"]')
+    await expect(item).toBeVisible()
+    await page.waitForTimeout(300)
+    const enterState = await item.evaluate((element) => ({
+      durations: getComputedStyle(element)
+        .transitionDuration.split(',')
+        .map((value) => value.trim()),
+      transform: getComputedStyle(element).transform
+    }))
+    expect(enterState.durations[0]).toBe('0.24s')
+    expect(enterState.durations[1]).toBe('0.24s')
+
+    await page.getByRole('button', { name: '关闭通知' }).click()
+    await expect(item).toHaveAttribute('data-removed', 'true')
+    const exitState = await item.evaluate((element) => ({
+      durations: getComputedStyle(element)
+        .transitionDuration.split(',')
+        .map((value) => value.trim()),
+      transform: getComputedStyle(element).transform
+    }))
+    expect(new Set(exitState.durations)).toEqual(new Set(['0.15s']))
+    expect(exitState.transform).toBe(enterState.transform)
+  })
+
+  test('Toast 支持 action、cancel、手动关闭与 loading 原位更新', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    await page.getByRole('button', { name: '显示完整内容 Toast' }).click()
+    await expect(page.getByText('Agent 配置已保存')).toBeVisible()
+    await expect(page.getByText('新的默认模型将在下次会话中生效。')).toBeVisible()
+    await expect(page.getByRole('button', { name: '查看详情' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '稍后处理' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '关闭通知' })).toBeVisible()
+
+    await page.getByRole('button', { name: '显示操作 Toast' }).click()
+    await expect(page.getByText('已归档 Agent「助手」')).toBeVisible()
+    await page.getByRole('button', { name: '撤销归档' }).click()
+    await expect(page.getByText('已撤销 Agent 归档')).toBeVisible()
+
+    await page.getByRole('button', { name: '显示取消 Toast' }).click()
+    await page.getByRole('button', { name: '取消操作' }).click()
+    await expect(page.getByText('已取消批量操作')).toBeVisible()
+
+    await page.getByRole('button', { name: '显示 loading Toast' }).click()
+    const loadingItem = page.locator('[data-sonner-toast][data-type="loading"]')
+    await expect(loadingItem).toContainText('正在保存 Agent 配置')
+    await page.getByRole('button', { name: '更新 loading Toast' }).click()
+    await expect(page.locator('[data-sonner-toast][data-type="success"]')).toContainText(
+      'Agent 配置已保存'
+    )
+    await expect(page.getByText('正在保存 Agent 配置')).toBeHidden()
+
+    await page.getByRole('button', { name: '关闭通知' }).first().click()
+    await expect(page.getByText('Agent 配置已保存')).toBeHidden()
+  })
+
+  test('Toast 连续触发时最多展示三条并保持 8px 堆叠间距', async ({ page }) => {
+    await page.goto(fixturePath)
+    await page.getByRole('button', { name: '显示连续 Toast' }).click()
+
+    const toaster = page.locator('[data-sonner-toaster]')
+    const visibleItems = toaster.locator('[data-sonner-toast][data-visible="true"]')
+    await expect(visibleItems).toHaveCount(3)
+    await toaster.dispatchEvent('mouseover')
+    await expect(visibleItems.first()).toHaveAttribute('data-expanded', 'true')
+
+    await page.waitForTimeout(300)
+    const boxes = await visibleItems.evaluateAll((elements) =>
+      elements
+        .map((element) => element.getBoundingClientRect())
+        .sort((left, right) => left.top - right.top)
+        .map((rect) => ({ top: rect.top, bottom: rect.bottom }))
+    )
+    expect(boxes[1]!.top - boxes[0]!.bottom).toBe(8)
+    expect(boxes[2]!.top - boxes[1]!.bottom).toBe(8)
+  })
+
   test('Separator 覆盖全宽、内缩、垂直和文字组合，并保持语义边框与 Level 0', async ({ page }) => {
     await page.goto(fixturePath)
 

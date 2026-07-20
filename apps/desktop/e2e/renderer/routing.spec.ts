@@ -16,10 +16,9 @@ test.describe('路由导航', () => {
     await page.goto('/#/chat/tangyuan/session-1')
 
     // 应被重定向到控制台 Providers 页，且 URL 包含 redirect 参数
-    await page.waitForSelector('#provider')
+    await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
     await expect(page).toHaveURL(/\/console\/providers/)
     await expect(page).toHaveURL(/redirect=/) // 包含 redirect 参数
-    await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
   })
 
   test('直接访问 /#/console/providers 渲染配置表单', async ({ page }) => {
@@ -29,10 +28,9 @@ test.describe('路由导航', () => {
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
 
-    await page.waitForSelector('#provider')
     await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
-    await expect(page.locator('#provider')).toBeVisible()
-    await expect(page.locator('#api-key')).toBeVisible()
+    await expect(page.locator('#model-anthropic')).toBeVisible()
+    await expect(page.locator('#api-key-anthropic')).toBeVisible()
   })
 
   test('直接访问 /#/console/agents 渲染 Agent 列表页', async ({ page }) => {
@@ -145,11 +143,11 @@ test.describe('路由导航', () => {
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
-    await page.waitForSelector('#provider')
+    await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
 
     // 刷新页面
     await page.reload()
-    await page.waitForSelector('#provider')
+    await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
 
     // 刷新后仍在 console providers 页
     await expect(page).toHaveURL(/\/console\/providers/)
@@ -185,7 +183,6 @@ test.describe('路由导航', () => {
 
     // 再访问 providers 页
     await page.goto('/#/console/providers')
-    await page.waitForSelector('#provider')
     await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
 
     // 后退
@@ -195,6 +192,19 @@ test.describe('路由导航', () => {
     // 前进
     await page.goForward()
     await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
+  })
+
+  test('设置页面目录对账继续通过全局 Sonner 队列反馈', async ({ page }) => {
+    const runtime = createMissingConfigSnapshot()
+    const initScript = createPreloadApiInitScript(runtime)
+
+    await page.addInitScript({ content: initScript })
+    await page.goto('/#/console/agents')
+    await page.getByRole('button', { name: '目录对账' }).click()
+
+    const item = page.locator('[data-sonner-toast][data-type="success"]')
+    await expect(item).toContainText('目录对账完成，所有 Agent 目录正常')
+    await expect(page.locator('[data-sonner-toaster]')).toHaveAttribute('data-x-position', 'right')
   })
 
   test('调用 openExternalLink API 发送外部链接', async ({ page }) => {
