@@ -118,3 +118,92 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.cardGrid,
+.cardStateGrid {
+  display: grid;
+  gap: calc(var(--space-grid) * 2);
+}
+
+.cardDetails {
+  display: flex;
+  margin: 0;
+  flex-direction: column;
+  gap: calc(var(--space-grid) * 1.5);
+}
+
+.cardDetailRow {
+  display: flex;
+  justify-content: space-between;
+  gap: calc(var(--space-grid) * 2);
+  font-size: 13px;
+}
+
+.cardDetailRow dt {
+  color: var(--muted-foreground);
+}
+
+.cardDetailRow dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.longCardCopy {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-body);
+  line-height: var(--text-body-line-height);
+  overflow-wrap: anywhere;
+}
+
+.cardState {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-grid);
+}
+
+.cardStateLabel {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.interactiveCardContent {
+  display: flex;
+  min-height: 5.375rem;
+  padding: var(--card-padding);
+  flex-direction: column;
+  gap: calc(var(--space-grid) - var(--space-micro));
+}
+
+.interactiveCardTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-grid);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.interactiveCardTitle svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.interactiveCardDescription {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+@media (min-width: 48rem) {
+  .cardGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cardStateGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

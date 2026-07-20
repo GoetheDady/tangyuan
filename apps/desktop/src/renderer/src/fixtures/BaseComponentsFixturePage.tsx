@@ -53,6 +53,23 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 /** 夹具构建产物探针；生产构建不得包含此值。 */
 export const BASE_COMPONENTS_FIXTURE_MARKER = 'base-components-fixture-v1'
 
+type CardStateFixture = {
+  id: 'default' | 'hover' | 'focus' | 'active' | 'selected' | 'disabled'
+  label: string
+  pressed?: boolean
+  disabled?: boolean
+  selectedIcon?: boolean
+}
+
+const CARD_STATE_FIXTURES: readonly CardStateFixture[] = [
+  { id: 'default', label: '默认' },
+  { id: 'hover', label: '悬停' },
+  { id: 'focus', label: '键盘聚焦' },
+  { id: 'active', label: '按下' },
+  { id: 'selected', label: '已选中', pressed: true, selectedIcon: true },
+  { id: 'disabled', label: '禁用', disabled: true }
+]
+
 /**
  * 渲染基础组件的高层验收矩阵。
  *
@@ -449,38 +466,92 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                 <AlertDescription>此状态仅用于验证破坏性语义层级。</AlertDescription>
               </Alert>
             </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Level 1 表面</CardTitle>
-                <CardDescription>完整 Card 组合用于检查内容层级与边界。</CardDescription>
-              </CardHeader>
-              <CardContent className={styles.successLine}>
-                <CheckCircle2 className={styles.successIcon} />
-                固定状态：可验收
-              </CardContent>
-              <CardFooter className={styles.cardFooter}>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline">打开确认对话框</Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>确认验收动作</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        对话框通过 Portal 渲染；此操作不会读写任何真实配置。
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>取消</AlertDialogCancel>
-                      <AlertDialogAction>确认</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-                <Button variant="secondary" onClick={() => toast.success('组件验收通知已显示')}>
-                  显示验收通知
-                </Button>
-              </CardFooter>
-            </Card>
+          </FixtureSection>
+
+          <FixtureSection
+            id="cards"
+            title="Card 内容容器"
+            description="完整组合、default/compact 密度、长内容、操作 Footer 与整卡交互状态。"
+          >
+            <div className={styles.cardGrid}>
+              <Card data-testid="card-default">
+                <CardHeader>
+                  <CardTitle>Agent 配置</CardTitle>
+                  <CardDescription>管理当前 Agent 的模型与运行参数。</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <dl className={styles.cardDetails}>
+                    <div className={styles.cardDetailRow}>
+                      <dt>模型</dt>
+                      <dd>Claude Sonnet 4</dd>
+                    </div>
+                    <div className={styles.cardDetailRow}>
+                      <dt>工作空间</dt>
+                      <dd>~/gdsw/tangyuan</dd>
+                    </div>
+                  </dl>
+                </CardContent>
+                <CardFooter className={styles.cardFooter}>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline">打开确认对话框</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>确认验收动作</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          对话框通过 Portal 渲染；此操作不会读写任何真实配置。
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>取消</AlertDialogCancel>
+                        <AlertDialogAction>确认</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                  <Button variant="secondary" onClick={() => toast.success('组件验收通知已显示')}>
+                    显示验收通知
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              <Card size="compact" data-testid="card-compact">
+                <CardHeader>
+                  <CardTitle>紧凑运行摘要</CardTitle>
+                  <CardDescription>16px 内边距用于并列信息与紧凑列表。</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className={styles.longCardCopy}>
+                    这是一段用于验证长内容换行的固定说明。Card 在 1024、1280 与 1440+
+                    宽度下都应保持边框、内边距和内容层级稳定，不依赖装饰阴影制造分组。
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className={styles.cardStateGrid} aria-label="整卡操作状态">
+              {CARD_STATE_FIXTURES.map((state) => (
+                <div key={state.id} className={styles.cardState}>
+                  <span className={styles.cardStateLabel}>{state.label}</span>
+                  <Card asChild interactive size="compact">
+                    <button
+                      type="button"
+                      aria-pressed={state.pressed}
+                      disabled={state.disabled}
+                      data-testid={`card-interactive-${state.id}`}
+                    >
+                      <span className={styles.interactiveCardContent}>
+                        <span className={styles.interactiveCardTitle}>
+                          Agent 卡片
+                          {state.selectedIcon ? <CheckCircle2 aria-hidden="true" /> : null}
+                        </span>
+                        <span className={styles.interactiveCardDescription}>状态说明</span>
+                      </span>
+                    </button>
+                  </Card>
+                </div>
+              ))}
+            </div>
           </FixtureSection>
         </div>
       </main>
@@ -489,7 +560,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
 }
 
 function FixtureSection(props: {
-  id: 'actions' | 'forms' | 'selects' | 'feedback'
+  id: 'actions' | 'forms' | 'selects' | 'feedback' | 'cards'
   title: string
   description: string
   children: React.ReactNode

@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { focusInteractiveCard, pressInteractiveCard } from './card-fixture-helpers'
+
 const fixturePath = '/#/__fixtures__/base-components'
 
 test.describe('基础组件验收夹具', () => {
@@ -27,11 +29,12 @@ test.describe('基础组件验收夹具', () => {
     await page.goto(fixturePath)
 
     await expect(page.getByRole('heading', { name: '基础组件验收夹具', level: 1 })).toBeVisible()
-    await expect(page.locator('[data-fixture-section]')).toHaveCount(4)
+    await expect(page.locator('[data-fixture-section]')).toHaveCount(5)
     await expect(page.locator('[data-fixture-section="actions"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="forms"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="selects"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="feedback"]')).toBeVisible()
+    await expect(page.locator('[data-fixture-section="cards"]')).toBeVisible()
     await expect(page.locator('[data-fixture-marker="base-components-fixture-v1"]')).toBeVisible()
 
     const apiReadCount = await page.evaluate(
@@ -72,6 +75,128 @@ test.describe('基础组件验收夹具', () => {
 
     await page.getByRole('button', { name: '显示验收通知' }).click()
     await expect(page.getByText('组件验收通知已显示')).toBeVisible()
+  })
+
+  test('Card default/compact 使用稳定的 Level 0、圆角和内边距契约', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const defaultCard = page.getByTestId('card-default')
+    const compactCard = page.getByTestId('card-compact')
+
+    await expect(defaultCard).toHaveAttribute('data-size', 'default')
+    await expect(defaultCard).toHaveCSS('border-radius', '8px')
+    await expect(defaultCard).toHaveCSS('border-width', '1px')
+    await expect(defaultCard).toHaveCSS('box-shadow', 'none')
+    await expect(defaultCard.locator('[data-slot="card-header"]')).toHaveCSS('padding', '20px')
+    await expect(defaultCard.locator('[data-slot="card-content"]')).toHaveCSS('padding', '20px')
+    await expect(defaultCard.locator('[data-slot="card-footer"]')).toHaveCSS('padding', '20px')
+
+    await expect(compactCard).toHaveAttribute('data-size', 'compact')
+    await expect(compactCard).toHaveCSS('border-radius', '8px')
+    await expect(compactCard).toHaveCSS('box-shadow', 'none')
+    await expect(compactCard.locator('[data-slot="card-header"]')).toHaveCSS('padding', '16px')
+    await expect(compactCard.locator('[data-slot="card-content"]')).toHaveCSS('padding', '16px')
+  })
+
+  test('普通 Card 不响应 hover 或制造键盘焦点暗示', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const card = page.getByTestId('card-default')
+    const before = await card.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        backgroundColor: style.backgroundColor,
+        borderColor: style.borderColor,
+        boxShadow: style.boxShadow
+      }
+    })
+
+    await card.hover()
+
+    const after = await card.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        backgroundColor: style.backgroundColor,
+        borderColor: style.borderColor,
+        boxShadow: style.boxShadow
+      }
+    })
+
+    expect(after).toEqual(before)
+    await expect(card).not.toHaveAttribute('tabindex')
+  })
+
+  test('整卡 button 语义提供 hover、focus-visible、active、selected 和 disabled 状态', async ({
+    page
+  }) => {
+    await page.goto(fixturePath)
+
+    const hoverCard = page.getByTestId('card-interactive-hover')
+    const hoverBorder = await hoverCard.evaluate((element) => getComputedStyle(element).borderColor)
+    await hoverCard.hover()
+    await expect
+      .poll(() => hoverCard.evaluate((element) => getComputedStyle(element).borderColor))
+      .not.toBe(hoverBorder)
+
+    const focusCard = await focusInteractiveCard(page)
+    await expect(focusCard).toBeFocused()
+    const focusShadow = await focusCard.evaluate((element) => getComputedStyle(element).boxShadow)
+    expect(focusShadow).not.toBe('none')
+
+    const activeCardBefore = page.getByTestId('card-interactive-active')
+    const activeBackgroundBefore = await activeCardBefore.evaluate(
+      (element) => getComputedStyle(element).backgroundColor
+    )
+    const { card: activeCard, release } = await pressInteractiveCard(page)
+    try {
+      const activeBackground = await activeCard.evaluate(
+        (element) => getComputedStyle(element).backgroundColor
+      )
+      expect(activeBackground).not.toBe(activeBackgroundBefore)
+    } finally {
+      await release()
+    }
+
+    const selectedCard = page.getByTestId('card-interactive-selected')
+    await expect(selectedCard).toHaveAttribute('aria-pressed', 'true')
+    const selectedStyles = await selectedCard.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return { backgroundColor: style.backgroundColor, borderColor: style.borderColor }
+    })
+    const defaultStyles = await page.getByTestId('card-interactive-default').evaluate((element) => {
+      const style = getComputedStyle(element)
+      return { backgroundColor: style.backgroundColor, borderColor: style.borderColor }
+    })
+    expect(selectedStyles).not.toEqual(defaultStyles)
+
+    const disabledCard = page.getByTestId('card-interactive-disabled')
+    await expect(disabledCard).toBeDisabled()
+    await expect(disabledCard).toHaveCSS('cursor', 'not-allowed')
+    await expect(disabledCard).toHaveCSS('opacity', '0.48')
+  })
+
+  test('Card 在 1024、1280 和 1440+ 宽度保持边框、内边距与内容稳定', async ({ page }) => {
+    for (const width of [1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 1200 })
+      await page.goto(fixturePath)
+
+      const defaultCard = page.getByTestId('card-default')
+      const compactCard = page.getByTestId('card-compact')
+      await expect(defaultCard).toHaveCSS('border-width', '1px')
+      await expect(defaultCard.locator('[data-slot="card-content"]')).toHaveCSS('padding', '20px')
+      await expect(compactCard.locator('[data-slot="card-content"]')).toHaveCSS('padding', '16px')
+
+      const layout = await page.evaluate(() => ({
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth
+      }))
+      expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth)
+
+      const longCopyFits = await compactCard
+        .locator('p')
+        .evaluate((element) => element.scrollWidth <= element.clientWidth)
+      expect(longCopyFits).toBe(true)
+    }
   })
 
   test('Badge 全部变体遵守紧凑 Level 0 规格', async ({ page }) => {
@@ -150,7 +275,7 @@ test.describe('基础组件验收夹具', () => {
 
     await expect(page.getByRole('button', { name: '搜索' })).toBeVisible()
     await expect(page.getByRole('button', { name: '设置' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '通知' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '通知', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '通知说明' })).toBeVisible()
   })
 
@@ -186,16 +311,14 @@ test.describe('基础组件验收夹具', () => {
   test('键盘 Tab 可在按钮间连续导航', async ({ page }) => {
     await page.goto(fixturePath)
 
-    // Tab 到 "主要操作"
-    await page.locator('body').press('Tab')
-    await expect(page.getByRole('button', { name: '主要操作' })).toBeFocused()
+    const primaryAction = page.getByRole('button', { name: '主要操作' })
+    const secondaryAction = page.getByRole('button', { name: '次要操作' })
+    await expect(primaryAction).toBeVisible()
 
-    // Tab 到下一个可聚焦的按钮
+    await page.locator('body').press('Tab')
+    await expect(primaryAction).toBeFocused()
     await page.keyboard.press('Tab')
-    const focusedElement = page.locator(':focus')
-    await expect(focusedElement).not.toBeNull()
-    const tagName = await focusedElement.evaluate((el) => el.tagName)
-    expect(tagName).toBe('BUTTON')
+    await expect(secondaryAction).toBeFocused()
   })
 
   test('图标与文字组合按钮渲染', async ({ page }) => {
