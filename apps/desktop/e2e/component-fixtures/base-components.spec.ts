@@ -157,6 +157,48 @@ test.describe('基础组件验收夹具', () => {
     await expect(page.getByRole('button', { name: '大号带图标' })).toBeVisible()
   })
 
+  test('Label 保持排版、控件关联和 disabled 反馈', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const defaultLabel = page.locator('[data-fixture-label-state="default"]')
+    const longLabel = page.locator('[data-fixture-label-state="long"]')
+    const disabledInputLabel = page.locator('[data-fixture-label-state="disabled-input"]')
+    const textareaLabel = page.locator('[data-fixture-label-state="textarea"]')
+    const disabledTextareaLabel = page.locator('[data-fixture-label-state="disabled-textarea"]')
+
+    await expect(defaultLabel).toHaveCSS('font-size', '14px')
+    await expect(defaultLabel).toHaveCSS('font-weight', '500')
+    await expect(defaultLabel).toHaveCSS('line-height', '14px')
+    const { labelColor, semanticForeground } = await defaultLabel.evaluate((element) => {
+      const probe = document.createElement('span')
+      probe.style.color = 'var(--foreground)'
+      document.body.append(probe)
+      const semanticForeground = getComputedStyle(probe).color
+      probe.remove()
+
+      return {
+        labelColor: getComputedStyle(element).color,
+        semanticForeground
+      }
+    })
+    expect(labelColor).toBe(semanticForeground)
+    await expect(longLabel).toBeVisible()
+
+    await defaultLabel.click()
+    await expect(page.getByRole('textbox', { name: '显示名称' })).toBeFocused()
+
+    await textareaLabel.click()
+    await expect(page.getByRole('textbox', { name: '验收说明' })).toBeFocused()
+
+    await expect(disabledInputLabel).toHaveCSS('opacity', '0.5')
+    await expect(disabledInputLabel).toHaveCSS('pointer-events', 'none')
+    await expect(page.getByRole('textbox', { name: '禁用输入' })).toBeDisabled()
+
+    await expect(disabledTextareaLabel).toHaveCSS('opacity', '0.5')
+    await expect(disabledTextareaLabel).toHaveCSS('pointer-events', 'none')
+    await expect(page.getByRole('textbox', { name: '禁用文本域' })).toBeDisabled()
+  })
+
   test('文本框默认值和长值渲染', async ({ page }) => {
     await page.goto(fixturePath)
 
@@ -378,9 +420,9 @@ test.describe('基础组件验收夹具', () => {
     await expect(longTextSelect).toBeVisible()
 
     // line-clamp-1 通过 -webkit-line-clamp 实现截断
-    const webkitLineClamp = await longTextSelect.locator('span[style*="pointer-events"]').evaluate(
-      (el) => getComputedStyle(el).webkitLineClamp
-    )
+    const webkitLineClamp = await longTextSelect
+      .locator('span[style*="pointer-events"]')
+      .evaluate((el) => getComputedStyle(el).webkitLineClamp)
     expect(webkitLineClamp).toBe('1')
   })
 

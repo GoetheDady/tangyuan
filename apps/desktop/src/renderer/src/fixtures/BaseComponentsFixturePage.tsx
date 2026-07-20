@@ -169,12 +169,22 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
           <FixtureSection
             id="forms"
             title="表单组件"
-            description="文本框的 type、长值、占位、禁用、只读、无效与必填状态。"
+            description="Label 与 Input、Textarea 的关联、排版、长文本和禁用反馈，以及控件的常用状态。"
           >
             <div className={styles.formGrid}>
               <div className={styles.field}>
-                <Label htmlFor="fixture-name">显示名称</Label>
+                <div className="text-muted-foreground">
+                  <Label htmlFor="fixture-name" data-fixture-label-state="default">
+                    显示名称
+                  </Label>
+                </div>
                 <Input id="fixture-name" defaultValue="汤圆" />
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-long-label" data-fixture-label-state="long">
+                  这是一个用于验证标签在有限宽度内保持清晰排版的长文本控件名称
+                </Label>
+                <Input id="fixture-long-label" defaultValue="长标签关联控件" />
               </div>
               <div className={styles.field}>
                 <Label htmlFor="fixture-password">API Key</Label>
@@ -192,7 +202,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                 <Input id="fixture-placeholder" placeholder="请输入内容..." />
               </div>
               <div className={styles.field}>
-                <Label htmlFor="fixture-disabled">禁用输入</Label>
+                <Label htmlFor="fixture-disabled" data-fixture-label-state="disabled-input">
+                  禁用输入
+                </Label>
                 <Input id="fixture-disabled" value="不可编辑" disabled readOnly />
               </div>
               <div className={styles.field}>
@@ -236,7 +248,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
               </div>
             </div>
             <div className={styles.field}>
-              <Label htmlFor="fixture-notes">验收说明</Label>
+              <Label htmlFor="fixture-notes" data-fixture-label-state="textarea">
+                验收说明
+              </Label>
               <Textarea id="fixture-notes" defaultValue="固定测试数据，不包含真实 API Key。" />
             </div>
             <div className={styles.field}>
@@ -260,11 +274,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
             </div>
             <div className={styles.field}>
               <Label htmlFor="fixture-textarea-tall">指定高度</Label>
-              <Textarea
-                id="fixture-textarea-tall"
-                defaultValue="高文本域"
-                rows={8}
-              />
+              <Textarea id="fixture-textarea-tall" defaultValue="高文本域" rows={8} />
             </div>
             <div className={styles.field}>
               <Label htmlFor="fixture-textarea-resize">可拖拽调整大小</Label>
@@ -275,7 +285,12 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
               />
             </div>
             <div className={styles.field}>
-              <Label htmlFor="fixture-textarea-disabled">禁用文本域</Label>
+              <Label
+                htmlFor="fixture-textarea-disabled"
+                data-fixture-label-state="disabled-textarea"
+              >
+                禁用文本域
+              </Label>
               <Textarea
                 id="fixture-textarea-disabled"
                 value="不可编辑的多行内容"
