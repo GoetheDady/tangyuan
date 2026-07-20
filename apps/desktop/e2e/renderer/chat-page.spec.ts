@@ -25,6 +25,40 @@ test.describe('聊天页', () => {
     await expect(page.getByText('大语言模型对话')).toBeVisible()
   })
 
+  test('现有侧栏 Separator 保持 1px 全宽 Level 0 布局', async ({ page }) => {
+    const separator = page.locator('aside > [data-slot="separator"]')
+
+    await expect(separator).toHaveCount(1)
+    await expect(separator).toHaveAttribute('role', 'none')
+    await expect(separator).toHaveAttribute('data-level', '0')
+    await expect(separator).toHaveCSS('height', '1px')
+    await expect(separator).toHaveCSS('box-shadow', 'none')
+
+    const layout = await separator.evaluate((element) => {
+      const parent = element.parentElement
+      if (!(parent instanceof HTMLElement)) throw new Error('缺少聊天侧栏父容器')
+      const separatorBox = element.getBoundingClientRect()
+      const parentBox = parent.getBoundingClientRect()
+      return {
+        separatorLeft: separatorBox.left,
+        separatorWidth: separatorBox.width,
+        parentLeft: parentBox.left,
+        parentContentWidth: parent.clientWidth,
+        overflowX: element.scrollWidth - element.clientWidth,
+        overflowY: element.scrollHeight - element.clientHeight
+      }
+    })
+
+    expect(layout).toEqual({
+      separatorLeft: layout.parentLeft,
+      separatorWidth: layout.parentContentWidth,
+      parentLeft: layout.parentLeft,
+      parentContentWidth: layout.parentContentWidth,
+      overflowX: 0,
+      overflowY: 0
+    })
+  })
+
   test('显示新会话按钮', async ({ page }) => {
     const newSessionButton = page.getByRole('button', { name: '新会话' })
     await expect(newSessionButton).toBeVisible()

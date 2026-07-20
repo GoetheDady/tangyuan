@@ -29,12 +29,13 @@ test.describe('基础组件验收夹具', () => {
     await page.goto(fixturePath)
 
     await expect(page.getByRole('heading', { name: '基础组件验收夹具', level: 1 })).toBeVisible()
-    await expect(page.locator('[data-fixture-section]')).toHaveCount(5)
+    await expect(page.locator('[data-fixture-section]')).toHaveCount(6)
     await expect(page.locator('[data-fixture-section="actions"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="forms"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="selects"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="feedback"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="cards"]')).toBeVisible()
+    await expect(page.locator('[data-fixture-section="separators"]')).toBeVisible()
     await expect(page.locator('[data-fixture-marker="base-components-fixture-v1"]')).toBeVisible()
 
     const apiReadCount = await page.evaluate(
@@ -75,6 +76,79 @@ test.describe('基础组件验收夹具', () => {
 
     await page.getByRole('button', { name: '显示验收通知' }).click()
     await expect(page.getByText('组件验收通知已显示')).toBeVisible()
+  })
+
+  test('Separator 覆盖全宽、内缩、垂直和文字组合，并保持语义边框与 Level 0', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const section = page.locator('[data-fixture-section="separators"]')
+    const fullWidth = page.getByTestId('separator-full-width')
+    const insetWrapper = page.getByTestId('separator-inset-wrapper')
+    const inset = page.getByTestId('separator-inset')
+    const verticalTrack = page.getByTestId('separator-vertical-track')
+    const vertical = page.getByTestId('separator-vertical')
+
+    await expect(fullWidth).toHaveAttribute('data-slot', 'separator')
+    await expect(fullWidth).toHaveAttribute('data-level', '0')
+    await expect(fullWidth).toHaveAttribute('data-orientation', 'horizontal')
+    await expect(fullWidth).toHaveAttribute('role', 'none')
+    await expect(fullWidth).toHaveCSS('height', '1px')
+    await expect(fullWidth).toHaveCSS('box-shadow', 'none')
+
+    const colors = await fullWidth.evaluate((element) => {
+      const probe = document.createElement('div')
+      probe.style.backgroundColor = 'var(--border)'
+      document.body.append(probe)
+      const result = {
+        separator: getComputedStyle(element).backgroundColor,
+        border: getComputedStyle(probe).backgroundColor
+      }
+      probe.remove()
+      return result
+    })
+    expect(colors.separator).toBe(colors.border)
+
+    const insetLayout = await insetWrapper.evaluate((wrapper) => {
+      const separator = wrapper.querySelector('[data-slot="separator"]')
+      if (!(separator instanceof HTMLElement)) throw new Error('缺少内缩 Separator')
+      const wrapperBox = wrapper.getBoundingClientRect()
+      const separatorBox = separator.getBoundingClientRect()
+      return {
+        leftInset: separatorBox.left - wrapperBox.left,
+        rightInset: wrapperBox.right - separatorBox.right
+      }
+    })
+    expect(insetLayout).toEqual({ leftInset: 24, rightInset: 24 })
+    await expect(inset).toHaveCSS('height', '1px')
+
+    const verticalLayout = await verticalTrack.evaluate((track) => {
+      const separator = track.querySelector('[data-slot="separator"]')
+      if (!(separator instanceof HTMLElement)) throw new Error('缺少垂直 Separator')
+      const trackBox = track.getBoundingClientRect()
+      const separatorBox = separator.getBoundingClientRect()
+      return {
+        trackHeight: trackBox.height,
+        separatorHeight: separatorBox.height,
+        separatorWidth: separatorBox.width,
+        overflowX: separator.scrollWidth - separator.clientWidth,
+        overflowY: separator.scrollHeight - separator.clientHeight
+      }
+    })
+    expect(verticalLayout).toEqual({
+      trackHeight: 24,
+      separatorHeight: 24,
+      separatorWidth: 1,
+      overflowX: 0,
+      overflowY: 0
+    })
+    await expect(vertical).toHaveAttribute('data-orientation', 'vertical')
+
+    await expect(section.getByText('高级设置')).toBeVisible()
+    await expect(section.getByText('或者')).toBeVisible()
+    await expect(page.getByRole('separator', { name: '语义内容分区' })).toHaveAttribute(
+      'data-orientation',
+      'horizontal'
+    )
   })
 
   test('Alert 四种语义共享状态 Token，并保持 8px、1px 与 Level 0 契约', async ({ page }) => {

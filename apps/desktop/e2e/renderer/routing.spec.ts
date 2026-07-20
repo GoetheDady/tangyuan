@@ -50,6 +50,38 @@ test.describe('路由导航', () => {
     await expect(page.getByText('活跃')).toBeVisible()
   })
 
+  test('设置页面现有 Separator 保持 1px 全宽 Level 0 布局', async ({ page }) => {
+    const runtime = createMissingConfigSnapshot()
+    const initScript = createPreloadApiInitScript(runtime)
+
+    await page.addInitScript({ content: initScript })
+
+    for (const route of ['/console/agents', '/console/agents/tangyuan']) {
+      await page.goto(`/#${route}`)
+
+      const separator = page.locator('main [data-slot="separator"]').first()
+      await expect(separator).toHaveAttribute('role', 'none')
+      await expect(separator).toHaveAttribute('data-level', '0')
+      await expect(separator).toHaveCSS('height', '1px')
+      await expect(separator).toHaveCSS('box-shadow', 'none')
+
+      const layout = await separator.evaluate((element) => {
+        const parent = element.parentElement
+        if (!(parent instanceof HTMLElement)) throw new Error('缺少设置页面父容器')
+        const separatorBox = element.getBoundingClientRect()
+        const parentBox = parent.getBoundingClientRect()
+        return {
+          leftInset: separatorBox.left - parentBox.left,
+          rightInset: parentBox.right - separatorBox.right,
+          overflowX: element.scrollWidth - element.clientWidth,
+          overflowY: element.scrollHeight - element.clientHeight
+        }
+      })
+
+      expect(layout).toEqual({ leftInset: 0, rightInset: 0, overflowX: 0, overflowY: 0 })
+    }
+  })
+
   test('设置页面的活跃 Agent 状态使用 success Badge', async ({ page }) => {
     const runtime = createMissingConfigSnapshot()
     const initScript = createPreloadApiInitScript(runtime)

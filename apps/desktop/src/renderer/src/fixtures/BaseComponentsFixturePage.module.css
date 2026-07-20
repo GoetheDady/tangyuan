@@ -209,3 +209,94 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+.separatorGrid {
+  display: grid;
+  gap: calc(var(--space-grid) * 2);
+}
+
+.separatorSample {
+  display: flex;
+  min-width: 0;
+  min-height: 9.5rem;
+  padding: calc(var(--space-grid) * 2);
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--space-grid) * 1.5);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.separatorMutedSample {
+  background: var(--muted);
+}
+
+.separatorSampleLabel,
+.separatorHint {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.separatorSampleLabel {
+  font-weight: var(--font-weight-semibold);
+}
+
+.separatorCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-micro);
+  font-size: 12px;
+}
+
+.separatorCopy span {
+  color: var(--muted-foreground);
+}
+
+.separatorInsetWrapper {
+  width: 100%;
+  padding: 0 calc(var(--space-grid) * 3);
+}
+
+.separatorToolbar,
+.separatorLabelRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: calc(var(--space-grid) * 1.5);
+}
+
+.separatorToolbar {
+  height: calc(var(--space-grid) * 4);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.separatorVerticalTrack {
+  display: flex;
+  height: calc(var(--space-grid) * 3);
+  align-items: stretch;
+}
+
+.separatorLabelRow {
+  width: 100%;
+  font-size: 12px;
+}
+
+.separatorLabelRow strong {
+  flex: none;
+  font-size: 13px;
+}
+
+.separatorLabelRow > span:not([data-slot='separator']) {
+  flex: none;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+@media (min-width: 48rem) {
+  .separatorGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

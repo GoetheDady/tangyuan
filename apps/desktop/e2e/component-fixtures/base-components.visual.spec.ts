@@ -6,6 +6,7 @@ const fixturePath = '/#/__fixtures__/base-components'
 
 const visualSections = [
   { id: 'actions', snapshot: 'actions.png' },
+  { id: 'separators', snapshot: 'separators.png' },
   { id: 'forms', snapshot: 'forms.png' },
   { id: 'selects', snapshot: 'selects.png' },
   { id: 'feedback', snapshot: 'feedback.png' },

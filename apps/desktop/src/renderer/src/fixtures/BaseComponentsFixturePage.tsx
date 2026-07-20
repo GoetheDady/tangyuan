@@ -184,6 +184,69 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
           </FixtureSection>
 
           <FixtureSection
+            id="separators"
+            title="Separator 内容分隔"
+            description="1px 语义边框、全宽与内缩水平线、固定高度垂直线，以及文字分隔组合。"
+          >
+            <div className={styles.separatorGrid}>
+              <div className={styles.separatorSample}>
+                <span className={styles.separatorSampleLabel}>水平全宽</span>
+                <div className={styles.separatorCopy}>
+                  <strong>模型设置</strong>
+                  <span>跟随父容器宽度，不通过阴影制造层级。</span>
+                </div>
+                <Separator data-testid="separator-full-width" />
+                <span className={styles.separatorHint}>默认 decorative · Level 0</span>
+              </div>
+
+              <div className={`${styles.separatorSample} ${styles.separatorMutedSample}`}>
+                <span className={styles.separatorSampleLabel}>水平内缩</span>
+                <div className={styles.separatorCopy}>
+                  <strong>会话分组</strong>
+                  <span>内缩由父布局提供，基础组件 API 保持不变。</span>
+                </div>
+                <div className={styles.separatorInsetWrapper} data-testid="separator-inset-wrapper">
+                  <Separator data-testid="separator-inset" />
+                </div>
+                <span className={styles.separatorHint}>父布局左右各提供 24px</span>
+              </div>
+
+              <div className={`${styles.separatorSample} ${styles.separatorMutedSample}`}>
+                <span className={styles.separatorSampleLabel}>垂直方向</span>
+                <div className={styles.separatorToolbar} aria-label="Separator 垂直工具栏">
+                  <span>刷新</span>
+                  <span
+                    className={styles.separatorVerticalTrack}
+                    data-testid="separator-vertical-track"
+                  >
+                    <Separator data-testid="separator-vertical" orientation="vertical" />
+                  </span>
+                  <span>导出</span>
+                  <span className={styles.separatorVerticalTrack}>
+                    <Separator orientation="vertical" />
+                  </span>
+                  <span>设置</span>
+                </div>
+                <span className={styles.separatorHint}>在 24px 确定父高度中完整填充</span>
+              </div>
+
+              <div className={styles.separatorSample}>
+                <span className={styles.separatorSampleLabel}>文字分隔组合</span>
+                <div className={styles.separatorLabelRow}>
+                  <strong>高级设置</strong>
+                  <Separator className="min-w-0 flex-1" />
+                </div>
+                <div className={styles.separatorLabelRow}>
+                  <Separator className="min-w-0 flex-1" />
+                  <span>或者</span>
+                  <Separator className="min-w-0 flex-1" />
+                </div>
+                <Separator decorative={false} aria-label="语义内容分区" />
+              </div>
+            </div>
+          </FixtureSection>
+
+          <FixtureSection
             id="forms"
             title="表单组件"
             description="Label 与 Input、Textarea 的关联、排版、长文本和禁用反馈，以及控件的常用状态。"
@@ -578,7 +641,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
 }
 
 function FixtureSection(props: {
-  id: 'actions' | 'forms' | 'selects' | 'feedback' | 'cards'
+  id: 'actions' | 'separators' | 'forms' | 'selects' | 'feedback' | 'cards'
   title: string
   description: string
   children: React.ReactNode
