@@ -21,22 +21,28 @@
 
 ## 当前状态
 
-已确认：
+全部 16 个面板已确认（2026-07-17）：
 
-- `00 基础规范`，Pencil 节点 `UVk1L`
-- `01 Button 组件`，节点 `IiJZ9`
-- `02 Input 组件`，节点 `n0PzQU`
-- `03 Textarea 组件`，节点 `cVR9i`
-- `04 Select 组件`，节点 `o9Xft`
-- `05 Field 组件`，节点 `knoXw`
-- `06 InputGroup 组件`，节点 `KWlgr`
-- `07 Badge 组件`，节点 `cjmQt`
+| # | 组件 | Pencil 节点 | 阴影层级 |
+|---|------|------------|----------|
+| 00 | 基础规范 | `UVk1L` | — |
+| 01 | Button | `IiJZ9` | Level 0 |
+| 02 | Input | `n0PzQU` | Level 0 |
+| 03 | Textarea | `cVR9i` | Level 0 |
+| 04 | Select | `o9Xft` | Level 0/2 |
+| 05 | Field | `knoXw` | Level 0 |
+| 06 | InputGroup | `KWlgr` | Level 0 |
+| 07 | Badge | `cjmQt` | Level 0 |
+| 08 | Card | `DCStC` | Level 0/1 |
+| 09 | Alert | `h6fLA` | Level 0 |
+| 10 | Separator | `fLD7W` | Level 0 |
+| 11 | Tooltip | `I57e1i` | Level 2 |
+| 12 | AlertDialog | `l0MbeG` | Level 3 |
+| 13 | Label | `p73o4I` | Level 0 |
+| 14 | DropdownMenu | `s1e1k` | Level 2 |
+| 15 | Toast | `QJjJP` | Level 3 |
 
-已设计并校验、等待用户明确确认：
-
-- `08 Card 组件`，节点 `DCStC`
-
-新会话的第一步是打开项目内 Pencil 文件并请用户确认 `08 Card`。不要直接设计下一个组件。
+所有组件已包含显式的 Shadow Level 标注。下一步进入完整页面设计阶段。
 
 ## 已确定的设计规则
 
@@ -56,22 +62,27 @@
 - Button 水平内边距：xs 6px、sm 10px、default 12px、lg 18px。
 - Field 横向布局：120px 标签列、12px 标签与内容间距。
 - Badge：22px 高、6px 圆角、7px 水平内边距、11px/600 字体、无阴影；包含 `success` 语义变体。
-- Card（待确认）：8px 圆角、默认 20px 内边距、紧凑模式 16px；默认 Level 0；整卡可操作时才展示悬停、键盘聚焦、按下、选中和禁用状态。
+- Card：8px 圆角、默认 20px 内边距、紧凑模式 16px；默认 Level 0；整卡可操作时才展示悬停、键盘聚焦、按下、选中和禁用状态。
+- Alert：8px 圆角、1px 边框、Level 0 无阴影；包含 `info`、`success`、`warning`、`destructive` 四种语义变体，状态同时由图标、标题和语义色表达。
+- Separator：统一使用 1px `color-border`；包含水平全宽、水平内缩、垂直方向和文字分隔组合；默认作为装饰性分隔。
+- Tooltip：6px 圆角、primary 背景、10px 箭头；12px 字体、水平 12px/垂直 6px 内边距；Level 2 阴影；160ms 淡入缩放；默认优先 top 方位。
+- AlertDialog：8px 圆角、24px 内边距、Level 3 阴影；240ms 弹入；default max-w-lg、sm max-w-xs；危险操作默认聚焦取消按钮。
+- Label：14px/500 字体；禁用态 opacity 50%；htmlFor 关联控件；required/optional 是 Field 层组合，不属 Label 核心状态。
+- DropdownMenu：最小 128px、6px 圆角、4px 内边距；菜单项 14px、32px 高、8px 水平内边距；Level 2 阴影；sideOffset 4px；包含 Checkbox/Radio/Submenu 高级交互。
+- Toast：8px 圆角、14px 内边距、Level 3 阴影；240ms 右滑入/150ms 淡出；默认 4000ms 自动消失、最多 3 条堆叠；info/success/warning/error 四种语义变体与 Alert 共用语义色。
 
-## Card 待确认内容
+## 后续阶段
 
-`08 Card` 已包含：
+所有 16 个组件面板已确认。下一步按照协作方式第 4 条，进入**完整页面设计**阶段。
 
-- Header、Content、Footer 完整组合结构。
-- Level 0 默认、Level 1 浮起和 Muted 次级容器样式。
-- 整卡操作的默认、悬停、键盘聚焦、按下、选中、禁用状态。
-- 静态 Card 不响应悬停、不显示焦点环。
-- 整卡操作必须由链接、按钮或选择控件提供可访问语义。
-- Pencil 布局检查结果为无裁切、无溢出、无重叠。
+页面设计候选（按使用频率排序）：
 
-## 后续组件候选
+1. **ChatPage** — 主聊天界面，使用 Composer、TranscriptMessages、Button、Select、Separator
+2. **ConsoleAgentListPage** — Agent 列表管理，使用 Button、Badge、Separator、AlertDialog、Tooltip
+3. **ConsoleAgentDetailPage** — Agent 详情配置，使用 Badge、Button、Select、Separator、AlertDialog
+4. **ConsoleProviderPage** — LLM 提供者配置，使用 Badge、Button、Input、Label
 
-项目当前已有但尚未设计的 UI 组件包括 `Alert`、`Separator`、`Tooltip`、`AlertDialog`。Card 获得确认后，再结合页面使用频率选择其中一个；建议先设计 `Alert`，因为它建立成功、警告、错误和信息反馈的视觉规则。
+所有页面均已使用 Toast（sonner）。页面设计确认后再进入代码实现阶段。
 
 不要在设计阶段处理 shadcn CLI 环境问题。当前 `pnpm dlx shadcn@latest` 会因本机 `zod` 包导出冲突失败，设计依据应使用项目现有组件源码、Pencil 基础规范和 shadcn 技能规则。
 
