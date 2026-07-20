@@ -155,4 +155,91 @@ test.describe('基础组件验收夹具', () => {
     await expect(page.getByRole('button', { name: '返回' })).toBeVisible()
     await expect(page.getByRole('button', { name: '大号带图标' })).toBeVisible()
   })
+
+  test('文本框默认值和长值渲染', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const nameInput = page.getByLabel('显示名称')
+    await expect(nameInput).toBeVisible()
+    await expect(nameInput).toHaveValue('汤圆')
+
+    const longValueInput = page.getByLabel('长值输入')
+    await expect(longValueInput).toBeVisible()
+    await expect(longValueInput).toHaveValue(/这段文案会很长/)
+  })
+
+  test('password 类型输入渲染并遮盖值', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const passwordInput = page.getByLabel('API Key')
+    await expect(passwordInput).toBeVisible()
+    await expect(passwordInput).toHaveAttribute('type', 'password')
+  })
+
+  test('placeholder 输入渲染', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const placeholderInput = page.getByPlaceholder('请输入内容...')
+    await expect(placeholderInput).toBeVisible()
+    await expect(placeholderInput).toHaveValue('')
+  })
+
+  test('disabled 输入不可编辑', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const disabledInput = page.getByLabel('禁用输入')
+    await expect(disabledInput).toBeDisabled()
+  })
+
+  test('read-only 输入渲染且可聚焦', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const readonlyInput = page.getByLabel('只读输入')
+    await expect(readonlyInput).toBeVisible()
+    await expect(readonlyInput).toHaveValue('只读内容')
+    await readonlyInput.focus()
+    await expect(readonlyInput).toBeFocused()
+  })
+
+  test('aria-invalid 输入渲染且可交互', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const invalidInput = page.getByLabel('无效输入')
+    await expect(invalidInput).toBeVisible()
+    await expect(invalidInput).toHaveAttribute('aria-invalid', 'true')
+    await invalidInput.click()
+    // 无报错即通过
+  })
+
+  test('required 输入渲染', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const requiredInput = page.getByLabel('必填输入')
+    await expect(requiredInput).toBeVisible()
+    // HTML required 属性由浏览器处理
+  })
+
+  test('file 类型输入渲染', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const fileInput = page.getByLabel('文件上传')
+    await expect(fileInput).toBeVisible()
+    await expect(fileInput).toHaveAttribute('type', 'file')
+  })
+
+  test('键盘 Tab 可在输入框间连续导航', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    // 先用多次 Tab 跳过按钮区域，定位到第一个 Input
+    // 通过点击 Label 直接聚焦确保导航正确
+    await page.getByLabel('显示名称').focus()
+    await expect(page.getByLabel('显示名称')).toBeFocused()
+
+    // Tab 到下一个输入框
+    await page.keyboard.press('Tab')
+    const focusedAfterTab = page.locator(':focus')
+    await expect(focusedAfterTab).not.toBeNull()
+    const tagName = await focusedAfterTab.evaluate((el) => el.tagName)
+    expect(tagName).toBe('INPUT')
+  })
 })

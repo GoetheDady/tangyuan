@@ -168,7 +168,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
           <FixtureSection
             id="forms"
             title="表单组件"
-            description="输入、选择、文本域的默认、禁用与无效状态。"
+            description="文本框的 type、长值、占位、禁用、只读、无效与必填状态。"
           >
             <div className={styles.formGrid}>
               <div className={styles.field}>
@@ -176,8 +176,27 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                 <Input id="fixture-name" defaultValue="汤圆" />
               </div>
               <div className={styles.field}>
+                <Label htmlFor="fixture-password">API Key</Label>
+                <Input id="fixture-password" type="password" defaultValue="secret-token-1234" />
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-long-value">长值输入</Label>
+                <Input
+                  id="fixture-long-value"
+                  defaultValue="这段文案会很长很长很长很长用来验证输入框的长文本表现"
+                />
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-placeholder">占位输入</Label>
+                <Input id="fixture-placeholder" placeholder="请输入内容..." />
+              </div>
+              <div className={styles.field}>
                 <Label htmlFor="fixture-disabled">禁用输入</Label>
                 <Input id="fixture-disabled" value="不可编辑" disabled readOnly />
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-readonly">只读输入</Label>
+                <Input id="fixture-readonly" value="只读内容" readOnly />
               </div>
               <div className={styles.field}>
                 <Label htmlFor="fixture-invalid">无效输入</Label>
@@ -190,6 +209,14 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                 <p id="fixture-invalid-help" className={styles.errorText}>
                   请检查输入格式。
                 </p>
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-required">必填输入</Label>
+                <Input id="fixture-required" required placeholder="此项必填" />
+              </div>
+              <div className={styles.field}>
+                <Label htmlFor="fixture-file">文件上传</Label>
+                <Input id="fixture-file" type="file" />
               </div>
               <div className={styles.field}>
                 <Label htmlFor="fixture-provider">模型服务</Label>
