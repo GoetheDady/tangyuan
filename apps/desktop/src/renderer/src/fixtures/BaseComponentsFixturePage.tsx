@@ -238,6 +238,66 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
               <Label htmlFor="fixture-notes">验收说明</Label>
               <Textarea id="fixture-notes" defaultValue="固定测试数据，不包含真实 API Key。" />
             </div>
+            <div className={styles.field}>
+              <Label htmlFor="fixture-textarea-empty">空文本域</Label>
+              <Textarea id="fixture-textarea-empty" placeholder="请输入多行内容..." />
+            </div>
+            <div className={styles.field}>
+              <Label htmlFor="fixture-textarea-multiline">多行内容</Label>
+              <Textarea
+                id="fixture-textarea-multiline"
+                defaultValue={'第一行内容\n第二行内容\n第三行内容'}
+                rows={4}
+              />
+            </div>
+            <div className={styles.field}>
+              <Label htmlFor="fixture-textarea-long-line">超长行内容</Label>
+              <Textarea
+                id="fixture-textarea-long-line"
+                defaultValue="这段文案会很长很长很长很长用来验证文本域的长文本不会溢出或破坏父布局，并且可以在文本域中正常换行显示"
+              />
+            </div>
+            <div className={styles.field}>
+              <Label htmlFor="fixture-textarea-tall">指定高度</Label>
+              <Textarea
+                id="fixture-textarea-tall"
+                defaultValue="高文本域"
+                rows={8}
+              />
+            </div>
+            <div className={styles.field}>
+              <Label htmlFor="fixture-textarea-resize">可拖拽调整大小</Label>
+              <Textarea
+                id="fixture-textarea-resize"
+                defaultValue="拖拽右下角调整大小"
+                className="resize"
+              />
+            </div>
+            <div className={styles.field}>
+              <Label htmlFor="fixture-textarea-disabled">禁用文本域</Label>
+              <Textarea
+                id="fixture-textarea-disabled"
+                value="不可编辑的多行内容"
+                disabled
+                readOnly
+              />
+            </div>
+            <div className={styles.field}>
+              <Label htmlFor="fixture-textarea-invalid">无效文本域</Label>
+              <Textarea
+                id="fixture-textarea-invalid"
+                defaultValue="格式待修正的多行内容"
+                aria-invalid="true"
+                aria-describedby="fixture-textarea-invalid-help"
+              />
+              <p id="fixture-textarea-invalid-help" className={styles.errorText}>
+                请检查输入格式。
+              </p>
+            </div>
+            <div className={styles.field}>
+              <Label htmlFor="fixture-textarea-required">必填文本域</Label>
+              <Textarea id="fixture-textarea-required" required placeholder="此项必填" />
+            </div>
           </FixtureSection>
 
           <FixtureSection

@@ -242,4 +242,100 @@ test.describe('基础组件验收夹具', () => {
     const tagName = await focusedAfterTab.evaluate((el) => el.tagName)
     expect(tagName).toBe('INPUT')
   })
+
+  test('Textarea 默认值和占位渲染', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const notesTextarea = page.getByLabel('验收说明')
+    await expect(notesTextarea).toBeVisible()
+    await expect(notesTextarea).toHaveValue('固定测试数据，不包含真实 API Key。')
+
+    const emptyTextarea = page.getByLabel('空文本域')
+    await expect(emptyTextarea).toBeVisible()
+    await expect(emptyTextarea).toHaveAttribute('placeholder', '请输入多行内容...')
+    await expect(emptyTextarea).toHaveValue('')
+  })
+
+  test('Textarea 多行内容渲染', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const multilineTextarea = page.getByLabel('多行内容')
+    await expect(multilineTextarea).toBeVisible()
+    await expect(multilineTextarea).toHaveValue(/第一行内容/)
+  })
+
+  test('Textarea 超长行不溢出父布局', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const longLineTextarea = page.getByLabel('超长行内容')
+    await expect(longLineTextarea).toBeVisible()
+
+    // 验证文本域自身不会比父容器宽
+    const parentWidth = await longLineTextarea.evaluate((el) => {
+      const parent = el.closest('[class*="field"]')
+      return parent instanceof HTMLElement ? parent.offsetWidth : null
+    })
+    const textareaWidth = await longLineTextarea.evaluate((el) => el.offsetWidth)
+    if (parentWidth !== null) {
+      expect(textareaWidth).toBeLessThanOrEqual(parentWidth)
+    }
+  })
+
+  test('Textarea rows 属性控制初始高度', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const tallTextarea = page.getByLabel('指定高度')
+    await expect(tallTextarea).toBeVisible()
+    await expect(tallTextarea).toHaveAttribute('rows', '8')
+  })
+
+  test('Textarea 可拖拽调整大小', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const resizableTextarea = page.getByLabel('可拖拽调整大小')
+    await expect(resizableTextarea).toBeVisible()
+
+    const resize = await resizableTextarea.evaluate((el) => getComputedStyle(el).resize)
+    // 默认 resize-vertical，若 className 覆盖为 resize 则应为 both 或 horizontal
+    expect(['vertical', 'both', 'horizontal']).toContain(resize)
+  })
+
+  test('Textarea disabled 不可编辑', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const disabledTextarea = page.getByLabel('禁用文本域')
+    await expect(disabledTextarea).toBeDisabled()
+  })
+
+  test('Textarea aria-invalid 渲染且可交互', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const invalidTextarea = page.getByLabel('无效文本域')
+    await expect(invalidTextarea).toBeVisible()
+    await expect(invalidTextarea).toHaveAttribute('aria-invalid', 'true')
+    await invalidTextarea.click()
+    // 无报错即通过
+  })
+
+  test('Textarea required 渲染', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const requiredTextarea = page.getByLabel('必填文本域')
+    await expect(requiredTextarea).toBeVisible()
+  })
+
+  test('键盘 Tab 可聚焦到 Textarea', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    // 直接聚焦验证真实键盘焦点
+    await page.getByLabel('验收说明').focus()
+    await expect(page.getByLabel('验收说明')).toBeFocused()
+
+    // Tab 导航到下一个 Textarea
+    await page.keyboard.press('Tab')
+    const focusedElement = page.locator(':focus')
+    await expect(focusedElement).not.toBeNull()
+    const tagName = await focusedElement.evaluate((el) => el.tagName)
+    expect(tagName).toBe('TEXTAREA')
+  })
 })
