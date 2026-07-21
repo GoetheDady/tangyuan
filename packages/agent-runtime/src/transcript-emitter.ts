@@ -419,9 +419,6 @@ export class TranscriptEmitter {
     // Accumulate snapshot for session reconstruction (AC 8)
     const snapshot = this.ensureSnapshot(agentId, sessionId)
     const nextSnapshot = applyTranscriptDelta(snapshot, delta)
-    if (delta.type === 'step-appended') {
-      const entry = nextSnapshot.entries[delta.index]
-    }
     this.transcriptSnapshots.set(sessionId, {
       ...nextSnapshot,
       updatedAt: new Date().toISOString(),
