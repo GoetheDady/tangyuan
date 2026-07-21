@@ -267,6 +267,10 @@ export type PiSdkStreamEvent =
       type: 'thinking-started'
     }
   | {
+      type: 'thinking-delta'
+      delta: string
+    }
+  | {
       type: 'tool-started'
       toolName: string
       toolInput?: unknown
@@ -1239,6 +1243,32 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       let accumulatedReply = ''
       const agentReply = await handle.prompt(prompt, {
         onEvent: (event) => {
+          if (event.type === 'thinking-started') {
+            this.emit({
+              type: 'activity-updated',
+              agentId: request.agentId,
+              sessionId: request.sessionId,
+              runId,
+              activity: mapPiSdkStreamEventToActivity(event),
+              occurredAt: this.now(),
+            })
+            return
+          }
+
+          if (event.type === 'thinking-delta') {
+            this.emit({
+              type: 'message-delta',
+              agentId: request.agentId,
+              sessionId: request.sessionId,
+              runId,
+              messageId: agentMessage.messageId,
+              delta: event.delta,
+              deltaKind: 'thinking',
+              occurredAt: this.now(),
+            })
+            return
+          }
+
           if (event.type === 'text-delta') {
             accumulatedReply += event.delta
             this.appendMessageDelta(agentMessage.messageId, event.delta)
@@ -1254,6 +1284,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
             return
           }
 
+          // tool-started / tool-completed / tool-failed
           this.emit({
             type: 'activity-updated',
             agentId: request.agentId,
@@ -5497,7 +5528,7 @@ function sanitizeErrorMessage(error: unknown, apiKey?: string): string {
  * @throws 此方法不会主动抛出错误。
  */
 function mapPiSdkStreamEventToActivity(event: PiSdkStreamEvent) {
-  if (event.type === 'text-delta') {
+  if (event.type === 'thinking-started') {
     return {
       kind: 'thinking' as const,
       state: 'running' as const,
@@ -5505,7 +5536,15 @@ function mapPiSdkStreamEventToActivity(event: PiSdkStreamEvent) {
     }
   }
 
-  if (event.type === 'thinking-started') {
+  if (event.type === 'thinking-delta') {
+    return {
+      kind: 'thinking' as const,
+      state: 'running' as const,
+      label: '思考中',
+    }
+  }
+
+  if (event.type === 'text-delta') {
     return {
       kind: 'thinking' as const,
       state: 'running' as const,
@@ -5592,11 +5631,15 @@ function normalizePiSdkSessionEvent(event: unknown): PiSdkStreamEvent[] {
       return [{ type: 'text-delta', delta: assistantEvent.delta }]
     }
 
-    if (
-      assistantEvent.type === 'thinking_start' ||
-      assistantEvent.type === 'thinking_delta'
-    ) {
+    if (assistantEvent.type === 'thinking_start') {
       return [{ type: 'thinking-started' }]
+    }
+
+    if (
+      assistantEvent.type === 'thinking_delta' &&
+      typeof assistantEvent.delta === 'string'
+    ) {
+      return [{ type: 'thinking-delta', delta: assistantEvent.delta }]
     }
   }
 

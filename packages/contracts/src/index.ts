@@ -80,6 +80,50 @@ export interface UserMessageEntry {
 }
 
 /**
+ * 描述执行历史中的单步操作类型。
+ */
+export type TurnStepKind = 'thinking' | 'text' | 'tool-call'
+
+/**
+ * 描述执行历史中的一个步骤（思考、文本输出或工具调用）。
+ */
+export interface TurnStep {
+  /** 步骤在 turn 内的稳定索引。 */
+  readonly index: number
+  /** 步骤类型。 */
+  readonly kind: TurnStepKind
+  /** 步骤内容：thinking 原文 / text 内容 / tool 名称。 */
+  readonly content: string
+  /** 当前步骤状态。 */
+  readonly status: 'running' | 'completed' | 'failed'
+  /** 步骤开始时间。 */
+  readonly startedAt: string
+  /** 步骤结束时间；未结束时为 null。 */
+  readonly completedAt: string | null
+}
+
+/**
+ * 描述一次 Agent 运行中的单个 turn。
+ *
+ * 每个 turn 由多个步骤（thinking → text → tool-call）组成，
+ * 在 tool call 或 run 结束时形成 turn 边界。
+ */
+export interface RunTurn {
+  /** turn 在 attempt 内的稳定索引。 */
+  readonly index: number
+  /** 关联的 run 标识。 */
+  readonly runId: string
+  /** turn 内的步骤列表，按时间顺序排列。 */
+  readonly steps: TurnStep[]
+  /** 当前 turn 状态。 */
+  readonly status: 'running' | 'completed' | 'cancelled' | 'failed'
+  /** turn 开始时间。 */
+  readonly startedAt: string
+  /** turn 结束时间；未结束时为 null。 */
+  readonly completedAt: string | null
+}
+
+/**
  * 描述 Agent 的最终文本回复条目。
  */
 export interface AgentReplyEntry {
@@ -94,6 +138,8 @@ export interface AgentReplyEntry {
   readonly createdAt: string
   /** 产生此回复的执行尝试。 */
   readonly attempt: ExecutionAttempt | null
+  /** 本次 attempt 中的所有 turn；旧 transcript 中为空数组。 */
+  readonly turns: RunTurn[]
 }
 
 /**
@@ -147,6 +193,29 @@ export type TranscriptDelta =
       readonly index: number
       readonly attempt: ExecutionAttempt
     }
+  | {
+      readonly type: 'step-appended'
+      /** agent-reply 条目的索引。 */
+      readonly index: number
+      /** 目标 turn 在 turns 数组中的索引。 */
+      readonly turnIndex: number
+      readonly step: TurnStep
+    }
+  | {
+      readonly type: 'step-updated'
+      /** agent-reply 条目的索引。 */
+      readonly index: number
+      /** 目标 turn 在 turns 数组中的索引。 */
+      readonly turnIndex: number
+      /** 目标 step 在 steps 数组中的索引。 */
+      readonly stepIndex: number
+      readonly step: TurnStep
+    }
+  | {
+      readonly type: 'reply-finalized'
+      /** agent-reply 条目的索引。 */
+      readonly index: number
+    }
 
 /**
  * 会话列表中展示的单个 Agent 会话摘要。
@@ -197,6 +266,8 @@ export interface AgentActivity {
   kind: AgentActivityKind
   state: AgentActivityState
   label: string
+  /** 可选：关联的 turn step 标识，用于 Renderer 链接到时间线。 */
+  stepId?: string
 }
 
 /**
@@ -263,6 +334,8 @@ export type AgentEvent =
       runId: string
       messageId: string
       delta: string
+      /** 区分 thinking 原文和普通文本增量，默认为 'text'。 */
+      deltaKind?: 'text' | 'thinking'
       occurredAt: string
     }
   | {
@@ -934,6 +1007,30 @@ export const executionAttemptSchema = z.strictObject({
 })
 
 /**
+ * 校验执行历史中的单个步骤。
+ */
+export const turnStepSchema = z.strictObject({
+  index: z.number().int().min(0),
+  kind: z.enum(['thinking', 'text', 'tool-call']),
+  content: z.string(),
+  status: z.enum(['running', 'completed', 'failed']),
+  startedAt: timestampSchema,
+  completedAt: timestampSchema.nullable(),
+})
+
+/**
+ * 校验执行历史中的单个 turn。
+ */
+export const runTurnSchema = z.strictObject({
+  index: z.number().int().min(0),
+  runId: nonEmptyIdentifierSchema,
+  steps: z.array(turnStepSchema),
+  status: z.enum(['running', 'completed', 'cancelled', 'failed']),
+  startedAt: timestampSchema,
+  completedAt: timestampSchema.nullable(),
+})
+
+/**
  * 校验用户消息条目。
  */
 export const userMessageEntrySchema = z.strictObject({
@@ -954,6 +1051,7 @@ export const agentReplyEntrySchema = z.strictObject({
   content: z.string(),
   createdAt: timestampSchema,
   attempt: executionAttemptSchema.nullable(),
+  turns: z.array(runTurnSchema),
 })
 
 /**
@@ -1006,6 +1104,23 @@ export const transcriptDeltaSchema = z.discriminatedUnion('type', [
     type: z.literal('attempt-status-changed'),
     index: z.number().int().min(0),
     attempt: executionAttemptSchema,
+  }),
+  z.strictObject({
+    type: z.literal('step-appended'),
+    index: z.number().int().min(0),
+    turnIndex: z.number().int().min(0),
+    step: turnStepSchema,
+  }),
+  z.strictObject({
+    type: z.literal('step-updated'),
+    index: z.number().int().min(0),
+    turnIndex: z.number().int().min(0),
+    stepIndex: z.number().int().min(0),
+    step: turnStepSchema,
+  }),
+  z.strictObject({
+    type: z.literal('reply-finalized'),
+    index: z.number().int().min(0),
   }),
 ])
 
@@ -1233,6 +1348,7 @@ export const agentActivitySchema = z.strictObject({
   kind: z.enum(['thinking', 'tool']),
   state: z.enum(['running', 'completed', 'failed']),
   label: z.string(),
+  stepId: z.string().optional(),
 })
 
 /**
@@ -1280,6 +1396,7 @@ export const agentEventSchema = z.discriminatedUnion('type', [
     runId: nonEmptyIdentifierSchema,
     messageId: nonEmptyIdentifierSchema,
     delta: z.string(),
+    deltaKind: z.enum(['text', 'thinking']).optional(),
     occurredAt: timestampSchema,
   }),
   z.strictObject({
@@ -2553,7 +2670,7 @@ export function migrateConfigV1ToV2(
  *
  * 转换规则：
  * - role='user' → UserMessageEntry
- * - role='agent' → AgentReplyEntry（attempt 初始为 null）
+ * - role='agent' → AgentReplyEntry（attempt 初始为 null，turns 初始为空）
  * - role='compaction' → CompactionEntry
  * - role='system' → 跳过（activity 消息将在后续 ticket 中转为执行步骤）
  *
@@ -2600,6 +2717,7 @@ export function buildTranscriptSnapshot(
         content: message.content,
         createdAt: message.createdAt,
         attempt: null,
+        turns: [],
       })
     }
   }
@@ -2658,6 +2776,73 @@ export function applyTranscriptDelta(
           entries[delta.index] = {
             ...entry,
             attempt: delta.attempt,
+          } as AgentReplyEntry
+        }
+      }
+      return { ...snapshot, entries }
+    }
+
+    case 'step-appended': {
+      if (delta.index >= 0 && delta.index < entries.length) {
+        const entry = entries[delta.index]
+        if (entry && entry.kind === 'agent-reply') {
+          const turns = [...entry.turns]
+          const existingTurn = turns[delta.turnIndex]
+          if (existingTurn) {
+            turns[delta.turnIndex] = {
+              ...existingTurn,
+              steps: [...existingTurn.steps, delta.step],
+            }
+          } else if (delta.turnIndex === turns.length) {
+            // Auto-create turn if index points to the next slot
+            turns.push({
+              index: delta.turnIndex,
+              runId: '',
+              steps: [delta.step],
+              status: 'running',
+              startedAt: delta.step.startedAt,
+              completedAt: null,
+            })
+          }
+          entries[delta.index] = { ...entry, turns } as AgentReplyEntry
+        }
+      }
+      return { ...snapshot, entries }
+    }
+
+    case 'step-updated': {
+      if (delta.index >= 0 && delta.index < entries.length) {
+        const entry = entries[delta.index]
+        if (entry && entry.kind === 'agent-reply') {
+          const turns = [...entry.turns]
+          const turn = turns[delta.turnIndex]
+          if (turn) {
+            const steps = [...turn.steps]
+            if (delta.stepIndex >= 0 && delta.stepIndex < steps.length) {
+              steps[delta.stepIndex] = delta.step
+            }
+            turns[delta.turnIndex] = { ...turn, steps }
+          }
+          entries[delta.index] = { ...entry, turns } as AgentReplyEntry
+        }
+      }
+      return { ...snapshot, entries }
+    }
+
+    case 'reply-finalized': {
+      if (delta.index >= 0 && delta.index < entries.length) {
+        const entry = entries[delta.index]
+        if (entry && entry.kind === 'agent-reply') {
+          const lastTurn = entry.turns[entry.turns.length - 1]
+          const turns = lastTurn
+            ? [
+                ...entry.turns.slice(0, -1),
+                { ...lastTurn, status: 'completed' as const, completedAt: lastTurn.completedAt ?? new Date().toISOString() },
+              ]
+            : entry.turns
+          entries[delta.index] = {
+            ...entry,
+            turns,
           } as AgentReplyEntry
         }
       }

@@ -57,6 +57,16 @@ class DefaultTangyuanRuntime {
   private readonly messagesBySession = new Map<string, AgentMessage[]>()
   private readonly activeRunIds = new Map<string, string>()
   private readonly runToAttempt = new Map<string, ExecutionAttempt>()
+  private readonly turnStateByRun = new Map<
+    string,
+    {
+      entryIndex: number
+      turnIndex: number
+      stepIndex: number
+      currentTurnHasToolCall: boolean
+      lastStepKind: import('@tangyuan/contracts').TurnStepKind | null
+    }
+  >()
   private runtimeSnapshot: RuntimeSnapshot | null = null
   private sessions: AgentSessionSummary[] = []
   private runQueue: Array<{
@@ -1168,12 +1178,17 @@ class DefaultTangyuanRuntime {
       this.activeRunIds.set(event.sessionId, event.runId)
       this.upsertSessionState(event.sessionId, 'running', event.occurredAt)
       this.startAttemptForRun(event)
+      this.initializeTurnStateForRun(event)
       return
     }
 
     if (event.type === 'message-delta') {
       this.appendDelta(event)
-      this.emitTranscriptDeltaForDelta(event)
+      if (event.deltaKind === 'thinking') {
+        this.emitTranscriptDeltaForThinking(event)
+      } else {
+        this.emitTranscriptDeltaForDelta(event)
+      }
       return
     }
 
@@ -1185,6 +1200,7 @@ class DefaultTangyuanRuntime {
 
     if (event.type === 'activity-updated') {
       this.upsertActivityMessage(event)
+      this.emitTranscriptDeltaForActivity(event)
       return
     }
 
@@ -1447,6 +1463,7 @@ class DefaultTangyuanRuntime {
           content: message.content,
           createdAt: message.createdAt,
           attempt,
+          turns: [],
         },
       }
       this.messageToEntryIndex.set(message.messageId, nextIndex)
@@ -1512,6 +1529,140 @@ class DefaultTangyuanRuntime {
   }
 
   /**
+   * 为 turn-started 事件初始化 turn 状态并发出第一个 turn 的 step-appended。
+   *
+   * @param event - turn-started 标准事件。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private initializeTurnStateForRun(
+    event: Extract<AgentEvent, { type: 'turn-started' }>,
+  ): void {
+    const entryIndex = this.findLastAgentReplyIndex()
+    if (entryIndex === undefined) return
+
+    this.turnStateByRun.set(event.runId, {
+      entryIndex,
+      turnIndex: 0,
+      stepIndex: 0,
+      currentTurnHasToolCall: false,
+      lastStepKind: null,
+    })
+  }
+
+  /**
+   * 为 thinking delta 发出 step-appended 或 step-updated。
+   *
+   * @param event - message-delta 事件（deltaKind 为 'thinking'）。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private emitTranscriptDeltaForThinking(
+    event: Extract<AgentEvent, { type: 'message-delta' }>,
+  ): void {
+    const turnState = this.turnStateByRun.get(event.runId)
+    if (!turnState) return
+
+    const now = event.occurredAt
+    // If the current step is a thinking step, update it. Otherwise, create new.
+    // For simplicity, create a step-appended on first thinking delta, step-updated on subsequent.
+    const step: import('@tangyuan/contracts').TurnStep = {
+      index: turnState.stepIndex,
+      kind: 'thinking',
+      content: event.delta,
+      status: 'running',
+      startedAt: now,
+      completedAt: null,
+    }
+
+    // If last step was thinking, update it (accumulate). Otherwise create new.
+    if (turnState.lastStepKind === 'thinking') {
+      const stepIndex = turnState.stepIndex - 1
+      const delta: TranscriptDelta = {
+        type: 'step-updated',
+        index: turnState.entryIndex,
+        turnIndex: turnState.turnIndex,
+        stepIndex,
+        step: { ...step, index: stepIndex },
+      }
+      this.emitTranscriptDeltaEvent(event.agentId, event.sessionId, delta)
+    } else {
+      const delta: TranscriptDelta = {
+        type: 'step-appended',
+        index: turnState.entryIndex,
+        turnIndex: turnState.turnIndex,
+        step,
+      }
+      this.emitTranscriptDeltaEvent(event.agentId, event.sessionId, delta)
+      turnState.stepIndex++
+      turnState.lastStepKind = 'thinking'
+    }
+  }
+
+  /**
+   * 为 activity-updated 事件发出 step-appended 或 step-updated。
+   *
+   * @param event - activity-updated 标准事件。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private emitTranscriptDeltaForActivity(
+    event: Extract<AgentEvent, { type: 'activity-updated' }>,
+  ): void {
+    const turnState = this.turnStateByRun.get(event.runId)
+    if (!turnState) return
+
+    const now = event.occurredAt
+    const activity = event.activity
+
+    if (activity.kind === 'tool') {
+      const toolName = activity.label
+      const status =
+        activity.state === 'running'
+          ? ('running' as const)
+          : activity.state === 'completed'
+            ? ('completed' as const)
+            : ('failed' as const)
+
+      const step: import('@tangyuan/contracts').TurnStep = {
+        index: turnState.stepIndex,
+        kind: 'tool-call',
+        content: toolName,
+        status,
+        startedAt: now,
+        completedAt: status !== 'running' ? now : null,
+      }
+
+      if (status === 'running') {
+        // New tool call means a new turn boundary
+        turnState.currentTurnHasToolCall = true
+        const delta: TranscriptDelta = {
+          type: 'step-appended',
+          index: turnState.entryIndex,
+          turnIndex: turnState.turnIndex,
+          step,
+        }
+        this.emitTranscriptDeltaEvent(event.agentId, event.sessionId, delta)
+        turnState.stepIndex++
+        turnState.lastStepKind = 'tool-call'
+      } else {
+        // Update existing tool step
+        const stepIndex = turnState.stepIndex - 1
+        if (stepIndex >= 0) {
+          const delta: TranscriptDelta = {
+            type: 'step-updated',
+            index: turnState.entryIndex,
+            turnIndex: turnState.turnIndex,
+            stepIndex,
+            step: { ...step, index: stepIndex },
+          }
+          this.emitTranscriptDeltaEvent(event.agentId, event.sessionId, delta)
+        }
+      }
+    }
+  }
+
+  /**
    * 为 message-completed 事件完成 ExecutionAttempt 并发出 entry-updated。
    *
    * @param event - message-completed 标准事件。
@@ -1550,6 +1701,7 @@ class DefaultTangyuanRuntime {
         content: event.message.content,
         createdAt: event.message.createdAt,
         attempt: completedAttempt,
+        turns: [],
       },
     }
     this.emitTranscriptDeltaEvent(event.agentId, event.sessionId, delta)

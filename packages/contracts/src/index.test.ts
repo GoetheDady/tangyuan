@@ -5,6 +5,8 @@ import {
   TANGYUAN_DEFAULT_AGENT_ID,
   agentEventSchema,
   agentSkillsStatusSchema,
+  applyTranscriptDelta,
+  buildTranscriptSnapshot,
   createAgentProfileStatus,
   createSessionRequestSchema,
   createDefaultSessionSummary,
@@ -14,15 +16,20 @@ import {
   migrateConfigV1ToV2,
   persistedConfigurationV2Schema,
   profileMaintenanceResultSchema,
+  runTurnSchema,
   runtimeSnapshotSchema,
   skillSummarySchema,
   skillApprovalRequestSchema,
   skillOperationParamsSchema,
   skillInstallRecordSchema,
   soulContentSchema,
+  transcriptDeltaSchema,
+  transcriptEntrySchema,
+  turnStepSchema,
   updateSoulRequestSchema,
   updateUserProfileRequestSchema,
   userProfileContentSchema,
+  type AgentReplyEntry,
   type PersistedConfigurationV1,
   type ProviderAuthSnapshot,
   type RuntimeSnapshotInput,
@@ -825,5 +832,296 @@ describe('Skill schemas', () => {
         status: 'removed',
       }),
     ).toThrow()
+  })
+})
+
+describe('turn step and turn schemas', () => {
+  it('parses a valid thinking step', () => {
+    expect(
+      turnStepSchema.parse({
+        index: 0,
+        kind: 'thinking',
+        content: '正在分析用户需求…',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null,
+      }),
+    ).toBeTruthy()
+  })
+
+  it('parses a valid tool-call step', () => {
+    expect(
+      turnStepSchema.parse({
+        index: 1,
+        kind: 'tool-call',
+        content: '正在读取文件',
+        status: 'completed',
+        startedAt: '2026-07-21T00:00:01.000Z',
+        completedAt: '2026-07-21T00:00:02.000Z',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('parses a valid turn with steps', () => {
+    expect(
+      runTurnSchema.parse({
+        index: 0,
+        runId: 'session-1-run-1',
+        steps: [
+          {
+            index: 0,
+            kind: 'thinking',
+            content: '分析中…',
+            status: 'completed',
+            startedAt: '2026-07-21T00:00:00.000Z',
+            completedAt: '2026-07-21T00:00:01.000Z',
+          },
+        ],
+        status: 'completed',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: '2026-07-21T00:00:02.000Z',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('rejects step with invalid kind', () => {
+    expect(() =>
+      turnStepSchema.parse({
+        index: 0,
+        kind: 'invalid',
+        content: '',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null,
+      }),
+    ).toThrow()
+  })
+})
+
+describe('transcript delta with turns', () => {
+  const baseSnapshot = {
+    sessionId: 's1',
+    agentId: 'a1',
+    entries: [
+      {
+        kind: 'user-message' as const,
+        index: 0,
+        messageId: 'm1',
+        content: 'hello',
+        createdAt: '2026-07-21T00:00:00.000Z',
+      },
+      {
+        kind: 'agent-reply' as const,
+        index: 1,
+        messageId: 'm2',
+        content: '',
+        createdAt: '2026-07-21T00:00:00.000Z',
+        attempt: null,
+        turns: [],
+      },
+    ],
+    updatedAt: '2026-07-21T00:00:00.000Z',
+  }
+
+  it('step-appended adds turn if none exists yet', () => {
+    const step = {
+      index: 0,
+      kind: 'thinking' as const,
+      content: '思考中',
+      status: 'running' as const,
+      startedAt: '2026-07-21T01:00:00.000Z',
+      completedAt: null,
+    }
+    const result = applyTranscriptDelta(baseSnapshot, {
+      type: 'step-appended',
+      index: 1,
+      turnIndex: 0,
+      step,
+    })
+    const entry = result.entries[1]
+    expect(entry).toBeDefined()
+    const reply = (entry as Exclude<typeof entry, undefined>).kind === 'agent-reply' ? entry as AgentReplyEntry : null
+    expect(reply).not.toBeNull()
+    if (reply) {
+      expect(reply.turns).toHaveLength(1)
+      expect(reply.turns[0]!.steps).toHaveLength(1)
+      expect(reply.turns[0]!.steps[0]!.kind).toBe('thinking')
+    }
+  })
+
+  it('step-updated replaces existing step', () => {
+    const step1 = {
+      index: 0,
+      kind: 'thinking' as const,
+      content: '初始',
+      status: 'running' as const,
+      startedAt: '2026-07-21T01:00:00.000Z',
+      completedAt: null,
+    }
+    const withStep = applyTranscriptDelta(baseSnapshot, {
+      type: 'step-appended',
+      index: 1,
+      turnIndex: 0,
+      step: step1,
+    })
+
+    const updated = {
+      index: 0,
+      kind: 'thinking' as const,
+      content: '更新后',
+      status: 'completed' as const,
+      startedAt: '2026-07-21T01:00:00.000Z',
+      completedAt: '2026-07-21T01:00:01.000Z',
+    }
+    const result = applyTranscriptDelta(withStep, {
+      type: 'step-updated',
+      index: 1,
+      turnIndex: 0,
+      stepIndex: 0,
+      step: updated,
+    })
+    const entry = result.entries[1]
+    expect(entry).toBeDefined()
+    const reply = entry && (entry as { kind: string }).kind === 'agent-reply' ? entry as AgentReplyEntry : null
+    expect(reply).not.toBeNull()
+    if (reply) {
+      expect(reply.turns[0]!.steps[0]!.content).toBe('更新后')
+      expect(reply.turns[0]!.steps[0]!.status).toBe('completed')
+    }
+  })
+
+  it('reply-finalized completes last turn', () => {
+    const step = {
+      index: 0,
+      kind: 'text' as const,
+      content: '最终回复',
+      status: 'running' as const,
+      startedAt: '2026-07-21T01:00:00.000Z',
+      completedAt: null,
+    }
+    const withStep = applyTranscriptDelta(baseSnapshot, {
+      type: 'step-appended',
+      index: 1,
+      turnIndex: 0,
+      step,
+    })
+
+    const result = applyTranscriptDelta(withStep, {
+      type: 'reply-finalized',
+      index: 1,
+    })
+    const entry = result.entries[1]
+    expect(entry).toBeDefined()
+    const reply = entry && (entry as { kind: string }).kind === 'agent-reply' ? entry as AgentReplyEntry : null
+    expect(reply).not.toBeNull()
+    if (reply) {
+      expect(reply.turns[0]!.status).toBe('completed')
+    }
+  })
+
+  it('buildTranscriptSnapshot produces turns array', () => {
+    const result = buildTranscriptSnapshot(
+      [
+        {
+          messageId: 'm1',
+          agentId: 'a1',
+          sessionId: 's1',
+          role: 'agent',
+          content: 'hello world',
+          createdAt: '2026-07-21T00:00:00.000Z',
+        },
+      ],
+      's1',
+      'a1',
+      '2026-07-21T00:00:00.000Z',
+    )
+    const entry = result.entries[0]
+    expect(entry).toBeDefined()
+    const reply = entry && (entry as { kind: string }).kind === 'agent-reply' ? entry as AgentReplyEntry : null
+    expect(reply).not.toBeNull()
+    if (reply) {
+      expect(reply.turns).toEqual([])
+    }
+  })
+
+  it('parses step-appended delta with schema', () => {
+    expect(
+      transcriptDeltaSchema.parse({
+        type: 'step-appended',
+        index: 1,
+        turnIndex: 0,
+        step: {
+          index: 0,
+          kind: 'thinking',
+          content: '',
+          status: 'running',
+          startedAt: '2026-07-21T00:00:00.000Z',
+          completedAt: null,
+        },
+      }),
+    ).toBeTruthy()
+  })
+
+  it('parses agent-reply entry with turns in schema', () => {
+    expect(
+      transcriptEntrySchema.parse({
+        kind: 'agent-reply',
+        index: 0,
+        messageId: 'm1',
+        content: 'hi',
+        createdAt: '2026-07-21T00:00:00.000Z',
+        attempt: null,
+        turns: [],
+      }),
+    ).toBeTruthy()
+  })
+})
+
+describe('agent event with deltaKind', () => {
+  it('parses message-delta with deltaKind thinking', () => {
+    expect(
+      agentEventSchema.parse({
+        type: 'message-delta',
+        agentId: 'a1',
+        sessionId: 's1',
+        runId: 'r1',
+        messageId: 'm1',
+        delta: '正在思考…',
+        deltaKind: 'thinking',
+        occurredAt: '2026-07-21T00:00:00.000Z',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('parses message-delta without deltaKind (backward compat)', () => {
+    expect(
+      agentEventSchema.parse({
+        type: 'message-delta',
+        agentId: 'a1',
+        sessionId: 's1',
+        runId: 'r1',
+        messageId: 'm1',
+        delta: 'hello',
+        occurredAt: '2026-07-21T00:00:00.000Z',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('parses activity-updated with optional stepId', () => {
+    expect(
+      agentEventSchema.parse({
+        type: 'activity-updated',
+        agentId: 'a1',
+        sessionId: 's1',
+        runId: 'r1',
+        activity: {
+          kind: 'tool',
+          state: 'running',
+          label: '正在读取文件',
+          stepId: 'step-1',
+        },
+        occurredAt: '2026-07-21T00:00:00.000Z',
+      }),
+    ).toBeTruthy()
   })
 })

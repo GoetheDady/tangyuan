@@ -1,16 +1,23 @@
-import type { AgentMessage, TranscriptEntry, TranscriptSnapshot } from '@tangyuan/contracts'
+import type {
+  AgentMessage,
+  AgentReplyEntry,
+  TranscriptEntry,
+  TranscriptSnapshot
+} from '@tangyuan/contracts'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Sparkles } from 'lucide-react'
 import React, { useEffect, useMemo, useRef } from 'react'
+import { AssistantMessage } from './AssistantMessage'
 import { CompactionIndicator } from './CompactionIndicator'
 import { StreamdownMessage } from './StreamdownMessage'
 import { UserMessage } from './UserMessage'
 
 /**
- * 虚拟列表中的渲染项：对话消息或压缩提示。
+ * 虚拟列表中的渲染项：对话消息、AssitantMessage 或压缩提示。
  */
 type RenderItem =
   | { type: 'message'; message: AgentMessage; isLastAgent: boolean; renderIndex: number }
+  | { type: 'assistant-message'; entry: AgentReplyEntry; isLastAgent: boolean; renderIndex: number }
   | { type: 'compaction'; timestamp: string; renderIndex: number }
 
 /**
@@ -86,19 +93,26 @@ function buildRenderItemsFromTranscript(
         timestamp: entry.timestamp,
         renderIndex: renderIndex++
       })
-    } else if (isDialogKind(entry.kind)) {
-      const isLastAgent =
-        isStreaming && entry.kind === 'agent-reply' && dialogIndex === dialogCount - 1
+    } else if (entry.kind === 'user-message') {
       items.push({
         type: 'message',
         message: {
           messageId: entry.messageId,
           agentId: '',
           sessionId: '',
-          role: entry.kind === 'user-message' ? 'user' : 'agent',
+          role: 'user',
           content: entry.content,
           createdAt: entry.createdAt
         },
+        isLastAgent: false,
+        renderIndex: renderIndex++
+      })
+      dialogIndex++
+    } else if (entry.kind === 'agent-reply') {
+      const isLastAgent = isStreaming && dialogIndex === dialogCount - 1
+      items.push({
+        type: 'assistant-message',
+        entry,
         isLastAgent,
         renderIndex: renderIndex++
       })
@@ -165,6 +179,7 @@ export function TranscriptMessages({
       const item = renderItems[index]
       if (!item) return `item-${index}`
       if (item.type === 'message') return item.message.messageId
+      if (item.type === 'assistant-message') return item.entry.messageId
       return `compaction-${item.timestamp}-${item.renderIndex}`
     }
   })
@@ -267,6 +282,10 @@ export function TranscriptMessages({
             >
               {item.type === 'compaction' ? (
                 <CompactionIndicator timestamp={item.timestamp} />
+              ) : item.type === 'assistant-message' ? (
+                <div className="py-3.5">
+                  <AssistantMessage entry={item.entry} isStreaming={item.isLastAgent} />
+                </div>
               ) : (
                 <div className="py-3.5">
                   <MemoizedDialogMessage message={item.message} isAnimating={item.isLastAgent} />

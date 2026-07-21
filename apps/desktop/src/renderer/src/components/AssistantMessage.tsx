@@ -1,0 +1,347 @@
+import type { AgentReplyEntry, RunTurn, TurnStep } from '@tangyuan/contracts'
+import { Check, ChevronDown, ChevronRight, CircleStop, CircleX, LoaderCircle } from 'lucide-react'
+import { useMemo, useState } from 'react'
+
+import { StreamdownMessage } from '@/components/StreamdownMessage'
+
+/**
+ * AssistantMessage 组件的属性。
+ */
+export interface AssistantMessageProps {
+  /** 完整的 Agent 回复条目（含 turns）。 */
+  entry: AgentReplyEntry
+  /** 是否正在流式执行中。 */
+  isStreaming: boolean
+}
+
+/**
+ * 根据 turns 和流式状态推导组件的交互状态。
+ */
+type AssistantState = 'active-tool-loop' | 'unconfirmed-text' | 'final-confirmed' | 'ended-nonfinal'
+
+function deriveState(entry: AgentReplyEntry, isStreaming: boolean): AssistantState {
+  if (entry.attempt?.status === 'cancelled' || entry.attempt?.status === 'failed') {
+    return 'ended-nonfinal'
+  }
+
+  if (!isStreaming && entry.attempt?.status === 'completed') {
+    return 'final-confirmed'
+  }
+
+  if (isStreaming) {
+    const hasToolCalls = entry.turns.some((turn) =>
+      turn.steps.some((step) => step.kind === 'tool-call')
+    )
+    if (hasToolCalls) {
+      return 'active-tool-loop'
+    }
+    if (entry.turns.length > 0) {
+      return 'unconfirmed-text'
+    }
+    return 'active-tool-loop'
+  }
+
+  return 'final-confirmed'
+}
+
+/**
+ * 按 Pencil 设计渲染 Agent 回复卡片，含执行历史展开/收起与时间线。
+ *
+ * @param props - 组件属性。
+ * @returns Agent 回复卡片。
+ * @throws 此组件不会主动抛出错误。
+ */
+export function AssistantMessage({ entry, isStreaming }: AssistantMessageProps): React.JSX.Element {
+  const state = deriveState(entry, isStreaming)
+  const shouldExpand =
+    state === 'active-tool-loop' || state === 'unconfirmed-text' || state === 'ended-nonfinal'
+
+  const [userToggled, setUserToggled] = useState(false)
+  const isExpanded = shouldExpand || userToggled
+
+  const { stepCount, turnCount, durationText } = useMemo(() => {
+    let steps = 0
+    let lastStartedAt: string | null = null
+    let lastCompletedAt: string | null = null
+
+    for (const turn of entry.turns) {
+      steps += turn.steps.length
+      if (!lastStartedAt || turn.startedAt < lastStartedAt) {
+        lastStartedAt = turn.startedAt
+      }
+      const completedStep = turn.steps.find((s) => s.completedAt)
+      if (
+        completedStep?.completedAt &&
+        (!lastCompletedAt || completedStep.completedAt > lastCompletedAt)
+      ) {
+        lastCompletedAt = completedStep.completedAt
+      }
+    }
+
+    const turnCount = entry.turns.length
+
+    let durationText = ''
+    if (lastStartedAt && lastCompletedAt) {
+      const durationMs = new Date(lastCompletedAt).getTime() - new Date(lastStartedAt).getTime()
+      if (durationMs > 0) {
+        durationText =
+          durationMs >= 60000
+            ? `${Math.round(durationMs / 60000)}m ${Math.round((durationMs % 60000) / 1000)}s`
+            : `${Math.round(durationMs / 1000)}s`
+      }
+    }
+
+    return { stepCount: steps, turnCount, durationText }
+  }, [entry.turns])
+
+  const hasTurns = entry.turns.length > 0
+
+  // 无 turns 时回退到纯文本气泡
+  if (!hasTurns) {
+    return (
+      <article className="flex justify-start">
+        <div className="max-w-[76%] min-w-0 rounded-lg border bg-card px-4 py-3 text-sm leading-6 text-card-foreground shadow-sm">
+          <StreamdownMessage content={entry.content} isAnimating={isStreaming} />
+        </div>
+      </article>
+    )
+  }
+
+  return (
+    <article className="flex justify-start">
+      <div className="max-w-[76%] min-w-0 rounded-lg border bg-card text-card-foreground shadow-sm">
+        {/* Execution Disclosure Bar */}
+        <ExecutionDisclosure
+          state={state}
+          isExpanded={isExpanded}
+          onToggle={() => setUserToggled((prev) => !prev)}
+          turnCount={turnCount}
+          stepCount={stepCount}
+          durationText={durationText}
+          attemptStatus={entry.attempt?.status ?? 'running'}
+        />
+
+        {/* Expanded Timeline */}
+        {isExpanded && <TurnTimeline turns={entry.turns} />}
+
+        {/* Final Body (shown when collapsed + final) */}
+        {state === 'final-confirmed' && !isExpanded && entry.content && (
+          <div className="px-4 pb-4">
+            <StreamdownMessage content={entry.content} isAnimating={false} />
+          </div>
+        )}
+
+        {/* Unconfirmed text (shown while streaming) */}
+        {(state === 'unconfirmed-text' || state === 'active-tool-loop') && entry.content && (
+          <div className="px-4 pb-3">
+            <div className="rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-foreground">
+              此文本尚未确认，后续仍可能出现工具调用。
+            </div>
+          </div>
+        )}
+
+        {/* Cancelled / Failed footer */}
+        {state === 'ended-nonfinal' && (
+          <div className="px-4 pb-4">
+            {entry.content ? (
+              <StreamdownMessage content={entry.content} isAnimating={false} />
+            ) : null}
+            <div className="mt-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-foreground">
+              {entry.attempt?.status === 'cancelled'
+                ? '此回复已在生成过程中被用户中断'
+                : '执行失败，已收到的内容保留在上方'}
+            </div>
+          </div>
+        )}
+      </div>
+    </article>
+  )
+}
+
+/**
+ * 执行历史展开/收起控制栏。
+ */
+function ExecutionDisclosure({
+  state,
+  isExpanded,
+  onToggle,
+  turnCount,
+  stepCount,
+  durationText,
+  attemptStatus
+}: {
+  state: AssistantState
+  isExpanded: boolean
+  onToggle: () => void
+  turnCount: number
+  stepCount: number
+  durationText: string
+  attemptStatus: string
+}): React.JSX.Element {
+  const ChevronIcon = isExpanded ? ChevronDown : ChevronRight
+
+  let StatusIcon: typeof LoaderCircle
+  let label: string
+  let bgClass: string
+
+  if (state === 'active-tool-loop' || state === 'unconfirmed-text') {
+    StatusIcon = LoaderCircle
+    label = '仍在执行'
+    bgClass = 'bg-muted'
+  } else if (state === 'final-confirmed') {
+    StatusIcon = Check
+    label = '已完成执行过程'
+    bgClass = 'bg-muted'
+  } else if (attemptStatus === 'cancelled') {
+    StatusIcon = CircleStop
+    label = '已中断执行过程'
+    bgClass = 'bg-warning-soft'
+  } else {
+    StatusIcon = CircleX
+    label = '执行失败'
+    bgClass = 'bg-muted'
+  }
+
+  const metaParts: string[] = []
+  if (turnCount > 1) metaParts.push(`${turnCount} 回合`)
+  if (stepCount > 0) metaParts.push(`${stepCount} 步`)
+  if (durationText) metaParts.push(durationText)
+  const meta = metaParts.join(' · ')
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`flex w-full items-center gap-1.5 rounded-t-lg px-3 py-2 text-left transition-colors duration-200 hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${bgClass}`}
+    >
+      <ChevronIcon size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+      <StatusIcon
+        size={14}
+        className={`shrink-0 ${
+          state === 'active-tool-loop' || state === 'unconfirmed-text'
+            ? 'animate-spin text-primary'
+            : attemptStatus === 'cancelled'
+              ? 'text-warning-foreground'
+              : attemptStatus === 'failed'
+                ? 'text-destructive-soft-foreground'
+                : 'text-muted-foreground'
+        }`}
+        aria-hidden="true"
+      />
+      <span className="text-xs font-semibold text-foreground">{label}</span>
+      <span className="flex-1" />
+      {meta && <span className="text-[10px] text-muted-foreground">{meta}</span>}
+    </button>
+  )
+}
+
+/**
+ * 时间线视图：按 turn 分组展示步骤。
+ */
+function TurnTimeline({ turns }: { turns: RunTurn[] }): React.JSX.Element {
+  return (
+    <div className="border-t px-3 py-2">
+      <div className="space-y-3">
+        {turns.map((turn, turnIdx) => (
+          <div key={turnIdx}>
+            {/* Turn header */}
+            <div className="mb-1.5 flex items-center gap-1.5">
+              <span
+                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                  turn.status === 'running'
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {turnIdx === turns.length - 1 ? '最终回合' : `回合 ${turnIdx + 1}`}
+              </span>
+              {turn.status === 'running' && (
+                <LoaderCircle size={10} className="animate-spin text-primary" aria-hidden="true" />
+              )}
+            </div>
+
+            {/* Steps */}
+            <div className="space-y-1">
+              {turn.steps.map((step, stepIdx) => (
+                <StepRow key={stepIdx} step={step} />
+              ))}
+              {turn.steps.length === 0 && turn.status === 'running' && (
+                <div className="flex items-center gap-1.5 py-0.5 pl-1">
+                  <LoaderCircle
+                    size={10}
+                    className="animate-spin text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <span className="text-[11px] text-muted-foreground">等待中…</span>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 时间线中的单个步骤行。
+ */
+function StepRow({ step }: { step: TurnStep }): React.JSX.Element {
+  let icon: React.JSX.Element
+  let bgClass: string
+  let contentPreview: string
+
+  switch (step.kind) {
+    case 'thinking':
+      icon = (
+        <span className="grid size-4 shrink-0 place-items-center text-[10px] text-muted-foreground">
+          💭
+        </span>
+      )
+      bgClass = 'bg-muted/50'
+      contentPreview = step.content
+        ? step.content.length > 80
+          ? `${step.content.slice(0, 80)}…`
+          : step.content
+        : '思考中…'
+      break
+    case 'tool-call':
+      icon = (
+        <span className="grid size-4 shrink-0 place-items-center text-[10px] text-muted-foreground">
+          🔧
+        </span>
+      )
+      bgClass = 'bg-accent/30'
+      contentPreview = step.content
+      break
+    case 'text':
+      icon = (
+        <span className="grid size-4 shrink-0 place-items-center text-[10px] text-muted-foreground">
+          💬
+        </span>
+      )
+      bgClass = ''
+      contentPreview = step.content.length > 80 ? `${step.content.slice(0, 80)}…` : step.content
+      break
+    default:
+      icon = <span className="grid size-4 shrink-0 place-items-center text-[10px]" />
+      bgClass = ''
+      contentPreview = ''
+  }
+
+  return (
+    <div className={`flex items-start gap-1.5 rounded px-1.5 py-0.5 text-[11px] ${bgClass}`}>
+      {icon}
+      <span className="flex-1 truncate text-muted-foreground">{contentPreview}</span>
+      <span className="shrink-0 text-[10px] text-muted-foreground/60">
+        {step.status === 'running' ? (
+          <LoaderCircle size={10} className="animate-spin" aria-label="运行中" />
+        ) : step.status === 'completed' ? (
+          <Check size={10} aria-label="完成" />
+        ) : (
+          <CircleX size={10} className="text-destructive-soft-foreground" aria-label="失败" />
+        )}
+      </span>
+    </div>
+  )
+}
