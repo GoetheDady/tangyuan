@@ -1720,3 +1720,377 @@ function createDeferred<T>(): {
 
   return { promise, resolve }
 }
+
+describe('transcript turn/step tracking', () => {
+  it('getTranscript returns cached snapshot with entries after message-appended', async () => {
+    const session = createSessionSummary('session-1')
+    const runtimeDriver = createRuntimeDriver(createReadySnapshot())
+    const sessionDriver = createSessionDriver([session])
+    const runtime = createTangyuanRuntimeForTesting({ runtimeDriver, sessionDriver })
+
+    sessionDriver.emit({
+      type: 'message-appended',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      message: {
+        messageId: 'user-msg',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        role: 'user',
+        content: 'hello',
+        createdAt: '2026-07-21T00:00:00.000Z',
+      },
+      occurredAt: '2026-07-21T00:00:00.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'message-appended',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      message: {
+        messageId: 'agent-msg',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        role: 'agent',
+        content: '',
+        createdAt: '2026-07-21T00:00:00.000Z',
+      },
+      occurredAt: '2026-07-21T00:00:00.000Z',
+    })
+
+    const snapshot = await runtime.getTranscript({
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+    })
+
+    expect(snapshot.entries.length).toBe(2)
+    expect(snapshot.entries[0]?.kind).toBe('user-message')
+    expect(snapshot.entries[1]?.kind).toBe('agent-reply')
+  })
+
+  it('building from messages is fallback when no cached snapshot', async () => {
+    const session = createSessionSummary('session-1')
+    const runtimeDriver = createRuntimeDriver(createReadySnapshot())
+    const sessionDriver = createSessionDriver([session])
+    sessionDriver.getMessages = vi.fn().mockResolvedValue([
+      {
+        messageId: 'm1',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        role: 'user',
+        content: 'hello',
+        createdAt: '2026-07-21T00:00:00.000Z',
+      },
+    ])
+    const runtime = createTangyuanRuntimeForTesting({ runtimeDriver, sessionDriver })
+
+    const snapshot = await runtime.getTranscript({
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+    })
+
+    // Fallback path: built from messages, no turns
+    expect(snapshot.entries.length).toBe(1)
+    const replyEntry = snapshot.entries.find((e) => e.kind === 'user-message')
+    expect(replyEntry).toBeDefined()
+  })
+
+  it('cached snapshot survives getTranscript call', async () => {
+    const session = createSessionSummary('session-1')
+    const runtimeDriver = createRuntimeDriver(createReadySnapshot())
+    const sessionDriver = createSessionDriver([session])
+    const runtime = createTangyuanRuntimeForTesting({ runtimeDriver, sessionDriver })
+
+    // No events emitted → no cached snapshot
+    const first = await runtime.getTranscript({
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+    })
+    // Fallback from messages: no cached snapshot exists
+    expect(first.entries.length).toBe(0)
+
+    // Now emit message-appended → creates cached snapshot
+    sessionDriver.emit({
+      type: 'message-appended',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      message: {
+        messageId: 'u1',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        role: 'user',
+        content: 'test',
+        createdAt: '2026-07-21T00:00:00.000Z',
+      },
+      occurredAt: '2026-07-21T00:00:00.000Z',
+    })
+
+    const second = await runtime.getTranscript({
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+    })
+    // Cached snapshot now available
+    expect(second.entries.length).toBe(1)
+  })
+
+
+  it('thinking-started then thinking-delta creates a thinking step in transcript', async () => {
+    const session = createSessionSummary('session-1')
+    const runtimeDriver = createRuntimeDriver(createReadySnapshot())
+    const sessionDriver = createSessionDriver([session])
+    const runtime = createTangyuanRuntimeForTesting({ runtimeDriver, sessionDriver })
+
+    // Emit message-appended events to create transcript entries (simulating PiSdkDriver)
+    sessionDriver.emit({
+      type: 'message-appended',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      message: {
+        messageId: 'user-msg',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        role: 'user',
+        content: '分析一下',
+        createdAt: '2026-07-21T00:00:00.000Z',
+      },
+      occurredAt: '2026-07-21T00:00:00.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'message-appended',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      message: {
+        messageId: 'msg-1',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        role: 'agent',
+        content: '',
+        createdAt: '2026-07-21T00:00:00.000Z',
+      },
+      occurredAt: '2026-07-21T00:00:00.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'turn-started',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+      runId: 'run-1',
+      occurredAt: '2026-07-21T00:00:01.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'message-delta',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+      runId: 'run-1',
+      messageId: 'msg-1',
+      delta: 'Let me think about this...',
+      deltaKind: 'thinking',
+      occurredAt: '2026-07-21T00:00:01.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'message-delta',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+      runId: 'run-1',
+      messageId: 'msg-1',
+      delta: '分析结果：没有问题。',
+      occurredAt: '2026-07-21T00:00:02.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'message-completed',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+      runId: 'run-1',
+      message: {
+        messageId: 'msg-1',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        role: 'agent',
+        content: '分析结果：没有问题。',
+        createdAt: '2026-07-21T00:00:02.000Z',
+      },
+      occurredAt: '2026-07-21T00:00:02.000Z',
+    })
+
+    const snapshot = await runtime.getTranscript({
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+    })
+
+    // Should have at least user + agent entries
+    expect(snapshot.entries.length).toBeGreaterThanOrEqual(2)
+
+    // Find agent-reply entry with turns
+    const replyEntry = snapshot.entries.find((e) => e.kind === 'agent-reply')
+    expect(replyEntry, 'agent-reply entry should exist').toBeDefined()
+
+    // Debug: check what's actually in the snapshot
+    if (!replyEntry || replyEntry.kind !== 'agent-reply') {
+      return
+    }
+    expect(replyEntry.turns.length).toBeGreaterThan(0)
+    const hasThinking = replyEntry.turns.some((t) =>
+      t.steps.some((s) => s.kind === 'thinking'),
+    )
+    expect(hasThinking).toBe(true)
+  })
+
+  it('tool-started creates tool-call step', async () => {
+    const session = createSessionSummary('session-1')
+    const runtimeDriver = createRuntimeDriver(createReadySnapshot())
+    const sessionDriver = createSessionDriver([session])
+    const runtime = createTangyuanRuntimeForTesting({ runtimeDriver, sessionDriver })
+
+    sessionDriver.emit({
+      type: 'message-appended',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      message: {
+        messageId: 'user-msg',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        role: 'user',
+        content: '搜索文件',
+        createdAt: '2026-07-21T00:00:00.000Z',
+      },
+      occurredAt: '2026-07-21T00:00:00.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'message-appended',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      message: {
+        messageId: 'msg-1',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        role: 'agent',
+        content: '',
+        createdAt: '2026-07-21T00:00:00.000Z',
+      },
+      occurredAt: '2026-07-21T00:00:00.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'turn-started',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+      runId: 'run-1',
+      occurredAt: '2026-07-21T00:00:01.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'activity-updated',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+      runId: 'run-1',
+      activity: { kind: 'tool', state: 'running', label: '正在搜索' },
+      occurredAt: '2026-07-21T00:00:01.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'activity-updated',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+      runId: 'run-1',
+      activity: { kind: 'tool', state: 'completed', label: '搜索完成' },
+      occurredAt: '2026-07-21T00:00:02.000Z',
+    })
+
+    const snapshot = await runtime.getTranscript({
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+    })
+
+    const replyEntry = snapshot.entries.find((e) => e.kind === 'agent-reply')
+    expect(replyEntry).toBeDefined()
+    if (replyEntry?.kind === 'agent-reply') {
+      const hasToolCall = replyEntry.turns.some((t) =>
+        t.steps.some((s) => s.kind === 'tool-call'),
+      )
+      expect(hasToolCall).toBe(true)
+    }
+  })
+
+  it('cancelled run preserves existing steps in transcript', async () => {
+    const session = createSessionSummary('session-1')
+    const runtimeDriver = createRuntimeDriver(createReadySnapshot())
+    const sessionDriver = createSessionDriver([session])
+    const runtime = createTangyuanRuntimeForTesting({ runtimeDriver, sessionDriver })
+
+    sessionDriver.emit({
+      type: 'message-appended',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      message: {
+        messageId: 'user-msg',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        role: 'user',
+        content: '搜索文件',
+        createdAt: '2026-07-21T00:00:00.000Z',
+      },
+      occurredAt: '2026-07-21T00:00:00.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'message-appended',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      message: {
+        messageId: 'msg-1',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        role: 'agent',
+        content: '',
+        createdAt: '2026-07-21T00:00:00.000Z',
+      },
+      occurredAt: '2026-07-21T00:00:00.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'turn-started',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+      runId: 'run-1',
+      occurredAt: '2026-07-21T00:00:01.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'message-delta',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+      runId: 'run-1',
+      messageId: 'msg-1',
+      delta: 'Let me check...',
+      deltaKind: 'thinking',
+      occurredAt: '2026-07-21T00:00:01.000Z',
+    })
+
+    sessionDriver.emit({
+      type: 'turn-cancelled',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+      runId: 'run-1',
+      occurredAt: '2026-07-21T00:00:02.000Z',
+    })
+
+    const snapshot = await runtime.getTranscript({
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: session.sessionId,
+    })
+
+    const replyEntry = snapshot.entries.find((e) => e.kind === 'agent-reply')
+    expect(replyEntry).toBeDefined()
+    if (replyEntry?.kind === 'agent-reply') {
+      // Should have preserved the thinking step
+      const hasThinking = replyEntry.turns.some((t) =>
+        t.steps.some((s) => s.kind === 'thinking'),
+      )
+      expect(hasThinking).toBe(true)
+    }
+  })
+})
+
+function createReadySnapshot(): RuntimeSnapshot {
+  return createSnapshot({
+    providerId: 'anthropic',
+    modelId: 'claude-sonnet-4-5',
+    maskedValue: 'sk-t...7890',
+  })
+}

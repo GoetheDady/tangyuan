@@ -620,6 +620,13 @@ class DefaultTangyuanRuntime {
   async getTranscript(
     request: GetSessionMessagesRequest,
   ): Promise<TranscriptSnapshot> {
+    // 优先使用 TranscriptEmitter 缓存的快照（含 turns/steps）
+    const cached = this.transcriptEmitter.getSnapshot(request.sessionId)
+    if (cached) {
+      return cached
+    }
+
+    // 回退：从扁平的 AgentMessage 列表构建（无 turns/steps）
     const messages = await this.getMessages(request)
 
     return buildTranscriptSnapshot(

@@ -2,10 +2,12 @@ import type {
   AgentEvent,
   AgentEventListener,
 } from './index'
-import type {
-  ExecutionAttempt,
-  TranscriptDelta,
-  TurnStep,
+import {
+  applyTranscriptDelta,
+  type ExecutionAttempt,
+  type TranscriptDelta,
+  type TranscriptSnapshot,
+  type TurnStep,
 } from '@tangyuan/contracts'
 
 /**
@@ -31,10 +33,36 @@ export class TranscriptEmitter {
   private readonly pendingAttemptBySession = new Map<string, ExecutionAttempt>()
   private readonly runToAttempt = new Map<string, ExecutionAttempt>()
   private readonly turnStateByRun = new Map<string, TurnState>()
+  private readonly transcriptSnapshots = new Map<string, TranscriptSnapshot>()
   private readonly emit: AgentEventListener
 
   constructor(emit: AgentEventListener) {
     this.emit = emit
+  }
+
+  /**
+   * 返回指定会话的累积 transcript 快照（含 turns/steps）。
+   * 若从未收到过该会话的 delta，返回 undefined。
+   */
+  getSnapshot(sessionId: string): TranscriptSnapshot | undefined {
+    return this.transcriptSnapshots.get(sessionId)
+  }
+
+  /**
+   * 确保指定会话有初始 transcript 快照。
+   */
+  private ensureSnapshot(agentId: string, sessionId: string): TranscriptSnapshot {
+    const existing = this.transcriptSnapshots.get(sessionId)
+    if (existing) return existing
+
+    const snapshot: TranscriptSnapshot = {
+      sessionId,
+      agentId,
+      entries: [],
+      updatedAt: new Date().toISOString(),
+    }
+    this.transcriptSnapshots.set(sessionId, snapshot)
+    return snapshot
   }
 
 
@@ -308,17 +336,9 @@ export class TranscriptEmitter {
     }
 
     const delta: TranscriptDelta = {
-      type: 'entry-updated',
+      type: 'attempt-status-changed',
       index: entryIndex,
-      entry: {
-        kind: 'agent-reply',
-        index: entryIndex,
-        messageId: event.message.messageId,
-        content: event.message.content,
-        createdAt: event.message.createdAt,
-        attempt: completedAttempt,
-        turns: [],
-      },
+      attempt: completedAttempt,
     }
     this.emitTranscriptDeltaEvent(event.agentId, event.sessionId, delta)
     this.pendingAttemptBySession.delete(event.sessionId)
@@ -396,6 +416,17 @@ export class TranscriptEmitter {
     sessionId: string,
     delta: TranscriptDelta,
   ): void {
+    // Accumulate snapshot for session reconstruction (AC 8)
+    const snapshot = this.ensureSnapshot(agentId, sessionId)
+    const nextSnapshot = applyTranscriptDelta(snapshot, delta)
+    if (delta.type === 'step-appended') {
+      const entry = nextSnapshot.entries[delta.index]
+    }
+    this.transcriptSnapshots.set(sessionId, {
+      ...nextSnapshot,
+      updatedAt: new Date().toISOString(),
+    })
+
     this.emit({
       type: 'transcript-delta',
       agentId,
