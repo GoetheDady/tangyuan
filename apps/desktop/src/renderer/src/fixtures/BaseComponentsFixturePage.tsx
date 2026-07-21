@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- TODO: 按组件种类拆分为多个 fixture 子模块 */
 import { useState } from 'react'
 import {
   Archive,

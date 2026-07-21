@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- TODO: 按职责拆分为 session-driver / gateway / transcript 等模块 */
 import {
   access,
   copyFile,

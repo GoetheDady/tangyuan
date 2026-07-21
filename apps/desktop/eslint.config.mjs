@@ -44,5 +44,16 @@ export default defineConfig(
       '@typescript-eslint/explicit-function-return-type': 'off'
     }
   },
+  {
+    rules: {
+      'max-lines': ['error', { max: 1000, skipBlankLines: true, skipComments: true }]
+    }
+  },
+  {
+    files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
+    rules: {
+      'max-lines': 'off'
+    }
+  },
   eslintConfigPrettier
 )

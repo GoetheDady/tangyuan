@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- TODO: 拆分为 transcript-types/schemas/delta 模块 */
 import { z } from 'zod'
 
 /**

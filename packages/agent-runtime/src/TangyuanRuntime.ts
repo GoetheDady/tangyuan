@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- TODO: 提取 transcript-emitter 模块 */
 import type {
   AgentEvent,
   AgentEventListener,
