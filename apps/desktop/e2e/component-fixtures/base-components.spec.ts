@@ -1440,6 +1440,106 @@ test.describe('基础组件验收夹具', () => {
     await expect(trigger).toBeFocused()
   })
 
+  test('Field 关联标签、说明、错误并配对 invalid 与 disabled 状态', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const invalidField = page.getByTestId('field-invalid')
+    const invalidControl = page.getByRole('textbox', { name: 'Provider 凭据' })
+    const description = page.getByText('凭据仅保存在当前设备。')
+    const error = page.getByText('当前凭据无法通过验证，请检查内容后重试。')
+
+    await expect(invalidField).toHaveAttribute('data-invalid', 'true')
+    await expect(invalidControl).toHaveAttribute('aria-invalid', 'true')
+    await expect(invalidControl).toHaveAttribute(
+      'aria-describedby',
+      `${await description.getAttribute('id')} ${await error.getAttribute('id')}`
+    )
+
+    await invalidField.locator('[data-slot="field-label"]').click()
+    await expect(invalidControl).toBeFocused()
+
+    const disabledField = page.getByTestId('field-disabled')
+    await expect(disabledField).toHaveAttribute('data-disabled', 'true')
+    await expect(page.getByRole('textbox', { name: '默认模型' })).toBeDisabled()
+    await expect(page.getByRole('textbox', { name: /备注.*可选/ })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: '工作空间名称' })).toHaveAttribute(
+      'required',
+      ''
+    )
+  })
+
+  test('Field 横向布局使用 120px 标签列与 12px 间距，并在窄容器中堆叠', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const horizontalField = page.getByTestId('field-horizontal-provider')
+    const horizontalLabel = horizontalField.locator('[data-slot="field-label"]')
+    const horizontalContent = horizontalField.locator('[data-slot="field-content"]')
+    const labelBox = await horizontalLabel.boundingBox()
+    const contentBox = await horizontalContent.boundingBox()
+
+    expect(labelBox).not.toBeNull()
+    expect(contentBox).not.toBeNull()
+    expect(labelBox!.width).toBeCloseTo(120, 0)
+    expect(contentBox!.x - (labelBox!.x + labelBox!.width)).toBeCloseTo(12, 0)
+
+    const narrowField = page.getByTestId('field-horizontal-narrow')
+    const narrowLabelBox = await narrowField.locator('[data-slot="field-label"]').boundingBox()
+    const narrowContentBox = await narrowField.locator('[data-slot="field-content"]').boundingBox()
+
+    expect(narrowLabelBox).not.toBeNull()
+    expect(narrowContentBox).not.toBeNull()
+    expect(narrowContentBox!.y).toBeGreaterThan(narrowLabelBox!.y)
+    expect(narrowContentBox!.x).toBeCloseTo(narrowLabelBox!.x, 0)
+  })
+
+  test('InputGroup addon 可聚焦 Input 与 Textarea，装饰图标不进入无障碍树', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const searchGroup = page.getByTestId('input-group-search')
+    const searchInput = page.getByRole('textbox', { name: '搜索 Agent' })
+    await searchGroup.getByTestId('input-group-search-addon').click()
+    await expect(searchInput).toBeFocused()
+    await expect(searchGroup.locator('svg')).toHaveAttribute('aria-hidden', 'true')
+
+    const textareaGroup = page.getByTestId('input-group-textarea')
+    const message = page.getByRole('textbox', { name: '发送消息' })
+    await textareaGroup
+      .getByTestId('input-group-textarea-addon')
+      .click({ position: { x: 12, y: 12 } })
+    await expect(message).toBeFocused()
+    await expect(textareaGroup).toContainText('Claude Sonnet 4.5')
+  })
+
+  test('InputGroup 操作按钮保持键盘顺序且不会窃取输入焦点', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const input = page.getByRole('textbox', { name: '凭据组合输入' })
+    const action = page.getByRole('button', { name: '显示凭据组合输入' })
+    await input.focus()
+    await expect(input).toBeFocused()
+
+    await page.keyboard.press('Tab')
+    await expect(action).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(action).toBeFocused()
+  })
+
+  test('InputGroup 同步 invalid 与 disabled 状态到实际控件和操作按钮', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const invalidGroup = page.getByTestId('input-group-invalid')
+    await expect(invalidGroup).toHaveAttribute('data-invalid', 'true')
+    await expect(page.getByRole('textbox', { name: '无效组合输入' })).toHaveAttribute(
+      'aria-invalid',
+      'true'
+    )
+
+    const disabledGroup = page.getByTestId('input-group-disabled')
+    await expect(disabledGroup).toHaveAttribute('data-disabled', 'true')
+    await expect(page.getByRole('textbox', { name: '禁用组合输入' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: '禁用组合操作' })).toBeDisabled()
+  })
+
   test('Select 长列表 (20 项) 渲染', async ({ page }) => {
     await page.goto(fixturePath)
 

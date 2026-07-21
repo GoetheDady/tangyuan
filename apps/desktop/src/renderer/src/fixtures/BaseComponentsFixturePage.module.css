@@ -440,3 +440,69 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.compositionBlock {
+  display: flex;
+  min-width: 0;
+  padding: calc(var(--space-grid) * 2);
+  flex-direction: column;
+  gap: calc(var(--space-grid) * 2);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.compositionHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-micro);
+}
+
+.compositionTitle,
+.compositionDescription {
+  margin: 0;
+}
+
+.compositionTitle {
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.compositionDescription {
+  color: var(--muted-foreground);
+  font-size: var(--text-caption);
+}
+
+.compositionGrid {
+  display: grid;
+  min-width: 0;
+  gap: calc(var(--space-grid) * 2.5);
+}
+
+.horizontalFieldGroup,
+.narrowFieldDemo {
+  min-width: 0;
+  padding: calc(var(--space-grid) * 2);
+  border: var(--border-width) solid var(--split);
+  border-radius: var(--radius);
+  background: var(--background);
+}
+
+.narrowFieldDemo {
+  width: 20rem;
+  max-width: 100%;
+}
+
+.inputGroupTextarea {
+  min-height: 8.25rem;
+}
+
+@media (min-width: 48rem) {
+  .compositionGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .inputGroupTextarea {
+    grid-column: 1 / -1;
+  }
+}

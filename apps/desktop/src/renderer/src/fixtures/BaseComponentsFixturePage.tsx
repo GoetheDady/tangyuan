@@ -6,8 +6,10 @@ import {
   CircleX,
   ChevronLeft,
   ChevronRight,
+  Eye,
   Info,
   Search,
+  Send,
   Settings
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -53,7 +55,24 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import {
+  Field,
+  FieldContent,
+  FieldControl,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel
+} from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+  InputGroupText,
+  InputGroupTextarea
+} from '@/components/ui/input-group'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -359,7 +378,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
           <FixtureSection
             id="forms"
             title="表单组件"
-            description="Label 与 Input、Textarea 的关联、排版、长文本和禁用反馈，以及控件的常用状态。"
+            description="Label、Field、InputGroup 与 Input、Textarea 的关联、状态传播、响应式布局和键盘流程。"
           >
             <div className={styles.formGrid}>
               <div className={styles.field}>
@@ -503,6 +522,162 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
             <div className={styles.field}>
               <Label htmlFor="fixture-textarea-required">必填文本域</Label>
               <Textarea id="fixture-textarea-required" required placeholder="此项必填" />
+            </div>
+
+            <div className={styles.compositionBlock} data-fixture-field-matrix>
+              <div className={styles.compositionHeader}>
+                <h3 className={styles.compositionTitle}>Field 状态与语义</h3>
+                <p className={styles.compositionDescription}>
+                  标签、说明、错误、必填/可选、禁用和无效状态通过一致结构与实际控件配对。
+                </p>
+              </div>
+              <FieldGroup className="grid gap-5 md:grid-cols-2">
+                <Field invalid required data-testid="field-invalid">
+                  <FieldLabel>Provider 凭据</FieldLabel>
+                  <FieldContent>
+                    <FieldControl>
+                      <Input defaultValue="sk-test-invalid" />
+                    </FieldControl>
+                    <FieldDescription>凭据仅保存在当前设备。</FieldDescription>
+                    <FieldError>当前凭据无法通过验证，请检查内容后重试。</FieldError>
+                  </FieldContent>
+                </Field>
+
+                <Field disabled data-testid="field-disabled">
+                  <FieldLabel>默认模型</FieldLabel>
+                  <FieldContent>
+                    <FieldControl>
+                      <Input value="Claude Sonnet 4.5" readOnly />
+                    </FieldControl>
+                    <FieldDescription>当前模型由默认 Agent 统一管理。</FieldDescription>
+                  </FieldContent>
+                </Field>
+
+                <Field required>
+                  <FieldLabel>工作空间名称</FieldLabel>
+                  <FieldContent>
+                    <FieldControl>
+                      <Input placeholder="请输入名称" />
+                    </FieldControl>
+                    <FieldDescription>创建后仍可在 Agent 设置中修改。</FieldDescription>
+                  </FieldContent>
+                </Field>
+
+                <Field optional>
+                  <FieldLabel>备注</FieldLabel>
+                  <FieldContent>
+                    <FieldControl>
+                      <Input placeholder="补充说明" />
+                    </FieldControl>
+                  </FieldContent>
+                </Field>
+              </FieldGroup>
+
+              <div className={styles.horizontalFieldGroup}>
+                <FieldGroup>
+                  <Field orientation="horizontal" data-testid="field-horizontal-provider">
+                    <FieldLabel>横向 Provider</FieldLabel>
+                    <FieldContent>
+                      <FieldControl>
+                        <Input defaultValue="Anthropic（测试数据）" />
+                      </FieldControl>
+                      <FieldDescription>横向布局保持统一标签起点。</FieldDescription>
+                    </FieldContent>
+                  </Field>
+                  <Field orientation="horizontal">
+                    <FieldLabel>这是一个用于验证横向标签列换行和内容对齐的长标签</FieldLabel>
+                    <FieldContent>
+                      <FieldControl>
+                        <Textarea defaultValue="长标签不会压缩或覆盖右侧控件。" />
+                      </FieldControl>
+                    </FieldContent>
+                  </Field>
+                </FieldGroup>
+              </div>
+
+              <div className={styles.narrowFieldDemo}>
+                <FieldGroup>
+                  <Field orientation="horizontal" data-testid="field-horizontal-narrow">
+                    <FieldLabel>紧凑窗口字段</FieldLabel>
+                    <FieldContent>
+                      <FieldControl>
+                        <Input defaultValue="自动堆叠" />
+                      </FieldControl>
+                      <FieldDescription>容器较窄时标签回到控件上方。</FieldDescription>
+                    </FieldContent>
+                  </Field>
+                </FieldGroup>
+              </div>
+            </div>
+
+            <div className={styles.compositionBlock} data-fixture-input-groups>
+              <div className={styles.compositionHeader}>
+                <h3 className={styles.compositionTitle}>InputGroup 组合矩阵</h3>
+                <p className={styles.compositionDescription}>
+                  Input、Textarea、图标、文本 addon 和操作按钮共享外层边框、焦点环与状态。
+                </p>
+              </div>
+              <div className={styles.compositionGrid}>
+                <InputGroup data-testid="input-group-search">
+                  <InputGroupAddon data-testid="input-group-search-addon">
+                    <Search aria-hidden="true" />
+                  </InputGroupAddon>
+                  <InputGroupInput aria-label="搜索 Agent" placeholder="搜索 Agent" />
+                </InputGroup>
+
+                <InputGroup data-testid="input-group-action-flow">
+                  <InputGroupInput
+                    type="password"
+                    aria-label="凭据组合输入"
+                    defaultValue="secret-token"
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupButton aria-label="显示凭据组合输入">
+                      <Eye data-icon="inline-start" aria-hidden="true" />
+                    </InputGroupButton>
+                  </InputGroupAddon>
+                </InputGroup>
+
+                <InputGroup>
+                  <InputGroupAddon>
+                    <InputGroupText>https://</InputGroupText>
+                  </InputGroupAddon>
+                  <InputGroupInput aria-label="网址组合输入" defaultValue="example.com" />
+                </InputGroup>
+
+                <InputGroup>
+                  <InputGroupInput aria-label="文件名组合输入" defaultValue="config" />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupText>.json</InputGroupText>
+                  </InputGroupAddon>
+                </InputGroup>
+
+                <InputGroup invalid data-testid="input-group-invalid">
+                  <InputGroupInput aria-label="无效组合输入" defaultValue="invalid-value" />
+                  <InputGroupAddon align="inline-end">格式错误</InputGroupAddon>
+                </InputGroup>
+
+                <InputGroup disabled data-testid="input-group-disabled">
+                  <InputGroupInput aria-label="禁用组合输入" defaultValue="不可编辑" />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupButton aria-label="禁用组合操作">操作</InputGroupButton>
+                  </InputGroupAddon>
+                </InputGroup>
+
+                <InputGroup
+                  className={styles.inputGroupTextarea}
+                  data-testid="input-group-textarea"
+                >
+                  <InputGroupTextarea aria-label="发送消息" placeholder="给汤圆发送消息" rows={3} />
+                  <InputGroupAddon align="block-end" data-testid="input-group-textarea-addon">
+                    <InputGroupText>Claude Sonnet 4.5</InputGroupText>
+                    <InputGroupButton size="sm" aria-label="发送组合消息">
+                      <Send data-icon="inline-start" aria-hidden="true" />
+                      发送
+                    </InputGroupButton>
+                  </InputGroupAddon>
+                </InputGroup>
+              </div>
             </div>
           </FixtureSection>
 
