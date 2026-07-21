@@ -20,7 +20,7 @@ pnpm install
 | 基础组件夹具视觉回归    | `pnpm --filter apps-desktop test:visual:fixtures`    | 是           | test       |
 | 页面人工截图 artifact   | `pnpm --filter apps-desktop test:artifacts:renderer` | 否，只写 PNG | production |
 
-像素比较不属于常规 Renderer 回归，避免不同平台的字体和栅格化差异阻断结构/交互测试。视觉 project 固定 Chromium、`1440×1000` viewport、`deviceScaleFactor=1`、浅色模式、`zh-CN`、`Asia/Shanghai`、reduced motion 和固定脱敏数据。
+像素比较不属于常规 Renderer 回归，避免不同平台的字体和栅格化差异阻断结构/交互测试。视觉 project 使用 `pnpm-lock.yaml` 锁定的 Playwright/Chromium，固定 `1440×1000` viewport、`deviceScaleFactor=1`、浅色模式、`zh-CN`、`Asia/Shanghai`、reduced motion 和固定脱敏数据；当前精确版本与基准更新理由记录在 `BASELINE.md`。
 
 ## 常规 E2E
 
@@ -50,7 +50,7 @@ pnpm --filter apps-desktop test:e2e:fixtures
 
 夹具只渲染 Renderer 基础组件和固定脱敏数据，不注入 Preload mock、不读取 `window.api`、不加载 Runtime，也不读写真实配置。后续组件 Ticket 应在现有 `data-fixture-section` 分区内增量加入 variant、size、状态和边界场景。
 
-运行结构/键盘/Portal smoke：
+运行结构、ARIA、键盘、焦点、几何、三档桌面宽度溢出与 Portal smoke：
 
 ```bash
 pnpm --filter apps-desktop test:e2e:fixtures

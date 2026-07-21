@@ -6,6 +6,7 @@ const fixturePath = '/#/__fixtures__/base-components'
 
 const visualSections = [
   { id: 'actions', snapshot: 'actions.png' },
+  { id: 'tooltips', snapshot: 'tooltips.png' },
   { id: 'separators', snapshot: 'separators.png' },
   { id: 'forms', snapshot: 'forms.png' },
   { id: 'selects', snapshot: 'selects.png' },
@@ -33,6 +34,25 @@ test.describe('基础组件视觉回归', () => {
         section.snapshot,
         screenshotOptions
       )
+    })
+  }
+
+  const tooltipVisualScenarios = [
+    { trigger: '悬停查看上方说明', side: 'top', snapshot: 'tooltip-top-open.png' },
+    { trigger: '悬停查看右侧说明', side: 'right', snapshot: 'tooltip-right-open.png' },
+    { trigger: '悬停查看下方说明', side: 'bottom', snapshot: 'tooltip-bottom-open.png' },
+    { trigger: '悬停查看左侧说明', side: 'left', snapshot: 'tooltip-left-open.png' }
+  ] as const
+
+  for (const scenario of tooltipVisualScenarios) {
+    test(`Tooltip ${scenario.side} 保持打开状态视觉基准`, async ({ page }) => {
+      const trigger = page.getByRole('button', { name: scenario.trigger })
+      await trigger.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+      await trigger.hover()
+      const content = page.locator('[data-slot="tooltip-content"]')
+      await expect(content).toBeVisible()
+      await expect(content).toHaveAttribute('data-side', scenario.side)
+      await expect(content).toHaveScreenshot(scenario.snapshot, screenshotOptions)
     })
   }
 

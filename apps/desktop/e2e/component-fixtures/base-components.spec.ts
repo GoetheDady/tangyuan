@@ -31,6 +31,7 @@ test.describe('基础组件验收夹具', () => {
     await expect(page.getByRole('heading', { name: '基础组件验收夹具', level: 1 })).toBeVisible()
     await expect(page.locator('[data-fixture-section]')).toHaveCount(9)
     await expect(page.locator('[data-fixture-section="actions"]')).toBeVisible()
+    await expect(page.locator('[data-fixture-section="tooltips"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="forms"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="selects"]')).toBeVisible()
     await expect(page.locator('[data-fixture-section="dropdown-menus"]')).toBeVisible()
@@ -59,6 +60,256 @@ test.describe('基础组件验收夹具', () => {
     const boxShadow = await primaryAction.evaluate((element) => getComputedStyle(element).boxShadow)
     expect(boxShadow).not.toBe('none')
   })
+
+  test('Tooltip 通过鼠标和键盘展示同一 Portal 内容，并匹配 Pencil 的 Level 2 规格', async ({
+    page
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await page.goto(fixturePath)
+
+    const trigger = page.getByRole('button', { name: '悬停查看上方说明' })
+    await trigger.scrollIntoViewIfNeeded()
+    await trigger.hover()
+
+    const content = page.locator('[data-slot="tooltip-content"]')
+    await expect(content).toBeVisible()
+    await expect(page.getByRole('tooltip')).toHaveText('上方 Tooltip')
+    await expect(content).toHaveAttribute('data-level', '2')
+    await expect(content).toHaveAttribute('data-side', 'top')
+    await expect(
+      page.locator('[data-fixture-section="tooltips"] [data-slot="tooltip-content"]')
+    ).toHaveCount(0)
+
+    const styles = await content.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        animationDuration: style.animationDuration,
+        borderRadius: style.borderRadius,
+        boxShadow: style.boxShadow,
+        fontSize: style.fontSize,
+        padding: style.padding
+      }
+    })
+    expect(styles).toEqual({
+      animationDuration: '0.16s',
+      borderRadius: '6px',
+      boxShadow:
+        'rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(33, 27, 22, 0.1) 0px 3px 6px -4px, rgba(33, 27, 22, 0.06) 0px 6px 16px 0px, rgba(33, 27, 22, 0.03) 0px 9px 28px 8px',
+      fontSize: '12px',
+      padding: '6px 12px'
+    })
+
+    const triggerBox = await trigger.boundingBox()
+    const contentBox = await content.boundingBox()
+    expect(triggerBox).not.toBeNull()
+    expect(contentBox).not.toBeNull()
+    expect(triggerBox!.y - (contentBox!.y + contentBox!.height)).toBeCloseTo(5, 0)
+
+    await page.goto(fixturePath)
+    await trigger.scrollIntoViewIfNeeded()
+    await trigger.focus()
+    await expect(page.getByRole('tooltip')).toHaveText('上方 Tooltip')
+    await page.keyboard.press('Escape')
+    await expect(content).toBeHidden()
+    await expect(trigger).toBeFocused()
+  })
+
+  test('常用控件共享 36px 高度与 8px 圆角，并使用统一的 Level 0–3 层级 Token', async ({ page }) => {
+    await page.goto(fixturePath)
+
+    const commonControls = [
+      page.getByRole('button', { name: '主要操作' }),
+      page.getByLabel('显示名称'),
+      page.getByLabel('模型服务'),
+      page.getByTestId('input-group-search')
+    ]
+    for (const control of commonControls) {
+      await expect(control).toHaveCSS('height', '36px')
+      await expect(control).toHaveCSS('border-radius', '8px')
+    }
+
+    const elevationTokens = await page.locator('html').evaluate((element) => {
+      const style = getComputedStyle(element)
+      return [0, 1, 2, 3].map((level) => style.getPropertyValue(`--shadow-level-${level}`).trim())
+    })
+    expect(elevationTokens.every(Boolean)).toBe(true)
+    await expect(page.locator('[data-slot="separator"][data-level="0"]').first()).toBeVisible()
+    await expect(page.locator('[data-slot="alert"][data-level="0"]').first()).toBeVisible()
+    await expect(page.locator('[data-slot="card"][data-level="0"]').first()).toBeVisible()
+
+    const badge = page.locator('[data-slot="badge"]').first()
+    await expect(badge).toHaveCSS('height', '22px')
+    await expect(badge).toHaveCSS('border-radius', '6px')
+
+    await page.getByRole('button', { name: '菜单：普通操作' }).click()
+    const menu = page.getByTestId('dropdown-menu-actions-content')
+    await expect(menu).toHaveAttribute('data-level', '2')
+    await expect(menu).toHaveCSS('border-radius', '6px')
+    await page.keyboard.press('Escape')
+
+    await page.getByRole('button', { name: '打开 default 对话框' }).click()
+    const dialog = page.getByRole('alertdialog', { name: '确认验收动作' })
+    await expect(dialog).toHaveCSS('border-radius', '8px')
+    expect(await dialog.evaluate((element) => getComputedStyle(element).boxShadow)).toContain(
+      'rgba(33, 27, 22, 0.08) 0px 6px 16px -8px'
+    )
+    await page.keyboard.press('Escape')
+  })
+
+  test('跨组件状态矩阵统一表达 invalid、disabled、hover、active 与 focus-visible', async ({
+    page
+  }) => {
+    await page.goto(fixturePath)
+
+    const invalidControls = [
+      page.getByRole('button', { name: '无效态' }),
+      page.getByLabel('无效输入'),
+      page.getByLabel('无效选择器'),
+      page.getByTestId('input-group-invalid')
+    ]
+    const invalidBorders = await Promise.all(
+      invalidControls.map((control) =>
+        control.evaluate((element) => getComputedStyle(element).borderColor)
+      )
+    )
+    expect(new Set(invalidBorders).size).toBe(1)
+
+    const disabledControls = [
+      page.getByRole('button', { name: '禁用操作' }),
+      page.getByLabel('禁用输入'),
+      page.getByLabel('禁用选择器'),
+      page.getByTestId('input-group-disabled')
+    ]
+    for (const control of disabledControls) {
+      await expect(control).toHaveCSS('cursor', 'not-allowed')
+    }
+
+    const primaryButton = page.getByRole('button', { name: '主要操作' })
+    const input = page.getByLabel('显示名称')
+    const select = page.getByLabel('模型服务')
+    const inputGroup = page.getByTestId('input-group-search')
+    const inputGroupControl = page.getByRole('textbox', { name: '搜索 Agent' })
+
+    const buttonBackground = await primaryButton.evaluate(
+      (element) => getComputedStyle(element).backgroundColor
+    )
+    await primaryButton.hover()
+    await expect
+      .poll(() => primaryButton.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .not.toBe(buttonBackground)
+
+    for (const control of [input, select, inputGroup]) {
+      const borderBefore = await control.evaluate(
+        (element) => getComputedStyle(element).borderColor
+      )
+      await control.hover()
+      await expect
+        .poll(() => control.evaluate((element) => getComputedStyle(element).borderColor))
+        .not.toBe(borderBefore)
+    }
+
+    const focusPairs = [
+      { target: primaryButton, surface: primaryButton },
+      { target: input, surface: input },
+      { target: select, surface: select },
+      { target: inputGroupControl, surface: inputGroup }
+    ]
+    for (const pair of focusPairs) {
+      await pair.target.focus()
+      expect(
+        await pair.surface.evaluate((element) => getComputedStyle(element).boxShadow)
+      ).not.toBe('none')
+    }
+
+    for (const activeSurface of [primaryButton, page.getByTestId('card-interactive-active')]) {
+      await activeSurface.scrollIntoViewIfNeeded()
+      const backgroundBefore = await activeSurface.evaluate(
+        (element) => getComputedStyle(element).backgroundColor
+      )
+      const box = await activeSurface.boundingBox()
+      expect(box).not.toBeNull()
+      await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2)
+      await page.mouse.down()
+      expect(
+        await activeSurface.evaluate((element) => getComputedStyle(element).backgroundColor)
+      ).not.toBe(backgroundBefore)
+      await page.mouse.up()
+    }
+  })
+
+  for (const width of [1024, 1280, 1440]) {
+    test(`${width}px 桌面宽度下全部分区和 Portal 不裁切或水平溢出`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1000 })
+      await page.goto(fixturePath)
+
+      const layout = await page.evaluate(() => ({
+        documentOverflow:
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        sections: Array.from(document.querySelectorAll<HTMLElement>('[data-fixture-section]')).map(
+          (section) => {
+            const rect = section.getBoundingClientRect()
+            return { left: rect.left, right: rect.right }
+          }
+        )
+      }))
+      expect(layout.documentOverflow).toBe(0)
+      for (const section of layout.sections) {
+        expect(section.left).toBeGreaterThanOrEqual(0)
+        expect(section.right).toBeLessThanOrEqual(width)
+      }
+
+      const edgeTooltipTrigger = page.getByRole('button', { name: '靠近右侧边缘' })
+      await edgeTooltipTrigger.hover()
+      const tooltip = page.locator('[data-slot="tooltip-content"]')
+      await expect(tooltip).toBeVisible()
+      const tooltipBox = await tooltip.boundingBox()
+      expect(tooltipBox).not.toBeNull()
+      expect(tooltipBox!.x).toBeGreaterThanOrEqual(0)
+      expect(tooltipBox!.x + tooltipBox!.width).toBeLessThanOrEqual(width)
+
+      await page.goto(fixturePath)
+      const menuTrigger = page.getByRole('button', { name: '菜单：受控子菜单' })
+      await menuTrigger.focus()
+      await page.keyboard.press('Enter')
+      await page.keyboard.press('ArrowDown')
+      await expect(page.getByRole('menuitem', { name: '共享到' })).toHaveAttribute(
+        'data-highlighted',
+        ''
+      )
+      await page.keyboard.press('ArrowRight')
+      await expect(page.getByTestId('dropdown-menu-controlled-sub-content')).toBeVisible()
+      const menuBoxes = await page
+        .locator(
+          '[data-slot="dropdown-menu-content"]:visible, [data-slot="dropdown-menu-sub-content"]:visible'
+        )
+        .evaluateAll((elements) =>
+          elements.map((element) => {
+            const rect = element.getBoundingClientRect()
+            return { bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top }
+          })
+        )
+      expect(menuBoxes.length).toBeGreaterThanOrEqual(2)
+      for (const box of menuBoxes) {
+        expect(box.left).toBeGreaterThanOrEqual(0)
+        expect(box.right).toBeLessThanOrEqual(width)
+        expect(box.top).toBeGreaterThanOrEqual(0)
+        expect(box.bottom).toBeLessThanOrEqual(1000)
+      }
+
+      await page.keyboard.press('Escape')
+      await expect(page.getByTestId('dropdown-menu-controlled-root-content')).toBeHidden()
+      await page.getByRole('button', { name: '打开长内容对话框' }).click()
+      const dialog = page.getByRole('alertdialog', {
+        name: '确认将“研究资料整理与长期知识维护 Agent”归档？'
+      })
+      const dialogBox = await dialog.boundingBox()
+      expect(dialogBox).not.toBeNull()
+      expect(dialogBox!.x).toBeGreaterThanOrEqual(16)
+      expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(width - 16)
+      expect(dialogBox!.y).toBeGreaterThanOrEqual(0)
+      expect(dialogBox!.y + dialogBox!.height).toBeLessThanOrEqual(1000)
+    })
+  }
 
   test('AlertDialog 保持安全的完整键盘焦点生命周期', async ({ page }) => {
     await page.goto(fixturePath)
@@ -310,7 +561,9 @@ test.describe('基础组件验收夹具', () => {
 
     const item = page.locator('[data-sonner-toast][data-type="success"]')
     await expect(item).toBeVisible()
-    await page.waitForTimeout(300)
+    await expect
+      .poll(() => item.evaluate((element) => getComputedStyle(element).transform))
+      .toBe('matrix(1, 0, 0, 1, 0, 0)')
     const enterState = await item.evaluate((element) => ({
       durations: getComputedStyle(element)
         .transitionDuration.split(',')

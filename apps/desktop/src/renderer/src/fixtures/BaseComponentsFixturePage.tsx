@@ -238,7 +238,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                   <TooltipTrigger asChild>
                     <Button variant="outline">悬停查看上方说明</Button>
                   </TooltipTrigger>
-                  <TooltipContent side="top">上方 Tooltip</TooltipContent>
+                  <TooltipContent side="top" avoidCollisions={false}>
+                    上方 Tooltip
+                  </TooltipContent>
                 </Tooltip>
               </div>
 
@@ -248,7 +250,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                   <TooltipTrigger asChild>
                     <Button variant="outline">悬停查看右侧说明</Button>
                   </TooltipTrigger>
-                  <TooltipContent side="right">右侧 Tooltip</TooltipContent>
+                  <TooltipContent side="right" avoidCollisions={false}>
+                    右侧 Tooltip
+                  </TooltipContent>
                 </Tooltip>
               </div>
 
@@ -258,7 +262,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                   <TooltipTrigger asChild>
                     <Button variant="outline">悬停查看下方说明</Button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">下方 Tooltip</TooltipContent>
+                  <TooltipContent side="bottom" avoidCollisions={false}>
+                    下方 Tooltip
+                  </TooltipContent>
                 </Tooltip>
               </div>
 
@@ -268,7 +274,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                   <TooltipTrigger asChild>
                     <Button variant="outline">悬停查看左侧说明</Button>
                   </TooltipTrigger>
-                  <TooltipContent side="left">左侧 Tooltip</TooltipContent>
+                  <TooltipContent side="left" avoidCollisions={false}>
+                    左侧 Tooltip
+                  </TooltipContent>
                 </Tooltip>
               </div>
 
