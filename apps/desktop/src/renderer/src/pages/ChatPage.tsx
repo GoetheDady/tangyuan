@@ -6,7 +6,8 @@ import type {
   BashApprovalRequest,
   ModelDescriptor,
   RuntimeSnapshot,
-  SessionModelInfo
+  SessionModelInfo,
+  TranscriptSnapshot
 } from '@tangyuan/contracts'
 import { MessageSquarePlus, Sparkles, StopCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -31,6 +32,7 @@ interface DesktopWorkbenchState {
   sessions: AgentSessionSummary[]
   selectedSessionId: string | null
   messages: AgentMessage[]
+  transcript: TranscriptSnapshot | null
   composerText: string
   isLoading: boolean
   isSendingMessage: boolean
@@ -451,6 +453,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
           <div className="min-h-0 flex-1 px-8 py-7">
             <TranscriptMessages
               messages={context.messages}
+              transcript={context.transcript}
               isStreaming={isSelectedSessionRunning}
               sessionId={selectedSession?.sessionId ?? null}
             />

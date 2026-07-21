@@ -64,6 +64,8 @@ import {
 
 export {
   TANGYUAN_DEFAULT_AGENT_ID,
+  buildTranscriptSnapshot,
+  applyTranscriptDelta,
   createAgentProfileStatus,
   type AgentEvent,
   type AgentEventListener,
@@ -77,8 +79,10 @@ export {
   type AgentSummary,
   type CancelConfigurationVerificationRequest,
   type CancelRunRequest,
+  type CompactionEntry,
   type ConfigEncryptionAdapter,
   type CreateSessionRequest,
+  type ExecutionAttempt,
   type GetSessionMessagesRequest,
   type InternalRuntimeConfig,
   type ListSessionsRequest,
@@ -88,6 +92,11 @@ export {
   type RuntimeSnapshot,
   type SendMessageRequest,
   type SkillSummary,
+  type TranscriptDelta,
+  type TranscriptEntry,
+  type TranscriptSnapshot,
+  type UserMessageEntry,
+  type AgentReplyEntry,
 } from '@tangyuan/contracts'
 export { createTangyuanRuntimeForTesting } from './TangyuanRuntime'
 export type { TangyuanRuntime } from './TangyuanRuntime'

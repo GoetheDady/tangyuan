@@ -39,6 +39,116 @@ export interface AgentMessage {
 }
 
 /**
+ * 描述一次 Agent 运行的身份与状态。
+ */
+export interface ExecutionAttempt {
+  /** 执行尝试的唯一标识，与 runId 相同。 */
+  attemptId: string
+  /** 关联的 run 标识。 */
+  runId: string
+  /** 当前执行状态。 */
+  status: 'running' | 'completed' | 'cancelled' | 'failed'
+  /** 执行开始时间。 */
+  startedAt: string
+  /** 执行结束时间；未结束时为 null。 */
+  completedAt: string | null
+}
+
+/**
+ * 描述结构化会话视图中的单条条目。
+ *
+ * 每个条目在 transcript 中拥有稳定索引，按时间顺序排列。
+ */
+export type TranscriptEntry =
+  | UserMessageEntry
+  | AgentReplyEntry
+  | CompactionEntry
+
+/**
+ * 描述用户发送的纯文本消息条目。
+ */
+export interface UserMessageEntry {
+  readonly kind: 'user-message'
+  /** 条目在 transcript 中的稳定位置。 */
+  readonly index: number
+  /** 对应的 AgentMessage 标识。 */
+  readonly messageId: string
+  /** 用户消息的纯文本内容。 */
+  readonly content: string
+  /** 消息发送时间。 */
+  readonly createdAt: string
+}
+
+/**
+ * 描述 Agent 的最终文本回复条目。
+ */
+export interface AgentReplyEntry {
+  readonly kind: 'agent-reply'
+  /** 条目在 transcript 中的稳定位置。 */
+  readonly index: number
+  /** 对应的 AgentMessage 标识。 */
+  readonly messageId: string
+  /** Agent 回复的 Markdown 内容。 */
+  readonly content: string
+  /** 消息创建时间。 */
+  readonly createdAt: string
+  /** 产生此回复的执行尝试。 */
+  readonly attempt: ExecutionAttempt | null
+}
+
+/**
+ * 描述上下文压缩提示条目。
+ */
+export interface CompactionEntry {
+  readonly kind: 'compaction'
+  /** 条目在 transcript 中的稳定位置。 */
+  readonly index: number
+  /** 压缩发生的时间戳。 */
+  readonly timestamp: string
+}
+
+/**
+ * 描述某一时刻的结构化会话快照。
+ */
+export interface TranscriptSnapshot {
+  /** 所属会话标识。 */
+  readonly sessionId: string
+  /** 所属 Agent 标识。 */
+  readonly agentId: string
+  /** 按时间排序的 transcript 条目列表。 */
+  readonly entries: TranscriptEntry[]
+  /** 快照生成时间。 */
+  readonly updatedAt: string
+}
+
+/**
+ * 描述结构化会话视图的增量更新。
+ *
+ * Renderer 通过 AgentEvent 接收 TranscriptDelta，
+ * 并按纯函数方式应用到本地 TranscriptSnapshot。
+ */
+export type TranscriptDelta =
+  | {
+      readonly type: 'entry-appended'
+      readonly entry: TranscriptEntry
+    }
+  | {
+      readonly type: 'entry-updated'
+      readonly index: number
+      readonly entry: TranscriptEntry
+    }
+  | {
+      readonly type: 'delta-appended'
+      readonly index: number
+      readonly delta: string
+    }
+  | {
+      readonly type: 'attempt-status-changed'
+      readonly index: number
+      readonly attempt: ExecutionAttempt
+    }
+
+/**
  * 会话列表中展示的单个 Agent 会话摘要。
  */
 export interface AgentSessionSummary {
@@ -256,6 +366,13 @@ export type AgentEvent =
       agentId: AgentId
       approvalId: string
       status: 'approved' | 'rejected'
+      occurredAt: string
+    }
+  | {
+      type: 'transcript-delta'
+      agentId: AgentId
+      sessionId: string
+      delta: TranscriptDelta
       occurredAt: string
     }
 
@@ -806,6 +923,93 @@ export const agentMessageSchema = z.strictObject({
 })
 
 /**
+ * 校验执行尝试的身份与状态。
+ */
+export const executionAttemptSchema = z.strictObject({
+  attemptId: nonEmptyIdentifierSchema,
+  runId: nonEmptyIdentifierSchema,
+  status: z.enum(['running', 'completed', 'cancelled', 'failed']),
+  startedAt: timestampSchema,
+  completedAt: timestampSchema.nullable(),
+})
+
+/**
+ * 校验用户消息条目。
+ */
+export const userMessageEntrySchema = z.strictObject({
+  kind: z.literal('user-message'),
+  index: z.number().int().min(0),
+  messageId: nonEmptyIdentifierSchema,
+  content: z.string(),
+  createdAt: timestampSchema,
+})
+
+/**
+ * 校验 Agent 回复条目。
+ */
+export const agentReplyEntrySchema = z.strictObject({
+  kind: z.literal('agent-reply'),
+  index: z.number().int().min(0),
+  messageId: nonEmptyIdentifierSchema,
+  content: z.string(),
+  createdAt: timestampSchema,
+  attempt: executionAttemptSchema.nullable(),
+})
+
+/**
+ * 校验压缩提示条目。
+ */
+export const compactionEntrySchema = z.strictObject({
+  kind: z.literal('compaction'),
+  index: z.number().int().min(0),
+  timestamp: timestampSchema,
+})
+
+/**
+ * 校验 transcript 条目。
+ */
+export const transcriptEntrySchema = z.discriminatedUnion('kind', [
+  userMessageEntrySchema,
+  agentReplyEntrySchema,
+  compactionEntrySchema,
+])
+
+/**
+ * 校验结构化会话快照。
+ */
+export const transcriptSnapshotSchema = z.strictObject({
+  sessionId: nonEmptyIdentifierSchema,
+  agentId: nonEmptyIdentifierSchema,
+  entries: z.array(transcriptEntrySchema),
+  updatedAt: timestampSchema,
+})
+
+/**
+ * 校验 transcript 增量更新。
+ */
+export const transcriptDeltaSchema = z.discriminatedUnion('type', [
+  z.strictObject({
+    type: z.literal('entry-appended'),
+    entry: transcriptEntrySchema,
+  }),
+  z.strictObject({
+    type: z.literal('entry-updated'),
+    index: z.number().int().min(0),
+    entry: transcriptEntrySchema,
+  }),
+  z.strictObject({
+    type: z.literal('delta-appended'),
+    index: z.number().int().min(0),
+    delta: z.string(),
+  }),
+  z.strictObject({
+    type: z.literal('attempt-status-changed'),
+    index: z.number().int().min(0),
+    attempt: executionAttemptSchema,
+  }),
+])
+
+/**
  * 校验跨进程传输的会话摘要。
  */
 export const agentSessionSummarySchema = z.strictObject({
@@ -1211,6 +1415,13 @@ export const agentEventSchema = z.discriminatedUnion('type', [
     status: z.enum(['approved', 'rejected']),
     occurredAt: timestampSchema,
   }),
+  z.strictObject({
+    type: z.literal('transcript-delta'),
+    agentId: nonEmptyIdentifierSchema,
+    sessionId: nonEmptyIdentifierSchema,
+    delta: transcriptDeltaSchema,
+    occurredAt: timestampSchema,
+  }),
 ])
 
 /**
@@ -1483,6 +1694,7 @@ export const DESKTOP_IPC_CHANNELS = {
   sessionsApproveBash: 'tangyuan:sessions:approve-bash',
   sessionsRejectBash: 'tangyuan:sessions:reject-bash',
   sessionsGetPendingApprovals: 'tangyuan:sessions:get-pending-approvals',
+  sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
 } as const
 
 /**
@@ -1537,6 +1749,7 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.sessionsApproveBash]: ApproveBashRequest
   [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: RejectBashRequest
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: undefined
+  [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: GetSessionMessagesRequest
 }
 
 /**
@@ -1582,6 +1795,7 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsApproveBash]: approveBashRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: rejectBashRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: z.undefined(),
+  [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: getSessionMessagesRequestSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -1645,6 +1859,7 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsApproveBash]: void
   [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: void
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: BashApprovalRequest[]
+  [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: TranscriptSnapshot
 }
 
 /**
@@ -1771,6 +1986,7 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: z.array(
     bashApprovalRequestSchema,
   ),
+  [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: transcriptSnapshotSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -1868,6 +2084,15 @@ export interface DesktopPreloadApi {
    * @throws 当 Driver 无法创建会话时，Promise 会 reject。
    */
   createSession(request: CreateSessionRequest): Promise<AgentSessionSummary>
+
+  /**
+   * 读取指定会话的结构化 transcript 快照。
+   *
+   * @param request - 会话所属 Agent 和会话标识。
+   * @returns 结构化会话快照，包含按时间排序的条目列表。
+   * @throws 当会话不存在或 Main 进程无法构建快照时，Promise 会 reject。
+   */
+  getTranscript(request: GetSessionMessagesRequest): Promise<TranscriptSnapshot>
 
   /**
    * 读取指定会话的对话消息。
@@ -2320,5 +2545,126 @@ export function migrateConfigV1ToV2(
         archivedAt: null,
       },
     },
+  }
+}
+
+/**
+ * 从扁平的 AgentMessage 列表构建结构化 TranscriptSnapshot。
+ *
+ * 转换规则：
+ * - role='user' → UserMessageEntry
+ * - role='agent' → AgentReplyEntry（attempt 初始为 null）
+ * - role='compaction' → CompactionEntry
+ * - role='system' → 跳过（activity 消息将在后续 ticket 中转为执行步骤）
+ *
+ * @param messages - 按时间排序的扁平消息列表。
+ * @param sessionId - 会话标识。
+ * @param agentId - Agent 标识。
+ * @param now - 快照生成时间戳。
+ * @returns 结构化会话快照。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function buildTranscriptSnapshot(
+  messages: readonly AgentMessage[],
+  sessionId: string,
+  agentId: string,
+  now: string,
+): TranscriptSnapshot {
+  const entries: TranscriptEntry[] = []
+  let index = 0
+
+  for (const message of messages) {
+    if (message.role === 'system') {
+      continue
+    }
+
+    if (message.role === 'compaction') {
+      entries.push({
+        kind: 'compaction',
+        index: index++,
+        timestamp: message.createdAt,
+      })
+    } else if (message.role === 'user') {
+      entries.push({
+        kind: 'user-message',
+        index: index++,
+        messageId: message.messageId,
+        content: message.content,
+        createdAt: message.createdAt,
+      })
+    } else if (message.role === 'agent') {
+      entries.push({
+        kind: 'agent-reply',
+        index: index++,
+        messageId: message.messageId,
+        content: message.content,
+        createdAt: message.createdAt,
+        attempt: null,
+      })
+    }
+  }
+
+  return { sessionId, agentId, entries, updatedAt: now }
+}
+
+/**
+ * 将 TranscriptDelta 应用到 TranscriptSnapshot 上。
+ *
+ * 纯函数，不修改原始 snapshot。
+ *
+ * @param snapshot - 当前快照。
+ * @param delta - 需要应用的增量更新。
+ * @returns 应用增量后的新快照。
+ * @throws 当 delta.index 越界时可能返回未修改的快照。
+ */
+export function applyTranscriptDelta(
+  snapshot: TranscriptSnapshot,
+  delta: TranscriptDelta,
+): TranscriptSnapshot {
+  const entries = [...snapshot.entries]
+
+  switch (delta.type) {
+    case 'entry-appended': {
+      return {
+        ...snapshot,
+        entries: [...entries, delta.entry],
+      }
+    }
+
+    case 'entry-updated': {
+      if (delta.index >= 0 && delta.index < entries.length) {
+        entries[delta.index] = delta.entry
+      }
+      return { ...snapshot, entries }
+    }
+
+    case 'delta-appended': {
+      if (delta.index >= 0 && delta.index < entries.length) {
+        const entry = entries[delta.index]
+        if (entry) {
+          entries[delta.index] = {
+            ...entry,
+            content: `${entry.kind === 'agent-reply' || entry.kind === 'user-message' ? (entry as { content: string }).content + delta.delta : delta.delta}`,
+          } as TranscriptEntry
+        }
+      }
+      return { ...snapshot, entries }
+    }
+
+    case 'attempt-status-changed': {
+      if (delta.index >= 0 && delta.index < entries.length) {
+        const entry = entries[delta.index]
+        if (entry && entry.kind === 'agent-reply') {
+          entries[delta.index] = {
+            ...entry,
+            attempt: delta.attempt,
+          } as AgentReplyEntry
+        }
+      }
+      return { ...snapshot, entries }
+    }
+
+    default:
+      return snapshot
   }
 }

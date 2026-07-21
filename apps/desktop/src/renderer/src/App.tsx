@@ -5,8 +5,10 @@ import type {
   AgentSummary,
   BashApprovalRequest,
   DesktopPreloadApi,
-  RuntimeSnapshot
+  RuntimeSnapshot,
+  TranscriptSnapshot
 } from '@tangyuan/contracts'
+import { applyTranscriptDelta } from '@tangyuan/contracts'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -29,6 +31,7 @@ interface DesktopWorkbenchState {
   sessions: AgentSessionSummary[]
   selectedSessionId: string | null
   messages: AgentMessage[]
+  transcript: TranscriptSnapshot | null
   composerText: string
   isLoading: boolean
   isSendingMessage: boolean
@@ -103,6 +106,7 @@ function DesktopRoutes(): React.JSX.Element {
   const [sessions, setSessions] = useState<AgentSessionSummary[]>([])
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<AgentMessage[]>([])
+  const [transcript, setTranscript] = useState<TranscriptSnapshot | null>(null)
   const [composerText, setComposerText] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
@@ -114,6 +118,7 @@ function DesktopRoutes(): React.JSX.Element {
     sessions,
     selectedSessionId,
     messages,
+    transcript,
     composerText,
     isLoading,
     isSendingMessage,
@@ -143,6 +148,7 @@ function DesktopRoutes(): React.JSX.Element {
           (currentSessionId) => currentSessionId ?? workbench.sessions[0]?.sessionId ?? null
         )
         setMessages(workbench.messages)
+        setTranscript(workbench.transcript)
 
         // 启动重定向由 StartupRedirect 组件在根路由 '/' 上处理。
         // 此处不再从任意路由无条件跳转，以保留用户直接访问的深层控制台 URI。
@@ -247,6 +253,13 @@ function DesktopRoutes(): React.JSX.Element {
 
       if (event.type === 'turn-failed') {
         toast.error(event.error.message)
+      }
+
+      if (event.type === 'transcript-delta' && event.sessionId === selectedSessionId) {
+        setTranscript((current) => {
+          if (!current || current.sessionId !== event.sessionId) return current
+          return applyTranscriptDelta(current, event.delta)
+        })
       }
 
       if (
@@ -510,6 +523,7 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   agents: AgentSummary[]
   sessions: AgentSessionSummary[]
   messages: AgentMessage[]
+  transcript: TranscriptSnapshot | null
 }> {
   const runtime = await api.getRuntimeSnapshot()
   const agents = runtime.agents ?? [
@@ -525,7 +539,7 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   ]
 
   if (runtime.status !== 'ready') {
-    return { runtime, agents, sessions: [], messages: [] }
+    return { runtime, agents, sessions: [], messages: [], transcript: null }
   }
 
   const sessions = await api.listSessions()
@@ -545,8 +559,14 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
         sessionId: firstSession.sessionId
       })
     : []
+  const transcript = firstSession
+    ? await api.getTranscript({
+        agentId: firstSession.agentId,
+        sessionId: firstSession.sessionId
+      })
+    : null
 
-  return { runtime, agents, sessions: nextSessions, messages }
+  return { runtime, agents, sessions: nextSessions, messages, transcript }
 }
 
 export default App

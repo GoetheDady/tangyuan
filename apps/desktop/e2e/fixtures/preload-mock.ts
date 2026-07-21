@@ -169,6 +169,21 @@ export function createPreloadApiInitScript(
           return session;
         },
         getMessages: async () => data.messages,
+        getTranscript: async (request) => {
+          const entries = [];
+          let index = 0;
+          for (const msg of data.messages) {
+            if (msg.role === 'user') {
+              entries.push({ kind: 'user-message', index: index++, messageId: msg.messageId, content: msg.content, createdAt: msg.createdAt });
+            } else if (msg.role === 'agent') {
+              entries.push({ kind: 'agent-reply', index: index++, messageId: msg.messageId, content: msg.content, createdAt: msg.createdAt, attempt: null });
+            } else if (msg.role === 'compaction') {
+              entries.push({ kind: 'compaction', index: index++, timestamp: msg.createdAt });
+            }
+          }
+          return { sessionId: request.sessionId, agentId: request.agentId, entries, updatedAt: new Date().toISOString() };
+        },
+        __getMessagesForTranscriptDispatch: () => data.messages,
         sendMessage: async () => data.messages,
         cancelRun: async () => {
           const session = data.sessions[0] || {

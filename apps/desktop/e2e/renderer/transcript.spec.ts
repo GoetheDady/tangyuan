@@ -32,10 +32,16 @@ function createEventDispatcherInitScript(
       window.api = {
         ...originalApi,
         subscribeToAgentEvents: (fn) => {
-          listener = fn;
-          return () => { listener = null; };
+          listener = fn
+          return () => { listener = null; }
         },
-      };
+        getTranscript: async () => ({
+          sessionId: '',
+          agentId: 'tangyuan',
+          entries: [],
+          updatedAt: new Date().toISOString()
+        }),
+      }
 
       window.__dispatchAgentEvent__ = (event) => {
         if (listener) {

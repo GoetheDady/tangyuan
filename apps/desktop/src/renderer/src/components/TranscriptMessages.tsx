@@ -1,4 +1,4 @@
-import type { AgentMessage } from '@tangyuan/contracts'
+import type { AgentMessage, TranscriptEntry, TranscriptSnapshot } from '@tangyuan/contracts'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Sparkles } from 'lucide-react'
 import React, { useEffect, useMemo, useRef } from 'react'
@@ -22,6 +22,16 @@ type RenderItem =
  */
 function isDialogRole(role: string): boolean {
   return role === 'user' || role === 'agent'
+}
+
+/**
+ * 根据对话消息角色判断是否为可展示的对话角色。
+ *
+ * @param kind - transcript 条目类型。
+ * @returns 用户消息或 Agent 回复返回 true。
+ */
+function isDialogKind(kind: TranscriptEntry['kind']): boolean {
+  return kind === 'user-message' || kind === 'agent-reply'
 }
 
 /**
@@ -53,11 +63,60 @@ function buildRenderItems(messages: AgentMessage[], isStreaming: boolean): Rende
 }
 
 /**
+ * 从结构化 TranscriptEntry 列表构建虚拟列表渲染项。
+ *
+ * @param entries - 结构化 transcript 条目列表。
+ * @param isStreaming - 是否正在流式传输中。
+ * @returns 可传入虚拟列表的 RenderItem 数组。
+ * @throws 此方法不会主动抛出错误。
+ */
+function buildRenderItemsFromTranscript(
+  entries: readonly TranscriptEntry[],
+  isStreaming: boolean
+): RenderItem[] {
+  const dialogCount = entries.filter((e) => isDialogKind(e.kind)).length
+  const items: RenderItem[] = []
+  let dialogIndex = 0
+  let renderIndex = 0
+
+  for (const entry of entries) {
+    if (entry.kind === 'compaction') {
+      items.push({
+        type: 'compaction',
+        timestamp: entry.timestamp,
+        renderIndex: renderIndex++
+      })
+    } else if (isDialogKind(entry.kind)) {
+      const isLastAgent =
+        isStreaming && entry.kind === 'agent-reply' && dialogIndex === dialogCount - 1
+      items.push({
+        type: 'message',
+        message: {
+          messageId: entry.messageId,
+          agentId: '',
+          sessionId: '',
+          role: entry.kind === 'user-message' ? 'user' : 'agent',
+          content: entry.content,
+          createdAt: entry.createdAt
+        },
+        isLastAgent,
+        renderIndex: renderIndex++
+      })
+      dialogIndex++
+    }
+  }
+
+  return items
+}
+
+/**
  * TranscriptMessages 组件的属性。
  */
 export interface TranscriptMessagesProps {
   /** 当前会话的全部消息（含 system/compaction）。 */
   messages: AgentMessage[]
+  /** 结构化会话快照；提供时优先于 messages 使用。 */
+  transcript?: TranscriptSnapshot | null
   /** 是否正在流式接收 Agent 回复。 */
   isStreaming: boolean
   /** 当前选中会话的标识；为 null 时不展示消息。 */
@@ -81,6 +140,7 @@ export interface TranscriptMessagesProps {
  */
 export function TranscriptMessages({
   messages,
+  transcript,
   isStreaming,
   sessionId
 }: TranscriptMessagesProps): React.JSX.Element {
@@ -89,8 +149,11 @@ export function TranscriptMessages({
   const prevSessionIdRef = useRef(sessionId)
 
   const renderItems = useMemo(
-    () => buildRenderItems(messages, isStreaming),
-    [messages, isStreaming]
+    () =>
+      transcript && transcript.entries.length > 0
+        ? buildRenderItemsFromTranscript(transcript.entries, isStreaming)
+        : buildRenderItems(messages, isStreaming),
+    [messages, transcript, isStreaming]
   )
 
   const virtualizer = useVirtualizer({

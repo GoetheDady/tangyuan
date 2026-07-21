@@ -47,6 +47,12 @@ describe('App', () => {
         })
       ),
       getMessages: vi.fn().mockResolvedValue([]),
+      getTranscript: vi.fn().mockResolvedValue({
+        sessionId: '',
+        agentId: 'tangyuan',
+        entries: [],
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }),
       sendMessage: vi.fn().mockResolvedValue([
         {
           messageId: 'message-1',
@@ -321,6 +327,12 @@ describe('App', () => {
         listSessions: vi.fn().mockResolvedValue([]),
         createSession: vi.fn(),
         getMessages: vi.fn().mockResolvedValue([]),
+        getTranscript: vi.fn().mockResolvedValue({
+          sessionId: '',
+          agentId: 'tangyuan',
+          entries: [],
+          updatedAt: '2026-01-01T00:00:00.000Z'
+        }),
         sendMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
@@ -400,6 +412,12 @@ describe('App', () => {
           })
         ),
         getMessages: vi.fn().mockResolvedValue([]),
+        getTranscript: vi.fn().mockResolvedValue({
+          sessionId: '',
+          agentId: 'tangyuan',
+          entries: [],
+          updatedAt: '2026-01-01T00:00:00.000Z'
+        }),
         sendMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
@@ -482,6 +500,12 @@ describe('App', () => {
         ]),
         createSession: vi.fn(),
         getMessages: vi.fn().mockResolvedValue([]),
+        getTranscript: vi.fn().mockResolvedValue({
+          sessionId: '',
+          agentId: 'tangyuan',
+          entries: [],
+          updatedAt: '2026-01-01T00:00:00.000Z'
+        }),
         sendMessage: vi.fn().mockResolvedValue([
           {
             messageId: 'message-1',
@@ -603,6 +627,12 @@ describe('App', () => {
         ]),
         createSession: vi.fn(),
         getMessages: vi.fn().mockResolvedValue([]),
+        getTranscript: vi.fn().mockResolvedValue({
+          sessionId: '',
+          agentId: 'tangyuan',
+          entries: [],
+          updatedAt: '2026-01-01T00:00:00.000Z'
+        }),
         sendMessage: vi.fn(async () => {
           for (const listener of listeners) {
             listener({
@@ -755,6 +785,12 @@ describe('App', () => {
             createdAt: '2026-07-08T00:00:02.000Z'
           }
         ] satisfies AgentMessage[]),
+        getTranscript: vi.fn().mockResolvedValue({
+          sessionId: '',
+          agentId: 'tangyuan',
+          entries: [],
+          updatedAt: '2026-01-01T00:00:00.000Z'
+        }),
         sendMessage: vi.fn(),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
@@ -843,6 +879,12 @@ describe('App', () => {
             createdAt: '2026-07-08T00:00:00.000Z'
           }
         ] satisfies AgentMessage[]),
+        getTranscript: vi.fn().mockResolvedValue({
+          sessionId: '',
+          agentId: 'tangyuan',
+          entries: [],
+          updatedAt: '2026-01-01T00:00:00.000Z'
+        }),
         sendMessage: vi.fn(),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
@@ -934,6 +976,12 @@ describe('App', () => {
             createdAt: '2026-07-08T00:00:00.000Z'
           }
         ] satisfies AgentMessage[]),
+        getTranscript: vi.fn().mockResolvedValue({
+          sessionId: '',
+          agentId: 'tangyuan',
+          entries: [],
+          updatedAt: '2026-01-01T00:00:00.000Z'
+        }),
         sendMessage: vi.fn(),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),

@@ -37,6 +37,12 @@ describe('registerDesktopAppIpc', () => {
       listSessions: vi.fn().mockResolvedValue([session]),
       createSession: vi.fn().mockResolvedValue(session),
       getMessages: vi.fn().mockResolvedValue([]),
+      getTranscript: vi.fn().mockResolvedValue({
+        sessionId: 'session-1',
+        agentId: 'tangyuan',
+        entries: [],
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }),
       sendMessage: vi.fn().mockResolvedValue([]),
       cancelRun: vi.fn().mockResolvedValue(session),
       subscribe: vi.fn(),
@@ -137,7 +143,7 @@ describe('registerDesktopAppIpc', () => {
 
     registerDesktopAppIpc(ipcMain, runtime, broadcastAgentEvent, openExternalLink)
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(37)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(38)
     expect(broadcastAgentEvent).toHaveBeenCalledWith(createTurnStartedEvent())
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
@@ -298,6 +304,12 @@ describe('registerDesktopAppIpc', () => {
       listSessions: vi.fn().mockResolvedValue([]),
       createSession: vi.fn(),
       getMessages: vi.fn().mockResolvedValue([]),
+      getTranscript: vi.fn().mockResolvedValue({
+        sessionId: 'session-1',
+        agentId: 'tangyuan',
+        entries: [],
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }),
       sendMessage: vi.fn().mockResolvedValue([]),
       cancelRun: vi.fn(),
       subscribe: vi.fn(),

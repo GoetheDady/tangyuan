@@ -47,6 +47,7 @@ describe('createTangyuanPreloadApi', () => {
       'getSessionModelInfo',
       'getSkillInstallRecords',
       'getSoul',
+      'getTranscript',
       'getUserProfile',
       'installSkill',
       'listAgentSkills',
@@ -83,6 +84,7 @@ describe('createTangyuanPreloadApi', () => {
     await api.listSessions()
     await api.createSession({ agentId: 'tangyuan', title: '新会话' })
     await api.getMessages({ agentId: 'tangyuan', sessionId: 'session-1' })
+    await api.getTranscript({ agentId: 'tangyuan', sessionId: 'session-1' })
     await api.sendMessage({
       agentId: 'tangyuan',
       sessionId: 'session-1',
@@ -158,6 +160,13 @@ describe('createTangyuanPreloadApi', () => {
       ],
       [
         DESKTOP_IPC_CHANNELS.sessionsGetMessages,
+        {
+          agentId: 'tangyuan',
+          sessionId: 'session-1'
+        }
+      ],
+      [
+        DESKTOP_IPC_CHANNELS.sessionsGetTranscript,
         {
           agentId: 'tangyuan',
           sessionId: 'session-1'
