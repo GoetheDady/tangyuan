@@ -309,6 +309,32 @@ export function registerDesktopAppIpc(
     )
   })
 
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsAnswerClarification, async (_event, payload) => {
+    const { clarificationId, answer } = parseDesktopIpcRequest(
+      DESKTOP_IPC_CHANNELS.sessionsAnswerClarification,
+      payload
+    )
+    await runtime.answerClarification(clarificationId, answer)
+    return parseDesktopIpcResponse(DESKTOP_IPC_CHANNELS.sessionsAnswerClarification, undefined)
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsCancelClarification, async (_event, payload) => {
+    const { clarificationId } = parseDesktopIpcRequest(
+      DESKTOP_IPC_CHANNELS.sessionsCancelClarification,
+      payload
+    )
+    await runtime.cancelClarification(clarificationId)
+    return parseDesktopIpcResponse(DESKTOP_IPC_CHANNELS.sessionsCancelClarification, undefined)
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications,
+      runtime.getPendingClarifications()
+    )
+  })
+
   ipcMain.handle(DESKTOP_IPC_CHANNELS.skillsInstall, async (_event, payload) => {
     return parseDesktopIpcResponse(
       DESKTOP_IPC_CHANNELS.skillsInstall,

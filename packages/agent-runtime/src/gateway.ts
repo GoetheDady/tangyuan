@@ -345,6 +345,74 @@ export class RealPiSdkGateway implements PiSdkGateway {
           }
         },
       })
+
+      // 自定义单问题澄清工具
+      customTools.push({
+        name: 'ask_clarification',
+        label: '询问用户（单问题澄清）',
+        description:
+          '向用户提出一个需要选择或回答的问题。每次只提一个问题，支持 2–5 个预设选项和可选的"其他"自由输入。后续问题通过新的 tool call 依次提出。',
+        promptSnippet:
+          'ask_clarification(question: string, options: string[], allowCustomAnswer?: boolean) → 用户选择的答案',
+        promptGuidelines: [
+          '每次只提一个问题，不要在一个 tool call 中提多个问题',
+          '选项数量应在 2–5 个之间',
+          '如果预设选项不足以覆盖用户可能的需求，设置 allowCustomAnswer 为 true',
+          '用户回答后将立即从断点继续执行',
+        ],
+        parameters: {
+          type: 'object',
+          properties: {
+            question: { type: 'string', minLength: 1 },
+            options: {
+              type: 'array',
+              items: { type: 'string', minLength: 1 },
+              minItems: 2,
+              maxItems: 5,
+            },
+            allowCustomAnswer: { type: 'boolean', default: false },
+          },
+          required: ['question', 'options'],
+          additionalProperties: false,
+        },
+        async execute(
+          _toolCallId: string,
+          params: {
+            question: string
+            options: string[]
+            allowCustomAnswer?: boolean
+          },
+        ) {
+          const result = await approvalGateway.requestClarification({
+            agentId: approvalRunContext.agentId || 'tangyuan',
+            sessionId: approvalRunContext.sessionId,
+            runId: '',
+            question: params.question,
+            options: params.options,
+            allowCustomAnswer: params.allowCustomAnswer ?? false,
+          })
+
+          if (!result.answer) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: '用户取消了本次澄清。',
+                },
+              ],
+            }
+          }
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `用户回答：${result.answer}`,
+              },
+            ],
+          }
+        },
+      })
     }
 
     // 使用 excludedToolNames 排除内置工具（当存在审批网关时由自定义工具接管）

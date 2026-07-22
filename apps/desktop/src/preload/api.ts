@@ -2,8 +2,10 @@ import {
   DESKTOP_AGENT_EVENT_CHANNEL,
   DESKTOP_IPC_CHANNELS,
   type AgentEventListener,
+  type AnswerClarificationRequest,
   type ApproveBashRequest,
   type ArchiveAgentRequest,
+  type CancelClarificationRequest,
   type CancelRunRequest,
   type ClaimAgentDirectoryRequest,
   type CreateSessionRequest,
@@ -24,6 +26,7 @@ import {
   type SendMessageRequest,
   type SetSessionModelRequest,
   type SetSessionThinkingLevelRequest,
+  type QuestionClarificationRequest,
   type SkillOperationParams,
   type UpdateAgentConfigRequest,
   type UpdateSoulRequest,
@@ -180,6 +183,15 @@ export function createTangyuanPreloadApi(
     },
     getPendingApprovals: async () => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals)
+    },
+    answerClarification: async (request: AnswerClarificationRequest) => {
+      await invoke(DESKTOP_IPC_CHANNELS.sessionsAnswerClarification, request)
+    },
+    cancelClarification: async (request: CancelClarificationRequest) => {
+      await invoke(DESKTOP_IPC_CHANNELS.sessionsCancelClarification, request)
+    },
+    getPendingClarifications: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications)
     }
   }
 }

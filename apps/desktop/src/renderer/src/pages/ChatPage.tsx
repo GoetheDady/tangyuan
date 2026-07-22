@@ -5,6 +5,7 @@ import type {
   AgentSummary,
   BashApprovalRequest,
   ModelDescriptor,
+  QuestionClarificationRequest,
   RuntimeSnapshot,
   SessionModelInfo,
   TranscriptSnapshot
@@ -15,6 +16,7 @@ import { Navigate, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 
 import { BashApprovalCard } from '@/components/BashApprovalCard'
+import { QuestionClarificationCard } from '@/components/QuestionClarificationCard'
 import { Button } from '@/components/ui/button'
 import { Composer } from '@/components/Composer'
 import { Separator } from '@/components/ui/separator'
@@ -31,6 +33,7 @@ interface DesktopWorkbenchState {
   isLoading: boolean
   isSendingMessage: boolean
   pendingApprovals: BashApprovalRequest[]
+  pendingClarifications: QuestionClarificationRequest[]
 }
 
 interface DesktopWorkbenchAction {
@@ -48,6 +51,11 @@ interface DesktopWorkbenchAction {
   setIsSendingMessage(value: boolean): void
   setPendingApprovals(
     value: BashApprovalRequest[] | ((currentValue: BashApprovalRequest[]) => BashApprovalRequest[])
+  ): void
+  setPendingClarifications(
+    value:
+      | QuestionClarificationRequest[]
+      | ((currentValue: QuestionClarificationRequest[]) => QuestionClarificationRequest[])
   ): void
   /** 将命令加入当前会话的"始终允许"列表。 */
   addAlwaysAllowedCommand(sessionId: string, command: string): void
@@ -498,6 +506,37 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                       }}
                       onReject={async (approvalId) => {
                         await window.api.rejectBash({ approvalId })
+                      }}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* 澄清卡片区域 */}
+          {selectedSession && context.pendingClarifications.length > 0 && (
+            <div className="border-t bg-muted/20 px-8 py-4">
+              <div className="mx-auto space-y-3">
+                {context.pendingClarifications
+                  .filter(
+                    (c) =>
+                      c.sessionId === selectedSession.sessionId &&
+                      c.status === 'pending'
+                  )
+                  .map((clarification) => (
+                    <QuestionClarificationCard
+                      key={clarification.clarificationId}
+                      clarification={clarification}
+                      onAnswer={async (clarificationId, answer) => {
+                        await window.api.answerClarification({
+                          clarificationId,
+                          answer
+                        })
+                      }}
+                      onCancel={async (clarificationId) => {
+                        await window.api.cancelClarification({
+                          clarificationId
+                        })
                       }}
                     />
                   ))}

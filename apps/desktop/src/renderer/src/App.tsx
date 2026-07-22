@@ -5,6 +5,7 @@ import type {
   AgentSummary,
   BashApprovalRequest,
   DesktopPreloadApi,
+  QuestionClarificationRequest,
   RuntimeSnapshot,
   TranscriptSnapshot
 } from '@tangyuan/contracts'
@@ -36,6 +37,7 @@ interface DesktopWorkbenchState {
   isLoading: boolean
   isSendingMessage: boolean
   pendingApprovals: BashApprovalRequest[]
+  pendingClarifications: QuestionClarificationRequest[]
 }
 
 interface DesktopWorkbenchAction {
@@ -53,6 +55,11 @@ interface DesktopWorkbenchAction {
   setIsSendingMessage(value: boolean): void
   setPendingApprovals(
     value: BashApprovalRequest[] | ((currentValue: BashApprovalRequest[]) => BashApprovalRequest[])
+  ): void
+  setPendingClarifications(
+    value:
+      | QuestionClarificationRequest[]
+      | ((currentValue: QuestionClarificationRequest[]) => QuestionClarificationRequest[])
   ): void
   /** 将命令加入当前会话的"始终允许"列表。 */
   addAlwaysAllowedCommand(sessionId: string, command: string): void
@@ -113,6 +120,9 @@ function DesktopRoutes(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(true)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [pendingApprovals, setPendingApprovals] = useState<BashApprovalRequest[]>([])
+  const [pendingClarifications, setPendingClarifications] = useState<
+    QuestionClarificationRequest[]
+  >([])
   const alwaysAllowedCommandsRef = useRef<Map<string, Set<string>>>(new Map())
 
   /**
@@ -142,6 +152,7 @@ function DesktopRoutes(): React.JSX.Element {
     isLoading,
     isSendingMessage,
     pendingApprovals,
+    pendingClarifications,
     setRuntime,
     setAgents,
     setSessions,
@@ -151,6 +162,7 @@ function DesktopRoutes(): React.JSX.Element {
     setIsLoading,
     setIsSendingMessage,
     setPendingApprovals,
+    setPendingClarifications,
     addAlwaysAllowedCommand
   }
 
@@ -265,6 +277,27 @@ function DesktopRoutes(): React.JSX.Element {
           toast.success('已批准 Bash 命令执行')
         } else {
           toast.info('已拒绝 Bash 命令执行')
+        }
+        return
+      }
+
+      if (event.type === 'clarification-required') {
+        setPendingClarifications((current) => [
+          ...current,
+          event.clarification
+        ])
+        toast.info(`Agent 需要更多信息：${event.clarification.question.slice(0, 60)}...`)
+        return
+      }
+
+      if (event.type === 'clarification-resolved') {
+        setPendingClarifications((current) =>
+          current.filter((c) => c.clarificationId !== event.clarificationId)
+        )
+        if (event.status === 'answered') {
+          toast.success(`已回答：${event.answer}`)
+        } else {
+          toast.info('已取消澄清')
         }
         return
       }

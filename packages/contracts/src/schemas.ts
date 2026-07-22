@@ -391,6 +391,24 @@ export const agentActivitySchema = z.strictObject({
 })
 
 /**
+ * 校验问题澄清请求。
+ */
+export const questionClarificationRequestSchema = z.strictObject({
+  clarificationId: nonEmptyIdentifierSchema,
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+  runId: nonEmptyIdentifierSchema,
+  question: z.string().min(1),
+  options: z
+    .array(z.string().min(1))
+    .min(2)
+    .max(5),
+  allowCustomAnswer: z.boolean(),
+  status: z.enum(['pending', 'answered', 'cancelled']),
+  createdAt: timestampSchema,
+})
+
+/**
  * 校验 Bash 审批请求。
  */
 export const bashApprovalRequestSchema = z.strictObject({
@@ -570,6 +588,22 @@ export const agentEventSchema = z.discriminatedUnion('type', [
     sessionId: nonEmptyIdentifierSchema,
     approvalId: nonEmptyIdentifierSchema,
     status: z.enum(['approved', 'rejected']),
+    occurredAt: timestampSchema,
+  }),
+  z.strictObject({
+    type: z.literal('clarification-required'),
+    agentId: nonEmptyIdentifierSchema,
+    sessionId: nonEmptyIdentifierSchema,
+    clarification: questionClarificationRequestSchema,
+    occurredAt: timestampSchema,
+  }),
+  z.strictObject({
+    type: z.literal('clarification-resolved'),
+    agentId: nonEmptyIdentifierSchema,
+    sessionId: nonEmptyIdentifierSchema,
+    clarificationId: nonEmptyIdentifierSchema,
+    answer: z.string(),
+    status: z.enum(['answered', 'cancelled']),
     occurredAt: timestampSchema,
   }),
   z.strictObject({
@@ -814,6 +848,21 @@ export const approveBashRequestSchema = z.strictObject({
  */
 export const rejectBashRequestSchema = z.strictObject({
   approvalId: nonEmptyIdentifierSchema,
+})
+
+/**
+ * 校验提交澄清答案的请求。
+ */
+export const answerClarificationRequestSchema = z.strictObject({
+  clarificationId: nonEmptyIdentifierSchema,
+  answer: z.string().min(1),
+})
+
+/**
+ * 校验取消澄清的请求。
+ */
+export const cancelClarificationRequestSchema = z.strictObject({
+  clarificationId: nonEmptyIdentifierSchema,
 })
 
 /**

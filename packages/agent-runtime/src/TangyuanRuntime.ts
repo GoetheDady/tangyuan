@@ -17,6 +17,7 @@ import {
   type AgentSummary,
   type BashApprovalRequest,
   type CancelConfigurationVerificationRequest,
+  type QuestionClarificationRequest,
   type CancelRunRequest,
   type CreateSessionRequest,
   type GetSessionMessagesRequest,
@@ -77,6 +78,13 @@ class DefaultTangyuanRuntime {
     {
       request: SkillApprovalRequest
       resolve: (result: { approved: boolean }) => void
+    }
+  >()
+  private readonly pendingClarifications = new Map<
+    string,
+    {
+      request: QuestionClarificationRequest
+      resolve: (result: { answer: string }) => void
     }
   >()
 
@@ -899,6 +907,86 @@ class DefaultTangyuanRuntime {
   }
 
   /**
+   * 提交澄清问题的答案，使 Agent 从断点继续执行。
+   *
+   * @param clarificationId - 澄清标识。
+   * @param answer - 用户选择的答案（预设选项或自定义输入）。
+   * @returns 无返回值。
+   * @throws 当澄清不存在或已过期时抛出错误。
+   */
+  async answerClarification(
+    clarificationId: string,
+    answer: string,
+  ): Promise<void> {
+    const entry = this.pendingClarifications.get(clarificationId)
+
+    if (!entry) {
+      throw new Error(
+        `找不到澄清请求 ${clarificationId}，可能已过期或已被处理。`,
+      )
+    }
+
+    this.pendingClarifications.delete(clarificationId)
+    const now = new Date().toISOString()
+
+    this.emit({
+      type: 'clarification-resolved',
+      agentId: entry.request.agentId,
+      sessionId: entry.request.sessionId,
+      clarificationId,
+      answer,
+      status: 'answered',
+      occurredAt: now,
+    })
+
+    entry.resolve({ answer })
+  }
+
+  /**
+   * 取消澄清问题，以取消结果结束工具调用。
+   *
+   * @param clarificationId - 澄清标识。
+   * @returns 无返回值。
+   * @throws 当澄清不存在或已过期时抛出错误。
+   */
+  async cancelClarification(clarificationId: string): Promise<void> {
+    const entry = this.pendingClarifications.get(clarificationId)
+
+    if (!entry) {
+      throw new Error(
+        `找不到澄清请求 ${clarificationId}，可能已过期或已被处理。`,
+      )
+    }
+
+    this.pendingClarifications.delete(clarificationId)
+    const now = new Date().toISOString()
+
+    this.emit({
+      type: 'clarification-resolved',
+      agentId: entry.request.agentId,
+      sessionId: entry.request.sessionId,
+      clarificationId,
+      answer: '',
+      status: 'cancelled',
+      occurredAt: now,
+    })
+
+    entry.resolve({ answer: '' })
+  }
+
+  /**
+   * 读取所有待回答的澄清请求。
+   *
+   * @returns 待回答澄清请求列表。
+   * @throws 此方法不会主动抛出错误。
+   */
+  getPendingClarifications(): QuestionClarificationRequest[] {
+    return [...this.pendingClarifications.values()].map(
+      (entry) => entry.request,
+    )
+  }
+
+  /**
    * 安装或更新 Skill（含权限校验和审批）。
    *
    * @param params - 操作参数。
@@ -1158,6 +1246,34 @@ class DefaultTangyuanRuntime {
 
       validateFilePath: (params) => {
         return this.validateFilePath(params)
+      },
+
+      requestClarification: async (params) => {
+        const clarificationId = crypto.randomUUID()
+        const now = new Date().toISOString()
+        const request: QuestionClarificationRequest = {
+          clarificationId,
+          agentId: params.agentId,
+          sessionId: params.sessionId,
+          runId: params.runId,
+          question: params.question,
+          options: params.options,
+          allowCustomAnswer: params.allowCustomAnswer,
+          status: 'pending',
+          createdAt: now,
+        }
+
+        return new Promise<{ answer: string }>((resolve) => {
+          this.pendingClarifications.set(clarificationId, { request, resolve })
+
+          this.emit({
+            type: 'clarification-required',
+            agentId: params.agentId,
+            sessionId: params.sessionId,
+            clarification: request,
+            occurredAt: now,
+          })
+        })
       },
     }
   }
@@ -1511,6 +1627,32 @@ class DefaultTangyuanRuntime {
     }
 
     this.pendingApprovals.clear()
+    this.cancelAllPendingClarifications()
+  }
+
+  /**
+   * 自动取消所有待回答的澄清（用于应用退出/全部取消场景）。
+   *
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private cancelAllPendingClarifications(): void {
+    const now = new Date().toISOString()
+
+    for (const [clarificationId, entry] of this.pendingClarifications) {
+      this.emit({
+        type: 'clarification-resolved',
+        agentId: entry.request.agentId,
+        sessionId: entry.request.sessionId,
+        clarificationId,
+        answer: '',
+        status: 'cancelled',
+        occurredAt: now,
+      })
+      entry.resolve({ answer: '' })
+    }
+
+    this.pendingClarifications.clear()
   }
 
   /**
@@ -1538,6 +1680,26 @@ class DefaultTangyuanRuntime {
       })
       entry.resolve({ approved: false })
       this.pendingApprovals.delete(approvalId)
+    }
+
+    // 同时取消该 session 的所有待回答澄清
+    for (const [clarificationId, clarificationEntry] of this
+      .pendingClarifications) {
+      if (clarificationEntry.request.sessionId !== sessionId) {
+        continue
+      }
+
+      this.emit({
+        type: 'clarification-resolved',
+        agentId: clarificationEntry.request.agentId,
+        sessionId: clarificationEntry.request.sessionId,
+        clarificationId,
+        answer: '',
+        status: 'cancelled',
+        occurredAt: now,
+      })
+      clarificationEntry.resolve({ answer: '' })
+      this.pendingClarifications.delete(clarificationId)
     }
   }
 
@@ -1664,6 +1826,9 @@ export type TangyuanRuntime = Pick<
   | 'approveBash'
   | 'rejectBash'
   | 'getPendingApprovals'
+  | 'answerClarification'
+  | 'cancelClarification'
+  | 'getPendingClarifications'
   | 'createToolApprovalGateway'
   | 'installSkill'
   | 'deleteSkill'

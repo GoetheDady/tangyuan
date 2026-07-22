@@ -135,6 +135,12 @@ export function createTangyuanRuntime(
         }
         return gatewayInstance.validateFilePath(params)
       },
+      requestClarification: (params) => {
+        if (!gatewayInstance) {
+          return Promise.resolve({ answer: '' })
+        }
+        return gatewayInstance.requestClarification(params)
+      },
     },
   })
 
@@ -201,6 +207,22 @@ export interface ToolApprovalGateway {
     path: string
     operation: 'read' | 'write' | 'edit'
   }): { allowed: boolean; reason?: string }
+
+  /**
+   * 请求用户回答一个问题澄清。
+   *
+   * @param params - 澄清所需上下文（Agent、session、run、问题、选项、是否允许自定义答案）。
+   * @returns 用户回答后 resolve `{ answer: string }`，取消后 answer 为空字符串。
+   * @throws 此方法不会主动抛出错误。
+   */
+  requestClarification(params: {
+    agentId: string
+    sessionId: string
+    runId: string
+    question: string
+    options: string[]
+    allowCustomAnswer: boolean
+  }): Promise<{ answer: string }>
 }
 
 /**

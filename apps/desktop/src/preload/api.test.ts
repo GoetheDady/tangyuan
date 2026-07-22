@@ -32,9 +32,11 @@ describe('createTangyuanPreloadApi', () => {
     const api = createTangyuanPreloadApi(invoke, subscribe)
 
     expect(Object.keys(api).sort()).toEqual([
+      'answerClarification',
       'approveBash',
       'approveSkillOperation',
       'archiveAgent',
+      'cancelClarification',
       'cancelRun',
       'cancelRuntimeConfigurationVerification',
       'claimAgentDirectory',
@@ -42,6 +44,7 @@ describe('createTangyuanPreloadApi', () => {
       'deleteSkill',
       'getMessages',
       'getPendingApprovals',
+      'getPendingClarifications',
       'getPendingSkillApprovals',
       'getRuntimeSnapshot',
       'getSessionModelInfo',

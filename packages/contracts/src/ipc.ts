@@ -2,8 +2,10 @@ import { z } from 'zod'
 import {
   agentMessageSchema,
   agentSessionSummarySchema,
+  answerClarificationRequestSchema,
   approveBashRequestSchema,
   archiveAgentRequestSchema,
+  cancelClarificationRequestSchema,
   cancelConfigurationVerificationRequestSchema,
   cancelRunRequestSchema,
   claimAgentDirectoryRequestSchema,
@@ -32,6 +34,7 @@ import {
   updateUserProfileRequestSchema,
   userProfileContentSchema,
   bashApprovalRequestSchema,
+  questionClarificationRequestSchema,
   skillApprovalRequestSchema,
   skillInstallRecordSchema,
   skillSummarySchema,
@@ -41,9 +44,11 @@ import type {
   AgentMessage,
   AgentSessionSummary,
   AgentSummary,
+  AnswerClarificationRequest,
   ApproveBashRequest,
   ArchiveAgentRequest,
   BashApprovalRequest,
+  CancelClarificationRequest,
   CancelConfigurationVerificationRequest,
   CancelRunRequest,
   ClaimAgentDirectoryRequest,
@@ -54,6 +59,7 @@ import type {
   ListAgentSkillsRequest,
   OpenExternalLinkRequest,
   ProfileMaintenanceResult,
+  QuestionClarificationRequest,
   RecoverAgentRequest,
   RejectBashRequest,
   RetryRunRequest,
@@ -115,6 +121,9 @@ export const DESKTOP_IPC_CHANNELS = {
   sessionsApproveBash: 'tangyuan:sessions:approve-bash',
   sessionsRejectBash: 'tangyuan:sessions:reject-bash',
   sessionsGetPendingApprovals: 'tangyuan:sessions:get-pending-approvals',
+  sessionsAnswerClarification: 'tangyuan:sessions:answer-clarification',
+  sessionsCancelClarification: 'tangyuan:sessions:cancel-clarification',
+  sessionsGetPendingClarifications: 'tangyuan:sessions:get-pending-clarifications',
   sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
   sessionsRetryMessage: 'tangyuan:sessions:retry-message',
 } as const
@@ -171,6 +180,9 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.sessionsApproveBash]: ApproveBashRequest
   [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: RejectBashRequest
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: undefined
+  [DESKTOP_IPC_CHANNELS.sessionsAnswerClarification]: AnswerClarificationRequest
+  [DESKTOP_IPC_CHANNELS.sessionsCancelClarification]: CancelClarificationRequest
+  [DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: GetSessionMessagesRequest
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: RetryRunRequest
 }
@@ -218,6 +230,9 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsApproveBash]: approveBashRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: rejectBashRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: z.undefined(),
+  [DESKTOP_IPC_CHANNELS.sessionsAnswerClarification]: answerClarificationRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsCancelClarification]: cancelClarificationRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: getSessionMessagesRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: retryRunRequestSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
@@ -283,6 +298,9 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsApproveBash]: void
   [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: void
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: BashApprovalRequest[]
+  [DESKTOP_IPC_CHANNELS.sessionsAnswerClarification]: void
+  [DESKTOP_IPC_CHANNELS.sessionsCancelClarification]: void
+  [DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications]: QuestionClarificationRequest[]
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: TranscriptSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: AgentMessage[]
 }
@@ -410,6 +428,11 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: z.void(),
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: z.array(
     bashApprovalRequestSchema,
+  ),
+  [DESKTOP_IPC_CHANNELS.sessionsAnswerClarification]: z.void(),
+  [DESKTOP_IPC_CHANNELS.sessionsCancelClarification]: z.void(),
+  [DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications]: z.array(
+    questionClarificationRequestSchema,
   ),
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: transcriptSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: z.array(agentMessageSchema),
@@ -817,4 +840,30 @@ export interface DesktopPreloadApi {
    * @throws 此方法不会主动抛出错误。
    */
   getPendingApprovals(): Promise<BashApprovalRequest[]>
+
+  /**
+   * 提交澄清问题的答案。
+   *
+   * @param request - 澄清标识和用户答案。
+   * @returns 无返回值。
+   * @throws 当澄清不存在或已过期时，Promise 会 reject。
+   */
+  answerClarification(request: AnswerClarificationRequest): Promise<void>
+
+  /**
+   * 取消澄清问题。
+   *
+   * @param request - 澄清标识。
+   * @returns 无返回值。
+   * @throws 当澄清不存在或已过期时，Promise 会 reject。
+   */
+  cancelClarification(request: CancelClarificationRequest): Promise<void>
+
+  /**
+   * 读取所有待回答的澄清问题。
+   *
+   * @returns 待回答澄清请求列表。
+   * @throws 此方法不会主动抛出错误。
+   */
+  getPendingClarifications(): Promise<QuestionClarificationRequest[]>
 }
