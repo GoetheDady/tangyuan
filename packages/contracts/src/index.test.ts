@@ -330,6 +330,7 @@ describe('DESKTOP_IPC_CHANNELS', () => {
       sessionsRejectBash: 'tangyuan:sessions:reject-bash',
       sessionsGetPendingApprovals: 'tangyuan:sessions:get-pending-approvals',
       sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
+      sessionsRetryMessage: 'tangyuan:sessions:retry-message',
       agentsArchive: 'tangyuan:agents:archive',
       agentsClaimDirectory: 'tangyuan:agents:claim-directory',
       agentsList: 'tangyuan:agents:list',

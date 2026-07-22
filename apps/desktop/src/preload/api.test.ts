@@ -63,6 +63,7 @@ describe('createTangyuanPreloadApi', () => {
       'rejectSkillOperation',
       'resetConfiguration',
       'restoreFromBackup',
+      'retryMessage',
       'saveRuntimeConfiguration',
       'sendMessage',
       'setSessionModel',

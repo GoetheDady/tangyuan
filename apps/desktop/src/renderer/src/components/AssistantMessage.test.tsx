@@ -248,7 +248,7 @@ describe('AssistantMessage', () => {
 
     render(<AssistantMessage entry={entry} isStreaming={false} />)
 
-    expect(screen.getByText('执行失败')).toBeInTheDocument()
+    expect(screen.getAllByText('执行失败').length).toBeGreaterThan(0)
   })
 
   it('falls back to plain text bubble when turns are empty', () => {

@@ -50,6 +50,8 @@ export interface ExecutionAttempt {
   startedAt: string
   /** 执行结束时间；未结束时为 null。 */
   completedAt: string | null
+  /** 失败或取消时的错误信息；成功和运行中时为 undefined。 */
+  error?: AgentRuntimeErrorPayload
 }
 
 /**
@@ -145,6 +147,8 @@ export interface AgentReplyEntry {
   readonly attempt: ExecutionAttempt | null
   /** 本次 attempt 中的所有 turn；旧 transcript 中为空数组。 */
   readonly turns: RunTurn[]
+  /** 关联的用户消息标识，用于多尝试重试场景；重试时不重复产生 UserMessage。 */
+  readonly inReplyTo?: string
 }
 
 /**
@@ -327,6 +331,8 @@ export type AgentEvent =
       type: 'message-appended'
       agentId: AgentId
       message: AgentMessage
+      /** 可选：关联的用户消息标识，用于重试场景标识 inReplyTo。 */
+      inReplyTo?: string
       occurredAt: string
     }
   | {
@@ -700,6 +706,18 @@ export interface SendMessageRequest {
 export interface CancelRunRequest {
   agentId: AgentId
   sessionId: string
+}
+
+/**
+ * 描述重试失败的用户消息时需要的定位信息。
+ *
+ * 重试复用原始用户请求，创建新的执行尝试，不追加重复 UserMessage。
+ */
+export interface RetryRunRequest {
+  agentId: AgentId
+  sessionId: string
+  /** 要重试的原始用户消息标识。 */
+  userMessageId: string
 }
 
 /**

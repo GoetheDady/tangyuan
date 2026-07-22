@@ -71,6 +71,7 @@ describe('App', () => {
           createdAt: '2026-07-08T00:00:00.000Z'
         }
       ]),
+      retryMessage: vi.fn().mockResolvedValue([]),
       cancelRun: vi.fn().mockResolvedValue(
         createDefaultSessionSummary({
           sessionId: 'welcome',
@@ -334,6 +335,7 @@ describe('App', () => {
           updatedAt: '2026-01-01T00:00:00.000Z'
         }),
         sendMessage: vi.fn().mockResolvedValue([]),
+        retryMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
         openExternalLink: vi.fn(),
@@ -419,6 +421,7 @@ describe('App', () => {
           updatedAt: '2026-01-01T00:00:00.000Z'
         }),
         sendMessage: vi.fn().mockResolvedValue([]),
+        retryMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
         openExternalLink: vi.fn(),
@@ -524,6 +527,7 @@ describe('App', () => {
             createdAt: '2026-07-08T00:00:00.000Z'
           }
         ]),
+        retryMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
         openExternalLink: vi.fn(),
@@ -675,6 +679,7 @@ describe('App', () => {
             }
           ] satisfies AgentMessage[]
         }),
+        retryMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn((listener: AgentEventListener) => {
           listeners.push(listener)
@@ -792,6 +797,7 @@ describe('App', () => {
           updatedAt: '2026-01-01T00:00:00.000Z'
         }),
         sendMessage: vi.fn(),
+        retryMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
         openExternalLink: vi.fn(),
@@ -886,6 +892,7 @@ describe('App', () => {
           updatedAt: '2026-01-01T00:00:00.000Z'
         }),
         sendMessage: vi.fn(),
+        retryMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
         openExternalLink: vi.fn(),
@@ -983,6 +990,7 @@ describe('App', () => {
           updatedAt: '2026-01-01T00:00:00.000Z'
         }),
         sendMessage: vi.fn(),
+        retryMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
         openExternalLink: vi.fn(),

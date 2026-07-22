@@ -139,6 +139,14 @@ export function registerDesktopAppIpc(
       )
     )
   })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsRetryMessage, async (_event, payload) => {
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsRetryMessage,
+      await runtime.retryMessage(
+        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsRetryMessage, payload)
+      )
+    )
+  })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.agentsList, async (_event, payload) => {
     parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.agentsList, payload)
     return parseDesktopIpcResponse(DESKTOP_IPC_CHANNELS.agentsList, await runtime.listAgents())

@@ -1,6 +1,7 @@
 import type { AgentEvent, AgentEventListener } from './index'
 import {
   applyTranscriptDelta,
+  type AgentRuntimeErrorPayload,
   type ExecutionAttempt,
   type TranscriptDelta,
   type TranscriptSnapshot,
@@ -110,6 +111,7 @@ export class TranscriptEmitter {
           createdAt: message.createdAt,
           attempt,
           turns: [],
+          ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}),
         },
       }
       this.messageToEntryIndex.set(message.messageId, nextIndex)
@@ -407,6 +409,7 @@ export class TranscriptEmitter {
    * @param runId - 运行标识。
    * @param status - 最终状态。
    * @param occurredAt - 事件时间。
+   * @param error - 失败时的错误信息；取消时为 undefined。
    * @returns 无返回值。
    * @throws 此方法不会主动抛出错误。
    */
@@ -415,16 +418,23 @@ export class TranscriptEmitter {
     runId: string,
     status: 'cancelled' | 'failed',
     occurredAt: string,
+    error?: AgentRuntimeErrorPayload,
   ): void {
     const attempt = this.runToAttempt.get(runId)
     const updatedAttempt: ExecutionAttempt = attempt
-      ? { ...attempt, status, completedAt: occurredAt }
+      ? {
+          ...attempt,
+          status,
+          completedAt: occurredAt,
+          ...(error ? { error } : {}),
+        }
       : {
           attemptId: runId,
           runId,
           status,
           startedAt: occurredAt,
           completedAt: occurredAt,
+          ...(error ? { error } : {}),
         }
 
     // Find the agent-reply entry index for this session

@@ -556,6 +556,20 @@ export interface AgentSessionDriver {
   cancelRun(request: CancelRunRequest): Promise<void>
 
   /**
+   * 重试一条失败的用户消息，复用原始请求并创建新的执行尝试。
+   *
+   * 不会追加重复的 UserMessage，而是创建新的 AgentMessage 和
+   * ExecutionAttempt，通过 AgentEvent 推送运行进度。
+   *
+   * @param request - 会话定位信息和要重试的原始用户消息标识。
+   * @returns 无返回值，运行进度通过 AgentEvent 推送。
+   * @throws 当配置缺失、会话不存在或 SDK 调用失败时，Promise 会 reject。
+   */
+  retryMessage?(
+    request: import('@tangyuan/contracts').RetryRunRequest,
+  ): Promise<void>
+
+  /**
    * 创建一个新 Agent。
    *
    * @param displayName - 新 Agent 的展示名称。
@@ -1455,6 +1469,316 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         runId,
         occurredAt: this.now(),
       })
+    }
+  }
+
+  /**
+   * 重试一条失败的用户消息，复用原始请求并创建新的执行尝试。
+   *
+   * @param request - 会话定位信息和要重试的原始用户消息标识。
+   * @returns 无返回值，运行进度通过 AgentEvent 推送。
+   * @throws 当配置缺失、会话不存在或 SDK 调用失败时，Promise 会 reject。
+   */
+  async retryMessage(
+    request: import('@tangyuan/contracts').RetryRunRequest,
+  ): Promise<void> {
+    await this.ensureSessionLoaded(request.sessionId)
+    const session = this.assertKnownSession(request.sessionId, request.agentId)
+    const handle = await this.ensureSessionHandle(request.sessionId)
+
+    if (
+      this.activeRunIds.has(request.sessionId) ||
+      session.state === 'running'
+    ) {
+      throw new AgentRuntimeError({
+        code: 'run-already-active',
+        message: '当前会话正在运行，请等待完成或先取消本次响应。',
+        recoverable: true,
+      })
+    }
+
+    if (!handle) {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `找不到会话 ${request.sessionId} 的 Pi SDK 运行器。`,
+        recoverable: true,
+      })
+    }
+
+    // 从缓存中查找原始用户消息内容
+    const messages = this.messages.get(request.sessionId) ?? []
+    const userMessage = messages.find(
+      (m) => m.messageId === request.userMessageId && m.role === 'user',
+    )
+
+    if (!userMessage) {
+      // 尝试从 Pi SDK 加载
+      const indexEntry = this.getKnownSessionIndexEntry(request.sessionId)
+      const loadedMessages = await this.gateway.readMessages({
+        sessionId: request.sessionId,
+        sdkSessionFile: indexEntry.sdkSessionFile,
+      })
+      this.messages.set(request.sessionId, loadedMessages)
+      const loadedUserMessage = loadedMessages.find(
+        (m) => m.messageId === request.userMessageId && m.role === 'user',
+      )
+      if (!loadedUserMessage) {
+        throw new AgentRuntimeError({
+          code: 'session-not-found',
+          message: '找不到要重试的原始用户消息。',
+          recoverable: true,
+        })
+      }
+      return this.executeRetry(
+        request,
+        loadedUserMessage.content,
+        session,
+        handle,
+      )
+    }
+
+    return this.executeRetry(request, userMessage.content, session, handle)
+  }
+
+  /**
+   * 执行重试核心逻辑：创建新 AgentMessage 和 ExecutionAttempt，
+   * 发送与原始用户请求相同的 prompt。
+   *
+   * @param request - 重试请求。
+   * @param content - 原始用户消息内容。
+   * @param session - 已确认的会话摘要。
+   * @param handle - Pi SDK 会话运行器。
+   * @returns 无返回值。
+   * @throws 当 SDK 调用失败时，Promise 会 reject。
+   */
+  private async executeRetry(
+    request: import('@tangyuan/contracts').RetryRunRequest,
+    content: string,
+    session: AgentSessionSummary,
+    handle: PiSdkSessionHandle | undefined,
+  ): Promise<void> {
+    if (!handle) {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `找不到会话 ${request.sessionId} 的 Pi SDK 运行器。`,
+        recoverable: true,
+      })
+    }
+
+    if (!content.trim()) {
+      throw new AgentRuntimeError({
+        code: 'unknown',
+        message: '原始用户消息为空，无法重试。',
+        recoverable: true,
+      })
+    }
+
+    const runId = this.createRunId(request.sessionId)
+    const now = this.now()
+
+    // 创建新的 AgentMessage（不创建 UserMessage）
+    const agentMessage = this.appendMessage({
+      agentId: request.agentId,
+      sessionId: request.sessionId,
+      role: 'agent',
+      content: '',
+    })
+
+    this.activeRunIds.set(request.sessionId, runId)
+    this.updateSessionState(session.sessionId, 'running')
+    await this.updateSessionIndexEntry(session.sessionId, {
+      lastMessagePreview: this.createMessagePreview(content),
+      status: 'running',
+      updatedAt: now,
+    })
+
+    this.emit({
+      type: 'turn-started',
+      agentId: request.agentId,
+      sessionId: request.sessionId,
+      runId,
+      occurredAt: now,
+    })
+
+    try {
+      const profileStatusBeforeRun = await this.ensureDefaultAgentHome()
+      const prompt = await this.buildPromptWithProfileContext(
+        content,
+        request.agentId,
+      )
+      let accumulatedReply = ''
+
+      const agentReply = await handle.prompt(prompt, {
+        onEvent: (event) => {
+          if (event.type === 'thinking-started') {
+            this.emit({
+              type: 'activity-updated',
+              agentId: request.agentId,
+              sessionId: request.sessionId,
+              runId,
+              activity: mapPiSdkStreamEventToActivity(event),
+              occurredAt: this.now(),
+            })
+            return
+          }
+
+          if (event.type === 'thinking-delta') {
+            this.emit({
+              type: 'message-delta',
+              agentId: request.agentId,
+              sessionId: request.sessionId,
+              runId,
+              messageId: agentMessage.messageId,
+              delta: event.delta,
+              deltaKind: 'thinking',
+              occurredAt: this.now(),
+            })
+            return
+          }
+
+          if (event.type === 'text-delta') {
+            accumulatedReply += event.delta
+            this.appendMessageDelta(agentMessage.messageId, event.delta)
+            this.emit({
+              type: 'message-delta',
+              agentId: request.agentId,
+              sessionId: request.sessionId,
+              runId,
+              messageId: agentMessage.messageId,
+              delta: event.delta,
+              occurredAt: this.now(),
+            })
+            return
+          }
+
+          this.emit({
+            type: 'activity-updated',
+            agentId: request.agentId,
+            sessionId: request.sessionId,
+            runId,
+            activity: mapPiSdkStreamEventToActivity(event),
+            occurredAt: this.now(),
+          })
+        },
+      })
+
+      if (this.activeRunIds.get(request.sessionId) !== runId) {
+        this.removeMessageIfEmpty(agentMessage.messageId)
+        this.updateSessionState(session.sessionId, 'cancelled')
+        await this.updateSessionIndexEntry(session.sessionId, {
+          status: 'cancelled',
+          updatedAt: this.now(),
+        })
+        return
+      }
+
+      if (!accumulatedReply && agentReply?.trim()) {
+        accumulatedReply = agentReply.trim()
+        this.appendMessageDelta(agentMessage.messageId, accumulatedReply)
+        this.emit({
+          type: 'message-delta',
+          agentId: request.agentId,
+          sessionId: request.sessionId,
+          runId,
+          messageId: agentMessage.messageId,
+          delta: accumulatedReply,
+          occurredAt: this.now(),
+        })
+      }
+
+      const completedMessage = this.completeMessage(agentMessage.messageId)
+      this.emit({
+        type: 'message-completed',
+        agentId: request.agentId,
+        sessionId: request.sessionId,
+        runId,
+        message: completedMessage,
+        occurredAt: this.now(),
+      })
+      this.emit({
+        type: 'message-appended',
+        agentId: request.agentId,
+        message: completedMessage,
+        inReplyTo: request.userMessageId,
+        occurredAt: this.now(),
+      })
+
+      const profileStatusAfterMainReply = await this.emitProfileUpdateEvents(
+        profileStatusBeforeRun,
+        {
+          agentId: request.agentId,
+          sessionId: request.sessionId,
+        },
+      )
+
+      if (profileStatusBeforeRun.initialized) {
+        await this.runProfileMaintenanceTurn({
+          agentId: request.agentId,
+          sessionId: request.sessionId,
+          handle,
+          userContent: content,
+          agentContent: completedMessage.content,
+          profileStatus: profileStatusAfterMainReply,
+        })
+      } else {
+        await this.performBootstrapCompletionGating()
+      }
+
+      this.updateSessionState(session.sessionId, 'completed')
+      await this.updateSessionIndexEntry(session.sessionId, {
+        lastMessagePreview: this.createMessagePreview(completedMessage.content),
+        status: 'completed',
+        updatedAt: this.now(),
+      })
+    } catch (error) {
+      if (isAbortError(error) || !this.activeRunIds.has(request.sessionId)) {
+        this.removeMessageIfEmpty(agentMessage.messageId)
+        this.updateSessionState(session.sessionId, 'cancelled')
+        await this.updateSessionIndexEntry(session.sessionId, {
+          status: 'cancelled',
+          updatedAt: this.now(),
+        })
+        this.emit({
+          type: 'turn-cancelled',
+          agentId: request.agentId,
+          sessionId: request.sessionId,
+          runId,
+          occurredAt: this.now(),
+        })
+        return
+      }
+
+      const runtimeError = {
+        code: 'unknown' as const,
+        message: sanitizeErrorMessage(error),
+        recoverable: true,
+      }
+      this.removeMessageIfEmpty(agentMessage.messageId)
+      this.updateSessionState(session.sessionId, 'failed')
+      await this.updateSessionIndexEntry(session.sessionId, {
+        lastMessagePreview: this.createMessagePreview(runtimeError.message),
+        status: 'failed',
+        updatedAt: this.now(),
+      })
+      this.emit({
+        type: 'turn-failed',
+        agentId: request.agentId,
+        sessionId: request.sessionId,
+        runId,
+        error: runtimeError,
+        occurredAt: this.now(),
+      })
+      this.emit({
+        type: 'runtime-error',
+        agentId: request.agentId,
+        error: runtimeError,
+        occurredAt: this.now(),
+      })
+      throw error
+    } finally {
+      if (this.activeRunIds.get(request.sessionId) === runId) {
+        this.activeRunIds.delete(request.sessionId)
+      }
     }
   }
 

@@ -302,6 +302,36 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
   }
 
   /**
+   * 重试一条失败的用户消息，复用原始请求并创建新的执行尝试。
+   *
+   * @param userMessageId - 要重试的原始用户消息标识。
+   * @returns 无返回值。
+   * @throws Preload API 错误会被捕获并通过 toast 反馈。
+   */
+  const retryMessage = async (userMessageId: string): Promise<void> => {
+    if (!selectedSession) {
+      toast.error('请先选择一个会话。')
+      return
+    }
+
+    context.setIsSendingMessage(true)
+
+    try {
+      const nextMessages = await window.api.retryMessage({
+        agentId: selectedSession.agentId,
+        sessionId: selectedSession.sessionId,
+        userMessageId
+      })
+      context.setMessages(nextMessages)
+      context.setSessions(await window.api.listSessions())
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '重试消息失败')
+    } finally {
+      context.setIsSendingMessage(false)
+    }
+  }
+
+  /**
    * 取消当前会话正在运行的模型响应。
    *
    * @returns 无返回值。
@@ -437,6 +467,9 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
               transcript={context.transcript}
               isStreaming={isSelectedSessionRunning}
               sessionId={selectedSession?.sessionId ?? null}
+              onRetry={(userMessageId) => {
+                void retryMessage(userMessageId)
+              }}
             />
           </div>
 

@@ -21,6 +21,7 @@ import {
   type GetSessionMessagesRequest,
   type GetSessionModelInfoRequest,
   type ProfileMaintenanceResult,
+  type RetryRunRequest,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
   type SendMessageRequest,
@@ -678,6 +679,26 @@ class DefaultTangyuanRuntime {
   }
 
   /**
+   * 重试一条失败的用户消息，复用原始请求并创建新的执行尝试。
+   *
+   * @param request - 会话定位信息和要重试的原始用户消息标识。
+   * @returns 重试完成后的最新消息列表。
+   * @throws 当 Driver 不支持重试或执行失败时，Promise 会 reject。
+   */
+  async retryMessage(request: RetryRunRequest): Promise<AgentMessage[]> {
+    if (!this.sessionDriver.retryMessage) {
+      throw new Error('当前运行时不支持重试消息。')
+    }
+
+    await this.sessionDriver.retryMessage(request)
+
+    return this.getMessages({
+      agentId: request.agentId,
+      sessionId: request.sessionId,
+    })
+  }
+
+  /**
    * 取消指定会话正在运行的 Agent 响应，并返回更新后的摘要。
    *
    * @param request - 会话所属 Agent 和会话标识。
@@ -1221,6 +1242,7 @@ class DefaultTangyuanRuntime {
         event.runId,
         'failed',
         event.occurredAt,
+        event.error,
       )
       this.upsertMessage({
         messageId: `${event.sessionId}-${event.runId}-error`,
@@ -1587,6 +1609,7 @@ export type TangyuanRuntime = Pick<
   | 'getMessages'
   | 'getTranscript'
   | 'sendMessage'
+  | 'retryMessage'
   | 'cancelRun'
   | 'subscribe'
   | 'cancelAllActiveRuns'

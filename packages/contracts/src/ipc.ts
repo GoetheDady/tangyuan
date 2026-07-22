@@ -17,6 +17,7 @@ import {
   profileMaintenanceResultSchema,
   recoverAgentRequestSchema,
   rejectBashRequestSchema,
+  retryRunRequestSchema,
   runtimeConfigurationSchema,
   runtimeSnapshotSchema,
   sendMessageRequestSchema,
@@ -55,6 +56,7 @@ import type {
   ProfileMaintenanceResult,
   RecoverAgentRequest,
   RejectBashRequest,
+  RetryRunRequest,
   RuntimeConfiguration,
   RuntimeSnapshot,
   SendMessageRequest,
@@ -114,6 +116,7 @@ export const DESKTOP_IPC_CHANNELS = {
   sessionsRejectBash: 'tangyuan:sessions:reject-bash',
   sessionsGetPendingApprovals: 'tangyuan:sessions:get-pending-approvals',
   sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
+  sessionsRetryMessage: 'tangyuan:sessions:retry-message',
 } as const
 
 /**
@@ -169,6 +172,7 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: RejectBashRequest
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: GetSessionMessagesRequest
+  [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: RetryRunRequest
 }
 
 /**
@@ -215,6 +219,7 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: rejectBashRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: getSessionMessagesRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: retryRunRequestSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -279,6 +284,7 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: void
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: BashApprovalRequest[]
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: TranscriptSnapshot
+  [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: AgentMessage[]
 }
 
 /**
@@ -406,6 +412,7 @@ export const desktopIpcResponseSchemas = {
     bashApprovalRequestSchema,
   ),
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: transcriptSnapshotSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: z.array(agentMessageSchema),
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -539,6 +546,15 @@ export interface DesktopPreloadApi {
    * @throws 当会话不存在或 Main 进程无法取消运行时，Promise 会 reject。
    */
   cancelRun(request: CancelRunRequest): Promise<AgentSessionSummary>
+
+  /**
+   * 重试一条失败的用户消息，复用原始请求并创建新的执行尝试。
+   *
+   * @param request - 会话定位信息和要重试的原始用户消息标识。
+   * @returns 重试完成后的最新消息列表。
+   * @throws 当配置缺失、会话不存在或 Agent 运行失败时，Promise 会 reject。
+   */
+  retryMessage(request: RetryRunRequest): Promise<AgentMessage[]>
 
   /**
    * 订阅 Main 进程转发的 Agent 标准事件。

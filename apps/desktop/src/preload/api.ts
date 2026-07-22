@@ -18,6 +18,7 @@ import {
   type OpenExternalLinkRequest,
   type RecoverAgentRequest,
   type RejectBashRequest,
+  type RetryRunRequest,
   type RuntimeConfiguration,
   type CancelConfigurationVerificationRequest,
   type SendMessageRequest,
@@ -89,6 +90,9 @@ export function createTangyuanPreloadApi(
     },
     cancelRun: async (request: CancelRunRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsCancelRun, request)
+    },
+    retryMessage: async (request: RetryRunRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsRetryMessage, request)
     },
     subscribeToAgentEvents: (listener: AgentEventListener) => {
       return subscribe(DESKTOP_AGENT_EVENT_CHANNEL, listener)

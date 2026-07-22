@@ -135,6 +135,8 @@ export interface TranscriptMessagesProps {
   isStreaming: boolean
   /** 当前选中会话的标识；为 null 时不展示消息。 */
   sessionId: string | null
+  /** 重试回调；传入失败条目的 inReplyTo 用户消息标识。 */
+  onRetry?: (userMessageId: string) => void
 }
 
 /**
@@ -156,7 +158,8 @@ export function TranscriptMessages({
   messages,
   transcript,
   isStreaming,
-  sessionId
+  sessionId,
+  onRetry
 }: TranscriptMessagesProps): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
@@ -284,7 +287,31 @@ export function TranscriptMessages({
                 <CompactionIndicator timestamp={item.timestamp} />
               ) : item.type === 'assistant-message' ? (
                 <div className="py-3.5">
-                  <AssistantMessage entry={item.entry} isStreaming={item.isLastAgent} />
+                  <AssistantMessage
+                    entry={item.entry}
+                    isStreaming={item.isLastAgent}
+                    onRetry={
+                      onRetry
+                        ? () => {
+                            // Use inReplyTo if available, otherwise find the preceding user message
+                            let userMessageId = item.entry.inReplyTo
+                            if (!userMessageId && transcript) {
+                              const entryIndex = item.entry.index
+                              for (let i = entryIndex - 1; i >= 0; i--) {
+                                const prevEntry = transcript.entries[i]
+                                if (prevEntry && prevEntry.kind === 'user-message') {
+                                  userMessageId = prevEntry.messageId
+                                  break
+                                }
+                              }
+                            }
+                            if (userMessageId) {
+                              onRetry(userMessageId)
+                            }
+                          }
+                        : undefined
+                    }
+                  />
                 </div>
               ) : (
                 <div className="py-3.5">

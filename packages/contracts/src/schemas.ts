@@ -23,6 +23,21 @@ export const executionAttemptSchema = z.strictObject({
   status: z.enum(['running', 'completed', 'cancelled', 'failed']),
   startedAt: timestampSchema,
   completedAt: timestampSchema.nullable(),
+  error: z
+    .strictObject({
+      code: z.enum([
+        'configuration-missing',
+        'driver-unavailable',
+        'provider-verification-failed',
+        'session-not-found',
+        'run-already-active',
+        'run-cancelled',
+        'unknown',
+      ]),
+      message: z.string(),
+      recoverable: z.boolean(),
+    })
+    .optional(),
 })
 
 /**
@@ -73,6 +88,7 @@ export const agentReplyEntrySchema = z.strictObject({
   createdAt: timestampSchema,
   attempt: executionAttemptSchema.nullable(),
   turns: z.array(runTurnSchema),
+  inReplyTo: z.string().optional(),
 })
 
 /**
@@ -403,6 +419,7 @@ export const agentEventSchema = z.discriminatedUnion('type', [
     type: z.literal('message-appended'),
     agentId: nonEmptyIdentifierSchema,
     message: agentMessageSchema,
+    inReplyTo: z.string().optional(),
     occurredAt: timestampSchema,
   }),
   z.strictObject({
@@ -595,6 +612,15 @@ export const sendMessageRequestSchema = z.strictObject({
 export const cancelRunRequestSchema = z.strictObject({
   agentId: nonEmptyIdentifierSchema,
   sessionId: nonEmptyIdentifierSchema,
+})
+
+/**
+ * 校验重试运行请求。
+ */
+export const retryRunRequestSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+  userMessageId: nonEmptyIdentifierSchema,
 })
 
 /**

@@ -1,5 +1,13 @@
 import type { AgentReplyEntry, RunTurn, TurnStep } from '@tangyuan/contracts'
-import { Check, ChevronDown, ChevronRight, CircleStop, CircleX, LoaderCircle } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  CircleStop,
+  CircleX,
+  LoaderCircle,
+  RefreshCw
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { StreamdownMessage } from '@/components/StreamdownMessage'
@@ -12,6 +20,8 @@ export interface AssistantMessageProps {
   entry: AgentReplyEntry
   /** 是否正在流式执行中。 */
   isStreaming: boolean
+  /** 重试回调；仅对失败且非取消的条目生效。 */
+  onRetry?: () => void
 }
 
 /**
@@ -51,7 +61,11 @@ function deriveState(entry: AgentReplyEntry, isStreaming: boolean): AssistantSta
  * @returns Agent 回复卡片。
  * @throws 此组件不会主动抛出错误。
  */
-export function AssistantMessage({ entry, isStreaming }: AssistantMessageProps): React.JSX.Element {
+export function AssistantMessage({
+  entry,
+  isStreaming,
+  onRetry
+}: AssistantMessageProps): React.JSX.Element {
   const state = deriveState(entry, isStreaming)
   const shouldExpand =
     state === 'active-tool-loop' || state === 'unconfirmed-text' || state === 'ended-nonfinal'
@@ -146,11 +160,13 @@ export function AssistantMessage({ entry, isStreaming }: AssistantMessageProps):
             {entry.content ? (
               <StreamdownMessage content={entry.content} isAnimating={false} />
             ) : null}
-            <div className="mt-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-foreground">
-              {entry.attempt?.status === 'cancelled'
-                ? '此回复已在生成过程中被用户中断'
-                : '执行失败，已收到的内容保留在上方'}
-            </div>
+            {entry.attempt?.status === 'cancelled' ? (
+              <div className="mt-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-foreground">
+                此回复已在生成过程中被用户中断
+              </div>
+            ) : (
+              <FailedFooter entry={entry} onRetry={onRetry} />
+            )}
           </div>
         )}
       </div>
@@ -361,6 +377,88 @@ function StepRow({ step }: { step: TurnStep }): React.JSX.Element {
           <CircleX size={10} className="text-destructive-soft-foreground" aria-label="失败" />
         )}
       </span>
+    </div>
+  )
+}
+
+/**
+ * 失败状态的底部区域：展示失败摘要、失败步骤和重试操作。
+ *
+ * 按照 Pencil 设计：失败且没有最终回复时展示可展开的失败摘要和重试按钮。
+ */
+function FailedFooter({
+  entry,
+  onRetry
+}: {
+  entry: AgentReplyEntry
+  onRetry?: () => void
+}): React.JSX.Element {
+  const [showDetails, setShowDetails] = useState(false)
+  const errorMessage = entry.attempt?.error?.message ?? '执行失败，已收到的内容保留在上方'
+
+  // 展开失败步骤：展示所有失败的 turn steps
+  const failedSteps = entry.turns.flatMap((turn) =>
+    turn.steps.filter((step) => step.status === 'failed')
+  )
+
+  return (
+    <div className="mt-2 space-y-2">
+      {/* 失败摘要 */}
+      <div className="rounded-md bg-destructive-soft/10 px-3 py-2">
+        <div className="flex items-start gap-1.5">
+          <CircleX
+            size={12}
+            className="mt-0.5 shrink-0 text-destructive-soft-foreground"
+            aria-hidden="true"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-destructive-foreground">执行失败</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{errorMessage}</p>
+          </div>
+        </div>
+
+        {/* 失败步骤详情（可展开） */}
+        {failedSteps.length > 0 && (
+          <div className="mt-1.5">
+            <button
+              type="button"
+              onClick={() => setShowDetails((prev) => !prev)}
+              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showDetails ? (
+                <ChevronDown size={10} aria-hidden="true" />
+              ) : (
+                <ChevronRight size={10} aria-hidden="true" />
+              )}
+              失败步骤（{failedSteps.length}）
+            </button>
+            {showDetails && (
+              <div className="mt-1 space-y-0.5">
+                {failedSteps.map((step) => (
+                  <StepRow key={step.index} step={step} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 重试操作 */}
+      <div className="rounded-md bg-muted px-3 py-2">
+        <p className="text-[11px] text-muted-foreground">
+          Agent 在产生最终回复前失败。您可以重试本次执行，原始用户请求将被复用。
+        </p>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <RefreshCw size={11} aria-hidden="true" />
+            重试
+          </button>
+        )}
+      </div>
     </div>
   )
 }
