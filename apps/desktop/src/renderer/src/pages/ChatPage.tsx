@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 
+import { BashApprovalCard } from '@/components/BashApprovalCard'
 import { Button } from '@/components/ui/button'
 import { Composer } from '@/components/Composer'
 import { Separator } from '@/components/ui/separator'
@@ -48,6 +49,8 @@ interface DesktopWorkbenchAction {
   setPendingApprovals(
     value: BashApprovalRequest[] | ((currentValue: BashApprovalRequest[]) => BashApprovalRequest[])
   ): void
+  /** 将命令加入当前会话的"始终允许"列表。 */
+  addAlwaysAllowedCommand(sessionId: string, command: string): void
 }
 
 interface DesktopWorkbenchContext extends DesktopWorkbenchState, DesktopWorkbenchAction {}
@@ -476,57 +479,27 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
           {/* 审批卡片区域 */}
           {selectedSession && context.pendingApprovals.length > 0 && (
             <div className="border-t bg-muted/20 px-8 py-4">
-              <div className="mx-auto max-w-3xl space-y-3">
+              <div className="mx-auto space-y-3">
                 {context.pendingApprovals
                   .filter(
                     (a) => a.sessionId === selectedSession.sessionId && a.status === 'pending'
                   )
                   .map((approval) => (
-                    <div
+                    <BashApprovalCard
                       key={approval.approvalId}
-                      className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 dark:border-yellow-700 dark:bg-yellow-950"
-                    >
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className="rounded bg-yellow-200 px-2 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-800 dark:text-yellow-200">
-                          待审批
-                        </span>
-                        <span className="text-sm font-medium text-foreground">
-                          Bash 命令执行审批
-                        </span>
-                      </div>
-                      <pre className="mb-2 overflow-x-auto rounded bg-muted p-2 text-xs">
-                        <code>{approval.command}</code>
-                      </pre>
-                      <p className="mb-1 text-xs text-muted-foreground">工作目录：{approval.cwd}</p>
-                      <p className="mb-3 text-xs text-muted-foreground">
-                        {approval.riskDescription}
-                      </p>
-                      <p className="mb-3 text-xs text-red-600 dark:text-red-400">
-                        此命令将以当前 macOS 用户权限执行，请确认操作安全。
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-                          onClick={() => {
-                            void window.api.approveBash({
-                              approvalId: approval.approvalId
-                            })
-                          }}
-                        >
-                          允许本次
-                        </button>
-                        <button
-                          className="inline-flex items-center rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10"
-                          onClick={() => {
-                            void window.api.rejectBash({
-                              approvalId: approval.approvalId
-                            })
-                          }}
-                        >
-                          拒绝
-                        </button>
-                      </div>
-                    </div>
+                      approval={approval}
+                      onApproveOnce={async (approvalId) => {
+                        await window.api.approveBash({ approvalId })
+                      }}
+                      onApproveAlways={async (approvalId) => {
+                        // 记录为"始终允许"并批准
+                        context.addAlwaysAllowedCommand(approval.sessionId, approval.command)
+                        await window.api.approveBash({ approvalId })
+                      }}
+                      onReject={async (approvalId) => {
+                        await window.api.rejectBash({ approvalId })
+                      }}
+                    />
                   ))}
               </div>
             </div>

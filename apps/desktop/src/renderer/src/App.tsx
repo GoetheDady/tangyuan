@@ -9,7 +9,7 @@ import type {
   TranscriptSnapshot
 } from '@tangyuan/contracts'
 import { applyTranscriptDelta } from '@tangyuan/contracts'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
@@ -54,6 +54,8 @@ interface DesktopWorkbenchAction {
   setPendingApprovals(
     value: BashApprovalRequest[] | ((currentValue: BashApprovalRequest[]) => BashApprovalRequest[])
   ): void
+  /** 将命令加入当前会话的"始终允许"列表。 */
+  addAlwaysAllowedCommand(sessionId: string, command: string): void
 }
 
 export interface DesktopWorkbenchContext extends DesktopWorkbenchState, DesktopWorkbenchAction {}
@@ -111,6 +113,23 @@ function DesktopRoutes(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(true)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [pendingApprovals, setPendingApprovals] = useState<BashApprovalRequest[]>([])
+  const alwaysAllowedCommandsRef = useRef<Map<string, Set<string>>>(new Map())
+
+  /**
+   * 将命令加入指定会话的"始终允许"列表，后续同命令自动免审。
+   *
+   * @param sessionId - 会话标识。
+   * @param command - 免审的 bash 命令。
+   * @returns 无返回值。
+   */
+  function addAlwaysAllowedCommand(sessionId: string, command: string): void {
+    const sessionCommands = alwaysAllowedCommandsRef.current.get(sessionId)
+    if (sessionCommands) {
+      sessionCommands.add(command)
+    } else {
+      alwaysAllowedCommandsRef.current.set(sessionId, new Set([command]))
+    }
+  }
 
   const context: DesktopWorkbenchContext = {
     runtime,
@@ -131,7 +150,8 @@ function DesktopRoutes(): React.JSX.Element {
     setComposerText,
     setIsLoading,
     setIsSendingMessage,
-    setPendingApprovals
+    setPendingApprovals,
+    addAlwaysAllowedCommand
   }
 
   useEffect(() => {
@@ -227,6 +247,13 @@ function DesktopRoutes(): React.JSX.Element {
       }
 
       if (event.type === 'approval-required') {
+        // 检查是否已"始终允许"此会话中的此命令
+        const sessionCommands = alwaysAllowedCommandsRef.current.get(event.sessionId)
+        if (sessionCommands?.has(event.approval.command)) {
+          // 自动批准，不展示审批卡片
+          void window.api.approveBash({ approvalId: event.approval.approvalId })
+          return
+        }
         setPendingApprovals((current) => [...current, event.approval])
         toast.info(`Bash 命令需要审批：${event.approval.command.slice(0, 60)}...`)
         return

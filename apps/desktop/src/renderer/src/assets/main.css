@@ -336,6 +336,30 @@
   }
 }
 
+@keyframes approval-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes approval-card-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+
 @layer components {
   [data-slot='alert-dialog-overlay'] {
     will-change: opacity;
