@@ -451,6 +451,24 @@ export interface PiSdkGateway {
 /**
  * 描述汤圆写入 userData/sessions/index.json 的单个会话索引条目。
  */
+/**
+ * 描述持久化到 session 索引的单条执行尝试。
+ *
+ * 在会话重建时用于还原每个 AgentReplyEntry 的 attempt 状态。
+ */
+export interface PersistedAttemptEntry {
+  attemptId: string
+  runId: string
+  /** 该尝试对应的 Agent 消息标识。 */
+  messageId: string
+  status: 'running' | 'completed' | 'cancelled' | 'failed'
+  startedAt: string
+  completedAt: string | null
+  error?: import('@tangyuan/contracts').AgentRuntimeErrorPayload
+  /** 关联的用户消息标识；重试场景的 inReplyTo。 */
+  inReplyTo?: string
+}
+
 export interface PersistedSessionIndexEntry {
   sessionId: string
   sdkSessionFile: string
@@ -462,6 +480,8 @@ export interface PersistedSessionIndexEntry {
   agentId: AgentId
   lastMessagePreview: string
   status: AgentRunState
+  /** 执行尝试记录列表，用于会话重建时还原 attempt 状态。 */
+  attempts?: PersistedAttemptEntry[]
 }
 
 /**
@@ -568,6 +588,15 @@ export interface AgentSessionDriver {
   retryMessage?(
     request: import('@tangyuan/contracts').RetryRunRequest,
   ): Promise<void>
+
+  /**
+   * 读取指定会话的持久化执行尝试记录，用于会话重建。
+   *
+   * @param sessionId - 会话标识。
+   * @returns 持久化的执行尝试记录列表。
+   * @throws 此方法不会主动抛出错误。
+   */
+  getSessionAttempts?(sessionId: string): PersistedAttemptEntry[]
 
   /**
    * 创建一个新 Agent。
@@ -1257,6 +1286,15 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       runId,
       occurredAt: this.now(),
     })
+    // 持久化执行尝试记录（运行中状态）
+    await this.upsertAttemptInIndex(request.sessionId, {
+      attemptId: runId,
+      runId,
+      messageId: agentMessage.messageId,
+      status: 'running',
+      startedAt: this.now(),
+      completedAt: null,
+    })
 
     try {
       const profileStatusBeforeRun = await this.ensureDefaultAgentHome()
@@ -1322,6 +1360,14 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
       if (this.activeRunIds.get(request.sessionId) !== runId) {
         this.removeMessageIfEmpty(agentMessage.messageId)
+        await this.upsertAttemptInIndex(request.sessionId, {
+          attemptId: runId,
+          runId,
+          messageId: agentMessage.messageId,
+          status: 'cancelled',
+          startedAt: this.now(),
+          completedAt: this.now(),
+        })
         this.updateSessionState(session.sessionId, 'cancelled')
         await this.updateSessionIndexEntry(session.sessionId, {
           status: 'cancelled',
@@ -1380,6 +1426,14 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         await this.performBootstrapCompletionGating()
       }
 
+      await this.upsertAttemptInIndex(request.sessionId, {
+        attemptId: runId,
+        runId,
+        messageId: agentMessage.messageId,
+        status: 'completed',
+        startedAt: this.now(),
+        completedAt: this.now(),
+      })
       this.updateSessionState(session.sessionId, 'completed')
       await this.updateSessionIndexEntry(session.sessionId, {
         lastMessagePreview: this.createMessagePreview(completedMessage.content),
@@ -1410,6 +1464,15 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         recoverable: true,
       }
       this.removeMessageIfEmpty(agentMessage.messageId)
+      await this.upsertAttemptInIndex(request.sessionId, {
+        attemptId: runId,
+        runId,
+        messageId: agentMessage.messageId,
+        status: 'failed',
+        startedAt: this.now(),
+        completedAt: this.now(),
+        error: runtimeError,
+      })
       this.updateSessionState(session.sessionId, 'failed')
       await this.updateSessionIndexEntry(session.sessionId, {
         lastMessagePreview: this.createMessagePreview(runtimeError.message),
@@ -1538,6 +1601,22 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     return this.executeRetry(request, userMessage.content, session, handle)
+  }
+
+  /**
+   * 执行重试核心逻辑：创建新 AgentMessage 和 ExecutionAttempt，
+   * 发送与原始用户请求相同的 prompt。
+   *
+   * @param request - 重试请求。
+   * @param content - 原始用户消息内容。
+   * @param session - 已确认的会话摘要。
+   * @param handle - Pi SDK 会话运行器。
+   * @returns 无返回值。
+   * @throws 当 SDK 调用失败时，Promise 会 reject。
+   */
+  getSessionAttempts(sessionId: string): PersistedAttemptEntry[] {
+    const entry = this.sessionIndex.get(sessionId)
+    return entry?.attempts ?? []
   }
 
   /**
@@ -1724,6 +1803,15 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         await this.performBootstrapCompletionGating()
       }
 
+      await this.upsertAttemptInIndex(request.sessionId, {
+        attemptId: runId,
+        runId,
+        messageId: agentMessage.messageId,
+        status: 'completed',
+        startedAt: this.now(),
+        completedAt: this.now(),
+        inReplyTo: request.userMessageId,
+      })
       this.updateSessionState(session.sessionId, 'completed')
       await this.updateSessionIndexEntry(session.sessionId, {
         lastMessagePreview: this.createMessagePreview(completedMessage.content),
@@ -1733,6 +1821,15 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     } catch (error) {
       if (isAbortError(error) || !this.activeRunIds.has(request.sessionId)) {
         this.removeMessageIfEmpty(agentMessage.messageId)
+        await this.upsertAttemptInIndex(request.sessionId, {
+          attemptId: runId,
+          runId,
+          messageId: agentMessage.messageId,
+          status: 'cancelled',
+          startedAt: this.now(),
+          completedAt: this.now(),
+          inReplyTo: request.userMessageId,
+        })
         this.updateSessionState(session.sessionId, 'cancelled')
         await this.updateSessionIndexEntry(session.sessionId, {
           status: 'cancelled',
@@ -1754,6 +1851,16 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         recoverable: true,
       }
       this.removeMessageIfEmpty(agentMessage.messageId)
+      await this.upsertAttemptInIndex(request.sessionId, {
+        attemptId: runId,
+        runId,
+        messageId: agentMessage.messageId,
+        status: 'failed',
+        startedAt: this.now(),
+        completedAt: this.now(),
+        error: runtimeError,
+        inReplyTo: request.userMessageId,
+      })
       this.updateSessionState(session.sessionId, 'failed')
       await this.updateSessionIndexEntry(session.sessionId, {
         lastMessagePreview: this.createMessagePreview(runtimeError.message),
@@ -3960,6 +4067,43 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     await this.writeSessionIndex()
 
     return nextEntry
+  }
+
+  /**
+   * 在会话索引中新增或更新一条执行尝试记录。
+   *
+   * 用于会话重建时还原每个 AgentReplyEntry 的 attempt 状态。
+   *
+   * @param sessionId - 所属会话标识。
+   * @param attempt - 要持久化的执行尝试记录。
+   * @returns 无返回值。
+   * @throws 当会话索引不存在或写入失败时，Promise 会 reject。
+   */
+  private async upsertAttemptInIndex(
+    sessionId: string,
+    attempt: PersistedAttemptEntry,
+  ): Promise<void> {
+    const currentEntry = this.getKnownSessionIndexEntry(sessionId)
+    const existingAttempts = currentEntry.attempts ?? []
+    const existingIndex = existingAttempts.findIndex(
+      (a) => a.attemptId === attempt.attemptId,
+    )
+
+    const nextAttempts =
+      existingIndex >= 0
+        ? [
+            ...existingAttempts.slice(0, existingIndex),
+            attempt,
+            ...existingAttempts.slice(existingIndex + 1),
+          ]
+        : [...existingAttempts, attempt]
+
+    // Keep only the last 20 attempts to prevent unbounded growth
+    const trimmedAttempts = nextAttempts.slice(-20)
+
+    await this.updateSessionIndexEntry(sessionId, {
+      attempts: trimmedAttempts,
+    })
   }
 
   /**

@@ -382,4 +382,77 @@ describe('TranscriptEmitter tool step handling', () => {
       expect(lastDelta.delta.type).toBe('step-appended')
     }
   })
+
+  it('sets inReplyTo on AgentReplyEntry when message-appended includes it', () => {
+    const { emitter, getSnapshot } = createEmitter()
+    const event: Extract<AgentEvent, { type: 'message-appended' }> = {
+      type: 'message-appended',
+      agentId: 'tangyuan',
+      message: {
+        messageId: 'agent-msg-1',
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        role: 'agent',
+        content: '重试成功',
+        createdAt: new Date().toISOString(),
+      },
+      inReplyTo: 'user-msg-1',
+      occurredAt: new Date().toISOString(),
+    }
+    emitter.emitTranscriptDeltaForMessageAppended(event)
+
+    const snapshot = getSnapshot('session-1')
+    expect(snapshot).toBeDefined()
+    const agentEntry = snapshot!.entries[0]
+    expect(agentEntry).toBeDefined()
+    if (agentEntry && agentEntry.kind === 'agent-reply') {
+      expect(agentEntry.inReplyTo).toBe('user-msg-1')
+    }
+  })
+
+  it('failAttemptForRun includes error in ExecutionAttempt when provided', () => {
+    const { emitter, getSnapshot } = createEmitter()
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+
+    const error = {
+      code: 'unknown' as const,
+      message: '连接超时',
+      recoverable: true,
+    }
+    emitter.failAttemptForRun(
+      'session-1',
+      'run-1',
+      'failed',
+      new Date().toISOString(),
+      error,
+    )
+
+    const snapshot = getSnapshot('session-1')
+    const agentEntry = snapshot!.entries[0]
+    if (agentEntry && agentEntry.kind === 'agent-reply') {
+      expect(agentEntry.attempt).toBeDefined()
+      expect(agentEntry.attempt!.status).toBe('failed')
+      expect(agentEntry.attempt!.error).toEqual(error)
+    }
+  })
+
+  it('failAttemptForRun for cancelled does not include error', () => {
+    const { emitter, getSnapshot } = createEmitter()
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+
+    emitter.failAttemptForRun(
+      'session-1',
+      'run-1',
+      'cancelled',
+      new Date().toISOString(),
+    )
+
+    const snapshot = getSnapshot('session-1')
+    const agentEntry = snapshot!.entries[0]
+    if (agentEntry && agentEntry.kind === 'agent-reply') {
+      expect(agentEntry.attempt).toBeDefined()
+      expect(agentEntry.attempt!.status).toBe('cancelled')
+      expect(agentEntry.attempt!.error).toBeUndefined()
+    }
+  })
 })

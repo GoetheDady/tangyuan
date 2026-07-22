@@ -584,4 +584,168 @@ describe('AssistantMessage', () => {
     // Timeline should be hidden
     expect(screen.queryByText(/回合/)).not.toBeInTheDocument()
   })
+
+  describe('FailedFooter', () => {
+    it('shows retry button for failed attempts', () => {
+      const onRetry = vi.fn()
+      const entry = createEntry({
+        attempt: {
+          attemptId: 'run-1',
+          runId: 'run-1',
+          status: 'failed',
+          startedAt: '2026-07-21T00:00:00.000Z',
+          completedAt: '2026-07-21T00:00:01.000Z',
+          error: { code: 'unknown', message: '连接超时', recoverable: true },
+        },
+        turns: [
+          createTurn({
+            steps: [
+              createToolStep({
+                content: '执行命令失败',
+                toolName: 'bash',
+                status: 'failed',
+                completedAt: '2026-07-21T00:00:01.000Z',
+              }),
+            ],
+            status: 'failed',
+            completedAt: '2026-07-21T00:00:01.000Z',
+          }),
+        ],
+      })
+
+      render(<AssistantMessage entry={entry} isStreaming={false} onRetry={onRetry} />)
+
+      // Should show retry button
+      expect(screen.getByText('重试')).toBeInTheDocument()
+      // Should show failure detail
+      expect(
+        screen.getByText(/Agent 在产生最终回复前失败/),
+      ).toBeInTheDocument()
+    })
+
+    it('does not show retry button for cancelled attempts', () => {
+      const entry = createEntry({
+        content: '部分结果...',
+        attempt: {
+          attemptId: 'run-1',
+          runId: 'run-1',
+          status: 'cancelled',
+          startedAt: '2026-07-21T00:00:00.000Z',
+          completedAt: '2026-07-21T00:00:03.000Z',
+        },
+        turns: [
+          createTurn({
+            steps: [createThinkingStep({ status: 'completed' })],
+            status: 'cancelled',
+            completedAt: '2026-07-21T00:00:03.000Z',
+          }),
+        ],
+      })
+
+      render(<AssistantMessage entry={entry} isStreaming={false} />)
+
+      // Should not show retry button
+      expect(screen.queryByText('重试')).not.toBeInTheDocument()
+      // Should show cancelled message
+      expect(screen.getByText(/被用户中断/)).toBeInTheDocument()
+    })
+
+    it('calls onRetry when retry button is clicked', () => {
+      const onRetry = vi.fn()
+      const entry = createEntry({
+        attempt: {
+          attemptId: 'run-1',
+          runId: 'run-1',
+          status: 'failed',
+          startedAt: '2026-07-21T00:00:00.000Z',
+          completedAt: '2026-07-21T00:00:01.000Z',
+        },
+        turns: [
+          createTurn({
+            steps: [
+              createToolStep({
+                status: 'failed',
+                completedAt: '2026-07-21T00:00:01.000Z',
+              }),
+            ],
+            status: 'failed',
+            completedAt: '2026-07-21T00:00:01.000Z',
+          }),
+        ],
+      })
+
+      render(<AssistantMessage entry={entry} isStreaming={false} onRetry={onRetry} />)
+
+      fireEvent.click(screen.getByText('重试'))
+      expect(onRetry).toHaveBeenCalled()
+    })
+
+    it('shows expandable failure steps', () => {
+      const entry = createEntry({
+        attempt: {
+          attemptId: 'run-1',
+          runId: 'run-1',
+          status: 'failed',
+          startedAt: '2026-07-21T00:00:00.000Z',
+          completedAt: '2026-07-21T00:00:01.000Z',
+          error: { code: 'unknown', message: '工具执行失败', recoverable: true },
+        },
+        turns: [
+          createTurn({
+            steps: [
+              createToolStep({
+                content: '执行命令失败',
+                toolName: 'bash',
+                status: 'failed',
+                completedAt: '2026-07-21T00:00:01.000Z',
+              }),
+            ],
+            status: 'failed',
+            completedAt: '2026-07-21T00:00:01.000Z',
+          }),
+        ],
+      })
+
+      render(<AssistantMessage entry={entry} isStreaming={false} />)
+
+      // Should show failure step toggle with count
+      expect(screen.getByText(/失败步骤（1）/)).toBeInTheDocument()
+
+      // Click to expand
+      fireEvent.click(screen.getByText(/失败步骤（1）/))
+      // After expand, StepRow with the tool content appears in the expandable section
+      // (in addition to the timeline - getAllByText is fine)
+      const stepElements = screen.getAllByText(/执行命令失败/)
+      expect(stepElements.length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('shows error message from attempt.error when available', () => {
+      const entry = createEntry({
+        attempt: {
+          attemptId: 'run-1',
+          runId: 'run-1',
+          status: 'failed',
+          startedAt: '2026-07-21T00:00:00.000Z',
+          completedAt: '2026-07-21T00:00:01.000Z',
+          error: { code: 'unknown', message: 'API 调用超时，请重试', recoverable: true },
+        },
+        turns: [
+          createTurn({
+            steps: [
+              createToolStep({
+                status: 'failed',
+                completedAt: '2026-07-21T00:00:01.000Z',
+              }),
+            ],
+            status: 'failed',
+            completedAt: '2026-07-21T00:00:01.000Z',
+          }),
+        ],
+      })
+
+      render(<AssistantMessage entry={entry} isStreaming={false} />)
+
+      expect(screen.getByText('API 调用超时，请重试')).toBeInTheDocument()
+    })
+  })
 })

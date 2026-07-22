@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- TODO: 按职责拆分为 session / transcript 等模块 */
 import type {
   AgentEvent,
   AgentEventListener,
@@ -629,13 +630,41 @@ class DefaultTangyuanRuntime {
 
     // 回退：从扁平的 AgentMessage 列表构建（无 turns/steps）
     const messages = await this.getMessages(request)
-
-    return buildTranscriptSnapshot(
+    const snapshot = buildTranscriptSnapshot(
       messages,
       request.sessionId,
       request.agentId,
       new Date().toISOString(),
     )
+
+    // 从 session 索引合并持久化的 attempt 数据
+    const attempts = this.sessionDriver.getSessionAttempts?.(request.sessionId) ?? []
+    if (attempts.length === 0) {
+      return snapshot
+    }
+
+    const attemptByMessageId = new Map(
+      attempts.map((a) => [a.messageId, a]),
+    )
+    const enrichedEntries = snapshot.entries.map((entry) => {
+      if (entry.kind !== 'agent-reply') return entry
+      const persisted = attemptByMessageId.get(entry.messageId)
+      if (!persisted) return entry
+      return {
+        ...entry,
+        attempt: {
+          attemptId: persisted.attemptId,
+          runId: persisted.runId,
+          status: persisted.status,
+          startedAt: persisted.startedAt,
+          completedAt: persisted.completedAt,
+          ...(persisted.error ? { error: persisted.error } : {}),
+        },
+        ...(persisted.inReplyTo ? { inReplyTo: persisted.inReplyTo } : {}),
+      }
+    })
+
+    return { ...snapshot, entries: enrichedEntries }
   }
 
   /**
