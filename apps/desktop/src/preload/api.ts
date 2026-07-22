@@ -26,7 +26,6 @@ import {
   type SendMessageRequest,
   type SetSessionModelRequest,
   type SetSessionThinkingLevelRequest,
-  type QuestionClarificationRequest,
   type SkillOperationParams,
   type UpdateAgentConfigRequest,
   type UpdateSoulRequest,

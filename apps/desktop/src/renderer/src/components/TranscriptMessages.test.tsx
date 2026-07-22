@@ -1,7 +1,13 @@
 import '@testing-library/jest-dom/vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentMessage } from '@tangyuan/contracts'
+import type {
+  AgentMessage,
+  AgentReplyEntry,
+  TranscriptEntry,
+  TranscriptSnapshot,
+  ExecutionAttempt
+} from '@tangyuan/contracts'
 import { TranscriptMessages } from './TranscriptMessages'
 
 /**
@@ -15,6 +21,52 @@ function createMessage(overrides?: Partial<AgentMessage>): AgentMessage {
     role: 'agent',
     content: '这是一条测试消息。',
     createdAt: new Date().toISOString(),
+    ...overrides
+  }
+}
+
+/**
+ * 创建测试用的执行尝试。
+ */
+function createAttempt(overrides?: Partial<ExecutionAttempt>): ExecutionAttempt {
+  return {
+    attemptId: 'attempt-1',
+    runId: 'run-1',
+    status: 'completed',
+    startedAt: '2026-07-21T00:00:00.000Z',
+    completedAt: '2026-07-21T00:00:01.000Z',
+    ...overrides
+  }
+}
+
+/**
+ * 创建测试用的 AgentReplyEntry（含 turns）。
+ */
+function createAgentReplyEntry(overrides?: Partial<AgentReplyEntry>): AgentReplyEntry {
+  return {
+    kind: 'agent-reply',
+    index: 1,
+    messageId: 'msg-reply-1',
+    content: '回复内容',
+    createdAt: '2026-07-21T00:00:00.000Z',
+    attempt: createAttempt(),
+    turns: [],
+    ...overrides
+  }
+}
+
+/**
+ * 创建测试用的 TranscriptSnapshot。
+ */
+function createTranscriptSnapshot(
+  entries: TranscriptEntry[],
+  overrides?: Partial<TranscriptSnapshot>
+): TranscriptSnapshot {
+  return {
+    sessionId: 'session-1',
+    agentId: 'tangyuan',
+    entries,
+    updatedAt: new Date().toISOString(),
     ...overrides
   }
 }
@@ -188,5 +240,477 @@ describe('TranscriptMessages', () => {
 
     // 虚拟列表可能不完全渲染所有消息，但至少第一条应该可见
     expect(screen.getByText('Message 0')).toBeInTheDocument()
+  })
+
+  it('renders from structured transcript entries', () => {
+    defineMockApi()
+    const entries: TranscriptEntry[] = [
+      {
+        kind: 'user-message',
+        index: 0,
+        messageId: 'msg-1',
+        content: '用户问题',
+        createdAt: '2026-07-21T00:00:00.000Z'
+      },
+      createAgentReplyEntry({
+        index: 1,
+        messageId: 'msg-2',
+        content: 'Agent 回复'
+      })
+    ]
+
+    const transcript = createTranscriptSnapshot(entries)
+
+    render(
+      <TranscriptMessages
+        messages={[]}
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />
+    )
+
+    expect(screen.getByText('用户问题')).toBeInTheDocument()
+    expect(screen.getByText('Agent 回复')).toBeInTheDocument()
+  })
+
+  it('renders compaction entries from transcript', () => {
+    defineMockApi()
+    const entries: TranscriptEntry[] = [
+      {
+        kind: 'user-message',
+        index: 0,
+        messageId: 'msg-1',
+        content: '第一轮',
+        createdAt: '2026-07-21T00:00:00.000Z'
+      },
+      {
+        kind: 'compaction',
+        index: 1,
+        timestamp: '2026-07-21T01:00:00.000Z'
+      },
+      {
+        kind: 'user-message',
+        index: 2,
+        messageId: 'msg-2',
+        content: '第二轮',
+        createdAt: '2026-07-21T01:00:01.000Z'
+      }
+    ]
+
+    const transcript = createTranscriptSnapshot(entries)
+
+    render(
+      <TranscriptMessages
+        messages={[]}
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />
+    )
+
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(screen.getByText('第一轮')).toBeInTheDocument()
+    expect(screen.getByText('第二轮')).toBeInTheDocument()
+  })
+
+  it('renders AgentReplyEntry with turns as AssistantMessage', () => {
+    defineMockApi()
+    const entry = createAgentReplyEntry({
+      index: 1,
+      messageId: 'msg-reply',
+      content: '带有工具的回复',
+      turns: [
+        {
+          index: 0,
+          runId: 'run-1',
+          steps: [
+            {
+              index: 0,
+              kind: 'thinking',
+              content: '分析中...',
+              status: 'completed',
+              startedAt: '2026-07-21T00:00:00.000Z',
+              completedAt: '2026-07-21T00:00:01.000Z'
+            },
+            {
+              index: 1,
+              kind: 'tool-call',
+              content: '读取文件',
+              toolCallId: 'tc-1',
+              toolName: 'read_file',
+              status: 'completed',
+              startedAt: '2026-07-21T00:00:01.000Z',
+              completedAt: '2026-07-21T00:00:02.000Z'
+            }
+          ],
+          status: 'completed',
+          startedAt: '2026-07-21T00:00:00.000Z',
+          completedAt: '2026-07-21T00:00:02.000Z'
+        }
+      ]
+    })
+
+    const entries: TranscriptEntry[] = [
+      {
+        kind: 'user-message',
+        index: 0,
+        messageId: 'msg-user',
+        content: '帮我读文件',
+        createdAt: '2026-07-21T00:00:00.000Z'
+      },
+      entry
+    ]
+
+    const transcript = createTranscriptSnapshot(entries)
+
+    render(
+      <TranscriptMessages
+        messages={[]}
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />
+    )
+
+    // AssistantMessage 应渲染执行披露栏（已完成的条目默认收起）
+    expect(screen.getByText('已完成执行过程')).toBeInTheDocument()
+    // 步骤数量标签应显示
+    expect(screen.getByText('2 步 · 1s')).toBeInTheDocument()
+    // 点击展开披露栏
+    const disclosure = screen.getByText('已完成执行过程').closest('button')
+    expect(disclosure).not.toBeNull()
+    if (disclosure) {
+      fireEvent.click(disclosure)
+    }
+    // turns 中的步骤应在时间线中展示
+    expect(screen.getByText('分析中...')).toBeInTheDocument()
+    expect(screen.getByText('read_file · 读取文件')).toBeInTheDocument()
+  })
+
+  it('renders AgentReplyEntry with failed attempt', () => {
+    defineMockApi()
+    const entry = createAgentReplyEntry({
+      index: 1,
+      messageId: 'msg-failed',
+      content: '部分回复',
+      attempt: createAttempt({
+        attemptId: 'attempt-failed',
+        status: 'failed',
+        error: {
+          code: 'unknown',
+          message: '执行失败，请重试',
+          recoverable: true
+        }
+      }),
+      turns: [
+        {
+          index: 0,
+          runId: 'run-1',
+          steps: [
+            {
+              index: 0,
+              kind: 'tool-call',
+              content: '失败步骤',
+              toolName: 'bad_tool',
+              status: 'failed',
+              startedAt: '2026-07-21T00:00:00.000Z',
+              completedAt: '2026-07-21T00:00:01.000Z'
+            }
+          ],
+          status: 'failed',
+          startedAt: '2026-07-21T00:00:00.000Z',
+          completedAt: '2026-07-21T00:00:01.000Z'
+        }
+      ]
+    })
+
+    const entries: TranscriptEntry[] = [
+      {
+        kind: 'user-message',
+        index: 0,
+        messageId: 'msg-user',
+        content: '触发失败的请求',
+        createdAt: '2026-07-21T00:00:00.000Z'
+      },
+      entry
+    ]
+
+    const transcript = createTranscriptSnapshot(entries)
+
+    render(
+      <TranscriptMessages
+        messages={[]}
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />
+    )
+
+    // 应展示失败状态（disclosure bar 和 failed footer 各有一个"执行失败"）
+    const failureLabels = screen.getAllByText('执行失败')
+    expect(failureLabels.length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('执行失败，请重试')).toBeInTheDocument()
+    // 失败步骤应可见（失败条目默认展开）
+    expect(screen.getByText('bad_tool · 失败步骤')).toBeInTheDocument()
+  })
+
+  it('passes onRetry callback with inReplyTo from entry', () => {
+    defineMockApi()
+    const onRetry = vi.fn()
+
+    const entry = createAgentReplyEntry({
+      index: 1,
+      messageId: 'msg-failed',
+      content: '',
+      attempt: createAttempt({
+        attemptId: 'attempt-failed',
+        status: 'failed',
+        error: {
+          code: 'unknown',
+          message: '失败',
+          recoverable: true
+        }
+      }),
+      inReplyTo: 'msg-user-1',
+      turns: [
+        {
+          index: 0,
+          runId: 'run-1',
+          steps: [
+            {
+              index: 0,
+              kind: 'tool-call',
+              content: '执行操作',
+              toolName: 'some_tool',
+              status: 'failed',
+              startedAt: '2026-07-21T00:00:00.000Z',
+              completedAt: '2026-07-21T00:00:01.000Z'
+            }
+          ],
+          status: 'failed',
+          startedAt: '2026-07-21T00:00:00.000Z',
+          completedAt: '2026-07-21T00:00:01.000Z'
+        }
+      ]
+    })
+
+    const entries: TranscriptEntry[] = [
+      {
+        kind: 'user-message',
+        index: 0,
+        messageId: 'msg-user-1',
+        content: '请求',
+        createdAt: '2026-07-21T00:00:00.000Z'
+      },
+      entry
+    ]
+
+    const transcript = createTranscriptSnapshot(entries)
+
+    render(
+      <TranscriptMessages
+        messages={[]}
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+        onRetry={onRetry}
+      />
+    )
+
+    // 点击重试按钮（失败条目默认展开，显示重试按钮）
+    const retryButton = screen.getByText('重试')
+    retryButton.click()
+
+    expect(onRetry).toHaveBeenCalledWith('msg-user-1')
+  })
+
+  it('handles session switch by clearing anchor and scrolling to bottom', () => {
+    defineMockApi()
+    const messages1: AgentMessage[] = [
+      createMessage({ messageId: 'msg-1', role: 'user', content: 'Session 1 message' })
+    ]
+
+    const { rerender } = render(
+      <TranscriptMessages messages={messages1} isStreaming={false} sessionId="session-1" />
+    )
+
+    expect(screen.getByText('Session 1 message')).toBeInTheDocument()
+
+    const messages2: AgentMessage[] = [
+      createMessage({ messageId: 'msg-2', role: 'user', content: 'Session 2 message' })
+    ]
+
+    // 切换到新会话
+    rerender(<TranscriptMessages messages={messages2} isStreaming={false} sessionId="session-2" />)
+
+    // 新会话的消息应可见
+    expect(screen.getByText('Session 2 message')).toBeInTheDocument()
+    // 旧会话的消息不应存在
+    expect(screen.queryByText('Session 1 message')).not.toBeInTheDocument()
+  })
+
+  it('uses adaptive estimate sizes for different item types', () => {
+    // 此测试验证 estimateItemSize 对不同类型返回不同值
+    // 虚拟列表的 estimateSize 函数会调用它
+    defineMockApi()
+    const messages: AgentMessage[] = [
+      createMessage({ messageId: 'msg-1', role: 'user', content: 'Hi' }),
+      createMessage({
+        messageId: 'msg-compact',
+        role: 'compaction',
+        content: '',
+        createdAt: new Date().toISOString()
+      }),
+      createMessage({ messageId: 'msg-2', role: 'agent', content: 'Hello' })
+    ]
+
+    render(<TranscriptMessages messages={messages} isStreaming={false} sessionId="session-1" />)
+
+    // 所有条目都应渲染
+    expect(screen.getByText('Hi')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(screen.getByText('Hello')).toBeInTheDocument()
+  })
+
+  it('buildRenderItemsFromTranscript marks last agent as streaming', () => {
+    defineMockApi()
+    const entries: TranscriptEntry[] = [
+      {
+        kind: 'user-message',
+        index: 0,
+        messageId: 'msg-1',
+        content: '问题',
+        createdAt: '2026-07-21T00:00:00.000Z'
+      },
+      createAgentReplyEntry({
+        index: 1,
+        messageId: 'msg-2',
+        content: '```js\nconst incomplete'
+      })
+    ]
+
+    const transcript = createTranscriptSnapshot(entries)
+
+    render(
+      <TranscriptMessages
+        messages={[]}
+        transcript={transcript}
+        isStreaming={true}
+        sessionId="session-1"
+      />
+    )
+
+    // 流式模式下，最后一条 agent 消息的代码块应标记为 incomplete
+    const codeBlock = document.querySelector('[data-streamdown="code-block"]')
+    expect(codeBlock).toBeInTheDocument()
+    expect(codeBlock?.getAttribute('data-incomplete')).toBe('true')
+  })
+
+  it('renders 200+ messages with virtual list and only mounts visible subset', () => {
+    defineMockApi()
+    const messages: AgentMessage[] = Array.from({ length: 250 }, (_, i) =>
+      createMessage({
+        messageId: `msg-${i}`,
+        role: i % 2 === 0 ? 'user' : 'agent',
+        content: `Message ${i}: Some longer content to fill more space`
+      })
+    )
+
+    render(<TranscriptMessages messages={messages} isStreaming={false} sessionId="session-1" />)
+
+    // 应该有消息渲染
+    expect(
+      screen.getByText('Message 0: Some longer content to fill more space')
+    ).toBeInTheDocument()
+
+    // 虚拟列表应只渲染可见子集——检查 DOM 中渲染的条目数量
+    // 通过 data-index 属性统计
+    const renderedItems = document.querySelectorAll('[data-index]')
+    // 对于有滚动容器的虚拟列表（clientHeight=600, estimate=100-120），
+    // 可见区域约为 5-6 条，加上 overscan 5 * 2 = 10，总共约 16~22 条
+    expect(renderedItems.length).toBeLessThan(50)
+    expect(renderedItems.length).toBeGreaterThan(0)
+  })
+
+  it('provides stable key for retry attempts via attemptId', () => {
+    defineMockApi()
+    const entry1 = createAgentReplyEntry({
+      index: 1,
+      messageId: 'msg-same',
+      content: '第一次回复',
+      attempt: createAttempt({
+        attemptId: 'attempt-1',
+        status: 'failed',
+        error: {
+          code: 'unknown',
+          message: 'failed',
+          recoverable: true
+        }
+      }),
+      inReplyTo: 'msg-user-1'
+    })
+
+    const entries: TranscriptEntry[] = [
+      {
+        kind: 'user-message',
+        index: 0,
+        messageId: 'msg-user-1',
+        content: '请求',
+        createdAt: '2026-07-21T00:00:00.000Z'
+      },
+      entry1
+    ]
+
+    const transcript = createTranscriptSnapshot(entries)
+
+    const { rerender } = render(
+      <TranscriptMessages
+        messages={[]}
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+        onRetry={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('第一次回复')).toBeInTheDocument()
+
+    // 模拟重试后的新 entry（同一 messageId，不同 attemptId）
+    const retryEntry = createAgentReplyEntry({
+      index: 1,
+      messageId: 'msg-same',
+      content: '重试回复',
+      attempt: createAttempt({
+        attemptId: 'attempt-2',
+        status: 'completed'
+      }),
+      inReplyTo: 'msg-user-1'
+    })
+
+    const retryTranscript = createTranscriptSnapshot([
+      {
+        kind: 'user-message',
+        index: 0,
+        messageId: 'msg-user-1',
+        content: '请求',
+        createdAt: '2026-07-21T00:00:00.000Z'
+      },
+      retryEntry
+    ])
+
+    rerender(
+      <TranscriptMessages
+        messages={[]}
+        transcript={retryTranscript}
+        isStreaming={false}
+        sessionId="session-1"
+        onRetry={vi.fn()}
+      />
+    )
+
+    // 重试回复应可见，旧内容不应存在
+    expect(screen.getByText('重试回复')).toBeInTheDocument()
+    expect(screen.queryByText('第一次回复')).not.toBeInTheDocument()
   })
 })

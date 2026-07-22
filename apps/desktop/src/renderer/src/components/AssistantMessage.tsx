@@ -22,6 +22,8 @@ export interface AssistantMessageProps {
   isStreaming: boolean
   /** 重试回调；仅对失败且非取消的条目生效。 */
   onRetry?: () => void
+  /** 展开/收起切换前回调，用于虚拟列表记录滚动锚点。 */
+  onToggleStart?: () => void
 }
 
 /**
@@ -64,7 +66,8 @@ function deriveState(entry: AgentReplyEntry, isStreaming: boolean): AssistantSta
 export function AssistantMessage({
   entry,
   isStreaming,
-  onRetry
+  onRetry,
+  onToggleStart
 }: AssistantMessageProps): React.JSX.Element {
   const state = deriveState(entry, isStreaming)
   const shouldExpand =
@@ -72,6 +75,14 @@ export function AssistantMessage({
 
   const [userToggled, setUserToggled] = useState(false)
   const isExpanded = shouldExpand || userToggled
+
+  /**
+   * 切换展开/收起状态，通知外层虚拟列表记录锚点。
+   */
+  function handleToggle(): void {
+    onToggleStart?.()
+    setUserToggled((prev) => !prev)
+  }
 
   const { stepCount, turnCount, durationText } = useMemo(() => {
     let steps = 0
@@ -128,7 +139,7 @@ export function AssistantMessage({
         <ExecutionDisclosure
           state={state}
           isExpanded={isExpanded}
-          onToggle={() => setUserToggled((prev) => !prev)}
+          onToggle={handleToggle}
           turnCount={turnCount}
           stepCount={stepCount}
           durationText={durationText}

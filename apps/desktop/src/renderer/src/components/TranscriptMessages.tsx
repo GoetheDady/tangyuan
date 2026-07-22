@@ -6,7 +6,7 @@ import type {
 } from '@tangyuan/contracts'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Sparkles } from 'lucide-react'
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { AssistantMessage } from './AssistantMessage'
 import { CompactionIndicator } from './CompactionIndicator'
 import { StreamdownMessage } from './StreamdownMessage'
@@ -19,6 +19,52 @@ type RenderItem =
   | { type: 'message'; message: AgentMessage; isLastAgent: boolean; renderIndex: number }
   | { type: 'assistant-message'; entry: AgentReplyEntry; isLastAgent: boolean; renderIndex: number }
   | { type: 'compaction'; timestamp: string; renderIndex: number }
+
+/**
+ * 距底部阈值（px）：scrollHeight - scrollTop - clientHeight 小于此值时视为"在底部"。
+ */
+const AT_BOTTOM_THRESHOLD = 50
+
+/**
+ * 各类型条目的预估高度（px），用于 TanStack Virtual 初始布局。
+ * 实际高度由 measureElement 通过 ResizeObserver 动态测量。
+ */
+const ESTIMATED_SIZES: Record<RenderItem['type'], number> = {
+  compaction: 48,
+  message: 100,
+  'assistant-message': 160
+}
+
+/**
+ * 根据条目类型返回虚拟列表的预估高度。
+ *
+ * @param item - 渲染项。
+ * @returns 预估高度（px）。
+ */
+function estimateItemSize(item: RenderItem): number {
+  return ESTIMATED_SIZES[item.type]
+}
+
+/**
+ * 生成虚拟列表中条目的稳定标识。
+ *
+ * 对于 assistant-message，使用 transcript 索引 + messageId + attemptId
+ * 确保多次执行尝试、重试、取消后条目身份稳定。
+ *
+ * @param item - 渲染项。
+ * @param _index - 虚拟列表索引（保留用于未来扩展）。
+ * @returns 稳定标识字符串。
+ */
+function getItemStableKey(item: RenderItem): string {
+  if (item.type === 'message') {
+    return item.message.messageId
+  }
+  if (item.type === 'assistant-message') {
+    const attemptId = item.entry.attempt?.attemptId ?? 'initial'
+    return `${item.entry.index}-${item.entry.messageId}-${attemptId}`
+  }
+  return `compaction-${item.timestamp}-${item.renderIndex}`
+}
 
 /**
  * 判断消息是否属于聊天主界面可展示的对话消息。
@@ -147,8 +193,11 @@ export interface TranscriptMessagesProps {
  * - 动态高度：流式增长和 Markdown 渲染后自动重测高度
  * - 自动跟随：用户在底部时新消息自动滚入视口
  * - 历史阅读不打扰：用户向上滚动后新消息不强制拉回
+ * - 展开/收起锚点：展开或收起执行历史时保持 disclosure 按钮可见
+ * - 容器高度自适应：审批/澄清卡片变化时自动调整滚动位置
  * - Memoization：已渲染消息的内容未变时跳过 Streamdown 重解析
  * - Compaction 检测：Pi 自动压缩条目渲染为非阻塞状态提示
+ * - 稳定身份：多次执行尝试、失败重试、取消后条目身份不重复或错位
  *
  * @param props - 组件的属性。
  * @returns 虚拟化 transcript 组件树。
@@ -176,16 +225,20 @@ export function TranscriptMessages({
   const virtualizer = useVirtualizer({
     count: renderItems.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 120,
+    estimateSize: (index) => {
+      const item = renderItems[index]
+      return item ? estimateItemSize(item) : 120
+    },
     overscan: 5,
     getItemKey: (index) => {
       const item = renderItems[index]
       if (!item) return `item-${index}`
-      if (item.type === 'message') return item.message.messageId
-      if (item.type === 'assistant-message') return item.entry.messageId
-      return `compaction-${item.timestamp}-${item.renderIndex}`
+      return getItemStableKey(item)
     }
   })
+
+  // 用于展开/收起时保持阅读位置的锚点信息
+  const anchorRef = useRef<{ index: number; offsetFromTop: number } | null>(null)
 
   // 监听滚动位置，跟踪用户是否在底部
   useEffect(() => {
@@ -194,18 +247,37 @@ export function TranscriptMessages({
 
     function handleScroll(): void {
       const { scrollTop, scrollHeight, clientHeight } = scrollEl!
-      // 距底部 50px 以内视为"在底部"
-      isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 50
+      // 距底部阈值以内视为"在底部"
+      isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < AT_BOTTOM_THRESHOLD
     }
 
     scrollEl.addEventListener('scroll', handleScroll, { passive: true })
     return () => scrollEl.removeEventListener('scroll', handleScroll)
   }, [])
 
+  // ResizeObserver 监听滚动容器高度变化（审批/澄清卡片出现/消失时）
+  useEffect(() => {
+    const scrollEl = scrollRef.current
+    if (!scrollEl) return
+
+    const observer = new ResizeObserver(() => {
+      // 容器高度变化时，若用户在底部则重新滚到底部
+      if (isAtBottomRef.current && renderItems.length > 0) {
+        requestAnimationFrame(() => {
+          virtualizer.scrollToIndex(renderItems.length - 1, { align: 'end' })
+        })
+      }
+    })
+
+    observer.observe(scrollEl)
+    return () => observer.disconnect()
+  }, [renderItems.length, virtualizer])
+
   // 会话切换时滚动到底部
   useEffect(() => {
     if (sessionId !== prevSessionIdRef.current) {
       prevSessionIdRef.current = sessionId
+      anchorRef.current = null
       if (renderItems.length > 0) {
         // 等待虚拟列表布局完成后滚动
         requestAnimationFrame(() => {
@@ -229,12 +301,58 @@ export function TranscriptMessages({
 
   // 流式模式下最后一条消息内容增长时，若用户在底部则保持跟随
   const lastItem = renderItems.length > 0 ? renderItems[renderItems.length - 1] : null
-  const lastMessageContent = lastItem?.type === 'message' ? lastItem.message.content.length : 0
+  const lastMessageContent =
+    lastItem?.type === 'message'
+      ? lastItem.message.content.length
+      : lastItem?.type === 'assistant-message'
+        ? lastItem.entry.content.length
+        : 0
   useEffect(() => {
     if (isStreaming && isAtBottomRef.current && renderItems.length > 0) {
       virtualizer.scrollToIndex(renderItems.length - 1, { align: 'end' })
     }
   }, [lastMessageContent]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 展开/收起执行历史时保持阅读位置
+  // 当总高度变化时（ResizeObserver 触发测量更新），检查是否需要调整滚动位置
+  const totalSize = virtualizer.getTotalSize()
+  const prevTotalSizeRef = useRef(totalSize)
+  useEffect(() => {
+    const anchor = anchorRef.current
+    if (anchor && scrollRef.current) {
+      // 找到锚点条目当前在虚拟列表中的位置
+      const anchorVirtualIndex = virtualizer.getVirtualItems().find((v) => v.index === anchor.index)
+      if (anchorVirtualIndex) {
+        const currentOffset = anchorVirtualIndex.start - scrollRef.current.scrollTop
+        const delta = currentOffset - anchor.offsetFromTop
+        scrollRef.current.scrollTop += delta
+      }
+      anchorRef.current = null
+    }
+    prevTotalSizeRef.current = totalSize
+  }, [totalSize]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * 在展开/收起执行历史前调用，记录当前展开按钮的锚点位置。
+   *
+   * @param renderIndex - 被切换的条目在 renderItems 中的索引。
+   */
+  const handleToggleStart = useCallback(
+    (renderIndex: number) => {
+      const scrollEl = scrollRef.current
+      if (!scrollEl) return
+
+      const virtualItems = virtualizer.getVirtualItems()
+      const targetItem = virtualItems.find((v) => v.index === renderIndex)
+      if (targetItem) {
+        anchorRef.current = {
+          index: renderIndex,
+          offsetFromTop: targetItem.start - scrollEl.scrollTop
+        }
+      }
+    },
+    [virtualizer]
+  )
 
   if (!sessionId) {
     return (
@@ -311,6 +429,7 @@ export function TranscriptMessages({
                           }
                         : undefined
                     }
+                    onToggleStart={() => handleToggleStart(item.renderIndex)}
                   />
                 </div>
               ) : (
