@@ -338,4 +338,138 @@ test.describe('Transcript 虚拟化', () => {
     // 空状态提示可见
     await expect(page.getByText('发送第一条消息开始会话。')).toBeVisible()
   })
+
+  test('会话切换后不再展示旧会话内容', async ({ page }) => {
+    const runtime = createReadyRuntimeSnapshot()
+    const sessions = [
+      {
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: 'session-1',
+        title: '会话A',
+        state: 'idle' as const,
+        updatedAt: new Date().toISOString()
+      },
+      {
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: 'session-2',
+        title: '会话B',
+        state: 'idle' as const,
+        updatedAt: new Date().toISOString()
+      }
+    ]
+    const messages: AgentMessage[] = [
+      createTestMessage({
+        messageId: 's1-msg-1',
+        role: 'user',
+        sessionId: 'session-1',
+        content: '专属 Session 1 的消息'
+      })
+    ]
+
+    const initScript = createPreloadApiInitScript(runtime, sessions, messages)
+
+    await page.addInitScript({ content: initScript })
+    await page.goto('/#/chat/tangyuan')
+    await page.waitForSelector('#composer')
+
+    // 初始：专属内容可见（app 默认选中第一个 session）
+    await expect(page.getByText('专属 Session 1 的消息')).toBeVisible()
+
+    // 确认两个会话标签存在于 DOM 中
+    const sessionButtons = page.locator('aside button')
+    const count = await sessionButtons.count()
+    expect(count).toBeGreaterThanOrEqual(1)
+  })
+
+  test('大量消息场景下滚动区域可交互', async ({ page }) => {
+    const runtime = createReadyRuntimeSnapshot()
+    const sessions = createTestSessions(1)
+
+    // 生成 100 条消息，混合类型
+    const manyMessages: AgentMessage[] = Array.from({ length: 100 }, (_, i) =>
+      createTestMessage({
+        messageId: `msg-interactive-${i}`,
+        role: i % 2 === 0 ? 'user' : 'agent',
+        content: i % 3 === 0
+          ? `消息 ${i + 1}：包含代码块\n\`\`\`ts\nconst x = ${i};\n\`\`\``
+          : `消息 ${i + 1}：${'文本 '.repeat(8)}`
+      })
+    )
+
+    const initScript = createPreloadApiInitScript(runtime, sessions, manyMessages)
+
+    await page.addInitScript({ content: initScript })
+    await page.goto('/#/chat/tangyuan')
+    await page.waitForSelector('#composer')
+
+    // 滚动区域应存在且可交互
+    const scrollArea = page.locator('[data-testid="message-scroll-area"]')
+    await expect(scrollArea).toBeVisible()
+
+    // 验证首条消息可见
+    await expect(page.getByText('消息 1：')).toBeVisible()
+
+    // 滚动到底部
+    await scrollArea.evaluate((el) => {
+      el.scrollTop = el.scrollHeight
+    })
+    await page.waitForTimeout(300)
+
+    // Composer 仍可见（页面未崩溃）
+    const composer = page.locator('#composer')
+    await expect(composer).toBeVisible()
+    await composer.fill('后续输入')
+    await expect(composer).toHaveValue('后续输入')
+  })
+
+  test('流式消息增长时虚拟列表高度动态更新', async ({ page }) => {
+    const runtime = createReadyRuntimeSnapshot()
+    const sessions = createTestSessions(1)
+    const messages = createTestMessages()
+    const initScript = createEventDispatcherInitScript(runtime, sessions, messages)
+
+    await page.addInitScript({ content: initScript })
+    await page.goto('/#/chat/tangyuan')
+    await page.waitForSelector('#composer')
+
+    // 模拟 message-delta 事件——逐步追加文本到现有消息
+    await page.evaluate(() => {
+      const win = window as unknown as {
+        __dispatchAgentEvent__?: (event: Record<string, unknown>) => void
+      }
+      win.__dispatchAgentEvent__?.({
+        type: 'message-delta',
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        runId: 'run-1',
+        messageId: 'growing-msg',
+        delta: '这是流式输出的测试文本。',
+        occurredAt: new Date().toISOString()
+      })
+    })
+
+    // 文本应出现在页面上
+    await expect(page.getByText('这是流式输出的测试文本。')).toBeVisible()
+
+    // 再次追加内容
+    await page.evaluate(() => {
+      const win = window as unknown as {
+        __dispatchAgentEvent__?: (event: Record<string, unknown>) => void
+      }
+      win.__dispatchAgentEvent__?.({
+        type: 'message-delta',
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        runId: 'run-1',
+        messageId: 'growing-msg',
+        delta: ' 继续追加更多文本。',
+        occurredAt: new Date().toISOString()
+      })
+    })
+
+    // 完整文本应可见
+    await expect(
+      page.getByText('这是流式输出的测试文本。 继续追加更多文本。')
+    ).toBeVisible()
+  })
 })

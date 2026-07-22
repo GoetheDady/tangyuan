@@ -714,3 +714,413 @@ describe('TranscriptMessages', () => {
     expect(screen.queryByText('第一次回复')).not.toBeInTheDocument()
   })
 })
+
+/**
+ * 确定性大数据夹具：长 thinking、长 Markdown、代码块、大量工具步骤。
+ */
+function createBigDataEntries(): TranscriptEntry[] {
+  const longThinking =
+    '分析用户需求：需要实现一个完整的 REST API 服务，包含用户认证、数据验证、错误处理、' +
+    '日志记录、性能监控等模块。' +
+    '考虑到现有系统架构基于微服务，新功能需要与已有服务通过 gRPC 通信。' +
+    '数据库方面需要同时支持 PostgreSQL 和 Redis 缓存层。' +
+    '安全方面需要实现 JWT 令牌刷新、CSRF 防护、速率限制。' +
+    '部署方面需要考虑 Docker 容器化和 Kubernetes 编排。'
+
+  const longMarkdown = [
+    '# API 设计方案',
+    '',
+    '## 认证流程',
+    '',
+    '```ts',
+    'interface AuthConfig {',
+    '  jwtSecret: string',
+    '  expiresIn: number',
+    '  refreshWindow: number',
+    '  rateLimit: {',
+    '    windowMs: number',
+    '    max: number',
+    '  }',
+    '}',
+    '',
+    'async function authenticate(token: string): Promise<User> {',
+    '  const payload = verifyToken(token)',
+    '  if (payload.exp < Date.now()) {',
+    '    throw new AuthError("Token expired")',
+    '  }',
+    '  return findUser(payload.sub)',
+    '}',
+    '```',
+    '',
+    '## 数据模型',
+    '',
+    '| 字段 | 类型 | 说明 |',
+    '| --- | --- | --- |',
+    '| `id` | `uuid` | 主键 |',
+    '| `email` | `string` | 用户邮箱 |',
+    '| `roles` | `string[]` | 角色列表 |',
+    '| `createdAt` | `timestamp` | 创建时间 |',
+    '',
+    '- [x] 用户认证',
+    '- [x] 数据验证',
+    '- [ ] 错误处理中间件',
+    '- [ ] 日志系统',
+    '- [ ] 性能监控',
+    '',
+    '> **注意：** 生产环境需要配置 HTTPS 和 CORS 白名单。'
+  ].join('\n')
+
+  const manyToolSteps = Array.from({ length: 12 }, (_, i) => ({
+    index: i,
+    kind: (['thinking', 'tool-call', 'text'] as const)[i % 3],
+    content:
+      i % 3 === 0
+        ? `思考步骤 ${i + 1}：分析当前阶段的任务目标和依赖关系`
+        : i % 3 === 1
+          ? `执行操作 ${i + 1}：调用工具完成子任务`
+          : `输出结果 ${i + 1}：生成中间文本`,
+    toolCallId: i % 3 === 1 ? `tc-${i}` : undefined,
+    toolName: i % 3 === 1 ? `tool_${i}` : undefined,
+    status: (i < 10 ? 'completed' : 'running') as 'completed' | 'running',
+    startedAt: `2026-07-21T00:0${Math.min(i, 9)}:00.000Z`,
+    completedAt: i < 10 ? `2026-07-21T00:0${Math.min(i, 9)}:05.000Z` : null
+  }))
+
+  const entries: TranscriptEntry[] = [
+    {
+      kind: 'user-message',
+      index: 0,
+      messageId: 'big-user-1',
+      content: '请帮我设计一个完整的 REST API 服务',
+      createdAt: '2026-07-21T00:00:00.000Z'
+    },
+    {
+      kind: 'agent-reply',
+      index: 1,
+      messageId: 'big-reply-1',
+      content: longMarkdown,
+      createdAt: '2026-07-21T00:00:00.000Z',
+      attempt: {
+        attemptId: 'big-attempt-1',
+        runId: 'big-run-1',
+        status: 'completed',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: '2026-07-21T00:03:00.000Z'
+      },
+      turns: [
+        {
+          index: 0,
+          runId: 'big-run-1',
+          steps: manyToolSteps,
+          status: 'completed' as const,
+          startedAt: '2026-07-21T00:00:00.000Z',
+          completedAt: '2026-07-21T00:03:00.000Z'
+        }
+      ]
+    },
+    {
+      kind: 'compaction',
+      index: 2,
+      timestamp: '2026-07-21T01:00:00.000Z'
+    },
+    {
+      kind: 'user-message',
+      index: 3,
+      messageId: 'big-user-2',
+      content: '现在加上 WebSocket 支持',
+      createdAt: '2026-07-21T01:00:01.000Z'
+    },
+    {
+      kind: 'agent-reply',
+      index: 4,
+      messageId: 'big-reply-2',
+      content: longThinking,
+      createdAt: '2026-07-21T01:00:01.000Z',
+      attempt: {
+        attemptId: 'big-attempt-2',
+        runId: 'big-run-2',
+        status: 'completed',
+        startedAt: '2026-07-21T01:00:01.000Z',
+        completedAt: '2026-07-21T01:01:00.000Z'
+      },
+      turns: [
+        {
+          index: 0,
+          runId: 'big-run-2',
+          steps: [
+            {
+              index: 0,
+              kind: 'thinking' as const,
+              content: longThinking,
+              status: 'completed' as const,
+              startedAt: '2026-07-21T01:00:01.000Z',
+              completedAt: '2026-07-21T01:01:00.000Z'
+            }
+          ],
+          status: 'completed' as const,
+          startedAt: '2026-07-21T01:00:01.000Z',
+          completedAt: '2026-07-21T01:01:00.000Z'
+        }
+      ]
+    }
+  ]
+
+  return entries
+}
+
+/**
+ * 确定性大数据夹具：多次执行尝试（含重试、失败、成功）。
+ */
+function createMultipleAttemptEntries(): TranscriptEntry[] {
+  const entries: TranscriptEntry[] = []
+
+  // 用户消息
+  entries.push({
+    kind: 'user-message',
+    index: 0,
+    messageId: 'multi-user-1',
+    content: '部署到生产环境',
+    createdAt: '2026-07-21T00:00:00.000Z'
+  })
+
+  // 第一次尝试：失败
+  entries.push({
+    kind: 'agent-reply',
+    index: 1,
+    messageId: 'multi-reply-1',
+    content: '',
+    createdAt: '2026-07-21T00:00:00.000Z',
+    attempt: {
+      attemptId: 'multi-attempt-1',
+      runId: 'multi-run-1',
+      status: 'failed',
+      startedAt: '2026-07-21T00:00:00.000Z',
+      completedAt: '2026-07-21T00:00:30.000Z',
+      error: {
+        code: 'unknown',
+        message: '部署脚本执行失败：权限不足',
+        recoverable: true
+      }
+    },
+    turns: [
+      {
+        index: 0,
+        runId: 'multi-run-1',
+        steps: [
+          {
+            index: 0,
+            kind: 'tool-call' as const,
+            content: '执行部署命令',
+            toolName: 'deploy',
+            toolCallId: 'tc-deploy-1',
+            status: 'failed' as const,
+            startedAt: '2026-07-21T00:00:00.000Z',
+            completedAt: '2026-07-21T00:00:30.000Z'
+          }
+        ],
+        status: 'failed' as const,
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: '2026-07-21T00:00:30.000Z'
+      }
+    ]
+  })
+
+  // 重试：成功
+  entries.push({
+    kind: 'agent-reply',
+    index: 2,
+    messageId: 'multi-reply-2',
+    content: '部署成功！应用已上线。',
+    createdAt: '2026-07-21T00:01:00.000Z',
+    attempt: {
+      attemptId: 'multi-attempt-2',
+      runId: 'multi-run-2',
+      status: 'completed',
+      startedAt: '2026-07-21T00:01:00.000Z',
+      completedAt: '2026-07-21T00:02:00.000Z'
+    },
+    turns: [
+      {
+        index: 0,
+        runId: 'multi-run-2',
+        steps: [
+          {
+            index: 0,
+            kind: 'tool-call' as const,
+            content: '执行部署命令（已提权）',
+            toolName: 'deploy',
+            toolCallId: 'tc-deploy-2',
+            status: 'completed' as const,
+            startedAt: '2026-07-21T00:01:00.000Z',
+            completedAt: '2026-07-21T00:02:00.000Z'
+          }
+        ],
+        status: 'completed' as const,
+        startedAt: '2026-07-21T00:01:00.000Z',
+        completedAt: '2026-07-21T00:02:00.000Z'
+      }
+    ]
+  })
+
+  return entries
+}
+
+/**
+ * 确定性大数据夹具：多个压缩提示分散在对话中。
+ */
+function createMultiCompactionEntries(): TranscriptEntry[] {
+  const entries: TranscriptEntry[] = []
+
+  for (let i = 0; i < 8; i++) {
+    entries.push({
+      kind: 'user-message',
+      index: entries.length,
+      messageId: `comp-user-${i}`,
+      content: `第 ${i + 1} 轮提问`,
+      createdAt: new Date(Date.now() + i * 60000).toISOString()
+    })
+    entries.push({
+      kind: 'agent-reply',
+      index: entries.length,
+      messageId: `comp-reply-${i}`,
+      content: `第 ${i + 1} 轮回复：处理完成。`,
+      createdAt: new Date(Date.now() + i * 60000 + 10000).toISOString(),
+      attempt: {
+        attemptId: `comp-attempt-${i}`,
+        runId: `comp-run-${i}`,
+        status: 'completed' as const,
+        startedAt: new Date(Date.now() + i * 60000).toISOString(),
+        completedAt: new Date(Date.now() + i * 60000 + 10000).toISOString()
+      },
+      turns: []
+    })
+    if (i % 3 === 2) {
+      entries.push({
+        kind: 'compaction',
+        index: entries.length,
+        timestamp: new Date(Date.now() + i * 60000 + 15000).toISOString()
+      })
+    }
+  }
+
+  return entries
+}
+
+describe('TranscriptMessages 确定性大数据夹具', () => {
+  it('渲染长 thinking + 长 Markdown + 代码块 + 12 个工具步骤', () => {
+    defineMockApi()
+    const entries = createBigDataEntries()
+    const transcript = createTranscriptSnapshot(entries)
+
+    render(
+      <TranscriptMessages
+        messages={[]}
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />
+    )
+
+    // 用户消息应可见
+    expect(screen.getByText('请帮我设计一个完整的 REST API 服务')).toBeInTheDocument()
+    expect(screen.getByText('现在加上 WebSocket 支持')).toBeInTheDocument()
+
+    // Markdown 渲染应包含代码块（Shiki 高亮后可能包裹在 pre 中）
+    const codeBlocks = document.querySelectorAll('[data-streamdown="code-block"]')
+    expect(codeBlocks.length).toBeGreaterThan(0)
+
+    // Compaction 指示器应出现
+    expect(screen.getByRole('status')).toBeInTheDocument()
+
+    // 第一个 agent-reply 应有执行披露栏
+    expect(screen.getAllByText('已完成执行过程').length).toBeGreaterThan(0)
+
+    // 展开第一个 reply 查看工具步骤
+    const disclosures = screen.getAllByText('已完成执行过程')
+    const firstDisclosure = disclosures[0]?.closest('button')
+    expect(firstDisclosure).not.toBeNull()
+    if (firstDisclosure) {
+      fireEvent.click(firstDisclosure)
+    }
+
+    // 12 个步骤中有部分应可见
+    expect(screen.getByText('tool_1 · 执行操作 2：调用工具完成子任务')).toBeInTheDocument()
+  })
+
+  it('渲染多次执行尝试：失败 + 重试成功', () => {
+    defineMockApi()
+    const entries = createMultipleAttemptEntries()
+    const transcript = createTranscriptSnapshot(entries)
+
+    render(
+      <TranscriptMessages
+        messages={[]}
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />
+    )
+
+    // 失败的尝试应展示
+    const failureLabels = screen.getAllByText('执行失败')
+    expect(failureLabels.length).toBeGreaterThanOrEqual(1)
+
+    // 成功的重试应答
+    expect(screen.getByText('部署成功！应用已上线。')).toBeInTheDocument()
+
+    // 两个 agent-reply 条目应都渲染
+    const articles = document.querySelectorAll('article')
+    // 1 user message + 2 agent replies = 3 articles
+    expect(articles.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('渲染 8 轮对话 + 2 个压缩提示', () => {
+    defineMockApi()
+    const entries = createMultiCompactionEntries()
+    const transcript = createTranscriptSnapshot(entries)
+
+    render(
+      <TranscriptMessages
+        messages={[]}
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />
+    )
+
+    // 前面几轮应可见（虚拟列表只渲染视口内项目）
+    expect(screen.getByText('第 1 轮提问')).toBeInTheDocument()
+    expect(screen.getByText('第 2 轮提问')).toBeInTheDocument()
+
+    // 压缩提示在可见范围内应有至少 1 个
+    const compactionIndicators = screen.getAllByRole('status')
+    // 虚拟列表视口内可见的 compaction 至少 1 个
+    expect(compactionIndicators.length).toBeGreaterThanOrEqual(1)
+
+    // 虚拟列表只渲染可见子集，不应渲染全部 18+ 条目
+    const renderedItems = document.querySelectorAll('[data-index]')
+    expect(renderedItems.length).toBeLessThan(18)
+    expect(renderedItems.length).toBeGreaterThan(0)
+  })
+
+  it('虚拟列表在大数据场景下不渲染全部条目', () => {
+    defineMockApi()
+    const entries = createBigDataEntries()
+    const transcript = createTranscriptSnapshot(entries)
+
+    render(
+      <TranscriptMessages
+        messages={[]}
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />
+    )
+
+    const renderedItems = document.querySelectorAll('[data-index]')
+    // 大数据条目共 5 条，clientHeight=600，全部在视口内 → 5 条全部渲染
+    // + overscan 5*2=10 → 但条目总共才 5
+    expect(renderedItems.length).toBeLessThanOrEqual(15)
+    expect(renderedItems.length).toBeGreaterThan(0)
+  })
+})

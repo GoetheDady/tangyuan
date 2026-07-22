@@ -176,7 +176,7 @@ export function createPreloadApiInitScript(
             if (msg.role === 'user') {
               entries.push({ kind: 'user-message', index: index++, messageId: msg.messageId, content: msg.content, createdAt: msg.createdAt });
             } else if (msg.role === 'agent') {
-              entries.push({ kind: 'agent-reply', index: index++, messageId: msg.messageId, content: msg.content, createdAt: msg.createdAt, attempt: null });
+              entries.push({ kind: 'agent-reply', index: index++, messageId: msg.messageId, content: msg.content, createdAt: msg.createdAt, attempt: null, turns: [] });
             } else if (msg.role === 'compaction') {
               entries.push({ kind: 'compaction', index: index++, timestamp: msg.createdAt });
             }
