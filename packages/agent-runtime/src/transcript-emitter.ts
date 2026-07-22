@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentEventListener } from './index'
+import type { AgentEventListener, DriverEvent } from './index'
 import {
   applyTranscriptDelta,
   type AgentRuntimeErrorPayload,
@@ -77,7 +77,7 @@ export class TranscriptEmitter {
    * @throws 此方法不会主动抛出错误。
    */
   emitTranscriptDeltaForMessageAppended(
-    event: Extract<AgentEvent, { type: 'message-appended' }>,
+    event: Extract<DriverEvent, { type: 'message-appended' }>,
   ): void {
     const message = event.message
     const sessionId = message.sessionId
@@ -142,7 +142,7 @@ export class TranscriptEmitter {
    * @throws 此方法不会主动抛出错误。
    */
   startAttemptForRun(
-    event: Extract<AgentEvent, { type: 'turn-started' }>,
+    event: Extract<DriverEvent, { type: 'turn-started' }>,
   ): void {
     const attempt: ExecutionAttempt = {
       attemptId: event.runId,
@@ -163,7 +163,7 @@ export class TranscriptEmitter {
    * @throws 此方法不会主动抛出错误。
    */
   emitTranscriptDeltaForDelta(
-    event: Extract<AgentEvent, { type: 'message-delta' }>,
+    event: Extract<DriverEvent, { type: 'message-delta' }>,
   ): void {
     const entryIndex = this.messageToEntryIndex.get(event.messageId)
     if (entryIndex === undefined) return
@@ -184,7 +184,7 @@ export class TranscriptEmitter {
    * @throws 此方法不会主动抛出错误。
    */
   initializeTurnStateForRun(
-    event: Extract<AgentEvent, { type: 'turn-started' }>,
+    event: Extract<DriverEvent, { type: 'turn-started' }>,
   ): void {
     const entryIndex = this.findLastAgentReplyIndex()
     if (entryIndex === undefined) return
@@ -207,7 +207,7 @@ export class TranscriptEmitter {
    * @throws 此方法不会主动抛出错误。
    */
   emitTranscriptDeltaForThinking(
-    event: Extract<AgentEvent, { type: 'message-delta' }>,
+    event: Extract<DriverEvent, { type: 'message-delta' }>,
   ): void {
     const turnState = this.turnStateByRun.get(event.runId)
     if (!turnState) return
@@ -261,7 +261,7 @@ export class TranscriptEmitter {
    * @throws 此方法不会主动抛出错误。
    */
   emitTranscriptDeltaForActivity(
-    event: Extract<AgentEvent, { type: 'activity-updated' }>,
+    event: Extract<DriverEvent, { type: 'activity-updated' }>,
   ): void {
     const turnState = this.turnStateByRun.get(event.runId)
     if (!turnState) return
@@ -372,7 +372,7 @@ export class TranscriptEmitter {
    * @throws 此方法不会主动抛出错误。
    */
   completeAttemptForRun(
-    event: Extract<AgentEvent, { type: 'message-completed' }>,
+    event: Extract<DriverEvent, { type: 'message-completed' }>,
   ): void {
     const attempt = this.runToAttempt.get(event.runId)
     const entryIndex = this.messageToEntryIndex.get(event.message.messageId)

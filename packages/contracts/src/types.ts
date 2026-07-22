@@ -20,23 +20,6 @@ export type AgentRunState =
   'idle' | 'queued' | 'running' | 'completed' | 'cancelled' | 'failed'
 
 /**
- * 描述消息在对话消息列表里的来源。
- */
-export type AgentMessageRole = 'user' | 'agent' | 'system' | 'compaction'
-
-/**
- * 描述一个用户或 Agent 消息。
- */
-export interface AgentMessage {
-  messageId: string
-  agentId: AgentId
-  sessionId: string
-  role: AgentMessageRole
-  content: string
-  createdAt: string
-}
-
-/**
  * 描述一次 Agent 运行的身份与状态。
  */
 export interface ExecutionAttempt {
@@ -259,31 +242,6 @@ export interface AgentRuntimeErrorPayload {
 }
 
 /**
- * 描述 Agent 运行中可展示给用户的简略活动类型。
- */
-export type AgentActivityKind = 'thinking' | 'tool'
-
-/**
- * 描述 Agent 运行中可展示给用户的简略活动状态。
- */
-export type AgentActivityState = 'running' | 'completed' | 'failed'
-
-/**
- * 描述 Agent 运行中不含敏感参数的简略活动。
- */
-export interface AgentActivity {
-  kind: AgentActivityKind
-  state: AgentActivityState
-  label: string
-  /** 可选：关联的 turn step 标识，用于 Renderer 链接到时间线。 */
-  stepId?: string
-  /** 可选：工具调用唯一标识，用于 Runtime 归并同一工具的实时更新和最终结果。 */
-  toolCallId?: string
-  /** 可选：工具原名，用于生成安全摘要。 */
-  toolName?: string
-}
-
-/**
  * 描述 Bash 审批请求的当前状态。
  */
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
@@ -370,37 +328,10 @@ export type AgentEvent =
       occurredAt: string
     }
   | {
-      type: 'message-appended'
-      agentId: AgentId
-      message: AgentMessage
-      /** 可选：关联的用户消息标识，用于重试场景标识 inReplyTo。 */
-      inReplyTo?: string
-      occurredAt: string
-    }
-  | {
       type: 'turn-started'
       agentId: AgentId
       sessionId: string
       runId: string
-      occurredAt: string
-    }
-  | {
-      type: 'message-delta'
-      agentId: AgentId
-      sessionId: string
-      runId: string
-      messageId: string
-      delta: string
-      /** 区分 thinking 原文和普通文本增量，默认为 'text'。 */
-      deltaKind?: 'text' | 'thinking'
-      occurredAt: string
-    }
-  | {
-      type: 'message-completed'
-      agentId: AgentId
-      sessionId: string
-      runId: string
-      message: AgentMessage
       occurredAt: string
     }
   | {
@@ -416,14 +347,6 @@ export type AgentEvent =
       sessionId: string
       runId: string
       error: AgentRuntimeErrorPayload
-      occurredAt: string
-    }
-  | {
-      type: 'activity-updated'
-      agentId: AgentId
-      sessionId: string
-      runId: string
-      activity: AgentActivity
       occurredAt: string
     }
   | {

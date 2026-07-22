@@ -1,6 +1,5 @@
 import type {
   AgentHomeBootstrapStatus,
-  AgentMessage,
   AgentProfileStatus,
   AgentReplyEntry,
   AgentSessionSummary,
@@ -180,66 +179,6 @@ export function migrateConfigV1ToV2(
       },
     },
   }
-}
-
-/**
- * 从扁平的 AgentMessage 列表构建结构化 TranscriptSnapshot。
- *
- * 转换规则：
- * - role='user' → UserMessageEntry
- * - role='agent' → AgentReplyEntry（attempt 初始为 null，turns 初始为空）
- * - role='compaction' → CompactionEntry
- * - role='system' → 跳过（activity 消息将在后续 ticket 中转为执行步骤）
- *
- * @param messages - 按时间排序的扁平消息列表。
- * @param sessionId - 会话标识。
- * @param agentId - Agent 标识。
- * @param now - 快照生成时间戳。
- * @returns 结构化会话快照。
- * @throws 此方法不会主动抛出错误。
- */
-export function buildTranscriptSnapshot(
-  messages: readonly AgentMessage[],
-  sessionId: string,
-  agentId: string,
-  now: string,
-): TranscriptSnapshot {
-  const entries: TranscriptEntry[] = []
-  let index = 0
-
-  for (const message of messages) {
-    if (message.role === 'system') {
-      continue
-    }
-
-    if (message.role === 'compaction') {
-      entries.push({
-        kind: 'compaction',
-        index: index++,
-        timestamp: message.createdAt,
-      })
-    } else if (message.role === 'user') {
-      entries.push({
-        kind: 'user-message',
-        index: index++,
-        messageId: message.messageId,
-        content: message.content,
-        createdAt: message.createdAt,
-      })
-    } else if (message.role === 'agent') {
-      entries.push({
-        kind: 'agent-reply',
-        index: index++,
-        messageId: message.messageId,
-        content: message.content,
-        createdAt: message.createdAt,
-        attempt: null,
-        turns: [],
-      })
-    }
-  }
-
-  return { sessionId, agentId, entries, updatedAt: now }
 }
 
 /**

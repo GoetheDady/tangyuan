@@ -1,6 +1,5 @@
 import { z } from 'zod'
 import {
-  agentMessageSchema,
   agentSessionSummarySchema,
   answerClarificationRequestSchema,
   approveBashRequestSchema,
@@ -41,7 +40,6 @@ import {
 } from './schemas'
 import type {
   AgentEventListener,
-  AgentMessage,
   AgentSessionSummary,
   AgentSummary,
   AnswerClarificationRequest,
@@ -266,8 +264,8 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: RuntimeSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsList]: AgentSessionSummary[]
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: AgentSessionSummary
-  [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: AgentMessage[]
-  [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: AgentMessage[]
+  [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: TranscriptSnapshot
+  [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: TranscriptSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: AgentSessionSummary
   [DESKTOP_IPC_CHANNELS.agentsList]: AgentSummary[]
   [DESKTOP_IPC_CHANNELS.agentsUpdateConfig]: AgentSummary
@@ -302,7 +300,7 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsCancelClarification]: void
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications]: QuestionClarificationRequest[]
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: TranscriptSnapshot
-  [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: AgentMessage[]
+  [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: TranscriptSnapshot
 }
 
 /**
@@ -318,8 +316,8 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: runtimeSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsList]: z.array(agentSessionSummarySchema),
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: agentSessionSummarySchema,
-  [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: z.array(agentMessageSchema),
-  [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: z.array(agentMessageSchema),
+  [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: transcriptSnapshotSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: transcriptSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: agentSessionSummarySchema,
   [DESKTOP_IPC_CHANNELS.agentsList]: z.array(
     z.strictObject({
@@ -435,7 +433,7 @@ export const desktopIpcResponseSchemas = {
     questionClarificationRequestSchema,
   ),
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: transcriptSnapshotSchema,
-  [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: z.array(agentMessageSchema),
+  [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: transcriptSnapshotSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -544,22 +542,13 @@ export interface DesktopPreloadApi {
   getTranscript(request: GetSessionMessagesRequest): Promise<TranscriptSnapshot>
 
   /**
-   * 读取指定会话的对话消息。
-   *
-   * @param request - 会话所属 Agent 和会话标识。
-   * @returns 会话里的消息列表。
-   * @throws 当会话不存在或 Main 进程无法读取消息时，Promise 会 reject。
-   */
-  getMessages(request: GetSessionMessagesRequest): Promise<AgentMessage[]>
-
-  /**
    * 向指定 Agent 会话发送一条用户消息。
    *
    * @param request - 会话所属 Agent、会话标识和用户消息内容。
-   * @returns 发送完成后可展示的最新消息列表。
+   * @returns 发送完成后的结构化会话快照。
    * @throws 当配置缺失、会话不存在或 Agent 运行失败时，Promise 会 reject。
    */
-  sendMessage(request: SendMessageRequest): Promise<AgentMessage[]>
+  sendMessage(request: SendMessageRequest): Promise<TranscriptSnapshot>
 
   /**
    * 取消指定会话正在运行的 Agent 响应。
@@ -574,10 +563,10 @@ export interface DesktopPreloadApi {
    * 重试一条失败的用户消息，复用原始请求并创建新的执行尝试。
    *
    * @param request - 会话定位信息和要重试的原始用户消息标识。
-   * @returns 重试完成后的最新消息列表。
+   * @returns 重试完成后的结构化会话快照。
    * @throws 当配置缺失、会话不存在或 Agent 运行失败时，Promise 会 reject。
    */
-  retryMessage(request: RetryRunRequest): Promise<AgentMessage[]>
+  retryMessage(request: RetryRunRequest): Promise<TranscriptSnapshot>
 
   /**
    * 订阅 Main 进程转发的 Agent 标准事件。

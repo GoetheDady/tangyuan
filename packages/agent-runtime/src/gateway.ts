@@ -1,5 +1,5 @@
 import { dirname } from 'node:path'
-import type { AgentMessage } from '@tangyuan/contracts'
+import type { TranscriptSnapshot } from '@tangyuan/contracts'
 import {
   type PiSdkCreateSessionRequest,
   type PiSdkGateway,
@@ -13,8 +13,8 @@ import {
   type PiSdkVerificationRequest,
 } from './index'
 import {
+  buildTranscriptSnapshotFromSdkEntries,
   describeBashRisk,
-  mapPiSdkSessionEntryToAgentMessage,
   normalizePiSdkSessionEvent,
 } from './utils'
 
@@ -160,18 +160,19 @@ export class RealPiSdkGateway implements PiSdkGateway {
    */
   async readMessages(
     request: PiSdkReadMessagesRequest,
-  ): Promise<AgentMessage[]> {
+  ): Promise<TranscriptSnapshot> {
     const { SessionManager } = await import('@earendil-works/pi-coding-agent')
     const sessionManager = SessionManager.open(
       request.sdkSessionFile,
       dirname(request.sdkSessionFile),
     )
 
-    return sessionManager
-      .getEntries()
-      .flatMap((entry: unknown) =>
-        mapPiSdkSessionEntryToAgentMessage(entry, request.sessionId),
-      )
+    const entries = sessionManager.getEntries()
+    return buildTranscriptSnapshotFromSdkEntries(
+      entries,
+      request.sessionId,
+      'tangyuan',
+    )
   }
 
   /**
@@ -512,12 +513,3 @@ export class RealPiSdkGateway implements PiSdkGateway {
     }
   }
 }
-
-/**
- * 将 Pi SDK session entry 转成汤圆标准消息。
- *
- * @param entry - Pi SDK SessionManager 返回的未知 entry。
- * @param sessionId - 当前汤圆会话标识。
- * @returns 可展示消息；不是 message entry 时返回空数组。
- * @throws 此方法不会主动抛出错误。
- */

@@ -1,6 +1,5 @@
 import type {
   AgentEvent,
-  AgentMessage,
   AgentSessionSummary,
   AgentSummary,
   BashApprovalRequest,
@@ -31,7 +30,6 @@ interface DesktopWorkbenchState {
   agents: AgentSummary[]
   sessions: AgentSessionSummary[]
   selectedSessionId: string | null
-  messages: AgentMessage[]
   transcript: TranscriptSnapshot | null
   composerText: string
   isLoading: boolean
@@ -49,7 +47,7 @@ interface DesktopWorkbenchAction {
   setSelectedSessionId(
     value: string | null | ((currentValue: string | null) => string | null)
   ): void
-  setMessages(value: AgentMessage[] | ((currentValue: AgentMessage[]) => AgentMessage[])): void
+  setTranscript(value: TranscriptSnapshot | null): void
   setComposerText(value: string): void
   setIsLoading(value: boolean): void
   setIsSendingMessage(value: boolean): void
@@ -114,7 +112,6 @@ function DesktopRoutes(): React.JSX.Element {
   const [agents, setAgents] = useState<AgentSummary[]>([])
   const [sessions, setSessions] = useState<AgentSessionSummary[]>([])
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
-  const [messages, setMessages] = useState<AgentMessage[]>([])
   const [transcript, setTranscript] = useState<TranscriptSnapshot | null>(null)
   const [composerText, setComposerText] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -146,7 +143,6 @@ function DesktopRoutes(): React.JSX.Element {
     agents,
     sessions,
     selectedSessionId,
-    messages,
     transcript,
     composerText,
     isLoading,
@@ -157,7 +153,7 @@ function DesktopRoutes(): React.JSX.Element {
     setAgents,
     setSessions,
     setSelectedSessionId,
-    setMessages,
+    setTranscript,
     setComposerText,
     setIsLoading,
     setIsSendingMessage,
@@ -179,7 +175,6 @@ function DesktopRoutes(): React.JSX.Element {
         setSelectedSessionId(
           (currentSessionId) => currentSessionId ?? workbench.sessions[0]?.sessionId ?? null
         )
-        setMessages(workbench.messages)
         setTranscript(workbench.transcript)
 
         // 启动重定向由 StartupRedirect 组件在根路由 '/' 上处理。
@@ -309,8 +304,6 @@ function DesktopRoutes(): React.JSX.Element {
         return
       }
 
-      applyAgentEventToMessages(event, setMessages)
-
       if (event.type === 'turn-failed') {
         toast.error(event.error.message)
       }
@@ -407,41 +400,6 @@ function applyAgentEventToSessions(
 }
 
 /**
- * 把 Agent 标准事件归并到当前 transcript。
- *
- * @param event - Main 推送的标准 Agent 事件。
- * @param setMessages - React 消息状态 setter。
- * @returns 无返回值。
- * @throws 此方法不会主动抛出错误。
- */
-function applyAgentEventToMessages(
-  event: AgentEvent,
-  setMessages: StateSetter<AgentMessage[]>
-): void {
-  if (event.type === 'message-appended' || event.type === 'message-completed') {
-    if (isDialogMessage(event.message)) {
-      setMessages((currentMessages) => upsertTranscriptMessage(currentMessages, event.message))
-    }
-    return
-  }
-
-  if (event.type === 'message-delta') {
-    setMessages((currentMessages) => appendTranscriptDelta(currentMessages, event))
-  }
-}
-
-/**
- * 判断消息是否属于聊天主界面可展示的对话消息。
- *
- * @param message - transcript 中的单条消息。
- * @returns 用户消息或模型消息返回 true，系统消息返回 false。
- * @throws 此方法不会主动抛出错误。
- */
-function isDialogMessage(message: AgentMessage): boolean {
-  return message.role === 'user' || message.role === 'agent'
-}
-
-/**
  * 从 Agent 事件中读取所属会话标识。
  *
  * @param event - 标准 Agent 事件。
@@ -455,20 +413,16 @@ function getAgentEventSessionId(event: AgentEvent): string | null {
 
   if (
     event.type === 'turn-started' ||
-    event.type === 'message-delta' ||
-    event.type === 'message-completed' ||
     event.type === 'turn-cancelled' ||
     event.type === 'turn-failed' ||
-    event.type === 'activity-updated' ||
     event.type === 'run-state-changed' ||
     event.type === 'approval-required' ||
-    event.type === 'approval-resolved'
+    event.type === 'approval-resolved' ||
+    event.type === 'clarification-required' ||
+    event.type === 'clarification-resolved' ||
+    event.type === 'transcript-delta'
   ) {
     return event.sessionId
-  }
-
-  if (event.type === 'message-appended') {
-    return event.message.sessionId
   }
 
   return null
@@ -503,73 +457,9 @@ function getAgentEventRunState(
   return null
 }
 
-/**
- * 新增或替换 transcript 消息，并替换对应的乐观用户消息。
- *
- * @param messages - 当前 transcript。
- * @param message - 需要写入的消息。
- * @returns 更新后的 transcript。
- * @throws 此方法不会主动抛出错误。
- */
-function upsertTranscriptMessage(messages: AgentMessage[], message: AgentMessage): AgentMessage[] {
-  const exactIndex = messages.findIndex((candidate) => candidate.messageId === message.messageId)
 
-  if (exactIndex !== -1) {
-    return messages.map((candidate) =>
-      candidate.messageId === message.messageId ? message : candidate
-    )
-  }
 
-  if (message.role === 'user') {
-    const optimisticIndex = messages.findIndex(
-      (candidate) =>
-        candidate.messageId.startsWith('optimistic-') &&
-        candidate.role === 'user' &&
-        candidate.content === message.content
-    )
 
-    if (optimisticIndex !== -1) {
-      return messages.map((candidate, index) => (index === optimisticIndex ? message : candidate))
-    }
-  }
-
-  return [...messages, message]
-}
-
-/**
- * 把文本增量拼接到 transcript 中的 Agent 消息。
- *
- * @param messages - 当前 transcript。
- * @param event - message-delta 标准事件。
- * @returns 更新后的 transcript。
- * @throws 此方法不会主动抛出错误。
- */
-function appendTranscriptDelta(
-  messages: AgentMessage[],
-  event: Extract<AgentEvent, { type: 'message-delta' }>
-): AgentMessage[] {
-  const messageIndex = messages.findIndex((message) => message.messageId === event.messageId)
-
-  if (messageIndex === -1) {
-    return [
-      ...messages,
-      {
-        messageId: event.messageId,
-        agentId: event.agentId,
-        sessionId: event.sessionId,
-        role: 'agent',
-        content: event.delta,
-        createdAt: event.occurredAt
-      }
-    ]
-  }
-
-  return messages.map((message) =>
-    message.messageId === event.messageId
-      ? { ...message, content: `${message.content}${event.delta}` }
-      : message
-  )
-}
 
 /**
  * 并行读取 Renderer 首屏需要的运行时和会话数据。
@@ -582,7 +472,6 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   runtime: RuntimeSnapshot
   agents: AgentSummary[]
   sessions: AgentSessionSummary[]
-  messages: AgentMessage[]
   transcript: TranscriptSnapshot | null
 }> {
   const runtime = await api.getRuntimeSnapshot()
@@ -599,7 +488,7 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   ]
 
   if (runtime.status !== 'ready') {
-    return { runtime, agents, sessions: [], messages: [], transcript: null }
+    return { runtime, agents, sessions: [], transcript: null }
   }
 
   const sessions = await api.listSessions()
@@ -613,12 +502,6 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
         ]
       : sessions
   const [firstSession] = nextSessions
-  const messages = firstSession
-    ? await api.getMessages({
-        agentId: firstSession.agentId,
-        sessionId: firstSession.sessionId
-      })
-    : []
   const transcript = firstSession
     ? await api.getTranscript({
         agentId: firstSession.agentId,
@@ -626,7 +509,7 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
       })
     : null
 
-  return { runtime, agents, sessions: nextSessions, messages, transcript }
+  return { runtime, agents, sessions: nextSessions, transcript }
 }
 
 export default App

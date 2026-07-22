@@ -7,7 +7,7 @@ import {
   createTestMessage,
   TANGYUAN_DEFAULT_AGENT_ID
 } from '../fixtures/preload-mock'
-import type { AgentMessage, AgentSessionSummary, RuntimeSnapshot } from '@tangyuan/contracts'
+import type { AgentSessionSummary, RuntimeSnapshot } from '@tangyuan/contracts'
 
 /**
  * 创建带有事件分发能力的 initScript。

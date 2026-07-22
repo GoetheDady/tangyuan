@@ -1,5 +1,4 @@
 import type {
-  AgentMessage,
   AgentRunState,
   AgentSessionSummary,
   AgentSummary,
@@ -27,7 +26,6 @@ interface DesktopWorkbenchState {
   agents: AgentSummary[]
   sessions: AgentSessionSummary[]
   selectedSessionId: string | null
-  messages: AgentMessage[]
   transcript: TranscriptSnapshot | null
   composerText: string
   isLoading: boolean
@@ -45,7 +43,7 @@ interface DesktopWorkbenchAction {
   setSelectedSessionId(
     value: string | null | ((currentValue: string | null) => string | null)
   ): void
-  setMessages(value: AgentMessage[] | ((currentValue: AgentMessage[]) => AgentMessage[])): void
+  setTranscript(value: TranscriptSnapshot | null): void
   setComposerText(value: string): void
   setIsLoading(value: boolean): void
   setIsSendingMessage(value: boolean): void
@@ -227,7 +225,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
         ...currentSessions.filter((candidate) => candidate.sessionId !== session.sessionId)
       ])
       context.setSelectedSessionId(session.sessionId)
-      context.setMessages([])
+      context.setTranscript(null)
       navigate(`/chat/${activeAgentId}/${session.sessionId}`, { replace: true })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '创建会话失败')
@@ -245,11 +243,11 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     context.setSelectedSessionId(session.sessionId)
 
     try {
-      const nextMessages = await window.api.getMessages({
+      const nextTranscript = await window.api.getTranscript({
         agentId: session.agentId,
         sessionId: session.sessionId
       })
-      context.setMessages(nextMessages)
+      context.setTranscript(nextTranscript)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '读取会话消息失败')
     }
@@ -283,26 +281,16 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
       return
     }
 
-    const optimisticMessage: AgentMessage = {
-      messageId: `optimistic-${Date.now()}`,
-      agentId: selectedSession.agentId,
-      sessionId: selectedSession.sessionId,
-      role: 'user',
-      content,
-      createdAt: new Date().toISOString()
-    }
-
-    context.setMessages((currentMessages) => [...currentMessages, optimisticMessage])
     context.setComposerText('')
     context.setIsSendingMessage(true)
 
     try {
-      const nextMessages = await window.api.sendMessage({
+      const nextTranscript = await window.api.sendMessage({
         agentId: selectedSession.agentId,
         sessionId: selectedSession.sessionId,
         content
       })
-      context.setMessages(nextMessages)
+      context.setTranscript(nextTranscript)
       context.setSessions(await window.api.listSessions())
       navigate(`/chat/${activeAgentId}/${selectedSession.sessionId}`, { replace: true })
     } catch (error) {
@@ -328,12 +316,12 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     context.setIsSendingMessage(true)
 
     try {
-      const nextMessages = await window.api.retryMessage({
+      const nextTranscript = await window.api.retryMessage({
         agentId: selectedSession.agentId,
         sessionId: selectedSession.sessionId,
         userMessageId
       })
-      context.setMessages(nextMessages)
+      context.setTranscript(nextTranscript)
       context.setSessions(await window.api.listSessions())
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '重试消息失败')
@@ -392,7 +380,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                     const nextAgentId = event.target.value
                     navigate(`/chat/${nextAgentId}`, { replace: true })
                     context.setSelectedSessionId(null)
-                    context.setMessages([])
+                    context.setTranscript(null)
                     void window.api.listSessions().then((sessions) => {
                       context.setSessions(sessions.filter((s) => s.agentId === nextAgentId))
                     })
@@ -474,7 +462,6 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
 
           <div className="min-h-0 flex-1 px-8 py-7">
             <TranscriptMessages
-              messages={context.messages}
               transcript={context.transcript}
               isStreaming={isSelectedSessionRunning}
               sessionId={selectedSession?.sessionId ?? null}

@@ -35,7 +35,6 @@ import {
   type AgentId,
   type AgentRuntimeErrorCode,
   type AgentRuntimeErrorPayload,
-  type AgentMessage,
   type AgentRunState,
   type AgentSessionSummary,
   type AgentSummary,
@@ -66,12 +65,12 @@ import {
   type SkillOperationParams,
   type SkillInstallRecord,
   type SoulContent,
+  type TranscriptSnapshot,
   type UserProfileContent,
 } from '@tangyuan/contracts'
 
 export {
   TANGYUAN_DEFAULT_AGENT_ID,
-  buildTranscriptSnapshot,
   applyTranscriptDelta,
   createAgentProfileStatus,
   type AgentEvent,
@@ -80,7 +79,6 @@ export {
   type AgentId,
   type AgentRuntimeErrorCode,
   type AgentRuntimeErrorPayload,
-  type AgentMessage,
   type AgentRunState,
   type AgentSessionSummary,
   type AgentSummary,
@@ -461,13 +459,16 @@ export interface PiSdkGateway {
   listSessions(request: PiSdkListSessionsRequest): Promise<PiSdkStoredSession[]>
 
   /**
-   * 从 Pi SDK 原生 session 文件读取 transcript 消息。
+   * 从 Pi SDK 原生 session 文件读取结构化会话快照。
+   *
+   * 只生成结构化会话事实（TranscriptEntry）；不再把 tool result、
+   * compaction 或未知 SDK 条目压成容易误用的普通字符串消息。
    *
    * @param request - 会话标识和 SDK session 文件。
-   * @returns 转换成汤圆标准消息结构后的 transcript。
+   * @returns 结构化会话快照。
    * @throws 当 SDK session 文件无法读取或解析时，Promise 会 reject。
    */
-  readMessages(request: PiSdkReadMessagesRequest): Promise<AgentMessage[]>
+  readMessages(request: PiSdkReadMessagesRequest): Promise<TranscriptSnapshot>
 }
 
 /**
@@ -571,13 +572,13 @@ export interface AgentSessionDriver {
   createSession(request: CreateSessionRequest): Promise<AgentSessionSummary>
 
   /**
-   * 读取指定会话的消息列表。
+   * 读取指定会话的结构化 transcript 快照。
    *
    * @param request - 会话定位信息。
-   * @returns 会话消息列表。
-   * @throws 当会话不存在或消息读取失败时，Promise 会 reject。
+   * @returns 结构化会话快照。
+   * @throws 当会话不存在或读取失败时，Promise 会 reject。
    */
-  getMessages(request: GetSessionMessagesRequest): Promise<AgentMessage[]>
+  getTranscript(request: GetSessionMessagesRequest): Promise<TranscriptSnapshot>
 
   /**
    * 向指定会话发送用户消息并启动 Agent 运行。
@@ -600,7 +601,7 @@ export interface AgentSessionDriver {
   /**
    * 重试一条失败的用户消息，复用原始请求并创建新的执行尝试。
    *
-   * 不会追加重复的 UserMessage，而是创建新的 AgentMessage 和
+   * 不会追加重复的 UserMessage，而是创建新的 InternalMessage 和
    * ExecutionAttempt，通过 AgentEvent 推送运行进度。
    *
    * @param request - 会话定位信息和要重试的原始用户消息标识。
@@ -967,6 +968,54 @@ interface ConfigReadResult {
 }
 
 /**
+ * Driver 内部使用的消息类型，替代已删除的公开 InternalMessage 契约。
+ * 仅在 PiSdkDriver 内部使用，不暴露给 Runtime 或 Renderer。
+ */
+interface InternalMessage {
+  messageId: string
+  agentId: string
+  sessionId: string
+  role: 'user' | 'agent' | 'system' | 'compaction'
+  content: string
+  createdAt: string
+}
+
+/**
+ * Driver 内部使用的扩展事件类型，包含 translate-delta 生成所需
+ * 但不在公开 AgentEvent 中的过渡事件。
+ */
+export type DriverEvent = AgentEvent | {
+  type: 'message-appended'
+  agentId: string
+  message: InternalMessage
+  inReplyTo?: string
+  occurredAt: string
+} | {
+  type: 'message-delta'
+  agentId: string
+  sessionId: string
+  runId: string
+  messageId: string
+  delta: string
+  deltaKind?: 'text' | 'thinking'
+  occurredAt: string
+} | {
+  type: 'message-completed'
+  agentId: string
+  sessionId: string
+  runId: string
+  message: InternalMessage
+  occurredAt: string
+} | {
+  type: 'activity-updated'
+  agentId: string
+  sessionId: string
+  runId: string
+  activity: { kind: 'thinking' | 'tool'; state: 'running' | 'completed' | 'failed'; label: string; toolCallId?: string; toolName?: string }
+  occurredAt: string
+}
+
+/**
  * Pi Agent SDK 的 v1 适配器骨架。
  */
 export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
@@ -979,7 +1028,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private readonly listeners = new Set<AgentEventListener>()
   private readonly sessions = new Map<string, AgentSessionSummary>()
   private readonly sessionIndex = new Map<string, PersistedSessionIndexEntry>()
-  private readonly messages = new Map<string, AgentMessage[]>()
+  private readonly messages = new Map<string, InternalMessage[]>()
+  private readonly transcriptCache = new Map<string, TranscriptSnapshot>()
   private readonly sessionHandles = new Map<string, PiSdkSessionHandle>()
   private readonly activeRunIds = new Map<string, string>()
   private readonly runSequenceBySession = new Map<string, number>()
@@ -1205,33 +1255,75 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
-   * 读取指定会话的消息列表。
+   * 读取指定会话的结构化 transcript 快照。
    *
    * @param request - 会话定位信息。
-   * @returns 当前本地 transcript 消息列表。
+   * @returns 结构化会话快照。
    * @throws 当会话不存在时，Promise 会 reject。
    */
-  async getMessages(
+  async getTranscript(
     request: GetSessionMessagesRequest,
-  ): Promise<AgentMessage[]> {
+  ): Promise<TranscriptSnapshot> {
     await this.ensureSessionLoaded(request.sessionId)
     this.assertKnownSession(request.sessionId, request.agentId)
 
-    const cachedMessages = this.messages.get(request.sessionId)
-
-    if (cachedMessages?.length) {
-      return [...cachedMessages]
+    const cached = this.transcriptCache.get(request.sessionId)
+    if (cached && cached.entries.length > 0) {
+      return cached
     }
 
     await this.ensureSessionHandle(request.sessionId)
     const indexEntry = this.getKnownSessionIndexEntry(request.sessionId)
-    const messages = await this.gateway.readMessages({
+    const snapshot = await this.gateway.readMessages({
       sessionId: request.sessionId,
       sdkSessionFile: indexEntry.sdkSessionFile,
     })
-    this.messages.set(request.sessionId, messages)
 
-    return [...messages]
+    // 填充持久化的 attempt 数据
+    const attempts = this.getSessionAttempts(request.sessionId)
+    const enriched = this.enrichTranscriptWithAttempts(snapshot, attempts)
+    this.transcriptCache.set(request.sessionId, enriched)
+
+    return enriched
+  }
+
+  /**
+   * 读取指定会话的持久化执行尝试记录。
+   */
+  getSessionAttempts(sessionId: string): PersistedAttemptEntry[] {
+    const entry = this.sessionIndex.get(sessionId)
+    return entry?.attempts ?? []
+  }
+
+  /**
+   * 将持久化 attempt 记录填充到 transcript 快照中。
+   */
+  private enrichTranscriptWithAttempts(
+    snapshot: TranscriptSnapshot,
+    attempts: PersistedAttemptEntry[],
+  ): TranscriptSnapshot {
+    if (attempts.length === 0) return snapshot
+
+    const attemptByMessageId = new Map(attempts.map((a) => [a.messageId, a]))
+    const enrichedEntries = snapshot.entries.map((entry) => {
+      if (entry.kind !== 'agent-reply') return entry
+      const persisted = attemptByMessageId.get(entry.messageId)
+      if (!persisted) return entry
+      return {
+        ...entry,
+        attempt: {
+          attemptId: persisted.attemptId,
+          runId: persisted.runId,
+          status: persisted.status,
+          startedAt: persisted.startedAt,
+          completedAt: persisted.completedAt,
+          ...(persisted.error ? { error: persisted.error } : {}),
+        },
+        ...(persisted.inReplyTo ? { inReplyTo: persisted.inReplyTo } : {}),
+      }
+    })
+
+    return { ...snapshot, entries: enrichedEntries }
   }
 
   /**
@@ -1603,11 +1695,12 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         sessionId: request.sessionId,
         sdkSessionFile: indexEntry.sdkSessionFile,
       })
-      this.messages.set(request.sessionId, loadedMessages)
-      const loadedUserMessage = loadedMessages.find(
-        (m) => m.messageId === request.userMessageId && m.role === 'user',
+      // 缓存 transcript 快照
+      this.transcriptCache.set(request.sessionId, loadedMessages)
+      const loadedUserMessage = loadedMessages.entries.find(
+        (e) => e.kind === 'user-message' && e.messageId === request.userMessageId,
       )
-      if (!loadedUserMessage) {
+      if (!loadedUserMessage || loadedUserMessage.kind !== 'user-message') {
         throw new AgentRuntimeError({
           code: 'session-not-found',
           message: '找不到要重试的原始用户消息。',
@@ -1626,23 +1719,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
-   * 执行重试核心逻辑：创建新 AgentMessage 和 ExecutionAttempt，
-   * 发送与原始用户请求相同的 prompt。
-   *
-   * @param request - 重试请求。
-   * @param content - 原始用户消息内容。
-   * @param session - 已确认的会话摘要。
-   * @param handle - Pi SDK 会话运行器。
-   * @returns 无返回值。
-   * @throws 当 SDK 调用失败时，Promise 会 reject。
-   */
-  getSessionAttempts(sessionId: string): PersistedAttemptEntry[] {
-    const entry = this.sessionIndex.get(sessionId)
-    return entry?.attempts ?? []
-  }
-
-  /**
-   * 执行重试核心逻辑：创建新 AgentMessage 和 ExecutionAttempt，
+   * 执行重试核心逻辑：创建新 InternalMessage 和 ExecutionAttempt，
    * 发送与原始用户请求相同的 prompt。
    *
    * @param request - 重试请求。
@@ -1677,7 +1754,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     const runId = this.createRunId(request.sessionId)
     const now = this.now()
 
-    // 创建新的 AgentMessage（不创建 UserMessage）
+    // 创建新的 InternalMessage（不创建 UserMessage）
     const agentMessage = this.appendMessage({
       agentId: request.agentId,
       sessionId: request.sessionId,
@@ -4945,7 +5022,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     agentId: AgentId
     sessionId: string
     content: string
-  }): AgentMessage {
+  }): InternalMessage {
     const message = this.appendMessage({
       agentId: input.agentId,
       sessionId: input.sessionId,
@@ -5270,13 +5347,13 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private appendMessage(input: {
     agentId: AgentId
     sessionId: string
-    role: AgentMessage['role']
+    role: InternalMessage['role']
     content: string
-  }): AgentMessage {
+  }): InternalMessage {
     this.assertKnownSession(input.sessionId, input.agentId)
 
     const messages = this.messages.get(input.sessionId) ?? []
-    const message: AgentMessage = {
+    const message: InternalMessage = {
       messageId: `${input.sessionId}-message-${messages.length + 1}`,
       agentId: input.agentId,
       sessionId: input.sessionId,
@@ -5311,7 +5388,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @returns 更新后的 Agent 消息。
    * @throws 当消息不存在时抛出 AgentRuntimeError。
    */
-  private appendMessageDelta(messageId: string, delta: string): AgentMessage {
+  private appendMessageDelta(messageId: string, delta: string): InternalMessage {
     for (const [sessionId, messages] of this.messages) {
       const messageIndex = messages.findIndex(
         (message) => message.messageId === messageId,
@@ -5352,7 +5429,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @returns 完成后的 Agent 消息。
    * @throws 当消息不存在时抛出 AgentRuntimeError。
    */
-  private completeMessage(messageId: string): AgentMessage {
+  private completeMessage(messageId: string): InternalMessage {
     for (const messages of this.messages.values()) {
       const message = messages.find(
         (candidate) => candidate.messageId === messageId,
@@ -5444,9 +5521,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @returns 无返回值。
    * @throws 订阅者回调抛出的错误会透传给调用方。
    */
-  private emit(event: AgentEvent): void {
+  private emit(event: DriverEvent): void {
     for (const listener of this.listeners) {
-      listener(event)
+      // DriverEvent is a superset of AgentEvent; listeners only process
+      // the subset of events that belong to the public AgentEvent union.
+      ;(listener as AgentEventListener)(event as AgentEvent)
     }
   }
 }

@@ -6,7 +6,6 @@ import {
   agentEventSchema,
   agentSkillsStatusSchema,
   applyTranscriptDelta,
-  buildTranscriptSnapshot,
   createAgentProfileStatus,
   createSessionRequestSchema,
   createDefaultSessionSummary,
@@ -1029,34 +1028,6 @@ describe('transcript delta with turns', () => {
     expect(reply).not.toBeNull()
     if (reply) {
       expect(reply.turns[0]!.status).toBe('completed')
-    }
-  })
-
-  it('buildTranscriptSnapshot produces turns array', () => {
-    const result = buildTranscriptSnapshot(
-      [
-        {
-          messageId: 'm1',
-          agentId: 'a1',
-          sessionId: 's1',
-          role: 'agent',
-          content: 'hello world',
-          createdAt: '2026-07-21T00:00:00.000Z',
-        },
-      ],
-      's1',
-      'a1',
-      '2026-07-21T00:00:00.000Z',
-    )
-    const entry = result.entries[0]
-    expect(entry).toBeDefined()
-    const reply =
-      entry && (entry as { kind: string }).kind === 'agent-reply'
-        ? (entry as AgentReplyEntry)
-        : null
-    expect(reply).not.toBeNull()
-    if (reply) {
-      expect(reply.turns).toEqual([])
     }
   })
 

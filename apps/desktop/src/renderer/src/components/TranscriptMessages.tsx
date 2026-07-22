@@ -1,5 +1,4 @@
 import type {
-  AgentMessage,
   AgentReplyEntry,
   TranscriptEntry,
   TranscriptSnapshot
@@ -9,14 +8,13 @@ import { Sparkles } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { AssistantMessage } from './AssistantMessage'
 import { CompactionIndicator } from './CompactionIndicator'
-import { StreamdownMessage } from './StreamdownMessage'
 import { UserMessage } from './UserMessage'
 
 /**
  * 虚拟列表中的渲染项：对话消息、AssitantMessage 或压缩提示。
  */
 type RenderItem =
-  | { type: 'message'; message: AgentMessage; isLastAgent: boolean; renderIndex: number }
+  | { type: 'user-message'; content: string; createdAt: string; renderIndex: number }
   | { type: 'assistant-message'; entry: AgentReplyEntry; isLastAgent: boolean; renderIndex: number }
   | { type: 'compaction'; timestamp: string; renderIndex: number }
 
@@ -31,7 +29,7 @@ const AT_BOTTOM_THRESHOLD = 50
  */
 const ESTIMATED_SIZES: Record<RenderItem['type'], number> = {
   compaction: 48,
-  message: 100,
+  'user-message': 100,
   'assistant-message': 160
 }
 
@@ -56,25 +54,14 @@ function estimateItemSize(item: RenderItem): number {
  * @returns 稳定标识字符串。
  */
 function getItemStableKey(item: RenderItem): string {
-  if (item.type === 'message') {
-    return item.message.messageId
+  if (item.type === 'user-message') {
+    return `user-${item.createdAt}-${item.renderIndex}`
   }
   if (item.type === 'assistant-message') {
     const attemptId = item.entry.attempt?.attemptId ?? 'initial'
     return `${item.entry.index}-${item.entry.messageId}-${attemptId}`
   }
   return `compaction-${item.timestamp}-${item.renderIndex}`
-}
-
-/**
- * 判断消息是否属于聊天主界面可展示的对话消息。
- *
- * @param role - 消息角色。
- * @returns 用户消息或模型消息返回 true。
- * @throws 此方法不会主动抛出错误。
- */
-function isDialogRole(role: string): boolean {
-  return role === 'user' || role === 'agent'
 }
 
 /**
@@ -85,34 +72,6 @@ function isDialogRole(role: string): boolean {
  */
 function isDialogKind(kind: TranscriptEntry['kind']): boolean {
   return kind === 'user-message' || kind === 'agent-reply'
-}
-
-/**
- * 将原始 transcript 消息列表转换为虚拟列表渲染项。
- *
- * @param messages - 原始消息列表（含 system/compaction）。
- * @param isStreaming - 是否正在流式传输中。
- * @returns 可传入虚拟列表的 RenderItem 数组。
- * @throws 此方法不会主动抛出错误。
- */
-function buildRenderItems(messages: AgentMessage[], isStreaming: boolean): RenderItem[] {
-  const dialogCount = messages.filter((m) => isDialogRole(m.role)).length
-  const items: RenderItem[] = []
-  let dialogIndex = 0
-  let renderIndex = 0
-
-  for (const message of messages) {
-    if (message.role === 'compaction') {
-      items.push({ type: 'compaction', timestamp: message.createdAt, renderIndex: renderIndex++ })
-    } else if (isDialogRole(message.role)) {
-      const isLastAgent = isStreaming && message.role === 'agent' && dialogIndex === dialogCount - 1
-      items.push({ type: 'message', message, isLastAgent, renderIndex: renderIndex++ })
-      dialogIndex++
-    }
-    // system 消息在 transcript 中静默跳过
-  }
-
-  return items
 }
 
 /**
@@ -141,16 +100,9 @@ function buildRenderItemsFromTranscript(
       })
     } else if (entry.kind === 'user-message') {
       items.push({
-        type: 'message',
-        message: {
-          messageId: entry.messageId,
-          agentId: '',
-          sessionId: '',
-          role: 'user',
-          content: entry.content,
-          createdAt: entry.createdAt
-        },
-        isLastAgent: false,
+        type: 'user-message',
+        content: entry.content,
+        createdAt: entry.createdAt,
         renderIndex: renderIndex++
       })
       dialogIndex++
@@ -173,9 +125,7 @@ function buildRenderItemsFromTranscript(
  * TranscriptMessages 组件的属性。
  */
 export interface TranscriptMessagesProps {
-  /** 当前会话的全部消息（含 system/compaction）。 */
-  messages: AgentMessage[]
-  /** 结构化会话快照；提供时优先于 messages 使用。 */
+  /** 结构化会话快照。 */
   transcript?: TranscriptSnapshot | null
   /** 是否正在流式接收 Agent 回复。 */
   isStreaming: boolean
@@ -204,7 +154,6 @@ export interface TranscriptMessagesProps {
  * @throws 此组件不会主动抛出错误。
  */
 export function TranscriptMessages({
-  messages,
   transcript,
   isStreaming,
   sessionId,
@@ -218,8 +167,8 @@ export function TranscriptMessages({
     () =>
       transcript && transcript.entries.length > 0
         ? buildRenderItemsFromTranscript(transcript.entries, isStreaming)
-        : buildRenderItems(messages, isStreaming),
-    [messages, transcript, isStreaming]
+        : [],
+    [transcript, isStreaming]
   )
 
   const virtualizer = useVirtualizer({
@@ -302,8 +251,8 @@ export function TranscriptMessages({
   // 流式模式下最后一条消息内容增长时，若用户在底部则保持跟随
   const lastItem = renderItems.length > 0 ? renderItems[renderItems.length - 1] : null
   const lastMessageContent =
-    lastItem?.type === 'message'
-      ? lastItem.message.content.length
+    lastItem?.type === 'user-message'
+      ? lastItem.content.length
       : lastItem?.type === 'assistant-message'
         ? lastItem.entry.content.length
         : 0
@@ -403,6 +352,14 @@ export function TranscriptMessages({
             >
               {item.type === 'compaction' ? (
                 <CompactionIndicator timestamp={item.timestamp} />
+              ) : item.type === 'user-message' ? (
+                <div className="py-3.5">
+                  <article className="flex justify-end">
+                    <div className="max-w-[76%] min-w-0 rounded-lg bg-primary px-4 py-3 text-sm leading-6 text-primary-foreground shadow-sm">
+                      <UserMessage content={item.content} />
+                    </div>
+                  </article>
+                </div>
               ) : item.type === 'assistant-message' ? (
                 <div className="py-3.5">
                   <AssistantMessage
@@ -432,11 +389,7 @@ export function TranscriptMessages({
                     onToggleStart={() => handleToggleStart(item.renderIndex)}
                   />
                 </div>
-              ) : (
-                <div className="py-3.5">
-                  <MemoizedDialogMessage message={item.message} isAnimating={item.isLastAgent} />
-                </div>
-              )}
+              ) : null}
             </div>
           )
         })}
@@ -444,45 +397,3 @@ export function TranscriptMessages({
     </div>
   )
 }
-
-/**
- * 单条对话消息气泡的展示属性。
- */
-interface DialogMessageProps {
-  /** 要渲染的消息。 */
-  message: AgentMessage
-  /** 是否为当前流式输出中的最后一条 Agent 消息。 */
-  isAnimating: boolean
-}
-
-/**
- * 经 React.memo 包裹的对话消息气泡。
- *
- * 自定义比较函数确保：仅当消息内容变化或流式动画状态变化时才重渲染，
- * 避免已渲染消息因 transcript 数组引用变化而触发冗余的 Markdown 解析和 Shiki 高亮。
- */
-const MemoizedDialogMessage = React.memo(
-  function DialogMessage({ message, isAnimating }: DialogMessageProps): React.JSX.Element {
-    return (
-      <article className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-        <div
-          className={`max-w-[76%] min-w-0 rounded-lg px-4 py-3 text-sm leading-6 shadow-sm ${
-            message.role === 'user'
-              ? 'bg-primary text-primary-foreground'
-              : 'border bg-card text-card-foreground'
-          }`}
-        >
-          {message.role === 'agent' ? (
-            <StreamdownMessage content={message.content} isAnimating={isAnimating} />
-          ) : (
-            <UserMessage content={message.content} />
-          )}
-        </div>
-      </article>
-    )
-  },
-  (prevProps, nextProps) =>
-    prevProps.message.content === nextProps.message.content &&
-    prevProps.message.messageId === nextProps.message.messageId &&
-    prevProps.isAnimating === nextProps.isAnimating
-)

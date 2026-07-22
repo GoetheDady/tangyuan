@@ -11,8 +11,6 @@ import { TranscriptEmitter } from './transcript-emitter'
 import { resolve as pathResolve } from 'node:path'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
-  buildTranscriptSnapshot,
-  type AgentMessage,
   type AgentSessionSummary,
   type AgentSummary,
   type BashApprovalRequest,
@@ -56,14 +54,13 @@ class DefaultTangyuanRuntime {
   private readonly runtimeDriver: RuntimeResourceDriver
   private readonly sessionDriver: AgentSessionDriver
   private readonly listeners = new Set<AgentEventListener>()
-  private readonly messagesBySession = new Map<string, AgentMessage[]>()
   private readonly activeRunIds = new Map<string, string>()
   private readonly transcriptEmitter: TranscriptEmitter
   private runtimeSnapshot: RuntimeSnapshot | null = null
   private sessions: AgentSessionSummary[] = []
   private runQueue: Array<{
     request: SendMessageRequest
-    resolve: (value: AgentMessage[]) => void
+    resolve: (value: TranscriptSnapshot) => void
     reject: (error: Error) => void
   }> = []
   private readonly pendingApprovals = new Map<
@@ -606,22 +603,15 @@ class DefaultTangyuanRuntime {
    */
   async getMessages(
     request: GetSessionMessagesRequest,
-  ): Promise<AgentMessage[]> {
-    if (this.messagesBySession.has(request.sessionId)) {
-      return [...(this.messagesBySession.get(request.sessionId) ?? [])]
-    }
-
-    const messages = await this.sessionDriver.getMessages(request)
-    this.messagesBySession.set(request.sessionId, messages)
-
-    return messages
+  ): Promise<TranscriptSnapshot> {
+    return this.getTranscript(request)
   }
 
   /**
    * 读取指定会话的结构化 transcript 快照。
    *
-   * 从本地消息缓存构建 TranscriptSnapshot；
-   * 缓存未命中时通过 Driver 加载消息后再构建。
+   * 优先使用 TranscriptEmitter 缓存的快照（含 turns/steps）；
+   * 缓存未命中时通过 Driver 加载。
    *
    * @param request - 会话所属 Agent 和会话标识。
    * @returns 结构化会话快照。
@@ -636,43 +626,18 @@ class DefaultTangyuanRuntime {
       return cached
     }
 
-    // 回退：从扁平的 AgentMessage 列表构建（无 turns/steps）
-    const messages = await this.getMessages(request)
-    const snapshot = buildTranscriptSnapshot(
-      messages,
-      request.sessionId,
-      request.agentId,
-      new Date().toISOString(),
-    )
-
-    // 从 session 索引合并持久化的 attempt 数据
-    const attempts = this.sessionDriver.getSessionAttempts?.(request.sessionId) ?? []
-    if (attempts.length === 0) {
-      return snapshot
+    // 回退：通过 Driver 加载结构化 transcript
+    if (this.sessionDriver.getTranscript) {
+      return this.sessionDriver.getTranscript(request)
     }
 
-    const attemptByMessageId = new Map(
-      attempts.map((a) => [a.messageId, a]),
-    )
-    const enrichedEntries = snapshot.entries.map((entry) => {
-      if (entry.kind !== 'agent-reply') return entry
-      const persisted = attemptByMessageId.get(entry.messageId)
-      if (!persisted) return entry
-      return {
-        ...entry,
-        attempt: {
-          attemptId: persisted.attemptId,
-          runId: persisted.runId,
-          status: persisted.status,
-          startedAt: persisted.startedAt,
-          completedAt: persisted.completedAt,
-          ...(persisted.error ? { error: persisted.error } : {}),
-        },
-        ...(persisted.inReplyTo ? { inReplyTo: persisted.inReplyTo } : {}),
-      }
-    })
-
-    return { ...snapshot, entries: enrichedEntries }
+    // 最终回退：返回空快照
+    return {
+      sessionId: request.sessionId,
+      agentId: request.agentId,
+      entries: [],
+      updatedAt: new Date().toISOString(),
+    }
   }
 
   /**
@@ -682,7 +647,7 @@ class DefaultTangyuanRuntime {
    * @returns 发送完成后的当前会话消息列表。
    * @throws 当运行时缺少配置、会话不存在或 AgentSessionDriver 发送失败时，Promise 会 reject。
    */
-  async sendMessage(request: SendMessageRequest): Promise<AgentMessage[]> {
+  async sendMessage(request: SendMessageRequest): Promise<TranscriptSnapshot> {
     await this.assertRuntimeReady()
 
     const session =
@@ -709,7 +674,7 @@ class DefaultTangyuanRuntime {
 
     await this.sessionDriver.sendMessage(request)
 
-    return this.getMessages({
+    return this.getTranscript({
       agentId: request.agentId,
       sessionId: request.sessionId,
     })
@@ -719,17 +684,17 @@ class DefaultTangyuanRuntime {
    * 重试一条失败的用户消息，复用原始请求并创建新的执行尝试。
    *
    * @param request - 会话定位信息和要重试的原始用户消息标识。
-   * @returns 重试完成后的最新消息列表。
+   * @returns 重试完成后的结构化会话快照。
    * @throws 当 Driver 不支持重试或执行失败时，Promise 会 reject。
    */
-  async retryMessage(request: RetryRunRequest): Promise<AgentMessage[]> {
+  async retryMessage(request: RetryRunRequest): Promise<TranscriptSnapshot> {
     if (!this.sessionDriver.retryMessage) {
       throw new Error('当前运行时不支持重试消息。')
     }
 
     await this.sessionDriver.retryMessage(request)
 
-    return this.getMessages({
+    return this.getTranscript({
       agentId: request.agentId,
       sessionId: request.sessionId,
     })
@@ -762,7 +727,12 @@ class DefaultTangyuanRuntime {
         occurredAt: now,
       })
       this.upsertSessionState(request.sessionId, 'cancelled', now)
-      queued!.resolve([])
+      queued!.resolve({
+        agentId: request.agentId,
+        sessionId: request.sessionId,
+        entries: [],
+        updatedAt: now,
+      })
       return (
         this.sessions.find((s) => s.sessionId === request.sessionId) ?? {
           agentId: request.agentId,
@@ -820,7 +790,12 @@ class DefaultTangyuanRuntime {
     const queue = [...this.runQueue]
     this.runQueue.length = 0
     for (const queued of queue) {
-      queued.resolve([])
+      queued.resolve({
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: queued.request.sessionId,
+        entries: [],
+        updatedAt: new Date().toISOString(),
+      })
     }
 
     const runningSessions = this.sessions.filter(
@@ -1325,86 +1300,86 @@ class DefaultTangyuanRuntime {
    * @throws 此方法不会主动抛出错误。
    */
   private applyAgentEvent(event: AgentEvent): void {
-    if (event.type === 'session-created') {
-      this.upsertSession(event.session)
-      this.messagesBySession.set(event.session.sessionId, [])
+    // Cast to DriverEvent for internal handlers that process old event types
+    const driverEvent = event as import('./index').DriverEvent
+
+    if (driverEvent.type === 'session-created') {
+      this.upsertSession(driverEvent.session)
       return
     }
 
-    if (event.type === 'message-appended') {
-      this.upsertMessage(event.message)
-      this.transcriptEmitter.emitTranscriptDeltaForMessageAppended(event)
+    if (driverEvent.type === 'message-appended') {
+      this.transcriptEmitter.emitTranscriptDeltaForMessageAppended(
+        driverEvent as Extract<AgentEvent, { type: 'message-appended' }>,
+      )
       return
     }
 
-    if (event.type === 'turn-started') {
-      this.activeRunIds.set(event.sessionId, event.runId)
-      this.upsertSessionState(event.sessionId, 'running', event.occurredAt)
-      this.transcriptEmitter.startAttemptForRun(event)
-      this.transcriptEmitter.initializeTurnStateForRun(event)
+    if (driverEvent.type === 'turn-started') {
+      this.activeRunIds.set(driverEvent.sessionId, driverEvent.runId)
+      this.upsertSessionState(driverEvent.sessionId, 'running', driverEvent.occurredAt)
+      this.transcriptEmitter.startAttemptForRun(driverEvent)
+      this.transcriptEmitter.initializeTurnStateForRun(driverEvent)
       return
     }
 
-    if (event.type === 'message-delta') {
-      this.appendDelta(event)
-      if (event.deltaKind === 'thinking') {
-        this.transcriptEmitter.emitTranscriptDeltaForThinking(event)
+    if (driverEvent.type === 'message-delta') {
+      if (driverEvent.deltaKind === 'thinking') {
+        this.transcriptEmitter.emitTranscriptDeltaForThinking(
+          driverEvent as Extract<AgentEvent, { type: 'message-delta' }>,
+        )
       } else {
-        this.transcriptEmitter.emitTranscriptDeltaForDelta(event)
+        this.transcriptEmitter.emitTranscriptDeltaForDelta(
+          driverEvent as Extract<AgentEvent, { type: 'message-delta' }>,
+        )
       }
       return
     }
 
-    if (event.type === 'message-completed') {
-      this.upsertMessage(event.message)
-      this.transcriptEmitter.completeAttemptForRun(event)
+    if (driverEvent.type === 'message-completed') {
+      this.transcriptEmitter.completeAttemptForRun(
+        driverEvent as Extract<AgentEvent, { type: 'message-completed' }>,
+      )
       return
     }
 
-    if (event.type === 'activity-updated') {
-      this.upsertActivityMessage(event)
-      this.transcriptEmitter.emitTranscriptDeltaForActivity(event)
+    if (driverEvent.type === 'activity-updated') {
+      this.transcriptEmitter.emitTranscriptDeltaForActivity(
+        driverEvent as Extract<AgentEvent, { type: 'activity-updated' }>,
+      )
       return
     }
 
-    if (event.type === 'turn-cancelled') {
-      this.activeRunIds.delete(event.sessionId)
-      this.upsertSessionState(event.sessionId, 'cancelled', event.occurredAt)
+    if (driverEvent.type === 'turn-cancelled') {
+      this.activeRunIds.delete(driverEvent.sessionId)
+      this.upsertSessionState(driverEvent.sessionId, 'cancelled', driverEvent.occurredAt)
       this.transcriptEmitter.failAttemptForRun(
-        event.sessionId,
-        event.runId,
+        driverEvent.sessionId,
+        driverEvent.runId,
         'cancelled',
-        event.occurredAt,
+        driverEvent.occurredAt,
       )
       return
     }
 
-    if (event.type === 'turn-failed') {
-      this.activeRunIds.delete(event.sessionId)
-      this.upsertSessionState(event.sessionId, 'failed', event.occurredAt)
+    if (driverEvent.type === 'turn-failed') {
+      this.activeRunIds.delete(driverEvent.sessionId)
+      this.upsertSessionState(driverEvent.sessionId, 'failed', driverEvent.occurredAt)
       this.transcriptEmitter.failAttemptForRun(
-        event.sessionId,
-        event.runId,
+        driverEvent.sessionId,
+        driverEvent.runId,
         'failed',
-        event.occurredAt,
-        event.error,
+        driverEvent.occurredAt,
+        driverEvent.error,
       )
-      this.upsertMessage({
-        messageId: `${event.sessionId}-${event.runId}-error`,
-        agentId: event.agentId,
-        sessionId: event.sessionId,
-        role: 'system',
-        content: event.error.message,
-        createdAt: event.occurredAt,
-      })
       return
     }
 
-    if (event.type === 'run-state-changed') {
-      this.upsertSessionState(event.sessionId, event.state, event.occurredAt)
+    if (driverEvent.type === 'run-state-changed') {
+      this.upsertSessionState(driverEvent.sessionId, driverEvent.state, driverEvent.occurredAt)
 
-      if (event.state !== 'running') {
-        this.activeRunIds.delete(event.sessionId)
+      if (driverEvent.state !== 'running') {
+        this.activeRunIds.delete(driverEvent.sessionId)
       }
     }
   }
@@ -1447,97 +1422,13 @@ class DefaultTangyuanRuntime {
   }
 
   /**
-   * 新增或替换对话消息。
-   *
-   * @param message - 需要写入缓存的消息。
-   * @returns 无返回值。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private upsertMessage(message: AgentMessage): void {
-    const messages = this.messagesBySession.get(message.sessionId) ?? []
-    const messageExists = messages.some(
-      (candidate) => candidate.messageId === message.messageId,
-    )
-    const nextMessages = messageExists
-      ? messages.map((candidate) =>
-          candidate.messageId === message.messageId ? message : candidate,
-        )
-      : [...messages, message]
-    this.messagesBySession.set(message.sessionId, nextMessages)
-  }
-
-  /**
-   * 把文本增量拼接进对应 Agent 消息。
-   *
-   * @param event - message-delta 标准事件。
-   * @returns 无返回值。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private appendDelta(
-    event: Extract<AgentEvent, { type: 'message-delta' }>,
-  ): void {
-    const messages = this.messagesBySession.get(event.sessionId) ?? []
-    const messageIndex = messages.findIndex(
-      (message) => message.messageId === event.messageId,
-    )
-
-    if (messageIndex === -1) {
-      this.messagesBySession.set(event.sessionId, [
-        ...messages,
-        {
-          messageId: event.messageId,
-          agentId: event.agentId,
-          sessionId: event.sessionId,
-          role: 'agent',
-          content: event.delta,
-          createdAt: event.occurredAt,
-        },
-      ])
-      return
-    }
-
-    const nextMessages = [...messages]
-    const currentMessage = nextMessages[messageIndex]
-
-    if (!currentMessage) {
-      return
-    }
-
-    nextMessages[messageIndex] = {
-      ...currentMessage,
-      content: `${currentMessage.content}${event.delta}`,
-    }
-    this.messagesBySession.set(event.sessionId, nextMessages)
-  }
-
-  /**
-   * 把 thinking/tool 活动写成可见但不含敏感参数的系统消息。
-   *
-   * @param event - activity-updated 标准事件。
-   * @returns 无返回值。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private upsertActivityMessage(
-    event: Extract<AgentEvent, { type: 'activity-updated' }>,
-  ): void {
-    this.upsertMessage({
-      messageId: `${event.sessionId}-${event.runId}-${event.activity.kind}`,
-      agentId: event.agentId,
-      sessionId: event.sessionId,
-      role: 'system',
-      content: event.activity.label,
-      createdAt: event.occurredAt,
-    })
-  }
-
-  /**
    * 将请求加入调度队列并广播 queued 状态。
    *
    * @param request - 需要排队等待的消息发送请求。
-   * @returns 排队完成后 resolve 的 Promise，含最终消息列表。
+   * @returns 排队完成后 resolve 的 Promise，含结构化会话快照。
    * @throws 此方法不会主动抛出错误。
    */
-  private enqueueRun(request: SendMessageRequest): Promise<AgentMessage[]> {
+  private enqueueRun(request: SendMessageRequest): Promise<TranscriptSnapshot> {
     const now = new Date().toISOString()
     this.emit({
       type: 'run-state-changed',
@@ -1548,7 +1439,7 @@ class DefaultTangyuanRuntime {
     })
     this.upsertSessionState(request.sessionId, 'queued', now)
 
-    return new Promise<AgentMessage[]>((resolve, reject) => {
+    return new Promise<TranscriptSnapshot>((resolve, reject) => {
       this.runQueue.push({ request, resolve, reject })
     })
   }
@@ -1583,7 +1474,7 @@ class DefaultTangyuanRuntime {
       .sendMessage(request)
       .then(async () =>
         resolve(
-          await this.getMessages({
+          await this.getTranscript({
             agentId: request.agentId,
             sessionId: request.sessionId,
           }),

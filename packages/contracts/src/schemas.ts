@@ -3,18 +3,6 @@ export const nonEmptyIdentifierSchema = z.string().trim().min(1)
 const timestampSchema = z.string().trim().min(1)
 
 /**
- * 校验跨进程传输的 Agent 消息。
- */
-export const agentMessageSchema = z.strictObject({
-  messageId: nonEmptyIdentifierSchema,
-  agentId: nonEmptyIdentifierSchema,
-  sessionId: nonEmptyIdentifierSchema,
-  role: z.enum(['user', 'agent', 'system', 'compaction']),
-  content: z.string(),
-  createdAt: timestampSchema,
-})
-
-/**
  * 校验执行尝试的身份与状态。
  */
 export const executionAttemptSchema = z.strictObject({
@@ -379,18 +367,6 @@ export const agentRuntimeErrorPayloadSchema = z.strictObject({
 })
 
 /**
- * 校验不含敏感参数的 Agent 活动摘要。
- */
-export const agentActivitySchema = z.strictObject({
-  kind: z.enum(['thinking', 'tool']),
-  state: z.enum(['running', 'completed', 'failed']),
-  label: z.string(),
-  stepId: z.string().optional(),
-  toolCallId: z.string().optional(),
-  toolName: z.string().optional(),
-})
-
-/**
  * 校验问题澄清请求。
  */
 export const questionClarificationRequestSchema = z.strictObject({
@@ -434,35 +410,10 @@ export const agentEventSchema = z.discriminatedUnion('type', [
     occurredAt: timestampSchema,
   }),
   z.strictObject({
-    type: z.literal('message-appended'),
-    agentId: nonEmptyIdentifierSchema,
-    message: agentMessageSchema,
-    inReplyTo: z.string().optional(),
-    occurredAt: timestampSchema,
-  }),
-  z.strictObject({
     type: z.literal('turn-started'),
     agentId: nonEmptyIdentifierSchema,
     sessionId: nonEmptyIdentifierSchema,
     runId: nonEmptyIdentifierSchema,
-    occurredAt: timestampSchema,
-  }),
-  z.strictObject({
-    type: z.literal('message-delta'),
-    agentId: nonEmptyIdentifierSchema,
-    sessionId: nonEmptyIdentifierSchema,
-    runId: nonEmptyIdentifierSchema,
-    messageId: nonEmptyIdentifierSchema,
-    delta: z.string(),
-    deltaKind: z.enum(['text', 'thinking']).optional(),
-    occurredAt: timestampSchema,
-  }),
-  z.strictObject({
-    type: z.literal('message-completed'),
-    agentId: nonEmptyIdentifierSchema,
-    sessionId: nonEmptyIdentifierSchema,
-    runId: nonEmptyIdentifierSchema,
-    message: agentMessageSchema,
     occurredAt: timestampSchema,
   }),
   z.strictObject({
@@ -478,14 +429,6 @@ export const agentEventSchema = z.discriminatedUnion('type', [
     sessionId: nonEmptyIdentifierSchema,
     runId: nonEmptyIdentifierSchema,
     error: agentRuntimeErrorPayloadSchema,
-    occurredAt: timestampSchema,
-  }),
-  z.strictObject({
-    type: z.literal('activity-updated'),
-    agentId: nonEmptyIdentifierSchema,
-    sessionId: nonEmptyIdentifierSchema,
-    runId: nonEmptyIdentifierSchema,
-    activity: agentActivitySchema,
     occurredAt: timestampSchema,
   }),
   z.strictObject({

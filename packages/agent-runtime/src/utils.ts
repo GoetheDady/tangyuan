@@ -1,13 +1,26 @@
 import type { PiSdkStreamEvent } from './index'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
-  type AgentMessage,
+  type TranscriptEntry,
+  type TranscriptSnapshot,
 } from '@tangyuan/contracts'
 
-export function mapPiSdkSessionEntryToAgentMessage(
+/**
+ * 从 Pi SDK session entry 构建结构化 TranscriptEntry。
+ *
+ * Pi session 读取只生成结构化会话事实；不再把 tool result、
+ * compaction 或未知 SDK 条目压成容易误用的普通字符串消息。
+ *
+ * @param entry - Pi SDK SessionManager 返回的未知 entry。
+ * @param sessionId - 当前汤圆会话标识。
+ * @param index - 条目在 transcript 中的稳定索引。
+ * @returns 结构化 transcript 条目列表；不是 message entry 时返回空数组。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function mapPiSdkSessionEntryToTranscriptEntries(
   entry: unknown,
   sessionId: string,
-): AgentMessage[] {
+  index: number,
+): TranscriptEntry[] {
   const candidate = entry as {
     type?: unknown
     id?: unknown
@@ -22,52 +35,45 @@ export function mapPiSdkSessionEntryToAgentMessage(
     return []
   }
 
-  const role = mapPiSdkMessageRole(candidate.message.role)
   const content = stringifyPiSdkMessageContent(candidate.message.content)
+  const messageId =
+    typeof candidate.id === 'string'
+      ? candidate.id
+      : `${sessionId}-sdk-message-${content.length}`
+  const createdAt =
+    typeof candidate.timestamp === 'string'
+      ? candidate.timestamp
+      : new Date(0).toISOString()
+  const role = candidate.message.role
 
-  if (!content) {
-    return []
-  }
-
-  return [
-    {
-      messageId:
-        typeof candidate.id === 'string'
-          ? candidate.id
-          : `${sessionId}-sdk-message-${content.length}`,
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
-      sessionId,
-      role,
-      content,
-      createdAt:
-        typeof candidate.timestamp === 'string'
-          ? candidate.timestamp
-          : new Date(0).toISOString(),
-    },
-  ]
-}
-
-/**
- * 将 Pi SDK 消息角色映射成汤圆标准角色。
- *
- * @param role - SDK 消息里的未知角色值。
- * @returns 汤圆 transcript 使用的消息角色。
- * @throws 此方法不会主动抛出错误。
- */
-export function mapPiSdkMessageRole(role: unknown): AgentMessage['role'] {
   if (role === 'user') {
-    return 'user'
+    return [{
+      kind: 'user-message',
+      index,
+      messageId,
+      content,
+      createdAt,
+    }]
   }
 
   if (role === 'assistant') {
-    return 'agent'
+    return [{
+      kind: 'agent-reply',
+      index,
+      messageId,
+      content,
+      createdAt,
+      attempt: null,
+      turns: [],
+    }]
   }
 
-  return 'system'
+  // Skip unknown roles (system, tool result, etc.) — no longer flatten into ambiguous strings
+  return []
 }
 
 /**
- * 将 Pi SDK 消息内容压成 Renderer 可展示的纯文本。
+ * 将 Pi SDK 消息内容压成纯文本。
  *
  * @param content - SDK 消息里的未知 content 值。
  * @returns 可展示的纯文本内容。
@@ -97,6 +103,92 @@ export function stringifyPiSdkMessageContent(content: unknown): string {
     })
     .filter(Boolean)
     .join('\n')
+}
+
+/**
+ * 从 Pi SDK session entries 构建结构化 TranscriptSnapshot。
+ *
+ * @param entries - Pi SDK session entries。
+ * @param sessionId - 会话标识。
+ * @param agentId - Agent 标识。
+ * @returns 结构化会话快照。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function buildTranscriptSnapshotFromSdkEntries(
+  entries: unknown[],
+  sessionId: string,
+  agentId: string,
+): TranscriptSnapshot {
+  const transcriptEntries: TranscriptEntry[] = []
+  let index = 0
+
+  for (const entry of entries) {
+    const mapped = mapPiSdkSessionEntryToTranscriptEntries(entry, sessionId, index)
+    for (const te of mapped) {
+      transcriptEntries.push(te)
+      index++
+    }
+  }
+
+  return {
+    sessionId,
+    agentId,
+    entries: transcriptEntries,
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+/**
+ * 从扁平 session entries 构建 transcript 后查找 attempt 记录并填充。
+ *
+ * @param entries - Pi SDK session entries。
+ * @param sessionId - 会话标识。
+ * @param agentId - Agent 标识。
+ * @param attempts - 持久化的执行尝试记录。
+ * @returns 填充了 attempt 的结构化快照。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function buildTranscriptWithAttempts(
+  entries: unknown[],
+  sessionId: string,
+  agentId: string,
+  attempts: ReadonlyArray<{
+    attemptId: string
+    runId: string
+    messageId: string
+    status: 'running' | 'completed' | 'cancelled' | 'failed'
+    startedAt: string
+    completedAt: string | null
+    error?: import('@tangyuan/contracts').AgentRuntimeErrorPayload
+    inReplyTo?: string
+  }>,
+): TranscriptSnapshot {
+  const snapshot = buildTranscriptSnapshotFromSdkEntries(entries, sessionId, agentId)
+
+  if (attempts.length === 0) {
+    return snapshot
+  }
+
+  const attemptByMessageId = new Map(attempts.map((a) => [a.messageId, a]))
+  const enrichedEntries = snapshot.entries.map((entry) => {
+    if (entry.kind !== 'agent-reply') return entry
+    const persisted = attemptByMessageId.get(entry.messageId)
+    if (!persisted) return entry
+    return {
+      ...entry,
+      attempt: {
+        attemptId: persisted.attemptId,
+        runId: persisted.runId,
+        status: persisted.status,
+        startedAt: persisted.startedAt,
+        completedAt: persisted.completedAt,
+        ...(persisted.error ? { error: persisted.error } : {}),
+      },
+      ...(persisted.inReplyTo ? { inReplyTo: persisted.inReplyTo } : {}),
+    }
+  })
+
+  return { ...snapshot, entries: enrichedEntries }
 }
 
 /**

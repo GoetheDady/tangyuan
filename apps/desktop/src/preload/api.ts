@@ -81,9 +81,6 @@ export function createTangyuanPreloadApi(
     createSession: async (request: CreateSessionRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsCreate, request)
     },
-    getMessages: async (request: GetSessionMessagesRequest) => {
-      return invoke(DESKTOP_IPC_CHANNELS.sessionsGetMessages, request)
-    },
     getTranscript: async (request: GetSessionMessagesRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsGetTranscript, request)
     },
