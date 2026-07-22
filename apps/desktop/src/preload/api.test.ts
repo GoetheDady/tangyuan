@@ -87,7 +87,6 @@ describe('createTangyuanPreloadApi', () => {
     await api.cancelRuntimeConfigurationVerification({ verificationId: 'verify-1' })
     await api.listSessions()
     await api.createSession({ agentId: 'tangyuan', title: '新会话' })
-    await api.getMessages({ agentId: 'tangyuan', sessionId: 'session-1' })
     await api.getTranscript({ agentId: 'tangyuan', sessionId: 'session-1' })
     await api.sendMessage({
       agentId: 'tangyuan',

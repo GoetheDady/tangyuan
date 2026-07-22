@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentEvent, AgentEventListener } from './index'
+import type { DriverEvent } from './index'
 import { TranscriptEmitter } from './transcript-emitter'
 import type { TranscriptSnapshot } from '@tangyuan/contracts'
 
 describe('TranscriptEmitter tool step handling', () => {
   function createEmitter(): {
     emitter: TranscriptEmitter
-    events: AgentEvent[]
+    events: DriverEvent[]
     getSnapshot: (sessionId: string) => TranscriptSnapshot | undefined
   } {
-    const events: AgentEvent[] = []
-    const emit: AgentEventListener = (event) => {
+    const events: DriverEvent[] = []
+    const emit = (event: DriverEvent) => {
       events.push(event)
     }
     const emitter = new TranscriptEmitter(emit)
@@ -27,7 +27,7 @@ describe('TranscriptEmitter tool step handling', () => {
     sessionId: string,
     runId: string,
   ) {
-    const event: Extract<AgentEvent, { type: 'turn-started' }> = {
+    const event: Extract<DriverEvent, { type: 'turn-started' }> = {
       type: 'turn-started',
       agentId,
       sessionId,
@@ -51,7 +51,7 @@ describe('TranscriptEmitter tool step handling', () => {
       toolCallId?: string
     } = {},
   ) {
-    const event: Extract<AgentEvent, { type: 'activity-updated' }> = {
+    const event: Extract<DriverEvent, { type: 'activity-updated' }> = {
       type: 'activity-updated',
       agentId: overrides.agentId ?? 'tangyuan',
       sessionId: overrides.sessionId ?? 'session-1',
@@ -79,7 +79,7 @@ describe('TranscriptEmitter tool step handling', () => {
     messageId: string,
     role: 'agent',
   ) {
-    const event: Extract<AgentEvent, { type: 'message-appended' }> = {
+    const event: Extract<DriverEvent, { type: 'message-appended' }> = {
       type: 'message-appended',
       agentId,
       message: {
@@ -256,7 +256,7 @@ describe('TranscriptEmitter tool step handling', () => {
     emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
 
     // Thinking in turn 0
-    const thinkingEvent: Extract<AgentEvent, { type: 'message-delta' }> = {
+    const thinkingEvent: Extract<DriverEvent, { type: 'message-delta' }> = {
       type: 'message-delta',
       agentId: 'tangyuan',
       sessionId: 'session-1',
@@ -385,7 +385,7 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('sets inReplyTo on AgentReplyEntry when message-appended includes it', () => {
     const { emitter, getSnapshot } = createEmitter()
-    const event: Extract<AgentEvent, { type: 'message-appended' }> = {
+    const event: Extract<DriverEvent, { type: 'message-appended' }> = {
       type: 'message-appended',
       agentId: 'tangyuan',
       message: {

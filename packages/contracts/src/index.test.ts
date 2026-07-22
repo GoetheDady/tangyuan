@@ -1064,48 +1064,46 @@ describe('transcript delta with turns', () => {
   })
 })
 
-describe('agent event with deltaKind', () => {
-  it('parses message-delta with deltaKind thinking', () => {
+describe('agent event with transcript-delta', () => {
+  it('parses transcript-delta with entry-appended', () => {
     expect(
       agentEventSchema.parse({
-        type: 'message-delta',
+        type: 'transcript-delta',
         agentId: 'a1',
         sessionId: 's1',
-        runId: 'r1',
-        messageId: 'm1',
-        delta: '正在思考…',
-        deltaKind: 'thinking',
+        delta: {
+          type: 'entry-appended',
+          entry: {
+            kind: 'user-message',
+            index: 0,
+            messageId: 'm1',
+            content: 'hello',
+            createdAt: '2026-07-21T00:00:00.000Z',
+          },
+        },
         occurredAt: '2026-07-21T00:00:00.000Z',
       }),
     ).toBeTruthy()
   })
 
-  it('parses message-delta without deltaKind (backward compat)', () => {
+  it('parses transcript-delta with step-appended', () => {
     expect(
       agentEventSchema.parse({
-        type: 'message-delta',
+        type: 'transcript-delta',
         agentId: 'a1',
         sessionId: 's1',
-        runId: 'r1',
-        messageId: 'm1',
-        delta: 'hello',
-        occurredAt: '2026-07-21T00:00:00.000Z',
-      }),
-    ).toBeTruthy()
-  })
-
-  it('parses activity-updated with optional stepId', () => {
-    expect(
-      agentEventSchema.parse({
-        type: 'activity-updated',
-        agentId: 'a1',
-        sessionId: 's1',
-        runId: 'r1',
-        activity: {
-          kind: 'tool',
-          state: 'running',
-          label: '正在读取文件',
-          stepId: 'step-1',
+        delta: {
+          type: 'step-appended',
+          index: 0,
+          turnIndex: 0,
+          step: {
+            index: 0,
+            kind: 'thinking',
+            content: '思考中…',
+            status: 'running',
+            startedAt: '2026-07-21T00:00:00.000Z',
+            completedAt: null,
+          },
         },
         occurredAt: '2026-07-21T00:00:00.000Z',
       }),

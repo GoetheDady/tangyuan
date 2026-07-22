@@ -971,7 +971,7 @@ interface ConfigReadResult {
  * Driver 内部使用的消息类型，替代已删除的公开 InternalMessage 契约。
  * 仅在 PiSdkDriver 内部使用，不暴露给 Runtime 或 Renderer。
  */
-interface InternalMessage {
+export interface InternalMessage {
   messageId: string
   agentId: string
   sessionId: string

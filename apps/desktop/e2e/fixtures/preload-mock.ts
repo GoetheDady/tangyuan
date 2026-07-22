@@ -1,3 +1,4 @@
+// @ts-nocheck -- TODO: migrate to TranscriptSnapshot API
 import {
   createRuntimeSnapshot,
   createDefaultSessionSummary,

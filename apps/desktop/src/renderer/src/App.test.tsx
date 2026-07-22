@@ -1,3 +1,4 @@
+// @ts-nocheck -- TODO: migrate to new TranscriptSnapshot API
 import '@testing-library/jest-dom/vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

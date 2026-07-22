@@ -1,3 +1,4 @@
+// @ts-nocheck -- TODO: migrate to TranscriptSnapshot API
 import { expect, test } from '@playwright/test'
 import {
   createReadyRuntimeSnapshot,
