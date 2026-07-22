@@ -63,11 +63,11 @@ test.describe('对话业务组件验收夹具', () => {
     await expect(result).toContainText('提交 1 次')
 
     const comboboxes = integrated.getByRole('combobox')
-    await comboboxes.nth(1).click()
+    await comboboxes.nth(0).click()
     await page.getByRole('option', { name: 'Claude Opus 4.1' }).click()
     await expect(result).toContainText('模型 claude-opus-4-1')
 
-    await comboboxes.nth(2).click()
+    await comboboxes.nth(1).click()
     await page.getByRole('option', { name: 'Thinking: high' }).click()
     await expect(result).toContainText('思考 high')
 

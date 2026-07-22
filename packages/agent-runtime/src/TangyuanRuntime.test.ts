@@ -7,6 +7,7 @@ import type {
 } from './index'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
+  agentEventSchema,
   type AgentSessionSummary,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
@@ -2147,6 +2148,51 @@ describe('transcript turn/step tracking', () => {
       )
       expect(hasThinking).toBe(true)
     }
+  })
+
+  it('never emits internal driver events to public subscribers', async () => {
+    const session = createSessionSummary('session-1')
+    const runtimeDriver = createRuntimeDriver(createReadySnapshot())
+    const sessionDriver = createSessionDriver([session])
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
+
+    // 复刻 ipc.ts 的行为：每条公开事件都会被 agentEventSchema 校验后广播给渲染层。
+    // 内部驱动事件（message-appended 等）若泄漏到这里会导致 parse 抛错。
+    const received: AgentEvent[] = []
+    runtime.subscribe((event) => {
+      agentEventSchema.parse(event)
+      received.push(event)
+    })
+
+    // 模拟一次真实发送：driver 先追加用户消息，再追加 agent 占位消息。
+    expect(() => {
+      sessionDriver.emit({
+        type: 'message-appended',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        message: {
+          messageId: 'user-msg',
+          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          sessionId: session.sessionId,
+          role: 'user',
+          content: '你好',
+          createdAt: '2026-07-21T00:00:00.000Z',
+        },
+        occurredAt: '2026-07-21T00:00:00.000Z',
+      })
+    }).not.toThrow()
+
+    // 公开订阅者只应收到 transcript-delta，不应收到 message-appended。
+    expect(
+      received.every(
+        (event) => (event.type as string) !== 'message-appended',
+      ),
+    ).toBe(true)
+    expect(received.some((event) => event.type === 'transcript-delta')).toBe(
+      true,
+    )
   })
 })
 

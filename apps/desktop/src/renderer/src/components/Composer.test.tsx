@@ -301,15 +301,13 @@ describe('Composer', () => {
   // 模型选择控件
   // ===========================================================================
 
-  it('renders provider and model selectors', () => {
+  it('renders the Pencil model pill selector', () => {
     render(<Composer {...createDefaultProps()} />)
 
-    // Provider 和 model 选择器都应该以 combobox 角色存在
-    const comboboxes = screen.getAllByRole('combobox')
-    expect(comboboxes.length).toBeGreaterThanOrEqual(2)
-    // Radix Select 的 SelectValue 会渲染选中项的文本
-    expect(screen.getAllByText('Anthropic').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText('Claude Sonnet 4.5').length).toBeGreaterThanOrEqual(1)
+    const modelTrigger = screen.getByRole('combobox', { name: '模型' })
+    expect(modelTrigger).toBeInTheDocument()
+    expect(modelTrigger).toHaveTextContent('Claude Sonnet 4.5')
+    expect(screen.queryByText('Anthropic')).not.toBeInTheDocument()
   })
 
   it('calls onModelChange when selecting a different model', async () => {
@@ -317,9 +315,7 @@ describe('Composer', () => {
     const onModelChange = vi.fn()
     render(<Composer {...createDefaultProps({ onModelChange })} />)
 
-    // 点击 model 选择器（第二个 combobox 是 model 选择器）
-    const comboboxes = screen.getAllByRole('combobox')
-    const modelTrigger = comboboxes[1]!
+    const modelTrigger = screen.getByRole('combobox', { name: '模型' })
     await user.click(modelTrigger)
 
     // 选择另一个模型（SelectContent portal 到 body，查找 option）
@@ -364,11 +360,9 @@ describe('Composer', () => {
       />
     )
 
-    // Thinking 控件应该可见（使用 getAllByText 因为 Radix Select 会渲染隐藏原生 select）
-    expect(screen.getAllByText('Thinking: off').length).toBeGreaterThanOrEqual(1)
-    // Thinking 选择器应该是第三个 combobox
-    const comboboxes = screen.getAllByRole('combobox')
-    expect(comboboxes.length).toBe(3) // Provider, Model, Thinking
+    expect(screen.getByRole('combobox', { name: '模型' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '思考强度' })).toBeInTheDocument()
+    expect(screen.getAllByRole('combobox')).toHaveLength(2)
   })
 
   it('does not render thinking level selector when model does not support thinking', () => {
@@ -419,9 +413,7 @@ describe('Composer', () => {
       />
     )
 
-    // 点击 thinking 选择器（第三个 combobox）
-    const comboboxes = screen.getAllByRole('combobox')
-    const thinkingTrigger = comboboxes[2]!
+    const thinkingTrigger = screen.getByRole('combobox', { name: '思考强度' })
     await user.click(thinkingTrigger)
 
     // 选择 high

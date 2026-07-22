@@ -88,10 +88,10 @@ test.describe('Electron 窗口', () => {
 
     // 根据 smoke test 的分类逻辑：页面应显示 setup 或 chat
     const isSetupPage =
-      bodyText.includes('配置模型服务') &&
+      bodyText.includes('连接模型服务') &&
       bodyText.includes('Provider') &&
       bodyText.includes('API Key')
-    const isChatPage = bodyText.includes('大语言模型对话') && bodyText.includes('新会话')
+    const isChatPage = bodyText.includes('大语言模型对话') && bodyText.includes('新建会话')
 
     expect(isSetupPage || isChatPage).toBe(true)
   })

@@ -4,6 +4,7 @@ import type {
   AgentEventListener,
   AgentEventSubscription,
   AgentSessionDriver,
+  DriverEvent,
   RuntimeResourceDriver,
   ToolApprovalGateway,
 } from './index'
@@ -37,6 +38,27 @@ import {
   type UpdateAgentConfigRequest,
   type UserProfileContent,
 } from '@tangyuan/contracts'
+
+/**
+ * 内部驱动事件类型：存在于 DriverEvent 但不属于公开 AgentEvent，
+ * 需先经 TranscriptEmitter 翻译为 transcript-delta 后才能向订阅者广播。
+ */
+const INTERNAL_DRIVER_EVENT_TYPES = new Set([
+  'message-appended',
+  'message-delta',
+  'message-completed',
+  'activity-updated',
+])
+
+/**
+ * 判断一个 Driver 事件是否为内部事件（不应直接向公开订阅者转发）。
+ *
+ * @param event - Driver 发出的事件。
+ * @returns 事件为内部驱动事件时返回 true。
+ */
+function isInternalDriverEvent(event: AgentEvent | DriverEvent): boolean {
+  return INTERNAL_DRIVER_EVENT_TYPES.has(event.type)
+}
 
 /**
  * 创建 TangyuanRuntime 时需要注入的内部 Driver。
@@ -98,7 +120,12 @@ class DefaultTangyuanRuntime {
     this.transcriptEmitter = new TranscriptEmitter(this.emit.bind(this))
     this.sessionDriver.subscribe((event) => {
       this.applyAgentEvent(event)
-      this.emit(event)
+      // 内部驱动事件（message-appended/message-delta/message-completed/
+      // activity-updated）已由 applyAgentEvent 翻译为 transcript-delta，
+      // 不属于公开 AgentEvent，直接向订阅者转发会导致 agentEventSchema 校验失败。
+      if (!isInternalDriverEvent(event)) {
+        this.emit(event)
+      }
       // 当 run 结束（完成/取消/失败）时，释放 slot 并启动下一个排队请求
       if (
         event.type === 'turn-cancelled' ||

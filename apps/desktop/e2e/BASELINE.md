@@ -99,3 +99,20 @@
 - Bash Approval：命令、工作目录、风险说明、警告和三决策按钮保持同一警告表面，完成态切换为成功语义。
 - Question Clarification：单问题、单选项、自定义输入、取消和已回答状态保持同一主色表面与键盘焦点顺序。
 - Transcript：压缩提示不进入对话气泡；长历史使用稳定条目身份和虚拟列表，不在会话切换时复用上一会话节点。
+
+## #59 后续修正：真实 ChatPage Pencil 基准（2026-07-22）
+
+原 #59 基准只覆盖 `conversation-components` 组件夹具；父 PRD #49 又明确把完整 ChatPage JSX 与 Sidebar 画板实现列为 Out of Scope，因此出现“组件截图通过，但产品页面仍沿用旧布局”的验收盲区。
+
+### 修正内容
+
+- 真实 ChatPage 改为 Pencil 的 `64px Agent Rail + 216px Session Pane` 双栏侧边栏，总宽保持 `280px`。
+- 标题栏固定为 `48px`；在 Pencil 原生 `1168×820` 视口下，消息区固定为 `720×630px`，Composer 区为 `888×142px`，Composer 卡片为 `720×131px`、`20px` 圆角。
+- User Message 使用 `max-width: 360px`、次级色表面、`16-16-4-16` 圆角、12/16px 内边距和 10px 时间戳；Assistant Message 移除旧卡片阴影与外边框，回到 640px 左对齐消息列。
+- Composer 按 Pencil 改为单一模型 pill、思考强度轨道、附件与发送/停止图标控制；Provider 不再作为聊天输入区中的独立视觉控件。
+- macOS BrowserWindow 使用 `hiddenInset` 标题栏，使系统 traffic lights 与 64px Agent Rail 对齐。
+- 新增 `chat-page.visual.spec.ts`，在固定 `1168×820` viewport 下直接截图真实产品路由，而不是再次截图组件夹具。
+
+### 基准更新理由
+
+本次更新 `integrated`、`assistant-states`、`composer-states`、Composer focus、Assistant expanded 和 Bash resolved 六张组件基准，并新增真实 ChatPage 基准。更新原因不是产品视觉改版，而是纠正旧基准对 Pencil 的错误实现，并补上真实页面未被视觉门禁覆盖的缺口。

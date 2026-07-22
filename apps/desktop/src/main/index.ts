@@ -82,6 +82,13 @@ function createWindow(): BrowserWindow {
     height: 670,
     show: false,
     autoHideMenuBar: true,
+    ...(process.platform === 'darwin'
+      ? {
+          titleBarStyle: 'hiddenInset' as const,
+          // 对齐设计稿：Agent rail padding [8,10] 让 Window controls 组左上角落在窗口 (10, 8)。
+          trafficLightPosition: { x: 10, y: 8 }
+        }
+      : {}),
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

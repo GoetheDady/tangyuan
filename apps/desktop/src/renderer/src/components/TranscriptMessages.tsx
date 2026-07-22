@@ -31,7 +31,7 @@ const AT_BOTTOM_THRESHOLD = 50
  */
 const ESTIMATED_SIZES: Record<RenderItem['type'], number> = {
   compaction: 48,
-  'user-message': 100,
+  'user-message': 112,
   'assistant-message': 160
 }
 
@@ -122,6 +122,17 @@ function buildRenderItemsFromTranscript(
   }
 
   return items
+}
+
+/**
+ * 将消息时间格式化为 Pencil 消息脚注使用的 24 小时制时间。
+ */
+function formatMessageTime(value: string): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(new Date(value))
 }
 
 /**
@@ -335,7 +346,7 @@ export function TranscriptMessages({
   return (
     <div
       ref={scrollRef}
-      className="mx-auto h-full max-w-3xl overflow-y-auto"
+      className="mx-auto h-full w-full max-w-[720px] overflow-x-hidden overflow-y-auto"
       data-testid="message-scroll-area"
     >
       <div className="relative w-full" style={{ height: `${virtualizer.getTotalSize()}px` }}>
@@ -356,15 +367,21 @@ export function TranscriptMessages({
               {item.type === 'compaction' ? (
                 <CompactionIndicator timestamp={item.timestamp} />
               ) : item.type === 'user-message' ? (
-                <div className="py-3.5">
+                <div className="py-2.5">
                   <article className="flex justify-end">
-                    <div className="max-w-[76%] min-w-0 rounded-lg bg-primary px-4 py-3 text-sm leading-6 text-primary-foreground shadow-sm">
+                    <div className="flex max-w-[360px] min-w-0 flex-col gap-1.5 rounded-[16px_16px_4px_16px] bg-secondary px-4 py-3 text-sm leading-[1.55] text-secondary-foreground">
                       <UserMessage content={item.content} />
+                      <time
+                        dateTime={item.createdAt}
+                        className="self-end font-mono text-[10px] leading-none text-muted-foreground"
+                      >
+                        {formatMessageTime(item.createdAt)}
+                      </time>
                     </div>
                   </article>
                 </div>
               ) : item.type === 'assistant-message' ? (
-                <div className="py-3.5">
+                <div className="py-2.5">
                   <AssistantMessage
                     entry={item.entry}
                     isStreaming={item.isLastAgent}

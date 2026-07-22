@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue
@@ -88,7 +89,6 @@ export function Composer({
   sessionModelInfo,
   isLoadingModelInfo,
   isSwitchingModel,
-  providers,
   selectableModels,
   onModelChange,
   onThinkingLevelChange
@@ -130,9 +130,17 @@ export function Composer({
     sessionModelInfo.supportedThinkingLevels &&
     sessionModelInfo.supportedThinkingLevels.length > 0
 
+  const thinkingLevels = sessionModelInfo?.supportedThinkingLevels ?? []
+  const selectedThinkingIndex = Math.max(
+    0,
+    thinkingLevels.indexOf(sessionModelInfo?.thinkingLevel ?? 'off')
+  )
+  const thinkingProgress =
+    thinkingLevels.length <= 1 ? 0 : selectedThinkingIndex / (thinkingLevels.length - 1)
+
   return (
     <form
-      className="mx-auto max-w-3xl"
+      className="mx-auto w-full max-w-[720px]"
       onSubmit={(event) => {
         event.preventDefault()
         if (canSend) {
@@ -140,20 +148,21 @@ export function Composer({
         }
       }}
     >
-      {/* Pencil Card：8px 圆角、1px 边框、card 背景、Level 0 无阴影 */}
-      <div className="rounded-lg border bg-card p-3 shadow-level-0">
+      <div
+        data-testid="composer-card"
+        className="flex min-h-[131px] flex-col rounded-[20px] bg-card p-[18px] shadow-[inset_0_0_0_1px_var(--border)] transition-[box-shadow] duration-200 focus-within:shadow-[inset_0_0_0_1px_var(--ring)] focus-within:ring-[3px] focus-within:ring-ring/25"
+      >
         <Label htmlFor="composer" className="sr-only">
           消息
         </Label>
         <Textarea
           ref={textareaRef}
           id="composer"
-          className="max-h-40 min-h-20 resize-none border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
+          className="max-h-40 min-h-[52px] resize-none rounded-none border-0 bg-transparent px-0 py-0 text-sm leading-[1.55] shadow-none placeholder:text-disabled-foreground hover:border-0 focus-visible:border-0 focus-visible:ring-0"
           placeholder={placeholder}
           value={value}
           onChange={(event) => {
             onChange(event.target.value)
-            // 延迟调整高度以等待 DOM 更新
             requestAnimationFrame(adjustHeight)
           }}
           onCompositionStart={() => {
@@ -166,135 +175,122 @@ export function Composer({
           disabled={disabled}
         />
 
-        {/* Pencil Separator：1px color-border，全宽，Level 0 */}
-        <Separator className="my-2" />
+        <Separator />
 
-        <div className="flex items-center justify-between gap-2">
-          {/* 左侧：模型和思考强度控件（仅在有会话时显示） */}
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted-foreground">
-            {sessionModelInfo && (
-              <>
-                {/* Provider 选择器 */}
-                <Select
-                  value={sessionModelInfo!.providerId}
-                  disabled={isSwitchingModel || isRunning}
+        <div className="flex min-h-10 items-end justify-between gap-2 pt-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 text-[11px] text-muted-foreground">
+            {sessionModelInfo ? (
+              <Select
+                value={sessionModelInfo.modelId}
+                onValueChange={(modelId) => {
+                  onModelChange(sessionModelInfo.providerId, modelId)
+                }}
+                disabled={isSwitchingModel || isRunning}
+              >
+                <SelectTrigger
+                  aria-label="模型"
+                  size="sm"
+                  className="h-[26px] w-auto min-w-0 gap-1 rounded-md border-0 bg-secondary px-2.5 text-[11px] font-medium text-secondary-foreground"
                 >
-                  <SelectTrigger
-                    size="sm"
-                    className="h-7 w-auto gap-1 border-0 bg-muted px-2 text-xs"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {providers.map((provider) => (
-                      <SelectItem key={provider.providerId} value={provider.providerId}>
-                        {provider.displayName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <span className="shrink-0 text-muted-foreground">/</span>
-
-                {/* Model 选择器 */}
-                <Select
-                  value={sessionModelInfo!.modelId}
-                  onValueChange={(modelId) => {
-                    if (sessionModelInfo!.providerId) {
-                      onModelChange(sessionModelInfo!.providerId, modelId)
-                    }
-                  }}
-                  disabled={isSwitchingModel || isRunning}
-                >
-                  <SelectTrigger
-                    size="sm"
-                    className="h-7 w-auto gap-1 border-0 bg-muted px-2 text-xs"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
                     {selectableModels.map((model) => (
                       <SelectItem key={model.modelId} value={model.modelId}>
                         {model.displayName}
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            ) : null}
 
-                {/* Thinking Level 选择器：仅当模型支持 thinking 时展示 */}
-                {showThinkingControl && (
-                  <>
-                    <span className="shrink-0 text-muted-foreground">·</span>
-                    <Select
-                      value={sessionModelInfo!.thinkingLevel ?? 'off'}
-                      onValueChange={(level) => {
-                        onThinkingLevelChange(level)
-                      }}
-                      disabled={isSwitchingModel || isRunning}
-                    >
-                      <SelectTrigger
-                        size="sm"
-                        className="h-7 w-auto gap-1 border-0 bg-muted px-2 text-xs"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sessionModelInfo!.supportedThinkingLevels.map((level) => (
-                          <SelectItem key={level} value={level}>
-                            Thinking: {level}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </>
-                )}
+            {showThinkingControl ? (
+              <Select
+                value={sessionModelInfo?.thinkingLevel ?? 'off'}
+                onValueChange={onThinkingLevelChange}
+                disabled={isSwitchingModel || isRunning}
+              >
+                <SelectTrigger
+                  aria-label="思考强度"
+                  size="sm"
+                  className="h-6 w-[96px] gap-1.5 border-0 bg-transparent p-0 text-[11px] text-muted-foreground hover:border-0 [&>svg]:hidden"
+                >
+                  <span>思考</span>
+                  <span className="relative h-[5px] w-16 shrink-0 rounded-full bg-border">
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-0 left-0 rounded-full bg-primary"
+                      style={{ width: `${thinkingProgress * 100}%` }}
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-background"
+                      style={{ left: `${thinkingProgress * 100}%` }}
+                    />
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {thinkingLevels.map((level) => (
+                      <SelectItem key={level} value={level}>
+                        Thinking: {level}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            ) : null}
 
-                {/* 附件占位：禁用按钮 + Tooltip 说明功能暂未开放 */}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        disabled
-                        className="ml-0.5 shrink-0 text-muted-foreground"
-                        aria-label="附件功能暂未开放"
-                      >
-                        <Paperclip className="size-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>附件功能暂未开放</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-
-                {isLoadingModelInfo && (
-                  <span className="shrink-0 text-muted-foreground">加载中...</span>
-                )}
-              </>
-            )}
+            {isLoadingModelInfo ? (
+              <span className="shrink-0 text-[10px] text-muted-foreground">加载中...</span>
+            ) : null}
           </div>
 
-          {/* 右侧：发送/停止按钮 */}
-          {isRunning ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              onClick={onCancel}
-            >
-              <StopCircle aria-hidden="true" />
-              停止
-            </Button>
-          ) : (
-            <Button type="submit" size="sm" className="shrink-0" disabled={!canSend}>
-              <Send aria-hidden="true" />
-              发送
-            </Button>
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled
+                    aria-label="附件功能暂未开放"
+                  >
+                    <Paperclip aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>附件功能暂未开放</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            {isRunning ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon-sm"
+                aria-label="停止"
+                title="停止"
+                onClick={onCancel}
+              >
+                <StopCircle aria-hidden="true" />
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="icon-sm"
+                aria-label="发送"
+                title="发送"
+                disabled={!canSend}
+              >
+                <Send aria-hidden="true" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </form>

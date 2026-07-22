@@ -176,14 +176,14 @@ describe('App', () => {
   it('renders the setup page when configuration is missing', async () => {
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: '配置模型服务' })).toBeInTheDocument()
-    expect(screen.getByText('控制台')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '连接模型服务' })).toBeInTheDocument()
+    expect(screen.getByText('首次配置')).toBeInTheDocument()
   })
 
   it('does not show chat controls while configuration is missing', async () => {
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: '配置模型服务' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '连接模型服务' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '新会话' })).not.toBeInTheDocument()
     expect(window.api.listSessions).not.toHaveBeenCalled()
   })
@@ -214,7 +214,7 @@ describe('App', () => {
     try {
       render(<App />)
 
-      await screen.findByText('配置模型服务')
+      await screen.findByText('连接模型服务')
       await waitFor(() => {
         expect(
           consoleError.mock.calls.some((call) =>
@@ -235,17 +235,14 @@ describe('App', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    // 等待 Anthropic 卡片渲染完成
-    const modelSelect = (await screen.findByLabelText('Model', {
-      selector: '#model-anthropic'
-    })) as HTMLSelectElement
-    const apiKeyInput = screen.getByLabelText('API Key', {
-      selector: '#api-key-anthropic'
-    }) as HTMLInputElement
+    // 等待表单渲染完成
+    const modelTrigger = await screen.findByTestId('setup-model-select')
+    const apiKeyInput = (await screen.findByTestId('setup-api-key-input')) as HTMLInputElement
 
-    await user.selectOptions(modelSelect, 'claude-sonnet-4-5')
+    await user.click(modelTrigger)
+    await user.click(screen.getByRole('option', { name: 'Claude Sonnet 4.5' }))
     await user.type(apiKeyInput, 'sk-test-secret-7890')
-    await user.click(screen.getByRole('button', { name: '验证并保存' }))
+    await user.click(screen.getByRole('button', { name: '验证并继续' }))
 
     expect(window.api.saveRuntimeConfiguration).toHaveBeenCalledWith({
       providerId: 'anthropic',
@@ -271,16 +268,13 @@ describe('App', () => {
     )
     render(<App />)
 
-    const modelSelect = (await screen.findByLabelText('Model', {
-      selector: '#model-anthropic'
-    })) as HTMLSelectElement
-    const apiKeyInput = screen.getByLabelText('API Key', {
-      selector: '#api-key-anthropic'
-    }) as HTMLInputElement
+    const modelTrigger = (await screen.findByTestId('setup-model-select'))
+    const apiKeyInput = (await screen.findByTestId('setup-api-key-input')) as HTMLInputElement
 
-    await user.selectOptions(modelSelect, 'claude-sonnet-4-5')
+    await user.click(modelTrigger)
+    await user.click(screen.getByRole('option', { name: 'Claude Sonnet 4.5' }))
     await user.type(apiKeyInput, 'sk-test-secret-7890')
-    await user.click(screen.getByRole('button', { name: '验证并保存' }))
+    await user.click(screen.getByRole('button', { name: '验证并继续' }))
 
     expect(window.api.createSession).toHaveBeenCalledWith({
       agentId: 'tangyuan',
@@ -296,17 +290,14 @@ describe('App', () => {
     window.api.saveRuntimeConfiguration = vi.fn(() => new Promise<RuntimeSnapshot>(() => undefined))
     render(<App />)
 
-    const modelSelect = (await screen.findByLabelText('Model', {
-      selector: '#model-anthropic'
-    })) as HTMLSelectElement
-    const apiKeyInput = screen.getByLabelText('API Key', {
-      selector: '#api-key-anthropic'
-    }) as HTMLInputElement
+    const modelTrigger = (await screen.findByTestId('setup-model-select'))
+    const apiKeyInput = (await screen.findByTestId('setup-api-key-input')) as HTMLInputElement
 
-    await user.selectOptions(modelSelect, 'claude-sonnet-4-5')
+    await user.click(modelTrigger)
+    await user.click(screen.getByRole('option', { name: 'Claude Sonnet 4.5' }))
     await user.type(apiKeyInput, 'sk-test-secret-7890')
-    await user.click(screen.getByRole('button', { name: '验证并保存' }))
-    await user.click(screen.getByRole('button', { name: '取消验证' }))
+    await user.click(screen.getByRole('button', { name: '验证并继续' }))
+    await user.click(screen.getByText('取消验证'))
 
     expect(window.api.cancelRuntimeConfigurationVerification).toHaveBeenCalledWith({
       verificationId: 'current'

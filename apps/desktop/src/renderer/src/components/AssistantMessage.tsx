@@ -125,7 +125,7 @@ export function AssistantMessage({
   if (!hasTurns) {
     return (
       <article className="flex justify-start" aria-busy={isStreaming}>
-        <div className="max-w-[76%] min-w-0 rounded-lg border bg-card px-4 py-3 text-sm leading-6 text-card-foreground shadow-sm">
+        <div className="w-full max-w-[640px] min-w-0 rounded-[7px] bg-background p-3.5 text-xs leading-[1.55] text-foreground">
           <StreamdownMessage content={entry.content} isAnimating={isStreaming} />
         </div>
       </article>
@@ -134,7 +134,7 @@ export function AssistantMessage({
 
   return (
     <article className="flex justify-start" aria-busy={isStreaming}>
-      <div className="max-w-[76%] min-w-0 rounded-lg border bg-card text-card-foreground shadow-sm">
+      <div className="flex w-full max-w-[640px] min-w-0 flex-col gap-2.5 rounded-[7px] bg-background p-3.5 text-foreground">
         {/* Execution Disclosure Bar */}
         <ExecutionDisclosure
           state={state}
@@ -151,23 +151,21 @@ export function AssistantMessage({
 
         {/* Final Body (shown when collapsed + final) */}
         {state === 'final-confirmed' && !isExpanded && entry.content && (
-          <div className="px-4 pb-4">
+          <div className="text-xs leading-[1.55]">
             <StreamdownMessage content={entry.content} isAnimating={false} />
           </div>
         )}
 
         {/* Unconfirmed text (shown while streaming) */}
         {(state === 'unconfirmed-text' || state === 'active-tool-loop') && entry.content && (
-          <div className="px-4 pb-3">
-            <div className="rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-foreground">
-              此文本尚未确认，后续仍可能出现工具调用。
-            </div>
+          <div className="rounded-md border border-warning-border bg-warning-soft px-2.5 py-2 text-[11px] text-warning-foreground">
+            此文本尚未确认，后续仍可能出现工具调用。
           </div>
         )}
 
         {/* Cancelled / Failed footer */}
         {state === 'ended-nonfinal' && (
-          <div className="px-4 pb-4">
+          <div className="text-xs leading-[1.55]">
             {entry.content ? (
               <StreamdownMessage content={entry.content} isAnimating={false} />
             ) : null}
@@ -217,11 +215,11 @@ function ExecutionDisclosure({
   if (state === 'active-tool-loop' || state === 'unconfirmed-text') {
     StatusIcon = LoaderCircle
     label = '仍在执行'
-    bgClass = 'bg-muted'
+    bgClass = 'bg-secondary'
   } else if (state === 'final-confirmed') {
     StatusIcon = Check
     label = '已完成执行过程'
-    bgClass = 'bg-muted'
+    bgClass = 'bg-secondary'
   } else if (attemptStatus === 'cancelled') {
     StatusIcon = CircleStop
     label = '已中断执行过程'
@@ -229,7 +227,7 @@ function ExecutionDisclosure({
   } else {
     StatusIcon = CircleX
     label = '执行失败'
-    bgClass = 'bg-muted'
+    bgClass = 'bg-destructive-soft'
   }
 
   const metaParts: string[] = []
@@ -243,11 +241,11 @@ function ExecutionDisclosure({
       type="button"
       aria-expanded={isExpanded}
       onClick={onToggle}
-      className={`flex w-full items-center gap-1.5 rounded-t-lg px-3 py-2 text-left transition-colors duration-200 hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${bgClass}`}
+      className={`flex w-full items-center gap-1.5 rounded-md px-2.5 py-2 text-left transition-colors duration-200 hover:bg-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${bgClass}`}
     >
-      <ChevronIcon size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+      <ChevronIcon size={13} className="shrink-0 text-muted-foreground" aria-hidden="true" />
       <StatusIcon
-        size={14}
+        size={13}
         className={`shrink-0 ${
           state === 'active-tool-loop' || state === 'unconfirmed-text'
             ? 'animate-spin text-primary'
@@ -259,9 +257,9 @@ function ExecutionDisclosure({
         }`}
         aria-hidden="true"
       />
-      <span className="text-xs font-semibold text-foreground">{label}</span>
+      <span className="text-[11px] font-semibold text-foreground">{label}</span>
       <span className="flex-1" />
-      {meta && <span className="text-[10px] text-muted-foreground">{meta}</span>}
+      {meta && <span className="font-mono text-[9px] text-muted-foreground">{meta}</span>}
     </button>
   )
 }
@@ -271,8 +269,8 @@ function ExecutionDisclosure({
  */
 function TurnTimeline({ turns }: { turns: RunTurn[] }): React.JSX.Element {
   return (
-    <div className="border-t px-3 py-2">
-      <div className="space-y-3">
+    <div className="px-2.5 pb-0.5 pt-1">
+      <div className="flex flex-col gap-1.5">
         {turns.map((turn, turnIdx) => (
           <div key={turnIdx}>
             {/* Turn header */}

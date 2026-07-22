@@ -21,46 +21,36 @@ test.describe('聊天页', () => {
 
   test('显示品牌标题和布局', async ({ page }) => {
     // 左侧 sidebar 品牌区域
-    await expect(page.getByRole('heading', { name: '汤圆' })).toBeVisible()
-    await expect(page.getByText('大语言模型对话')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '汤圆' })).toBeAttached()
+    await expect(page.getByText('大语言模型对话')).toBeAttached()
   })
 
-  test('现有侧栏 Separator 保持 1px 全宽 Level 0 布局', async ({ page }) => {
-    const separator = page.locator('aside > [data-slot="separator"]')
+  test('侧栏按 Pencil 使用 64px Agent Rail + 216px Session Pane', async ({ page }) => {
+    const sidebar = page.getByTestId('chat-sidebar')
+    const agentRail = page.getByTestId('chat-agent-rail')
+    const sessionPane = page.getByTestId('chat-session-pane')
 
-    await expect(separator).toHaveCount(1)
-    await expect(separator).toHaveAttribute('role', 'none')
-    await expect(separator).toHaveAttribute('data-level', '0')
-    await expect(separator).toHaveCSS('height', '1px')
-    await expect(separator).toHaveCSS('box-shadow', 'none')
+    await expect(sidebar).toBeVisible()
+    await expect(agentRail).toBeVisible()
+    await expect(sessionPane).toBeVisible()
 
-    const layout = await separator.evaluate((element) => {
-      const parent = element.parentElement
-      if (!(parent instanceof HTMLElement)) throw new Error('缺少聊天侧栏父容器')
-      const separatorBox = element.getBoundingClientRect()
-      const parentBox = parent.getBoundingClientRect()
-      return {
-        separatorLeft: separatorBox.left,
-        separatorWidth: separatorBox.width,
-        parentLeft: parentBox.left,
-        parentContentWidth: parent.clientWidth,
-        overflowX: element.scrollWidth - element.clientWidth,
-        overflowY: element.scrollHeight - element.clientHeight
-      }
-    })
+    await expect(sidebar).toHaveCSS('width', '280px')
+    await expect(agentRail).toHaveCSS('width', '64px')
+    await expect(sessionPane).toHaveCSS('width', '216px')
+  })
 
-    expect(layout).toEqual({
-      separatorLeft: layout.parentLeft,
-      separatorWidth: layout.parentContentWidth,
-      parentLeft: layout.parentLeft,
-      parentContentWidth: layout.parentContentWidth,
-      overflowX: 0,
-      overflowY: 0
-    })
+  test('标题栏和 Composer 使用 Pencil 尺寸', async ({ page }) => {
+    await expect(page.getByTestId('chat-header')).toHaveCSS('height', '48px')
+    await expect(page.getByTestId('composer-card')).toHaveCSS('height', '131px')
+    await expect(page.getByTestId('composer-card')).toHaveCSS('border-radius', '20px')
+    await expect(page.getByTestId('composer-card')).toHaveCSS('max-width', 'none')
+
+    const composerForm = page.getByTestId('composer-card').locator('..')
+    await expect(composerForm).toHaveCSS('max-width', '720px')
   })
 
   test('显示新会话按钮', async ({ page }) => {
-    const newSessionButton = page.getByRole('button', { name: '新会话' })
+    const newSessionButton = page.getByRole('button', { name: '新建会话' })
     await expect(newSessionButton).toBeVisible()
   })
 
@@ -71,10 +61,9 @@ test.describe('聊天页', () => {
     await expect(page.getByRole('button', { name: /测试会话 3/ })).toBeVisible()
   })
 
-  test('会话列表显示运行状态', async ({ page }) => {
-    // 每个会话都应显示"空闲"状态
-    const idleIndicators = page.getByText('空闲')
-    await expect(idleIndicators.first()).toBeVisible()
+  test('会话列表只显示影响操作的状态', async ({ page }) => {
+    await expect(page.getByText('空闲')).toHaveCount(0)
+    await expect(page.getByText('已完成')).toHaveCount(0)
   })
 
   test('消息区域显示 mock 消息', async ({ page }) => {

@@ -194,13 +194,32 @@ describe('TangyuanRuntime', () => {
         ],
       }),
     )
+    // 公开订阅者只应收到公开 AgentEvent，不应泄漏内部驱动事件。
+    // （本用例在 agent 回复落地前就取消，因此不断言具体的 delta-appended。）
     expect(events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: 'turn-started' }),
-        expect.objectContaining({ type: 'message-delta', delta: '收' }),
+        expect.objectContaining({
+          type: 'transcript-delta',
+          delta: expect.objectContaining({
+            type: 'entry-appended',
+            entry: expect.objectContaining({ kind: 'user-message' }),
+          }),
+        }),
         expect.objectContaining({ type: 'turn-cancelled' }),
       ]),
     )
+    // 内部驱动事件不应泄漏给公开订阅者（否则 IPC 层 agentEventSchema 会抛错）。
+    expect(
+      events.some((event) =>
+        [
+          'message-appended',
+          'message-delta',
+          'message-completed',
+          'activity-updated',
+        ].includes(event.type),
+      ),
+    ).toBe(false)
   })
 })
 

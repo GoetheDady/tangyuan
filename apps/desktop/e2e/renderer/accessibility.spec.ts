@@ -41,7 +41,7 @@ test.describe('Renderer 基础无障碍', () => {
 
     await expect(page.getByRole('heading', { name: '汤圆' })).toBeVisible()
     await expect(page.getByRole('heading', { name: /测试会话/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: '新会话' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '新建会话' })).toBeVisible()
     await expect(page.getByRole('button', { name: '发送' })).toBeDisabled()
 
     const messageArea = page.locator('[data-testid="message-scroll-area"]')

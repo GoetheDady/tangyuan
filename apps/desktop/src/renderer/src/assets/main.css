@@ -246,6 +246,14 @@
     line-height: var(--text-body-line-height);
     user-select: none;
   }
+
+  .window-drag-region {
+    -webkit-app-region: drag;
+  }
+
+  .window-no-drag {
+    -webkit-app-region: no-drag;
+  }
 }
 
 @keyframes alert-dialog-overlay-fade-in {

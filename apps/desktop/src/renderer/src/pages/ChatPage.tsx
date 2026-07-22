@@ -1,5 +1,4 @@
 import type {
-  AgentRunState,
   AgentSessionSummary,
   AgentSummary,
   BashApprovalRequest,
@@ -9,7 +8,7 @@ import type {
   SessionModelInfo,
   TranscriptSnapshot
 } from '@tangyuan/contracts'
-import { MessageSquarePlus, Sparkles } from 'lucide-react'
+import { MessageSquarePlus, Settings } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -18,7 +17,6 @@ import { BashApprovalCard } from '@/components/BashApprovalCard'
 import { QuestionClarificationCard } from '@/components/QuestionClarificationCard'
 import { Button } from '@/components/ui/button'
 import { Composer } from '@/components/Composer'
-import { Separator } from '@/components/ui/separator'
 import { TranscriptMessages } from '@/components/TranscriptMessages'
 
 interface DesktopWorkbenchState {
@@ -60,6 +58,10 @@ interface DesktopWorkbenchAction {
 }
 
 interface DesktopWorkbenchContext extends DesktopWorkbenchState, DesktopWorkbenchAction {}
+
+function getAgentInitial(displayName: string): string {
+  return Array.from(displayName.trim())[0] ?? '汤'
+}
 
 /**
  * 聊天页路由守卫：运行时未就绪时重定向到控制台。
@@ -355,114 +357,197 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     }
   }
 
+  const sessionGroups = useMemo(() => {
+    const today = new Date().toDateString()
+    const groups = [
+      {
+        label: '今天',
+        sessions: context.sessions.filter(
+          (session) => new Date(session.updatedAt).toDateString() === today
+        )
+      },
+      {
+        label: '更早',
+        sessions: context.sessions.filter(
+          (session) => new Date(session.updatedAt).toDateString() !== today
+        )
+      }
+    ]
+
+    return groups.filter((group) => group.sessions.length > 0)
+  }, [context.sessions])
+
+  async function handleAgentChange(nextAgentId: string): Promise<void> {
+    navigate(`/chat/${nextAgentId}`, { replace: true })
+    context.setSelectedSessionId(null)
+    context.setTranscript(null)
+
+    try {
+      const sessions = await window.api.listSessions()
+      context.setSessions(sessions.filter((session) => session.agentId === nextAgentId))
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : '加载 Agent 会话失败')
+    }
+  }
+
+  const isElectron =
+    typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes(' electron/')
+
   return (
     <main className="h-screen overflow-hidden bg-background text-foreground">
-      <div className="grid h-full min-h-0 grid-cols-[280px_1fr]">
-        <aside className="flex min-h-0 flex-col border-r bg-muted/35">
-          <div className="border-b px-5 py-4">
-            <div className="flex items-center gap-3">
-              <div className="grid size-9 place-items-center rounded-md bg-primary text-primary-foreground">
-                <Sparkles size={18} aria-hidden="true" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <h1 className="truncate text-base font-semibold leading-5">
-                    {activeAgentDisplayName}
-                  </h1>
-                </div>
-                <p className="text-xs text-muted-foreground">大语言模型对话</p>
-              </div>
-            </div>
-            {context.agents.length > 1 ? (
-              <div className="mt-3">
-                <select
-                  className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                  value={activeAgentId}
-                  onChange={(event) => {
-                    const nextAgentId = event.target.value
-                    navigate(`/chat/${nextAgentId}`, { replace: true })
-                    context.setSelectedSessionId(null)
-                    context.setTranscript(null)
-                    void window.api.listSessions().then((sessions) => {
-                      context.setSessions(sessions.filter((s) => s.agentId === nextAgentId))
-                    })
-                  }}
-                >
-                  {context.agents.map((agent) => (
-                    <option key={agent.agentId} value={agent.agentId}>
-                      {agent.displayName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="p-4">
-            <Button
-              className="w-full"
-              onClick={() => {
-                void createSession()
-              }}
+      <h1 className="sr-only">{activeAgentDisplayName}</h1>
+      <p className="sr-only">大语言模型对话</p>
+      <div className="grid h-full min-h-0 grid-cols-[292px_minmax(0,1fr)]">
+        <aside
+          data-testid="chat-sidebar"
+          className="grid min-h-0 grid-cols-[76px_216px] border-r border-border bg-sidebar"
+        >
+          <nav
+            aria-label="Agent 切换"
+            data-testid="chat-agent-rail"
+            className="window-drag-region flex min-h-0 flex-col items-center gap-2.5 border-r border-sidebar-border bg-background px-2.5 py-2"
+          >
+            <div
+              aria-hidden="true"
+              className={`flex h-3 w-11 items-center gap-[7px] ${isElectron ? 'opacity-0' : ''}`}
             >
-              <MessageSquarePlus aria-hidden="true" />
-              新会话
-            </Button>
-          </div>
+              <span className="size-2.5 rounded-full bg-destructive" />
+              <span className="size-2.5 rounded-full bg-warning" />
+              <span className="size-2.5 rounded-full bg-success" />
+            </div>
 
-          <Separator />
-
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <div className="space-y-1">
-              {context.sessions.length ? (
-                context.sessions.map((session) => (
+            {context.agents
+              .filter((agent) => agent.status === 'active')
+              .map((agent) => {
+                const isActive = agent.agentId === activeAgentId
+                return (
                   <button
-                    key={session.sessionId}
-                    className={`w-full rounded-md px-3 py-2 text-left text-sm transition focus:outline-none focus:ring-1 focus:ring-ring ${
-                      session.sessionId === selectedSession?.sessionId
-                        ? 'bg-card text-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    key={agent.agentId}
+                    type="button"
+                    aria-label={`切换到 Agent ${agent.displayName}`}
+                    aria-current={isActive ? 'page' : undefined}
+                    title={agent.displayName}
+                    className={`window-no-drag grid size-9 shrink-0 place-items-center rounded-[10px] border text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
+                      isActive
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-secondary text-foreground hover:bg-accent'
                     }`}
                     onClick={() => {
-                      void openSession(session)
-                      navigate(`/chat/${activeAgentId}/${session.sessionId}`, { replace: true })
+                      void handleAgentChange(agent.agentId)
                     }}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="block truncate font-medium">{session.title}</span>
-                      {context.pendingApprovals.filter(
-                        (a) => a.sessionId === session.sessionId && a.status === 'pending'
-                      ).length > 0 && (
-                        <span className="inline-flex size-2 shrink-0 rounded-full bg-red-500" />
-                      )}
-                    </div>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {formatRunState(session.state)}
-                    </span>
+                    {getAgentInitial(agent.displayName)}
                   </button>
-                ))
+                )
+              })}
+
+            <div className="min-h-0 flex-1" />
+            <button
+              type="button"
+              aria-label="设置"
+              title="设置"
+              className="window-no-drag grid size-9 shrink-0 place-items-center rounded-[10px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              onClick={() => {
+                navigate('/console/providers')
+              }}
+            >
+              <Settings size={16} aria-hidden="true" />
+            </button>
+          </nav>
+
+          <section
+            data-testid="chat-session-pane"
+            className="flex min-h-0 min-w-0 flex-col bg-sidebar"
+          >
+            <div className="p-[8px_10px_10px]">
+              <Button
+                className="h-9 w-full gap-1.5 rounded-lg px-2 text-[11px] font-semibold"
+                onClick={() => {
+                  void createSession()
+                }}
+              >
+                <MessageSquarePlus data-icon="inline-start" size={14} aria-hidden="true" />
+                新建会话
+              </Button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+              {sessionGroups.length > 0 ? (
+                <div className="flex flex-col gap-0.5">
+                  {sessionGroups.map((group) => (
+                    <div key={group.label} role="group" aria-label={group.label}>
+                      <p className="flex h-5 items-center px-2.5 font-mono text-[8px] font-semibold text-muted-foreground">
+                        {group.label}
+                      </p>
+                      {group.sessions.map((session) => {
+                        const isSelected = session.sessionId === selectedSession?.sessionId
+                        const hasPendingApproval = context.pendingApprovals.some(
+                          (approval) =>
+                            approval.sessionId === session.sessionId &&
+                            approval.status === 'pending'
+                        )
+                        const isRunning = session.state === 'running' || session.state === 'queued'
+
+                        return (
+                          <button
+                            key={session.sessionId}
+                            type="button"
+                            className={`flex h-10 w-full items-center gap-1.5 rounded-lg px-2.5 text-left text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
+                              isSelected
+                                ? 'bg-secondary text-foreground'
+                                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                            }`}
+                            onClick={() => {
+                              void openSession(session)
+                              navigate(`/chat/${activeAgentId}/${session.sessionId}`, {
+                                replace: true
+                              })
+                            }}
+                          >
+                            <span
+                              className={`min-w-0 flex-1 truncate ${isSelected ? 'font-semibold' : 'font-medium'}`}
+                            >
+                              {session.title}
+                            </span>
+                            {(isRunning || hasPendingApproval) && (
+                              <>
+                                <span
+                                  aria-hidden="true"
+                                  title={hasPendingApproval ? '待审批' : '运行中'}
+                                  className={`size-1.5 shrink-0 rounded-full ${
+                                    hasPendingApproval ? 'bg-warning' : 'bg-info'
+                                  }`}
+                                />
+                                <span className="sr-only">
+                                  {hasPendingApproval ? '待审批' : '运行中'}
+                                </span>
+                              </>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <div className="rounded-md border bg-card p-3 text-sm text-muted-foreground">
-                  暂无会话
+                <div className="px-2.5 py-3 text-[11px] text-muted-foreground">
+                  <p className="font-medium">暂无会话</p>
+                  <p className="mt-1 text-[10px]">新建会话后会显示在这里</p>
                 </div>
               )}
             </div>
-          </div>
+          </section>
         </aside>
 
-        <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
-          <header className="flex h-16 items-center border-b px-8">
-            <div className="min-w-0">
-              <h2 className="truncate text-base font-semibold">
-                {selectedSession?.title ?? '新对话'}
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                {selectedSession ? formatRunState(selectedSession.state) : '创建新会话后开始'}
-              </p>
-            </div>
+        <section data-testid="chat-main" className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+          <header
+            data-testid="chat-header"
+            className="flex h-12 shrink-0 items-center border-b border-border px-[18px]"
+          >
+            <h2 className="truncate text-xs font-semibold">{selectedSession?.title ?? '新对话'}</h2>
           </header>
 
-          <div className="min-h-0 flex-1 px-8 py-7">
+          <div className="min-h-0 flex-1 px-4">
             <TranscriptMessages
               key={selectedSession?.sessionId ?? 'no-session'}
               transcript={selectedTranscript}
@@ -474,13 +559,14 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
             />
           </div>
 
-          {/* 审批卡片区域 */}
           {selectedSession && context.pendingApprovals.length > 0 && (
-            <div className="border-t bg-muted/20 px-8 py-4">
-              <div className="mx-auto space-y-3">
+            <div className="shrink-0 bg-background px-4 py-2">
+              <div className="mx-auto max-w-[720px] space-y-2">
                 {context.pendingApprovals
                   .filter(
-                    (a) => a.sessionId === selectedSession.sessionId && a.status === 'pending'
+                    (approval) =>
+                      approval.sessionId === selectedSession.sessionId &&
+                      approval.status === 'pending'
                   )
                   .map((approval) => (
                     <BashApprovalCard
@@ -490,7 +576,6 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                         await window.api.approveBash({ approvalId })
                       }}
                       onApproveAlways={async (approvalId) => {
-                        // 记录为"始终允许"并批准
                         context.addAlwaysAllowedCommand(approval.sessionId, approval.command)
                         await window.api.approveBash({ approvalId })
                       }}
@@ -503,28 +588,24 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
             </div>
           )}
 
-          {/* 澄清卡片区域 */}
           {selectedSession && context.pendingClarifications.length > 0 && (
-            <div className="border-t bg-muted/20 px-8 py-4">
-              <div className="mx-auto space-y-3">
+            <div className="shrink-0 bg-background px-4 py-2">
+              <div className="mx-auto max-w-[720px] space-y-2">
                 {context.pendingClarifications
                   .filter(
-                    (c) => c.sessionId === selectedSession.sessionId && c.status === 'pending'
+                    (clarification) =>
+                      clarification.sessionId === selectedSession.sessionId &&
+                      clarification.status === 'pending'
                   )
                   .map((clarification) => (
                     <QuestionClarificationCard
                       key={clarification.clarificationId}
                       clarification={clarification}
                       onAnswer={async (clarificationId, answer) => {
-                        await window.api.answerClarification({
-                          clarificationId,
-                          answer
-                        })
+                        await window.api.answerClarification({ clarificationId, answer })
                       }}
                       onCancel={async (clarificationId) => {
-                        await window.api.cancelClarification({
-                          clarificationId
-                        })
+                        await window.api.cancelClarification({ clarificationId })
                       }}
                     />
                   ))}
@@ -532,14 +613,19 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
             </div>
           )}
 
-          <footer className="border-t bg-background px-8 py-4">
+          <footer
+            data-testid="chat-composer-area"
+            className="shrink-0 bg-background px-4 pb-[6px] pt-[5px]"
+          >
             <Composer
               value={context.composerText}
               onChange={context.setComposerText}
               onSubmit={() => {
                 void sendMessage()
               }}
-              placeholder={`给${activeAgentDisplayName}发送消息`}
+              placeholder={
+                selectedSession ? '继续输入...' : `给${activeAgentDisplayName}发送消息...`
+              }
               isRunning={isSelectedSessionRunning || context.isSendingMessage}
               onCancel={() => {
                 void cancelRun()
@@ -576,24 +662,4 @@ export function LoadingScreen(): React.JSX.Element {
       <div className="text-sm text-muted-foreground">正在打开汤圆...</div>
     </main>
   )
-}
-
-/**
- * 把内部运行状态枚举转换为用户可读中文。
- *
- * @param state - 会话当前运行状态。
- * @returns 对应的中文展示文案。
- * @throws 此方法不会主动抛出错误。
- */
-function formatRunState(state: AgentRunState): string {
-  const labels: Record<AgentRunState, string> = {
-    idle: '空闲',
-    queued: '排队中',
-    running: '运行中',
-    completed: '已完成',
-    cancelled: '已取消',
-    failed: '失败'
-  }
-
-  return labels[state]
 }

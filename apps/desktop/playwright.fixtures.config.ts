@@ -30,7 +30,11 @@ export default defineConfig({
     },
     {
       name: 'chromium-fixtures-visual',
-      testMatch: ['**/base-components.visual.spec.ts', '**/conversation-components.visual.spec.ts']
+      testMatch: [
+        '**/base-components.visual.spec.ts',
+        '**/conversation-components.visual.spec.ts',
+        '**/chat-page.visual.spec.ts'
+      ]
     }
   ]
 })
