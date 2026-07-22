@@ -200,7 +200,7 @@ describe('TangyuanRuntime', () => {
     // （本用例在 agent 回复落地前就取消，因此不断言具体的 delta-appended。）
     expect(events).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ type: 'turn-started' }),
+        expect.objectContaining({ type: 'attempt-started' }),
         expect.objectContaining({
           type: 'transcript-delta',
           delta: expect.objectContaining({
@@ -780,7 +780,7 @@ describe('PiSdkDriver', () => {
     expect(events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          type: 'turn-started',
+          type: 'attempt-started',
           runId: expect.stringMatching(/-run-1$/),
         }),
         expect.objectContaining({

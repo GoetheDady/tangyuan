@@ -1329,7 +1329,7 @@ class DefaultTangyuanRuntime {
       return
     }
 
-    if (driverEvent.type === 'turn-started') {
+    if (driverEvent.type === 'attempt-started') {
       this.activeRunIds.set(driverEvent.sessionId, driverEvent.runId)
       this.upsertSessionState(
         driverEvent.sessionId,

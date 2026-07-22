@@ -147,7 +147,7 @@ describe('registerDesktopAppIpc', () => {
     const broadcastAgentEvent = vi.fn()
     const openExternalLink = vi.fn().mockResolvedValue(undefined)
     runtime.subscribe = vi.fn((listener) => {
-      listener(createTurnStartedEvent())
+      listener(createAttemptStartedEvent())
 
       return {
         unsubscribe: vi.fn()
@@ -157,7 +157,7 @@ describe('registerDesktopAppIpc', () => {
     registerDesktopAppIpc(ipcMain, runtime, broadcastAgentEvent, openExternalLink)
 
     expect(ipcMain.handle).toHaveBeenCalledTimes(41)
-    expect(broadcastAgentEvent).toHaveBeenCalledWith(createTurnStartedEvent())
+    expect(broadcastAgentEvent).toHaveBeenCalledWith(createAttemptStartedEvent())
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
     ).resolves.toEqual(snapshot)
@@ -550,14 +550,14 @@ function createSessionSummary(): AgentSessionSummary {
 }
 
 /**
- * 创建 IPC 测试使用的标准 turn-started 事件。
+ * 创建 IPC 测试使用的标准 attempt-started 事件。
  *
- * @returns 默认 Agent 下的 turn-started 事件。
+ * @returns 默认 Agent 下的 attempt-started 事件。
  * @throws 此测试辅助方法不会主动抛出错误。
  */
-function createTurnStartedEvent(): AgentEvent {
+function createAttemptStartedEvent(): AgentEvent {
   return {
-    type: 'turn-started',
+    type: 'attempt-started',
     agentId: TANGYUAN_DEFAULT_AGENT_ID,
     sessionId: 'session-1',
     runId: 'run-1',

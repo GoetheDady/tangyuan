@@ -24,14 +24,14 @@ describe('TranscriptEmitter tool step handling', () => {
     }
   }
 
-  function emitTurnStarted(
+  function emitAttemptStarted(
     emitter: TranscriptEmitter,
     agentId: string,
     sessionId: string,
     runId: string,
   ) {
-    const event: Extract<DriverEvent, { type: 'turn-started' }> = {
-      type: 'turn-started',
+    const event: Extract<DriverEvent, { type: 'attempt-started' }> = {
+      type: 'attempt-started',
       agentId,
       sessionId,
       runId,
@@ -101,7 +101,7 @@ describe('TranscriptEmitter tool step handling', () => {
   it('produces a snapshot that passes transcriptSnapshotSchema validation', () => {
     const { emitter, getSnapshot } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
     emitActivityUpdated(emitter, {
       kind: 'tool',
       state: 'running',
@@ -137,10 +137,10 @@ describe('TranscriptEmitter tool step handling', () => {
     emitter.emitTranscriptDeltaForThinking(event)
   }
 
-  it('renders thinking step when turn-started arrives before agent message-appended (real order)', () => {
+  it('renders thinking step when attempt-started arrives before agent message-appended (real order)', () => {
     const { emitter, getSnapshot } = createEmitter()
-    // 真实运行顺序：turn-started 先于 agent message-appended
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    // 真实运行顺序：attempt-started 先于 agent message-appended
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
     emitThinkingDelta(emitter, { delta: '正在思考' })
 
@@ -158,7 +158,7 @@ describe('TranscriptEmitter tool step handling', () => {
   it('creates a tool step in turn 0 on first tool-started', () => {
     const { emitter, getSnapshot } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
     emitActivityUpdated(emitter, {
       kind: 'tool',
       state: 'running',
@@ -182,7 +182,7 @@ describe('TranscriptEmitter tool step handling', () => {
   it('updates the same tool step when tool-completed matches toolCallId', () => {
     const { emitter, getSnapshot } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
 
     const toolCallId = 'tc-1'
     emitActivityUpdated(emitter, {
@@ -210,7 +210,7 @@ describe('TranscriptEmitter tool step handling', () => {
   it('advances to next turn when a new tool starts after previous tool completed', () => {
     const { emitter, getSnapshot } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
 
     // First tool cycle
     emitActivityUpdated(emitter, {
@@ -248,7 +248,7 @@ describe('TranscriptEmitter tool step handling', () => {
   it('keeps failed tool in timeline (does not advance turn on failure alone)', () => {
     const { emitter, getSnapshot } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
 
     emitActivityUpdated(emitter, {
       kind: 'tool',
@@ -276,7 +276,7 @@ describe('TranscriptEmitter tool step handling', () => {
   it('advances turn after a failed tool when next tool starts', () => {
     const { emitter, getSnapshot } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
 
     // First tool fails
     emitActivityUpdated(emitter, {
@@ -313,7 +313,7 @@ describe('TranscriptEmitter tool step handling', () => {
   it('does not advance turn for thinking steps (same turn)', () => {
     const { emitter, getSnapshot } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
 
     // Thinking in turn 0
     const thinkingEvent: Extract<DriverEvent, { type: 'message-delta' }> = {
@@ -349,7 +349,7 @@ describe('TranscriptEmitter tool step handling', () => {
   it('starts a new turn when thinking arrives after a completed tool (multi-turn boundary)', () => {
     const { emitter, getSnapshot } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
 
     // 真实多轮序列：thinking → read 启动 → read 完成 → thinking → bash 启动
     emitThinkingDelta(emitter, { delta: '先读文件' })
@@ -396,13 +396,13 @@ describe('TranscriptEmitter tool step handling', () => {
   it('attaches second-run steps to the second agent entry (not the first)', () => {
     const { emitter, getSnapshot } = createEmitter()
 
-    // 第一轮对话（真实顺序：turn-started 先于 agent message-appended）
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    // 第一轮对话（真实顺序：attempt-started 先于 agent message-appended）
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
     emitThinkingDelta(emitter, { runId: 'run-1', messageId: 'msg-1', delta: '第一轮思考' })
 
     // 第二轮对话：新 run、新 agent 消息
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-2')
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-2')
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-2', 'agent')
     emitThinkingDelta(emitter, { runId: 'run-2', messageId: 'msg-2', delta: '第二轮思考' })
     emitActivityUpdated(emitter, {
@@ -438,7 +438,7 @@ describe('TranscriptEmitter tool step handling', () => {
   it('uses safe summary with tool name and status for custom tools', () => {
     const { emitter, getSnapshot } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
 
     emitActivityUpdated(emitter, {
       kind: 'tool',
@@ -459,7 +459,7 @@ describe('TranscriptEmitter tool step handling', () => {
   it('handles multiple tools in sequence with turn advancement', () => {
     const { emitter, getSnapshot } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
 
     // Turn 0: read
     emitActivityUpdated(emitter, {
@@ -511,7 +511,7 @@ describe('TranscriptEmitter tool step handling', () => {
   it('emits transcript-delta events with correct delta types', () => {
     const { emitter, events } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
 
     emitActivityUpdated(emitter, {
       kind: 'tool',

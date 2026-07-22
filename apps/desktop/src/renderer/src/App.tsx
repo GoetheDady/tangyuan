@@ -438,7 +438,7 @@ function getAgentEventSessionId(event: AgentEvent): string | null {
   }
 
   if (
-    event.type === 'turn-started' ||
+    event.type === 'attempt-started' ||
     event.type === 'turn-cancelled' ||
     event.type === 'turn-failed' ||
     event.type === 'run-state-changed' ||
@@ -464,7 +464,7 @@ function getAgentEventSessionId(event: AgentEvent): string | null {
 function getAgentEventRunState(
   event: AgentEvent
 ): 'idle' | 'queued' | 'running' | 'completed' | 'cancelled' | 'failed' | null {
-  if (event.type === 'turn-started') {
+  if (event.type === 'attempt-started') {
     return 'running'
   }
 

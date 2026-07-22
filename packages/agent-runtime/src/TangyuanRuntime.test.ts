@@ -136,7 +136,7 @@ describe('TangyuanRuntime', () => {
         occurredAt: '2026-07-08T00:00:01.000Z',
       })
       sessionDriver.emit({
-        type: 'turn-started',
+        type: 'attempt-started',
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
@@ -221,7 +221,7 @@ describe('TangyuanRuntime', () => {
     const sessionDriver = createSessionDriver([session])
     sessionDriver.sendMessage = vi.fn(async () => {
       sessionDriver.emit({
-        type: 'turn-started',
+        type: 'attempt-started',
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
@@ -313,7 +313,7 @@ describe('TangyuanRuntime', () => {
       occurredAt: '2026-07-08T00:00:01.000Z',
     })
     sessionDriver.emit({
-      type: 'turn-started',
+      type: 'attempt-started',
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
@@ -376,7 +376,7 @@ describe('TangyuanRuntime', () => {
     const sessionOneStarted = createDeferred<void>()
     sessionDriver.sendMessage = vi.fn(async (request) => {
       sessionDriver.emit({
-        type: 'turn-started',
+        type: 'attempt-started',
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: request.sessionId,
         runId: `${request.sessionId}-run-1`,
@@ -850,7 +850,7 @@ describe('TangyuanRuntime', () => {
       >()
       sessionDriver.sendMessage = vi.fn(async (request) => {
         sessionDriver.emit({
-          type: 'turn-started',
+          type: 'attempt-started',
           agentId: TANGYUAN_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
@@ -918,7 +918,7 @@ describe('TangyuanRuntime', () => {
       >()
       sessionDriver.sendMessage = vi.fn(async (request) => {
         sessionDriver.emit({
-          type: 'turn-started',
+          type: 'attempt-started',
           agentId: TANGYUAN_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
@@ -946,7 +946,7 @@ describe('TangyuanRuntime', () => {
       const startedSessions: string[] = []
       const queuedSessions: string[] = []
       runtime.subscribe((event) => {
-        if (event.type === 'turn-started') {
+        if (event.type === 'attempt-started') {
           startedSessions.push(event.sessionId)
         }
         if (event.type === 'run-state-changed' && event.state === 'queued') {
@@ -1010,7 +1010,7 @@ describe('TangyuanRuntime', () => {
       sessionDriver.sendMessage = vi.fn(async (request) => {
         startedSessions.push(request.sessionId)
         sessionDriver.emit({
-          type: 'turn-started',
+          type: 'attempt-started',
           agentId: TANGYUAN_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
@@ -1098,7 +1098,7 @@ describe('TangyuanRuntime', () => {
       >()
       sessionDriver.sendMessage = vi.fn(async (request) => {
         sessionDriver.emit({
-          type: 'turn-started',
+          type: 'attempt-started',
           agentId: TANGYUAN_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
@@ -1198,7 +1198,7 @@ describe('TangyuanRuntime', () => {
       sessionDriver.sendMessage = vi.fn(async (request) => {
         startedSessions.push(request.sessionId)
         sessionDriver.emit({
-          type: 'turn-started',
+          type: 'attempt-started',
           agentId: TANGYUAN_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
@@ -1283,7 +1283,7 @@ describe('TangyuanRuntime', () => {
       sessionDriver.sendMessage = vi.fn(async (request) => {
         startedSessions.push(request.sessionId)
         sessionDriver.emit({
-          type: 'turn-started',
+          type: 'attempt-started',
           agentId: TANGYUAN_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
@@ -1383,7 +1383,7 @@ describe('TangyuanRuntime', () => {
       sessionDriver.sendMessage = vi.fn(async (request) => {
         startedSessions.push(request.sessionId)
         sessionDriver.emit({
-          type: 'turn-started',
+          type: 'attempt-started',
           agentId: TANGYUAN_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
@@ -1700,7 +1700,7 @@ function createSessionDriver(
         )
       }
 
-      if (event.type === 'turn-started') {
+      if (event.type === 'attempt-started') {
         currentSessions = currentSessions.map((session) =>
           session.sessionId === event.sessionId
             ? { ...session, state: 'running', updatedAt: event.occurredAt }
@@ -1925,7 +1925,7 @@ describe('transcript turn/step tracking', () => {
     })
 
     sessionDriver.emit({
-      type: 'turn-started',
+      type: 'attempt-started',
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
@@ -2030,7 +2030,7 @@ describe('transcript turn/step tracking', () => {
     })
 
     sessionDriver.emit({
-      type: 'turn-started',
+      type: 'attempt-started',
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
@@ -2108,7 +2108,7 @@ describe('transcript turn/step tracking', () => {
     })
 
     sessionDriver.emit({
-      type: 'turn-started',
+      type: 'attempt-started',
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',

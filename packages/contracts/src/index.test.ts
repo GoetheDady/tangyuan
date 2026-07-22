@@ -38,14 +38,14 @@ describe('contracts schemas', () => {
   it('accepts serializable Agent events and rejects malformed event payloads', () => {
     expect(
       agentEventSchema.parse({
-        type: 'turn-started',
+        type: 'attempt-started',
         agentId: 'tangyuan',
         sessionId: 'session-1',
         runId: 'run-1',
         occurredAt: '2026-07-16T00:00:00.000Z',
       }),
     ).toEqual({
-      type: 'turn-started',
+      type: 'attempt-started',
       agentId: 'tangyuan',
       sessionId: 'session-1',
       runId: 'run-1',

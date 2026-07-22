@@ -19,13 +19,13 @@ describe('createTangyuanPreloadApi', () => {
     const subscriptions: Array<[typeof DESKTOP_AGENT_EVENT_CHANNEL, AgentEvent['type']]> = []
     const subscribe: IpcSubscribe = (channel, listener) => {
       listener({
-        type: 'turn-started',
+        type: 'attempt-started',
         agentId: 'tangyuan',
         sessionId: 'session-1',
         runId: 'run-1',
         occurredAt: '2026-07-08T00:00:00.000Z'
       })
-      subscriptions.push([channel, 'turn-started'])
+      subscriptions.push([channel, 'attempt-started'])
 
       return () => undefined
     }
@@ -246,6 +246,6 @@ describe('createTangyuanPreloadApi', () => {
       [DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals],
       [DESKTOP_IPC_CHANNELS.skillsGetInstallRecords]
     ])
-    expect(subscriptions).toEqual([[DESKTOP_AGENT_EVENT_CHANNEL, 'turn-started']])
+    expect(subscriptions).toEqual([[DESKTOP_AGENT_EVENT_CHANNEL, 'attempt-started']])
   })
 })

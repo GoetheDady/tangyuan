@@ -411,7 +411,7 @@ export const agentEventSchema = z.discriminatedUnion('type', [
     occurredAt: timestampSchema,
   }),
   z.strictObject({
-    type: z.literal('turn-started'),
+    type: z.literal('attempt-started'),
     agentId: nonEmptyIdentifierSchema,
     sessionId: nonEmptyIdentifierSchema,
     runId: nonEmptyIdentifierSchema,

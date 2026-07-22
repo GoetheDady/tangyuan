@@ -93,13 +93,18 @@ export interface TurnStep {
 }
 
 /**
- * 描述一次 Agent 运行中的单个 turn。
+ * 描述一次执行尝试中的单个回合（对应 SDK 的一次 LLM 生成循环，turn_start…turn_end）。
  *
- * 每个 turn 由多个步骤（thinking → text → tool-call）组成，
- * 在 tool call 或 run 结束时形成 turn 边界。
+ * 每个回合由多个步骤（thinking / text / tool-call）组成，按产生顺序排列。
+ * 回合边界由 SDK 权威 turn 事件界定，不由上层启发式推断。
  */
 export interface RunTurn {
-  /** turn 在 attempt 内的稳定索引。 */
+  /**
+   * 回合在 attempt 内的稳定索引，对应 SDK 的 `turnIndex`。
+   *
+   * `turnIndex` 由 SDK agent-session 层维护：`agent_start` 时归零，
+   * 每个 `turn_end` 后递增。
+   */
   readonly index: number
   /** 关联的 run 标识。 */
   readonly runId: string
@@ -122,7 +127,13 @@ export interface AgentReplyEntry {
   readonly index: number
   /** 条目唯一标识，对应底层存储中的消息标识。 */
   readonly messageId: string
-  /** Agent 回复的 Markdown 内容。 */
+  /**
+   * Agent 回复的 Markdown 内容，语义为「最后一个回合的文字」。
+   *
+   * 对齐 SDK 语义：Pi SDK 无「跨回合累加的最终回复」概念，
+   * `getLastAssistantText()` 取的是最后一条 assistant 消息的文字，
+   * 因此此字段不是所有回合文字的累加，而是最后一个回合面向用户的文字。
+   */
   readonly content: string
   /** 消息创建时间。 */
   readonly createdAt: string
@@ -330,7 +341,7 @@ export type AgentEvent =
       occurredAt: string
     }
   | {
-      type: 'turn-started'
+      type: 'attempt-started'
       agentId: AgentId
       sessionId: string
       runId: string

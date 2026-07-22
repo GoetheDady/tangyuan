@@ -121,8 +121,8 @@ export class TranscriptEmitter {
       this.messageToEntryIndex.set(message.messageId, nextIndex)
       this.emitTranscriptDeltaEvent(event.agentId, sessionId, delta)
       this.sessionNextIndex.set(sessionId, nextIndex + 1)
-      // entry 刚创建完成，若对应 attempt 已存在（turn-started 先到），立即初始化并
-      // 用本轮真实 entryIndex 修正 turn-started 早到时的猜测。
+      // entry 刚创建完成，若对应 attempt 已存在（attempt-started 先到），立即初始化并
+      // 用本轮真实 entryIndex 修正 attempt-started 早到时的猜测。
       if (attempt) {
         this.ensureTurnStateInitialized(attempt.runId, nextIndex)
       }
@@ -144,14 +144,14 @@ export class TranscriptEmitter {
   }
 
   /**
-   * 为 turn-started 事件创建 ExecutionAttempt 并发出 transcript-delta。
+   * 为 attempt-started 事件创建 ExecutionAttempt 并发出 transcript-delta。
    *
-   * @param event - turn-started 标准事件。
+   * @param event - attempt-started 标准事件。
    * @returns 无返回值。
    * @throws 此方法不会主动抛出错误。
    */
   startAttemptForRun(
-    event: Extract<DriverEvent, { type: 'turn-started' }>,
+    event: Extract<DriverEvent, { type: 'attempt-started' }>,
   ): void {
     const attempt: ExecutionAttempt = {
       attemptId: event.runId,
@@ -186,17 +186,17 @@ export class TranscriptEmitter {
   }
 
   /**
-   * 为 turn-started 事件初始化 turn 状态。
+   * 为 attempt-started 事件初始化 turn 状态。
    *
-   * turnState 依附于 agent-reply 条目，而条目可能在 turn-started 之后才创建。
+   * turnState 依附于 agent-reply 条目，而条目可能在 attempt-started 之后才创建。
    * 因此此处只尝试初始化；若条目尚未存在，则在 agent message-appended 到达时补充初始化。
    *
-   * @param event - turn-started 标准事件。
+   * @param event - attempt-started 标准事件。
    * @returns 无返回值。
    * @throws 此方法不会主动抛出错误。
    */
   initializeTurnStateForRun(
-    event: Extract<DriverEvent, { type: 'turn-started' }>,
+    event: Extract<DriverEvent, { type: 'attempt-started' }>,
   ): void {
     this.ensureTurnStateInitialized(event.runId)
   }
@@ -204,7 +204,7 @@ export class TranscriptEmitter {
   /**
    * 为指定 run 建立或修正 turn 状态，并绑定到正确的 agent-reply 条目。
    *
-   * 真实顺序下 turn-started 先于 agent message-appended，此时本轮条目尚未创建，
+   * 真实顺序下 attempt-started 先于 agent message-appended，此时本轮条目尚未创建，
    * findLastAgentReplyIndex 会误指上一轮条目。因此 message-appended 创建条目时
    * 会传入确切的 entryIndex 修正此前的猜测。delta 均在 message-appended 之后才发出，
    * 故修正发生在任何步骤写入之前，不会造成步骤错位。
@@ -219,7 +219,7 @@ export class TranscriptEmitter {
   ): void {
     const existing = this.turnStateByRun.get(runId)
     if (existing) {
-      // turn-started 早到时用旧条目猜错了 entryIndex，此处用真实值修正。
+      // attempt-started 早到时用旧条目猜错了 entryIndex，此处用真实值修正。
       if (entryIndex !== undefined) existing.entryIndex = entryIndex
       return
     }

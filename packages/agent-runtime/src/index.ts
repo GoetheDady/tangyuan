@@ -12,6 +12,10 @@ import {
 import { constants as fsConstants } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import type {
+  TurnStartEvent as PiSdkTurnStartEvent,
+  TurnEndEvent as PiSdkTurnEndEvent,
+} from '@earendil-works/pi-coding-agent'
 import {
   createTangyuanRuntimeForTesting,
   type TangyuanRuntime,
@@ -1013,6 +1017,28 @@ export type DriverEvent = AgentEvent | {
   runId: string
   activity: { kind: 'thinking' | 'tool'; state: 'running' | 'completed' | 'failed'; label: string; toolCallId?: string; toolName?: string }
   occurredAt: string
+} | {
+  // 对应 SDK 原生 `turn_start`，界定一个真实回合的开始。
+  // 携带 SDK 权威 `turnIndex`（agent_start 归零，每个 turn_end 后递增）。
+  // 仅 Runtime 内部使用，不跨 IPC 暴露给 Renderer。
+  type: 'turn-started'
+  agentId: string
+  sessionId: string
+  runId: string
+  turnIndex: PiSdkTurnStartEvent['turnIndex']
+  occurredAt: string
+} | {
+  // 对应 SDK 原生 `turn_end`，携带本回合完整的 assistant message
+  // 与 toolResults，与历史 session 文件中持久化的 AssistantMessage 同构。
+  // 仅 Runtime 内部使用，不跨 IPC 暴露给 Renderer。
+  type: 'turn-ended'
+  agentId: string
+  sessionId: string
+  runId: string
+  turnIndex: PiSdkTurnEndEvent['turnIndex']
+  message: PiSdkTurnEndEvent['message']
+  toolResults: PiSdkTurnEndEvent['toolResults']
+  occurredAt: string
 }
 
 /**
@@ -1394,7 +1420,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       updatedAt: this.now(),
     })
     this.emit({
-      type: 'turn-started',
+      type: 'attempt-started',
       agentId: request.agentId,
       sessionId: request.sessionId,
       runId,
@@ -1788,7 +1814,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     })
 
     this.emit({
-      type: 'turn-started',
+      type: 'attempt-started',
       agentId: request.agentId,
       sessionId: request.sessionId,
       runId,
