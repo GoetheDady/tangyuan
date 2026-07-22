@@ -52,7 +52,7 @@ export interface UserMessageEntry {
   readonly kind: 'user-message'
   /** 条目在 transcript 中的稳定位置。 */
   readonly index: number
-  /** 对应的 AgentMessage 标识。 */
+  /** 条目唯一标识，对应底层存储中的消息标识。 */
   readonly messageId: string
   /** 用户消息的纯文本内容。 */
   readonly content: string
@@ -120,7 +120,7 @@ export interface AgentReplyEntry {
   readonly kind: 'agent-reply'
   /** 条目在 transcript 中的稳定位置。 */
   readonly index: number
-  /** 对应的 AgentMessage 标识。 */
+  /** 条目唯一标识，对应底层存储中的消息标识。 */
   readonly messageId: string
   /** Agent 回复的 Markdown 内容。 */
   readonly content: string
