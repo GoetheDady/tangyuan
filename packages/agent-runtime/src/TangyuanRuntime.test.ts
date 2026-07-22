@@ -1726,7 +1726,10 @@ describe('transcript turn/step tracking', () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
     sessionDriver.emit({
       type: 'message-appended',
@@ -1780,7 +1783,10 @@ describe('transcript turn/step tracking', () => {
         createdAt: '2026-07-21T00:00:00.000Z',
       },
     ])
-    const runtime = createTangyuanRuntimeForTesting({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
     const snapshot = await runtime.getTranscript({
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
@@ -1797,7 +1803,10 @@ describe('transcript turn/step tracking', () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
     // No events emitted → no cached snapshot
     const first = await runtime.getTranscript({
@@ -1830,12 +1839,14 @@ describe('transcript turn/step tracking', () => {
     expect(second.entries.length).toBe(1)
   })
 
-
   it('thinking-started then thinking-delta creates a thinking step in transcript', async () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
     // Emit message-appended events to create transcript entries (simulating PiSdkDriver)
     sessionDriver.emit({
@@ -1938,7 +1949,10 @@ describe('transcript turn/step tracking', () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
     sessionDriver.emit({
       type: 'message-appended',
@@ -2013,7 +2027,10 @@ describe('transcript turn/step tracking', () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({ runtimeDriver, sessionDriver })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
 
     sessionDriver.emit({
       type: 'message-appended',

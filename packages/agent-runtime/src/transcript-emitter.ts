@@ -1,7 +1,4 @@
-import type {
-  AgentEvent,
-  AgentEventListener,
-} from './index'
+import type { AgentEvent, AgentEventListener } from './index'
 import {
   applyTranscriptDelta,
   type ExecutionAttempt,
@@ -9,6 +6,7 @@ import {
   type TranscriptSnapshot,
   type TurnStep,
 } from '@tangyuan/contracts'
+import { createToolStepSummary } from './utils'
 
 /**
  * turn 追踪状态。
@@ -19,6 +17,8 @@ interface TurnState {
   stepIndex: number
   currentTurnHasToolCall: boolean
   lastStepKind: TurnStep['kind'] | null
+  /** toolCallId → stepIndex 映射，用于归并同一工具的实时更新与最终结果。 */
+  toolCallStepIndex: Map<string, number>
 }
 
 /**
@@ -51,7 +51,10 @@ export class TranscriptEmitter {
   /**
    * 确保指定会话有初始 transcript 快照。
    */
-  private ensureSnapshot(agentId: string, sessionId: string): TranscriptSnapshot {
+  private ensureSnapshot(
+    agentId: string,
+    sessionId: string,
+  ): TranscriptSnapshot {
     const existing = this.transcriptSnapshots.get(sessionId)
     if (existing) return existing
 
@@ -64,7 +67,6 @@ export class TranscriptEmitter {
     this.transcriptSnapshots.set(sessionId, snapshot)
     return snapshot
   }
-
 
   /**
    * 为 message-appended 事件生成 transcript-delta。
@@ -191,6 +193,7 @@ export class TranscriptEmitter {
       stepIndex: 0,
       currentTurnHasToolCall: false,
       lastStepKind: null,
+      toolCallStepIndex: new Map(),
     })
   }
 
@@ -246,6 +249,11 @@ export class TranscriptEmitter {
   /**
    * 为 activity-updated 事件发出 step-appended 或 step-updated。
    *
+   * 多 turn 工具循环规则：
+   * - 新 tool call 在上一个工具已完成/失败后启动 → 推进 turnIndex 创建新 turn
+   * - 同一 toolCallId 的 running → completed/failed 归并为同一个 step
+   * - 使用 createToolStepSummary 生成不包含敏感参数的安全摘要
+   *
    * @param event - activity-updated 标准事件。
    * @returns 无返回值。
    * @throws 此方法不会主动抛出错误。
@@ -260,7 +268,8 @@ export class TranscriptEmitter {
     const activity = event.activity
 
     if (activity.kind === 'tool') {
-      const toolName = activity.label
+      const toolName = activity.toolName ?? activity.label
+      const toolCallId = activity.toolCallId
       const status =
         activity.state === 'running'
           ? ('running' as const)
@@ -268,17 +277,37 @@ export class TranscriptEmitter {
             ? ('completed' as const)
             : ('failed' as const)
 
-      const step: import('@tangyuan/contracts').TurnStep = {
-        index: turnState.stepIndex,
-        kind: 'tool-call',
-        content: toolName,
-        status,
-        startedAt: now,
-        completedAt: status !== 'running' ? now : null,
-      }
-
       if (status === 'running') {
-        // New tool call means a new turn boundary
+        // 多 turn 规则：如果当前 turn 已有完成的工具调用，推进到下一个 turn
+        if (turnState.currentTurnHasToolCall) {
+          turnState.turnIndex++
+          turnState.stepIndex = 0
+          turnState.currentTurnHasToolCall = false
+          turnState.lastStepKind = null
+          turnState.toolCallStepIndex = new Map()
+        }
+
+        const summary = createToolStepSummary(toolName, 'running')
+        const step: TurnStep = {
+          index: turnState.stepIndex,
+          kind: 'tool-call',
+          content: summary,
+          status,
+          startedAt: now,
+          completedAt: null,
+        }
+        if (toolCallId !== undefined) {
+          ;(step as { toolCallId?: string }).toolCallId = toolCallId
+        }
+        if (toolName) {
+          ;(step as { toolName?: string }).toolName = toolName
+        }
+
+        // 记录 toolCallId 以便后续更新归并
+        if (toolCallId) {
+          turnState.toolCallStepIndex.set(toolCallId, turnState.stepIndex)
+        }
+
         turnState.currentTurnHasToolCall = true
         const delta: TranscriptDelta = {
           type: 'step-appended',
@@ -290,17 +319,44 @@ export class TranscriptEmitter {
         turnState.stepIndex++
         turnState.lastStepKind = 'tool-call'
       } else {
-        // Update existing tool step
-        const stepIndex = turnState.stepIndex - 1
-        if (stepIndex >= 0) {
+        // completed 或 failed：按 toolCallId 归并更新
+        const stepIndex = toolCallId
+          ? turnState.toolCallStepIndex.get(toolCallId)
+          : undefined
+
+        // 回退到最后一个 tool-call step
+        const targetStepIndex =
+          stepIndex !== undefined ? stepIndex : turnState.stepIndex - 1
+
+        if (targetStepIndex >= 0) {
+          const summary = createToolStepSummary(toolName, status)
+          const step: TurnStep = {
+            index: targetStepIndex,
+            kind: 'tool-call',
+            content: summary,
+            status,
+            startedAt: now,
+            completedAt: now,
+          }
+          if (toolCallId !== undefined) {
+            ;(step as { toolCallId?: string }).toolCallId = toolCallId
+          }
+          if (toolName) {
+            ;(step as { toolName?: string }).toolName = toolName
+          }
+
           const delta: TranscriptDelta = {
             type: 'step-updated',
             index: turnState.entryIndex,
             turnIndex: turnState.turnIndex,
-            stepIndex,
-            step: { ...step, index: stepIndex },
+            stepIndex: targetStepIndex,
+            step,
           }
           this.emitTranscriptDeltaEvent(event.agentId, event.sessionId, delta)
+
+          // 保持 lastStepKind 为 tool-call（用于后续 turn 边界判断）
+          // 标记当前 turn 已完成（工具已结束）
+          // 但不重置 currentTurnHasToolCall —— 让下一 running 工具触发 turn 推进
         }
       }
     }

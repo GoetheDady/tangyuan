@@ -1204,14 +1204,24 @@ class DefaultTangyuanRuntime {
     if (event.type === 'turn-cancelled') {
       this.activeRunIds.delete(event.sessionId)
       this.upsertSessionState(event.sessionId, 'cancelled', event.occurredAt)
-      this.transcriptEmitter.failAttemptForRun(event.sessionId, event.runId, 'cancelled', event.occurredAt)
+      this.transcriptEmitter.failAttemptForRun(
+        event.sessionId,
+        event.runId,
+        'cancelled',
+        event.occurredAt,
+      )
       return
     }
 
     if (event.type === 'turn-failed') {
       this.activeRunIds.delete(event.sessionId)
       this.upsertSessionState(event.sessionId, 'failed', event.occurredAt)
-      this.transcriptEmitter.failAttemptForRun(event.sessionId, event.runId, 'failed', event.occurredAt)
+      this.transcriptEmitter.failAttemptForRun(
+        event.sessionId,
+        event.runId,
+        'failed',
+        event.occurredAt,
+      )
       this.upsertMessage({
         messageId: `${event.sessionId}-${event.runId}-error`,
         agentId: event.agentId,

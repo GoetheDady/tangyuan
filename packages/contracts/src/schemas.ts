@@ -32,6 +32,8 @@ export const turnStepSchema = z.strictObject({
   index: z.number().int().min(0),
   kind: z.enum(['thinking', 'text', 'tool-call']),
   content: z.string(),
+  toolCallId: z.string().optional(),
+  toolName: z.string().optional(),
   status: z.enum(['running', 'completed', 'failed']),
   startedAt: timestampSchema,
   completedAt: timestampSchema.nullable(),
@@ -368,6 +370,8 @@ export const agentActivitySchema = z.strictObject({
   state: z.enum(['running', 'completed', 'failed']),
   label: z.string(),
   stepId: z.string().optional(),
+  toolCallId: z.string().optional(),
+  toolName: z.string().optional(),
 })
 
 /**

@@ -7,7 +7,7 @@ import { AssistantMessage } from './AssistantMessage'
 function createMockApi() {
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { openExternalLink: vi.fn().mockResolvedValue(undefined) },
+    value: { openExternalLink: vi.fn().mockResolvedValue(undefined) }
   })
 }
 
@@ -23,10 +23,10 @@ function createEntry(overrides?: Partial<AgentReplyEntry>): AgentReplyEntry {
       runId: 'run-1',
       status: 'running',
       startedAt: '2026-07-21T00:00:00.000Z',
-      completedAt: null,
+      completedAt: null
     },
     turns: [],
-    ...overrides,
+    ...overrides
   }
 }
 
@@ -38,7 +38,7 @@ function createThinkingStep(overrides?: Partial<TurnStep>): TurnStep {
     status: 'running',
     startedAt: '2026-07-21T00:00:01.000Z',
     completedAt: null,
-    ...overrides,
+    ...overrides
   }
 }
 
@@ -50,7 +50,7 @@ function createToolStep(overrides?: Partial<TurnStep>): TurnStep {
     status: 'running',
     startedAt: '2026-07-21T00:00:02.000Z',
     completedAt: null,
-    ...overrides,
+    ...overrides
   }
 }
 
@@ -62,7 +62,7 @@ function createTurn(overrides?: Partial<RunTurn>): RunTurn {
     status: 'running',
     startedAt: '2026-07-21T00:00:00.000Z',
     completedAt: null,
-    ...overrides,
+    ...overrides
   }
 }
 
@@ -73,22 +73,32 @@ describe('AssistantMessage', () => {
 
   it('renders expanded disclosure with loader when in active tool loop state', () => {
     const entry = createEntry({
-      attempt: { attemptId: 'run-1', runId: 'run-1', status: 'running', startedAt: '2026-07-21T00:00:00.000Z', completedAt: null },
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null
+      },
       turns: [
         createTurn({
           steps: [
             createThinkingStep({ status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' }),
-            createToolStep({ content: '正在读取文件', status: 'completed', completedAt: '2026-07-21T00:00:02.000Z' }),
+            createToolStep({
+              content: '正在读取文件',
+              status: 'completed',
+              completedAt: '2026-07-21T00:00:02.000Z'
+            })
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:02.000Z',
+          completedAt: '2026-07-21T00:00:02.000Z'
         }),
         createTurn({
           index: 1,
           steps: [createToolStep({ index: 1, content: '正在搜索', status: 'running' })],
-          status: 'running',
-        }),
-      ],
+          status: 'running'
+        })
+      ]
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -103,13 +113,21 @@ describe('AssistantMessage', () => {
   it('shows unconfirmed notice in unconfirmed-text state', () => {
     const entry = createEntry({
       content: '分析正在进行中...',
-      attempt: { attemptId: 'run-1', runId: 'run-1', status: 'running', startedAt: '2026-07-21T00:00:00.000Z', completedAt: null },
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null
+      },
       turns: [
         createTurn({
-          steps: [createThinkingStep({ status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' })],
-          status: 'running',
-        }),
-      ],
+          steps: [
+            createThinkingStep({ status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' })
+          ],
+          status: 'running'
+        })
+      ]
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -120,16 +138,22 @@ describe('AssistantMessage', () => {
 
   it('shows completed disclosure when run is done', () => {
     const entry = createEntry({
-      attempt: { attemptId: 'run-1', runId: 'run-1', status: 'completed', startedAt: '2026-07-21T00:00:00.000Z', completedAt: '2026-07-21T00:00:05.000Z' },
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'completed',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: '2026-07-21T00:00:05.000Z'
+      },
       turns: [
         createTurn({
           steps: [
-            createThinkingStep({ status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' }),
+            createThinkingStep({ status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' })
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:02.000Z',
-        }),
-      ],
+          completedAt: '2026-07-21T00:00:02.000Z'
+        })
+      ]
     })
 
     render(<AssistantMessage entry={entry} isStreaming={false} />)
@@ -140,14 +164,26 @@ describe('AssistantMessage', () => {
 
   it('expands timeline after clicking disclosure when completed', () => {
     const entry = createEntry({
-      attempt: { attemptId: 'run-1', runId: 'run-1', status: 'completed', startedAt: '2026-07-21T00:00:00.000Z', completedAt: '2026-07-21T00:00:05.000Z' },
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'completed',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: '2026-07-21T00:00:05.000Z'
+      },
       turns: [
         createTurn({
-          steps: [createThinkingStep({ content: '分析完成', status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' })],
+          steps: [
+            createThinkingStep({
+              content: '分析完成',
+              status: 'completed',
+              completedAt: '2026-07-21T00:00:01.000Z'
+            })
+          ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:01.000Z',
-        }),
-      ],
+          completedAt: '2026-07-21T00:00:01.000Z'
+        })
+      ]
     })
 
     render(<AssistantMessage entry={entry} isStreaming={false} />)
@@ -167,14 +203,22 @@ describe('AssistantMessage', () => {
   it('shows cancelled state with preserved content', () => {
     const entry = createEntry({
       content: '部分分析结果...',
-      attempt: { attemptId: 'run-1', runId: 'run-1', status: 'cancelled', startedAt: '2026-07-21T00:00:00.000Z', completedAt: '2026-07-21T00:00:03.000Z' },
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'cancelled',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: '2026-07-21T00:00:03.000Z'
+      },
       turns: [
         createTurn({
-          steps: [createThinkingStep({ status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' })],
+          steps: [
+            createThinkingStep({ status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' })
+          ],
           status: 'cancelled',
-          completedAt: '2026-07-21T00:00:03.000Z',
-        }),
-      ],
+          completedAt: '2026-07-21T00:00:03.000Z'
+        })
+      ]
     })
 
     render(<AssistantMessage entry={entry} isStreaming={false} />)
@@ -186,14 +230,20 @@ describe('AssistantMessage', () => {
 
   it('shows failed state', () => {
     const entry = createEntry({
-      attempt: { attemptId: 'run-1', runId: 'run-1', status: 'failed', startedAt: '2026-07-21T00:00:00.000Z', completedAt: '2026-07-21T00:00:01.000Z' },
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'failed',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: '2026-07-21T00:00:01.000Z'
+      },
       turns: [
         createTurn({
           steps: [createToolStep({ status: 'failed', completedAt: '2026-07-21T00:00:01.000Z' })],
           status: 'failed',
-          completedAt: '2026-07-21T00:00:01.000Z',
-        }),
-      ],
+          completedAt: '2026-07-21T00:00:01.000Z'
+        })
+      ]
     })
 
     render(<AssistantMessage entry={entry} isStreaming={false} />)
@@ -213,14 +263,26 @@ describe('AssistantMessage', () => {
 
   it('shows thinking content in timeline', () => {
     const entry = createEntry({
-      attempt: { attemptId: 'run-1', runId: 'run-1', status: 'running', startedAt: '2026-07-21T00:00:00.000Z', completedAt: null },
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null
+      },
       turns: [
         createTurn({
-          steps: [createThinkingStep({ content: '正在分析数据库 schema...', status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' })],
+          steps: [
+            createThinkingStep({
+              content: '正在分析数据库 schema...',
+              status: 'completed',
+              completedAt: '2026-07-21T00:00:01.000Z'
+            })
+          ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:01.000Z',
-        }),
-      ],
+          completedAt: '2026-07-21T00:00:01.000Z'
+        })
+      ]
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -230,14 +292,296 @@ describe('AssistantMessage', () => {
 
   it('shows running indicator for empty running turn', () => {
     const entry = createEntry({
-      attempt: { attemptId: 'run-1', runId: 'run-1', status: 'running', startedAt: '2026-07-21T00:00:00.000Z', completedAt: null },
-      turns: [
-        createTurn({ steps: [], status: 'running' }),
-      ],
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null
+      },
+      turns: [createTurn({ steps: [], status: 'running' })]
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
 
     expect(screen.getByText('等待中…')).toBeInTheDocument()
+  })
+
+  it('shows tool name and safe summary in tool steps', () => {
+    const entry = createEntry({
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null
+      },
+      turns: [
+        createTurn({
+          steps: [
+            {
+              index: 0,
+              kind: 'tool-call',
+              content: '读取文件',
+              toolName: 'read',
+              status: 'completed' as const,
+              startedAt: '2026-07-21T00:00:00.000Z',
+              completedAt: '2026-07-21T00:00:01.000Z'
+            }
+          ],
+          status: 'completed',
+          completedAt: '2026-07-21T00:00:01.000Z'
+        })
+      ]
+    })
+
+    render(<AssistantMessage entry={entry} isStreaming />)
+
+    // Should show tool name and safe summary
+    expect(screen.getByText(/read/)).toBeInTheDocument()
+    expect(screen.getByText(/读取文件/)).toBeInTheDocument()
+  })
+
+  it('shows duration label for completed steps', () => {
+    const entry = createEntry({
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null
+      },
+      turns: [
+        createTurn({
+          steps: [
+            {
+              index: 0,
+              kind: 'tool-call',
+              content: '执行命令',
+              toolName: 'bash',
+              status: 'completed' as const,
+              startedAt: '2026-07-21T00:00:00.000Z',
+              completedAt: '2026-07-21T00:00:02.000Z'
+            }
+          ],
+          status: 'completed',
+          completedAt: '2026-07-21T00:00:02.000Z'
+        })
+      ]
+    })
+
+    render(<AssistantMessage entry={entry} isStreaming />)
+
+    // Should show duration (2 seconds)
+    expect(screen.getByText('2s')).toBeInTheDocument()
+  })
+
+  it('shows minutes duration for long running steps', () => {
+    const entry = createEntry({
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null
+      },
+      turns: [
+        createTurn({
+          steps: [
+            {
+              index: 0,
+              kind: 'tool-call',
+              content: '执行命令',
+              toolName: 'bash',
+              status: 'completed' as const,
+              startedAt: '2026-07-21T00:00:00.000Z',
+              completedAt: '2026-07-21T00:01:30.000Z'
+            }
+          ],
+          status: 'completed',
+          completedAt: '2026-07-21T00:01:30.000Z'
+        })
+      ]
+    })
+
+    render(<AssistantMessage entry={entry} isStreaming />)
+
+    // Should show duration in minutes and seconds
+    expect(screen.getByText('1m 30s')).toBeInTheDocument()
+  })
+
+  it('shows failed tool step with distinct background', () => {
+    const entry = createEntry({
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null
+      },
+      turns: [
+        createTurn({
+          steps: [
+            {
+              index: 0,
+              kind: 'tool-call',
+              content: '执行命令失败',
+              toolName: 'bash',
+              status: 'failed' as const,
+              startedAt: '2026-07-21T00:00:00.000Z',
+              completedAt: '2026-07-21T00:00:01.000Z'
+            }
+          ],
+          status: 'completed',
+          completedAt: '2026-07-21T00:00:01.000Z'
+        })
+      ]
+    })
+
+    render(<AssistantMessage entry={entry} isStreaming />)
+
+    expect(screen.getByText(/执行命令失败/)).toBeInTheDocument()
+    // Should show failure icon
+    expect(screen.getByLabelText('失败')).toBeInTheDocument()
+  })
+
+  it('displays custom tool with name and status fallback', () => {
+    const entry = createEntry({
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null
+      },
+      turns: [
+        createTurn({
+          steps: [
+            {
+              index: 0,
+              kind: 'tool-call',
+              content: 'my_tool（已完成）',
+              toolName: 'my_tool',
+              status: 'completed' as const,
+              startedAt: '2026-07-21T00:00:00.000Z',
+              completedAt: '2026-07-21T00:00:01.000Z'
+            }
+          ],
+          status: 'completed',
+          completedAt: '2026-07-21T00:00:01.000Z'
+        })
+      ]
+    })
+
+    render(<AssistantMessage entry={entry} isStreaming />)
+
+    // Should show tool name and fallback summary
+    expect(screen.getByText(/my_tool/)).toBeInTheDocument()
+  })
+
+  it('shows multi-turn separation correctly', () => {
+    const entry = createEntry({
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null
+      },
+      turns: [
+        createTurn({
+          index: 0,
+          steps: [
+            {
+              index: 0,
+              kind: 'tool-call' as const,
+              content: '读取文件',
+              toolName: 'read',
+              status: 'completed' as const,
+              startedAt: '2026-07-21T00:00:00.000Z',
+              completedAt: '2026-07-21T00:00:01.000Z'
+            }
+          ],
+          status: 'completed' as const,
+          completedAt: '2026-07-21T00:00:01.000Z'
+        }),
+        createTurn({
+          index: 1,
+          steps: [
+            {
+              index: 0,
+              kind: 'tool-call' as const,
+              content: '执行命令',
+              toolName: 'bash',
+              status: 'running' as const,
+              startedAt: '2026-07-21T00:00:02.000Z',
+              completedAt: null
+            }
+          ],
+          status: 'running' as const
+        })
+      ]
+    })
+
+    render(<AssistantMessage entry={entry} isStreaming />)
+
+    // Should show turn labels
+    expect(screen.getByText('回合 1')).toBeInTheDocument()
+    expect(screen.getByText('最终回合')).toBeInTheDocument()
+  })
+
+  it('does not auto-collapse when turns contain tool calls during streaming', () => {
+    const entry = createEntry({
+      content: 'final text',
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null
+      },
+      turns: [
+        createTurn({
+          steps: [createToolStep({ content: '执行命令', toolName: 'bash', status: 'running' })],
+          status: 'running'
+        })
+      ]
+    })
+
+    render(<AssistantMessage entry={entry} isStreaming />)
+
+    // Should be expanded (active-tool-loop state)
+    expect(screen.getByText('仍在执行')).toBeInTheDocument()
+    // Timeline should be visible
+    expect(screen.getByText(/执行命令/)).toBeInTheDocument()
+  })
+
+  it('collapses when final confirmed without tool calls', () => {
+    const entry = createEntry({
+      content: 'final reply text',
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'completed',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: '2026-07-21T00:00:05.000Z'
+      },
+      turns: [
+        createTurn({
+          steps: [
+            createThinkingStep({ status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' })
+          ],
+          status: 'completed',
+          completedAt: '2026-07-21T00:00:05.000Z'
+        })
+      ]
+    })
+
+    render(<AssistantMessage entry={entry} isStreaming={false} />)
+
+    // Should show final content (collapsed state with text visible)
+    expect(screen.getByText('final reply text')).toBeInTheDocument()
+    // Timeline should be hidden
+    expect(screen.queryByText(/回合/)).not.toBeInTheDocument()
   })
 })

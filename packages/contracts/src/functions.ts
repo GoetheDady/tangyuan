@@ -18,7 +18,6 @@ import type {
 } from './types'
 import { CURRENT_SCHEMA_VERSION, TANGYUAN_DEFAULT_AGENT_ID } from './types'
 
-
 /**
  * 根据运行时配置生成 Renderer 可直接展示的就绪状态。
  *
@@ -355,7 +354,11 @@ export function applyTranscriptDelta(
           const turns = lastTurn
             ? [
                 ...entry.turns.slice(0, -1),
-                { ...lastTurn, status: 'completed' as const, completedAt: lastTurn.completedAt ?? new Date().toISOString() },
+                {
+                  ...lastTurn,
+                  status: 'completed' as const,
+                  completedAt: lastTurn.completedAt ?? new Date().toISOString(),
+                },
               ]
             : entry.turns
           entries[delta.index] = {

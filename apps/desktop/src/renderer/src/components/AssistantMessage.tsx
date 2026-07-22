@@ -86,7 +86,7 @@ export function AssistantMessage({ entry, isStreaming }: AssistantMessageProps):
       if (durationMs > 0) {
         durationText =
           durationMs >= 60000
-            ? `${Math.round(durationMs / 60000)}m ${Math.round((durationMs % 60000) / 1000)}s`
+            ? `${Math.floor(durationMs / 60000)}m ${Math.round((durationMs % 60000) / 1000)}s`
             : `${Math.round(durationMs / 1000)}s`
       }
     }
@@ -285,6 +285,9 @@ function TurnTimeline({ turns }: { turns: RunTurn[] }): React.JSX.Element {
 
 /**
  * 时间线中的单个步骤行。
+ *
+ * 工具步骤显示：工具名、安全摘要、状态图标和耗时。
+ * 不暴露完整参数、原始输出或内部调试日志。
  */
 function StepRow({ step }: { step: TurnStep }): React.JSX.Element {
   let icon: React.JSX.Element
@@ -305,15 +308,17 @@ function StepRow({ step }: { step: TurnStep }): React.JSX.Element {
           : step.content
         : '思考中…'
       break
-    case 'tool-call':
+    case 'tool-call': {
+      const toolDisplayName = step.toolName ?? step.content
       icon = (
         <span className="grid size-4 shrink-0 place-items-center text-[10px] text-muted-foreground">
           🔧
         </span>
       )
-      bgClass = 'bg-accent/30'
-      contentPreview = step.content
+      bgClass = step.status === 'failed' ? 'bg-destructive-soft/20' : 'bg-accent/30'
+      contentPreview = step.toolName ? `${toolDisplayName} · ${step.content}` : step.content
       break
+    }
     case 'text':
       icon = (
         <span className="grid size-4 shrink-0 place-items-center text-[10px] text-muted-foreground">
@@ -329,10 +334,24 @@ function StepRow({ step }: { step: TurnStep }): React.JSX.Element {
       contentPreview = ''
   }
 
+  const durationMs =
+    step.completedAt && step.startedAt
+      ? new Date(step.completedAt).getTime() - new Date(step.startedAt).getTime()
+      : null
+  const durationLabel =
+    durationMs && durationMs > 0
+      ? durationMs >= 60000
+        ? `${Math.floor(durationMs / 60000)}m ${Math.round((durationMs % 60000) / 1000)}s`
+        : `${Math.round(durationMs / 1000)}s`
+      : null
+
   return (
     <div className={`flex items-start gap-1.5 rounded px-1.5 py-0.5 text-[11px] ${bgClass}`}>
       {icon}
       <span className="flex-1 truncate text-muted-foreground">{contentPreview}</span>
+      {durationLabel && (
+        <span className="shrink-0 text-[10px] text-muted-foreground/60">{durationLabel}</span>
+      )}
       <span className="shrink-0 text-[10px] text-muted-foreground/60">
         {step.status === 'running' ? (
           <LoaderCircle size={10} className="animate-spin" aria-label="运行中" />

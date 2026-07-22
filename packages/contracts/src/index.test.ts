@@ -940,7 +940,10 @@ describe('transcript delta with turns', () => {
     })
     const entry = result.entries[1]
     expect(entry).toBeDefined()
-    const reply = (entry as Exclude<typeof entry, undefined>).kind === 'agent-reply' ? entry as AgentReplyEntry : null
+    const reply =
+      (entry as Exclude<typeof entry, undefined>).kind === 'agent-reply'
+        ? (entry as AgentReplyEntry)
+        : null
     expect(reply).not.toBeNull()
     if (reply) {
       expect(reply.turns).toHaveLength(1)
@@ -982,7 +985,10 @@ describe('transcript delta with turns', () => {
     })
     const entry = result.entries[1]
     expect(entry).toBeDefined()
-    const reply = entry && (entry as { kind: string }).kind === 'agent-reply' ? entry as AgentReplyEntry : null
+    const reply =
+      entry && (entry as { kind: string }).kind === 'agent-reply'
+        ? (entry as AgentReplyEntry)
+        : null
     expect(reply).not.toBeNull()
     if (reply) {
       expect(reply.turns[0]!.steps[0]!.content).toBe('更新后')
@@ -1012,7 +1018,10 @@ describe('transcript delta with turns', () => {
     })
     const entry = result.entries[1]
     expect(entry).toBeDefined()
-    const reply = entry && (entry as { kind: string }).kind === 'agent-reply' ? entry as AgentReplyEntry : null
+    const reply =
+      entry && (entry as { kind: string }).kind === 'agent-reply'
+        ? (entry as AgentReplyEntry)
+        : null
     expect(reply).not.toBeNull()
     if (reply) {
       expect(reply.turns[0]!.status).toBe('completed')
@@ -1037,7 +1046,10 @@ describe('transcript delta with turns', () => {
     )
     const entry = result.entries[0]
     expect(entry).toBeDefined()
-    const reply = entry && (entry as { kind: string }).kind === 'agent-reply' ? entry as AgentReplyEntry : null
+    const reply =
+      entry && (entry as { kind: string }).kind === 'agent-reply'
+        ? (entry as AgentReplyEntry)
+        : null
     expect(reply).not.toBeNull()
     if (reply) {
       expect(reply.turns).toEqual([])

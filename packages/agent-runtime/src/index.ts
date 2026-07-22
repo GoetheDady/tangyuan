@@ -280,15 +280,18 @@ export type PiSdkStreamEvent =
   | {
       type: 'tool-started'
       toolName: string
+      toolCallId?: string
       toolInput?: unknown
     }
   | {
       type: 'tool-completed'
       toolName: string
+      toolCallId?: string
     }
   | {
       type: 'tool-failed'
       toolName: string
+      toolCallId?: string
     }
 
 /**

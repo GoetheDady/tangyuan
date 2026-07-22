@@ -12,7 +12,11 @@ import {
   type PiSdkStoredSession,
   type PiSdkVerificationRequest,
 } from './index'
-import { describeBashRisk, mapPiSdkSessionEntryToAgentMessage, normalizePiSdkSessionEvent } from './utils'
+import {
+  describeBashRisk,
+  mapPiSdkSessionEntryToAgentMessage,
+  normalizePiSdkSessionEvent,
+} from './utils'
 
 export class RealPiSdkGateway implements PiSdkGateway {
   /**

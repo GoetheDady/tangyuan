@@ -1,5 +1,3 @@
- 
-
 /**
  * v1 默认 Agent 的稳定标识。
  */
@@ -60,9 +58,7 @@ export interface ExecutionAttempt {
  * 每个条目在 transcript 中拥有稳定索引，按时间顺序排列。
  */
 export type TranscriptEntry =
-  | UserMessageEntry
-  | AgentReplyEntry
-  | CompactionEntry
+  UserMessageEntry | AgentReplyEntry | CompactionEntry
 
 /**
  * 描述用户发送的纯文本消息条目。
@@ -92,8 +88,17 @@ export interface TurnStep {
   readonly index: number
   /** 步骤类型。 */
   readonly kind: TurnStepKind
-  /** 步骤内容：thinking 原文 / text 内容 / tool 名称。 */
+  /**
+   * 步骤内容：thinking 原文 / text 内容 / tool 安全摘要。
+   *
+   * 对于 tool-call 步骤，此字段为不包含敏感参数、原始输出和
+   * 文件内容的安全摘要，由确定性函数生成，不调用模型。
+   */
   readonly content: string
+  /** 工具调用唯一标识（仅 tool-call 步骤，用于实时更新与最终结果归并）。 */
+  readonly toolCallId?: string
+  /** 工具原名（仅 tool-call 步骤，用于 Renderer 显示工具名和生成安全摘要）。 */
+  readonly toolName?: string
   /** 当前步骤状态。 */
   readonly status: 'running' | 'completed' | 'failed'
   /** 步骤开始时间。 */
@@ -268,6 +273,10 @@ export interface AgentActivity {
   label: string
   /** 可选：关联的 turn step 标识，用于 Renderer 链接到时间线。 */
   stepId?: string
+  /** 可选：工具调用唯一标识，用于 Runtime 归并同一工具的实时更新和最终结果。 */
+  toolCallId?: string
+  /** 可选：工具原名，用于生成安全摘要。 */
+  toolName?: string
 }
 
 /**
@@ -986,4 +995,3 @@ export interface ConfigEncryptionAdapter {
   /** 检查当前系统是否可用加密能力。 */
   isAvailable(): boolean
 }
-
