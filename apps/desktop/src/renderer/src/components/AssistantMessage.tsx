@@ -124,7 +124,7 @@ export function AssistantMessage({
   // 无 turns 时回退到纯文本气泡
   if (!hasTurns) {
     return (
-      <article className="flex justify-start">
+      <article className="flex justify-start" aria-busy={isStreaming}>
         <div className="max-w-[76%] min-w-0 rounded-lg border bg-card px-4 py-3 text-sm leading-6 text-card-foreground shadow-sm">
           <StreamdownMessage content={entry.content} isAnimating={isStreaming} />
         </div>
@@ -133,7 +133,7 @@ export function AssistantMessage({
   }
 
   return (
-    <article className="flex justify-start">
+    <article className="flex justify-start" aria-busy={isStreaming}>
       <div className="max-w-[76%] min-w-0 rounded-lg border bg-card text-card-foreground shadow-sm">
         {/* Execution Disclosure Bar */}
         <ExecutionDisclosure
@@ -172,7 +172,10 @@ export function AssistantMessage({
               <StreamdownMessage content={entry.content} isAnimating={false} />
             ) : null}
             {entry.attempt?.status === 'cancelled' ? (
-              <div className="mt-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-foreground">
+              <div
+                className="mt-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-foreground"
+                role="status"
+              >
                 此回复已在生成过程中被用户中断
               </div>
             ) : (
@@ -238,6 +241,7 @@ function ExecutionDisclosure({
   return (
     <button
       type="button"
+      aria-expanded={isExpanded}
       onClick={onToggle}
       className={`flex w-full items-center gap-1.5 rounded-t-lg px-3 py-2 text-left transition-colors duration-200 hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${bgClass}`}
     >
@@ -415,7 +419,7 @@ function FailedFooter({
   return (
     <div className="mt-2 space-y-2">
       {/* 失败摘要 */}
-      <div className="rounded-md bg-destructive-soft/10 px-3 py-2">
+      <div className="rounded-md bg-destructive-soft/10 px-3 py-2" role="alert">
         <div className="flex items-start gap-1.5">
           <CircleX
             size={12}

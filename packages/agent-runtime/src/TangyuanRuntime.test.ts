@@ -1,6 +1,6 @@
-// @ts-nocheck -- TODO: migrate to DriverEvent for old event types
 import type {
   AgentEvent,
+  DriverEvent,
   AgentEventListener,
   AgentSessionDriver,
   RuntimeResourceDriver,
@@ -8,11 +8,10 @@ import type {
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
-  type InternalMessage,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
+  type TranscriptSnapshot,
 } from '@tangyuan/contracts'
-import type { DriverEvent } from './index'
 import { describe, expect, it, vi } from 'vitest'
 import { createTangyuanRuntimeForTesting } from './TangyuanRuntime'
 
@@ -71,16 +70,20 @@ describe('TangyuanRuntime', () => {
       }),
     )
     const sessionDriver = createSessionDriver([session])
-    sessionDriver.getMessages = vi.fn().mockResolvedValue([
-      {
-        messageId: 'message-1',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
-        sessionId: session.sessionId,
-        role: 'user',
-        content: '你好',
-        createdAt: '2026-07-08T00:00:00.000Z',
-      },
-    ])
+    sessionDriver.messages.set(session.sessionId, {
+      sessionId: session.sessionId,
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      entries: [
+        {
+          kind: 'user-message',
+          index: 0,
+          messageId: 'message-1',
+          content: '你好',
+          createdAt: '2026-07-08T00:00:00.000Z',
+        },
+      ],
+      updatedAt: '2026-07-08T00:00:00.000Z',
+    })
     const runtime = createTangyuanRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
@@ -92,12 +95,13 @@ describe('TangyuanRuntime', () => {
         sessionId: session.sessionId,
         content: '你好',
       }),
-    ).resolves.toEqual([
+    ).resolves.toEqual(
       expect.objectContaining({
-        role: 'user',
-        content: '你好',
+        entries: [
+          expect.objectContaining({ kind: 'user-message', content: '你好' }),
+        ],
       }),
-    ])
+    )
 
     expect(sessionDriver.sendMessage).toHaveBeenCalledWith({
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
@@ -117,6 +121,19 @@ describe('TangyuanRuntime', () => {
     )
     const sessionDriver = createSessionDriver([session])
     sessionDriver.sendMessage = vi.fn(async () => {
+      sessionDriver.emit({
+        type: 'message-appended',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        message: {
+          messageId: 'message-agent-1',
+          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          sessionId: session.sessionId,
+          role: 'agent',
+          content: '',
+          createdAt: '2026-07-08T00:00:01.000Z',
+        },
+        occurredAt: '2026-07-08T00:00:01.000Z',
+      })
       sessionDriver.emit({
         type: 'turn-started',
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
@@ -176,12 +193,13 @@ describe('TangyuanRuntime', () => {
         sessionId: session.sessionId,
         content: '你好',
       }),
-    ).resolves.toEqual([
+    ).resolves.toEqual(
       expect.objectContaining({
-        role: 'agent',
-        content: '你好',
+        entries: [
+          expect.objectContaining({ kind: 'agent-reply', content: '你好' }),
+        ],
       }),
-    ])
+    )
     await expect(runtime.listSessions()).resolves.toEqual([
       expect.objectContaining({
         sessionId: session.sessionId,
@@ -190,7 +208,7 @@ describe('TangyuanRuntime', () => {
     ])
   })
 
-  it('records sanitized activity and error events as system messages', async () => {
+  it('does not expose activity and error events as system messages', async () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(
       createSnapshot({
@@ -263,14 +281,7 @@ describe('TangyuanRuntime', () => {
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
       }),
-    ).resolves.toEqual([
-      expect.objectContaining({ role: 'system', content: '思考中' }),
-      expect.objectContaining({ role: 'system', content: '工具失败' }),
-      expect.objectContaining({
-        role: 'system',
-        content: '模型服务暂时不可用',
-      }),
-    ])
+    ).resolves.toEqual(expect.objectContaining({ entries: [] }))
   })
 
   it('keeps partial content and marks the session cancelled after cancellation', async () => {
@@ -286,6 +297,19 @@ describe('TangyuanRuntime', () => {
     const runtime = createTangyuanRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
+    })
+    sessionDriver.emit({
+      type: 'message-appended',
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      message: {
+        messageId: 'message-agent-1',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        role: 'agent',
+        content: '',
+        createdAt: '2026-07-08T00:00:01.000Z',
+      },
+      occurredAt: '2026-07-08T00:00:01.000Z',
     })
     sessionDriver.emit({
       type: 'turn-started',
@@ -324,12 +348,16 @@ describe('TangyuanRuntime', () => {
         agentId: TANGYUAN_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
       }),
-    ).resolves.toEqual([
+    ).resolves.toEqual(
       expect.objectContaining({
-        role: 'agent',
-        content: '已生成片段',
+        entries: [
+          expect.objectContaining({
+            kind: 'agent-reply',
+            content: '已生成片段',
+          }),
+        ],
       }),
-    ])
+    )
   })
 
   it('blocks duplicate sends in one session while allowing another session to run', async () => {
@@ -392,10 +420,14 @@ describe('TangyuanRuntime', () => {
         sessionId: sessionTwo.sessionId,
         content: '另一个会话',
       }),
-    ).resolves.toEqual([])
+    ).resolves.toEqual(
+      expect.objectContaining({ sessionId: sessionTwo.sessionId, entries: [] }),
+    )
 
     releaseSessionOne.resolve()
-    await expect(firstRun).resolves.toEqual([])
+    await expect(firstRun).resolves.toEqual(
+      expect.objectContaining({ sessionId: sessionOne.sessionId, entries: [] }),
+    )
   })
 
   it('blocks sending messages when runtime configuration is missing', async () => {
@@ -1215,7 +1247,9 @@ describe('TangyuanRuntime', () => {
       })
       expect(cancelled.state).toBe('cancelled')
       // session-5 的 sendMessage promise 应 resolve 为空数组
-      await expect(runs[4]).resolves.toEqual([])
+      await expect(runs[4]).resolves.toEqual(
+        expect.objectContaining({ sessionId: 'session-5', entries: [] }),
+      )
 
       // 释放所有 slots → session-5 不应启动（已被取消且移出队列）
       for (const deferred of sessionDeferreds.values()) {
@@ -1617,7 +1651,7 @@ function createRuntimeDriver(snapshot: RuntimeSnapshot): RuntimeResourceDriver {
 function createSessionDriver(
   sessions: AgentSessionSummary[],
 ): AgentSessionDriver & {
-  emit(event: AgentEvent): void
+  emit(event: AgentEvent | DriverEvent): void
   messages: Map<string, TranscriptSnapshot>
 } {
   const [firstSession] = sessions
@@ -1628,8 +1662,14 @@ function createSessionDriver(
   return {
     listSessions: vi.fn(async () => currentSessions),
     createSession: vi.fn().mockResolvedValue(firstSession),
-    getMessages: vi.fn(
-      async (request) => messages.get(request.sessionId) ?? [],
+    getTranscript: vi.fn(
+      async (request) =>
+        messages.get(request.sessionId) ?? {
+          sessionId: request.sessionId,
+          agentId: request.agentId,
+          entries: [],
+          updatedAt: '2026-07-08T00:00:00.000Z',
+        },
     ),
     sendMessage: vi.fn().mockResolvedValue(undefined),
     cancelRun: vi.fn().mockResolvedValue(undefined),
@@ -1641,7 +1681,7 @@ function createSessionDriver(
       }
     }),
     messages,
-    emit: (event: AgentEvent) => {
+    emit: (event: AgentEvent | DriverEvent) => {
       if (event.type === 'session-created') {
         currentSessions = [
           event.session,
@@ -1683,7 +1723,7 @@ function createSessionDriver(
         )
       }
 
-      currentListener?.(event)
+      currentListener?.(event as AgentEvent)
     },
   }
 }
@@ -1771,20 +1811,24 @@ describe('transcript turn/step tracking', () => {
     expect(snapshot.entries[1]?.kind).toBe('agent-reply')
   })
 
-  it('building from messages is fallback when no cached snapshot', async () => {
+  it('loads the driver transcript when no cached snapshot exists', async () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    sessionDriver.getMessages = vi.fn().mockResolvedValue([
-      {
-        messageId: 'm1',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
-        sessionId: session.sessionId,
-        role: 'user',
-        content: 'hello',
-        createdAt: '2026-07-21T00:00:00.000Z',
-      },
-    ])
+    sessionDriver.messages.set(session.sessionId, {
+      sessionId: session.sessionId,
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      entries: [
+        {
+          kind: 'user-message',
+          index: 0,
+          messageId: 'm1',
+          content: 'hello',
+          createdAt: '2026-07-21T00:00:00.000Z',
+        },
+      ],
+      updatedAt: '2026-07-21T00:00:00.000Z',
+    })
     const runtime = createTangyuanRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
@@ -1795,7 +1839,7 @@ describe('transcript turn/step tracking', () => {
       sessionId: session.sessionId,
     })
 
-    // Fallback path: built from messages, no turns
+    // Driver fallback returns structured entries without turns
     expect(snapshot.entries.length).toBe(1)
     const replyEntry = snapshot.entries.find((e) => e.kind === 'user-message')
     expect(replyEntry).toBeDefined()

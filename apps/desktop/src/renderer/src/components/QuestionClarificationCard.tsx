@@ -62,6 +62,7 @@ export function QuestionClarificationCard({
 
   // 当 clarification 变化时重置状态（同时处理首次挂载和连续多个单问题）
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clarificationId changes start a new interaction state
     setPhase('entering')
     setCustomAnswer('')
     setShowCustomInput(false)
@@ -86,12 +87,7 @@ export function QuestionClarificationCard({
    */
   const submitOption = useCallback(
     async (option: string): Promise<void> => {
-      if (
-        phase === 'submitting' ||
-        phase === 'resolved' ||
-        phase === 'exiting'
-      )
-        return
+      if (phase === 'submitting' || phase === 'resolved' || phase === 'exiting') return
 
       setPhase('submitting')
       setActiveOption(option)
@@ -107,8 +103,7 @@ export function QuestionClarificationCard({
           setPhase('exiting')
         }, 800)
       } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : '操作失败，请重试'
+        const message = error instanceof Error ? error.message : '操作失败，请重试'
         setErrorMessage(message)
         setPhase('pending')
         setActiveOption(null)
@@ -127,8 +122,7 @@ export function QuestionClarificationCard({
 
     if (!trimmed) return
 
-    if (phase === 'submitting' || phase === 'resolved' || phase === 'exiting')
-      return
+    if (phase === 'submitting' || phase === 'resolved' || phase === 'exiting') return
 
     setPhase('submitting')
     setErrorMessage(null)
@@ -143,8 +137,7 @@ export function QuestionClarificationCard({
         setPhase('exiting')
       }, 800)
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : '操作失败，请重试'
+      const message = error instanceof Error ? error.message : '操作失败，请重试'
       setErrorMessage(message)
       setPhase('pending')
     }
@@ -156,8 +149,7 @@ export function QuestionClarificationCard({
    * @returns 无返回值。
    */
   const handleCancel = useCallback(async (): Promise<void> => {
-    if (phase === 'submitting' || phase === 'resolved' || phase === 'exiting')
-      return
+    if (phase === 'submitting' || phase === 'resolved' || phase === 'exiting') return
 
     setPhase('submitting')
     setErrorMessage(null)
@@ -171,8 +163,7 @@ export function QuestionClarificationCard({
         setPhase('exiting')
       }, 800)
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : '操作失败，请重试'
+      const message = error instanceof Error ? error.message : '操作失败，请重试'
       setErrorMessage(message)
       setPhase('pending')
     }
@@ -193,11 +184,7 @@ export function QuestionClarificationCard({
         void handleCancel()
       }
 
-      if (
-        event.key === 'Enter' &&
-        showCustomInput &&
-        customAnswer.trim().length > 0
-      ) {
+      if (event.key === 'Enter' && showCustomInput && customAnswer.trim().length > 0) {
         event.preventDefault()
         void submitCustomAnswer()
       }
@@ -222,9 +209,7 @@ export function QuestionClarificationCard({
   }
 
   const animationClass =
-    phase === 'entering'
-      ? 'animate-[approval-card-enter_240ms_cubic-bezier(0.2,0,0,1)_both]'
-      : ''
+    phase === 'entering' ? 'animate-[approval-card-enter_240ms_cubic-bezier(0.2,0,0,1)_both]' : ''
 
   return (
     <div
@@ -247,28 +232,14 @@ export function QuestionClarificationCard({
         <div className="flex items-center gap-2 border-b border-primary-border/30 px-4 py-2.5">
           {isResolved ? (
             <>
-              <Check
-                size={14}
-                className="shrink-0 text-success-foreground"
-                aria-hidden="true"
-              />
-              <span className="text-xs font-semibold text-success-foreground">
-                已回答
-              </span>
+              <Check size={14} className="shrink-0 text-success-foreground" aria-hidden="true" />
+              <span className="text-xs font-semibold text-success-foreground">已回答</span>
             </>
           ) : (
             <>
-              <HelpCircle
-                size={14}
-                className="shrink-0 text-primary"
-                aria-hidden="true"
-              />
-              <span className="text-xs font-semibold text-primary">
-                待回答
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Agent 需要更多信息
-              </span>
+              <HelpCircle size={14} className="shrink-0 text-primary" aria-hidden="true" />
+              <span className="text-xs font-semibold text-primary">待回答</span>
+              <span className="text-xs text-muted-foreground">Agent 需要更多信息</span>
             </>
           )}
         </div>
@@ -306,11 +277,7 @@ export function QuestionClarificationCard({
                 aria-label={`选择：${option}`}
               >
                 {isSubmitting && activeOption === option ? (
-                  <LoaderCircle
-                    size={14}
-                    className="animate-spin shrink-0"
-                    aria-hidden="true"
-                  />
+                  <LoaderCircle size={14} className="animate-spin shrink-0" aria-hidden="true" />
                 ) : (
                   <MessageSquare
                     size={14}
@@ -346,9 +313,7 @@ export function QuestionClarificationCard({
                     ref={customInputRef}
                     type="text"
                     className={`min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      isResolved
-                        ? 'cursor-not-allowed text-muted-foreground'
-                        : 'border-input'
+                      isResolved ? 'cursor-not-allowed text-muted-foreground' : 'border-input'
                     }`}
                     value={customAnswer}
                     onChange={(e) => setCustomAnswer(e.target.value)}
@@ -359,25 +324,18 @@ export function QuestionClarificationCard({
                   <button
                     type="button"
                     className={`inline-flex shrink-0 items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      isResolved ||
-                      !customAnswer.trim()
+                      isResolved || !customAnswer.trim()
                         ? 'cursor-not-allowed bg-muted text-muted-foreground'
                         : 'bg-primary text-primary-foreground hover:bg-primary-hover'
                     }`}
                     onClick={() => {
                       void submitCustomAnswer()
                     }}
-                    disabled={
-                      isSubmitting || isResolved || !customAnswer.trim()
-                    }
+                    disabled={isSubmitting || isResolved || !customAnswer.trim()}
                     aria-label="提交自定义答案"
                   >
                     {isSubmitting ? (
-                      <LoaderCircle
-                        size={14}
-                        className="animate-spin"
-                        aria-hidden="true"
-                      />
+                      <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
                     ) : (
                       <Check size={14} aria-hidden="true" />
                     )}

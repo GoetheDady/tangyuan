@@ -42,7 +42,6 @@ describe('createTangyuanPreloadApi', () => {
       'claimAgentDirectory',
       'createSession',
       'deleteSkill',
-      'getMessages',
       'getPendingApprovals',
       'getPendingClarifications',
       'getPendingSkillApprovals',
@@ -159,13 +158,6 @@ describe('createTangyuanPreloadApi', () => {
         {
           agentId: 'tangyuan',
           title: '新会话'
-        }
-      ],
-      [
-        DESKTOP_IPC_CHANNELS.sessionsGetMessages,
-        {
-          agentId: 'tangyuan',
-          sessionId: 'session-1'
         }
       ],
       [

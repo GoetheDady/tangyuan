@@ -322,7 +322,6 @@ describe('DESKTOP_IPC_CHANNELS', () => {
       runtimeResetConfiguration: 'tangyuan:runtime:reset-configuration',
       sessionsList: 'tangyuan:sessions:list',
       sessionsCreate: 'tangyuan:sessions:create',
-      sessionsGetMessages: 'tangyuan:sessions:get-messages',
       sessionsSendMessage: 'tangyuan:sessions:send-message',
       sessionsCancelRun: 'tangyuan:sessions:cancel-run',
       sessionsAnswerClarification: 'tangyuan:sessions:answer-clarification',
@@ -330,7 +329,8 @@ describe('DESKTOP_IPC_CHANNELS', () => {
       sessionsCancelClarification: 'tangyuan:sessions:cancel-clarification',
       sessionsRejectBash: 'tangyuan:sessions:reject-bash',
       sessionsGetPendingApprovals: 'tangyuan:sessions:get-pending-approvals',
-      sessionsGetPendingClarifications: 'tangyuan:sessions:get-pending-clarifications',
+      sessionsGetPendingClarifications:
+        'tangyuan:sessions:get-pending-clarifications',
       sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
       sessionsRetryMessage: 'tangyuan:sessions:retry-message',
       agentsArchive: 'tangyuan:agents:archive',

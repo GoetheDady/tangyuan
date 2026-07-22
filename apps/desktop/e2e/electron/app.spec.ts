@@ -74,7 +74,7 @@ test.describe('Electron 窗口', () => {
     expect(apiKeys).toContain('cancelRuntimeConfigurationVerification')
     expect(apiKeys).toContain('listSessions')
     expect(apiKeys).toContain('createSession')
-    expect(apiKeys).toContain('getMessages')
+    expect(apiKeys).toContain('getTranscript')
     expect(apiKeys).toContain('sendMessage')
     expect(apiKeys).toContain('cancelRun')
     expect(apiKeys).toContain('subscribeToAgentEvents')

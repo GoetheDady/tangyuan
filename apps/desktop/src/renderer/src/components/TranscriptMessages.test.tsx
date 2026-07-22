@@ -1,64 +1,56 @@
-// @ts-nocheck -- TODO: migrate to new TranscriptSnapshot API
 import '@testing-library/jest-dom/vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type {
-  AgentMessage,
   AgentReplyEntry,
+  ExecutionAttempt,
   TranscriptEntry,
   TranscriptSnapshot,
-  ExecutionAttempt
+  UserMessageEntry
 } from '@tangyuan/contracts'
 import { TranscriptMessages } from './TranscriptMessages'
 
-/**
- * 创建测试用的 AgentMessage。
- */
-function createMessage(overrides?: Partial<AgentMessage>): AgentMessage {
+const FIXED_TIME = '2026-07-21T00:00:00.000Z'
+
+/** 创建测试用的用户消息条目。 */
+function createUserMessageEntry(overrides?: Partial<UserMessageEntry>): UserMessageEntry {
   return {
-    messageId: `msg-${Math.random().toString(36).slice(2, 9)}`,
-    agentId: 'tangyuan',
-    sessionId: 'session-1',
-    role: 'agent',
+    kind: 'user-message',
+    index: 0,
+    messageId: 'msg-user-1',
     content: '这是一条测试消息。',
-    createdAt: new Date().toISOString(),
+    createdAt: FIXED_TIME,
     ...overrides
   }
 }
 
-/**
- * 创建测试用的执行尝试。
- */
+/** 创建测试用的执行尝试。 */
 function createAttempt(overrides?: Partial<ExecutionAttempt>): ExecutionAttempt {
   return {
     attemptId: 'attempt-1',
     runId: 'run-1',
     status: 'completed',
-    startedAt: '2026-07-21T00:00:00.000Z',
+    startedAt: FIXED_TIME,
     completedAt: '2026-07-21T00:00:01.000Z',
     ...overrides
   }
 }
 
-/**
- * 创建测试用的 AgentReplyEntry（含 turns）。
- */
+/** 创建测试用的 AgentReplyEntry（含 turns）。 */
 function createAgentReplyEntry(overrides?: Partial<AgentReplyEntry>): AgentReplyEntry {
   return {
     kind: 'agent-reply',
     index: 1,
     messageId: 'msg-reply-1',
     content: '回复内容',
-    createdAt: '2026-07-21T00:00:00.000Z',
+    createdAt: FIXED_TIME,
     attempt: createAttempt(),
     turns: [],
     ...overrides
   }
 }
 
-/**
- * 创建测试用的 TranscriptSnapshot。
- */
+/** 创建测试用的 TranscriptSnapshot。 */
 function createTranscriptSnapshot(
   entries: TranscriptEntry[],
   overrides?: Partial<TranscriptSnapshot>
@@ -67,7 +59,7 @@ function createTranscriptSnapshot(
     sessionId: 'session-1',
     agentId: 'tangyuan',
     entries,
-    updatedAt: new Date().toISOString(),
+    updatedAt: FIXED_TIME,
     ...overrides
   }
 }
@@ -82,164 +74,143 @@ function defineMockApi(openExternalLink = vi.fn().mockResolvedValue(undefined)) 
 describe('TranscriptMessages', () => {
   it('renders dialog messages', () => {
     defineMockApi()
-    const messages: AgentMessage[] = [
-      createMessage({ messageId: 'msg-1', role: 'user', content: '你好' }),
-      createMessage({ messageId: 'msg-2', role: 'agent', content: '你好！有什么可以帮助你的？' })
-    ]
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, messageId: 'msg-1', content: '你好' }),
+      createAgentReplyEntry({
+        index: 1,
+        messageId: 'msg-2',
+        content: '你好！有什么可以帮助你的？'
+      })
+    ])
 
-    render(<TranscriptMessages messages={messages} isStreaming={false} sessionId="session-1" />)
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
     expect(screen.getByText('你好')).toBeInTheDocument()
     expect(screen.getByText('你好！有什么可以帮助你的？')).toBeInTheDocument()
   })
 
-  it('filters out system messages from dialog bubbles', () => {
+  it('renders only structured dialog entries', () => {
     defineMockApi()
-    const messages: AgentMessage[] = [
-      createMessage({ messageId: 'msg-1', role: 'user', content: '你好' }),
-      createMessage({
-        messageId: 'msg-sys',
-        role: 'system',
-        content: 'internal event'
-      }),
-      createMessage({ messageId: 'msg-2', role: 'agent', content: '回复' })
-    ]
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: '你好' }),
+      { kind: 'compaction', index: 1, timestamp: FIXED_TIME },
+      createAgentReplyEntry({ index: 2, content: '回复' })
+    ])
 
-    render(<TranscriptMessages messages={messages} isStreaming={false} sessionId="session-1" />)
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
-    // system 消息不应渲染为对话气泡
-    expect(screen.queryByText('internal event')).not.toBeInTheDocument()
-    // 但用户和 Agent 消息应该渲染
     expect(screen.getByText('你好')).toBeInTheDocument()
     expect(screen.getByText('回复')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('自动压缩')
   })
 
-  it('renders compaction indicator for compaction messages', () => {
+  it('renders compaction indicator for compaction entries', () => {
     defineMockApi()
-    const messages: AgentMessage[] = [
-      createMessage({ messageId: 'msg-1', role: 'user', content: '第一轮' }),
-      createMessage({ messageId: 'msg-2', role: 'agent', content: '回复' }),
-      createMessage({
-        messageId: 'msg-compact',
-        role: 'compaction',
-        content: '',
-        createdAt: '2026-07-17T10:30:00.000Z'
-      }),
-      createMessage({ messageId: 'msg-3', role: 'user', content: '第二轮' }),
-      createMessage({ messageId: 'msg-4', role: 'agent', content: '回复2' })
-    ]
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: '第一轮' }),
+      createAgentReplyEntry({ index: 1, content: '回复' }),
+      { kind: 'compaction', index: 2, timestamp: '2026-07-17T10:30:00.000Z' },
+      createUserMessageEntry({ index: 3, messageId: 'msg-3', content: '第二轮' }),
+      createAgentReplyEntry({ index: 4, messageId: 'msg-4', content: '回复2' })
+    ])
 
-    render(<TranscriptMessages messages={messages} isStreaming={false} sessionId="session-1" />)
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
-    // Compaction 指示器应包含 "上下文已于" 和 "自动压缩" 文本
-    const indicator = screen.getByRole('status')
-    expect(indicator).toBeInTheDocument()
-    expect(indicator.textContent).toContain('自动压缩')
+    expect(screen.getByRole('status')).toHaveTextContent('自动压缩')
   })
 
-  it('shows empty state when no messages', () => {
+  it('shows empty state when transcript has no entries', () => {
     defineMockApi()
-    render(<TranscriptMessages messages={[]} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={createTranscriptSnapshot([])}
+        isStreaming={false}
+        sessionId="session-1"
+      />
+    )
 
     expect(screen.getByText('发送第一条消息开始会话。')).toBeInTheDocument()
   })
 
   it('shows select-session prompt when sessionId is null', () => {
     defineMockApi()
-    render(<TranscriptMessages messages={[]} isStreaming={false} sessionId={null} />)
+    render(<TranscriptMessages transcript={null} isStreaming={false} sessionId={null} />)
 
     expect(screen.getByText('选择一个会话后开始。')).toBeInTheDocument()
   })
 
   it('renders last agent message with isAnimating when streaming', () => {
     defineMockApi()
-    const messages: AgentMessage[] = [
-      createMessage({ messageId: 'msg-1', role: 'user', content: '问题' }),
-      createMessage({ messageId: 'msg-2', role: 'agent', content: '```js\nconst x = 1' })
-    ]
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: '问题' }),
+      createAgentReplyEntry({ index: 1, content: '```js\nconst x = 1' })
+    ])
 
-    render(<TranscriptMessages messages={messages} isStreaming={true} sessionId="session-1" />)
+    render(<TranscriptMessages transcript={transcript} isStreaming sessionId="session-1" />)
 
-    // 流式模式下未闭合的代码块应带 data-incomplete 属性
-    const codeBlock = document.querySelector('[data-streamdown="code-block"]')
-    expect(codeBlock).toBeInTheDocument()
-    expect(codeBlock?.getAttribute('data-incomplete')).toBe('true')
+    expect(document.querySelector('[data-streamdown="code-block"]')).toHaveAttribute(
+      'data-incomplete',
+      'true'
+    )
   })
 
   it('does not mark non-last message as animating when streaming', () => {
     defineMockApi()
-    const messages: AgentMessage[] = [
-      createMessage({ messageId: 'msg-1', role: 'user', content: 'Q1' }),
-      createMessage({ messageId: 'msg-2', role: 'agent', content: 'A1' }),
-      createMessage({ messageId: 'msg-3', role: 'user', content: 'Q2' }),
-      createMessage({
-        messageId: 'msg-4',
-        role: 'agent',
-        content: '```js\nconst streaming'
-      })
-    ]
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: 'Q1' }),
+      createAgentReplyEntry({ index: 1, content: 'A1' }),
+      createUserMessageEntry({ index: 2, messageId: 'msg-3', content: 'Q2' }),
+      createAgentReplyEntry({ index: 3, messageId: 'msg-4', content: '```js\nconst y = 2' })
+    ])
 
-    render(<TranscriptMessages messages={messages} isStreaming={true} sessionId="session-1" />)
+    render(<TranscriptMessages transcript={transcript} isStreaming sessionId="session-1" />)
 
-    // 应有两个代码块（第二条 agent 消息和最后一条流式 agent 消息各一个）
-    const codeBlocks = document.querySelectorAll('[data-streamdown="code-block"]')
-    // 至少最后一条流式消息有代码块
-    expect(codeBlocks.length).toBeGreaterThan(0)
-    // 最后一条流式消息的代码块应标记为 incomplete
-    const lastCodeBlock = codeBlocks[codeBlocks.length - 1]
-    expect(lastCodeBlock?.getAttribute('data-incomplete')).toBe('true')
+    expect(screen.getByText('A1')).toBeInTheDocument()
+    expect(document.querySelectorAll('[data-incomplete="true"]')).toHaveLength(1)
   })
 
-  it('MemoizedMessage does not cause redundant Markdown parsing for unchanged content', () => {
+  it('does not reparse unchanged Markdown on rerender', () => {
     defineMockApi()
-    const messages: AgentMessage[] = [
-      createMessage({ messageId: 'msg-1', role: 'user', content: 'Hi' }),
-      createMessage({ messageId: 'msg-2', role: 'agent', content: 'Hello world' })
-    ]
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: 'Hi' }),
+      createAgentReplyEntry({ index: 1, content: 'Hello world' })
+    ])
 
     const { rerender } = render(
-      <TranscriptMessages messages={messages} isStreaming={false} sessionId="session-1" />
+      <TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />
+    )
+    rerender(
+      <TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />
     )
 
-    // 用相同的 messages 引用重新渲染——memo 应跳过 StreamdownMessage 重新解析
-    rerender(<TranscriptMessages messages={messages} isStreaming={false} sessionId="session-1" />)
-
-    // 内容应仍然渲染
     expect(screen.getByText('Hello world')).toBeInTheDocument()
-    expect(screen.getByText('Hi')).toBeInTheDocument()
   })
 
   it('renders user messages on the right and agent messages on the left', () => {
     defineMockApi()
-    const messages: AgentMessage[] = [
-      createMessage({ messageId: 'msg-1', role: 'user', content: 'User' }),
-      createMessage({ messageId: 'msg-2', role: 'agent', content: 'Agent' })
-    ]
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: 'User' }),
+      createAgentReplyEntry({ index: 1, content: 'Agent' })
+    ])
 
-    render(<TranscriptMessages messages={messages} isStreaming={false} sessionId="session-1" />)
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
     const articles = document.querySelectorAll('article')
-    expect(articles.length).toBe(2)
-
-    // 用户消息在右侧（justify-end）
-    expect(articles[0]?.className).toContain('justify-end')
-    // Agent 消息在左侧（justify-start）
-    expect(articles[1]?.className).toContain('justify-start')
+    expect(articles[0]).toHaveClass('justify-end')
+    expect(articles[1]).toHaveClass('justify-start')
   })
 
-  it('renders many messages without crashing', () => {
+  it('renders many structured entries without crashing', () => {
     defineMockApi()
-    const messages: AgentMessage[] = Array.from({ length: 100 }, (_, i) =>
-      createMessage({
-        messageId: `msg-${i}`,
-        role: i % 2 === 0 ? 'user' : 'agent',
-        content: `Message ${i}`
-      })
+    const entries: TranscriptEntry[] = Array.from({ length: 100 }, (_, index) =>
+      index % 2 === 0
+        ? createUserMessageEntry({ index, messageId: `msg-${index}`, content: `Message ${index}` })
+        : createAgentReplyEntry({ index, messageId: `msg-${index}`, content: `Message ${index}` })
     )
+    const transcript = createTranscriptSnapshot(entries)
 
-    render(<TranscriptMessages messages={messages} isStreaming={false} sessionId="session-1" />)
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
-    // 虚拟列表可能不完全渲染所有消息，但至少第一条应该可见
     expect(screen.getByText('Message 0')).toBeInTheDocument()
   })
 
@@ -262,14 +233,7 @@ describe('TranscriptMessages', () => {
 
     const transcript = createTranscriptSnapshot(entries)
 
-    render(
-      <TranscriptMessages
-        messages={[]}
-        transcript={transcript}
-        isStreaming={false}
-        sessionId="session-1"
-      />
-    )
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
     expect(screen.getByText('用户问题')).toBeInTheDocument()
     expect(screen.getByText('Agent 回复')).toBeInTheDocument()
@@ -301,14 +265,7 @@ describe('TranscriptMessages', () => {
 
     const transcript = createTranscriptSnapshot(entries)
 
-    render(
-      <TranscriptMessages
-        messages={[]}
-        transcript={transcript}
-        isStreaming={false}
-        sessionId="session-1"
-      />
-    )
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
     expect(screen.getByRole('status')).toBeInTheDocument()
     expect(screen.getByText('第一轮')).toBeInTheDocument()
@@ -365,14 +322,7 @@ describe('TranscriptMessages', () => {
 
     const transcript = createTranscriptSnapshot(entries)
 
-    render(
-      <TranscriptMessages
-        messages={[]}
-        transcript={transcript}
-        isStreaming={false}
-        sessionId="session-1"
-      />
-    )
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
     // AssistantMessage 应渲染执行披露栏（已完成的条目默认收起）
     expect(screen.getByText('已完成执行过程')).toBeInTheDocument()
@@ -439,14 +389,7 @@ describe('TranscriptMessages', () => {
 
     const transcript = createTranscriptSnapshot(entries)
 
-    render(
-      <TranscriptMessages
-        messages={[]}
-        transcript={transcript}
-        isStreaming={false}
-        sessionId="session-1"
-      />
-    )
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
     // 应展示失败状态（disclosure bar 和 failed footer 各有一个"执行失败"）
     const failureLabels = screen.getAllByText('执行失败')
@@ -511,7 +454,6 @@ describe('TranscriptMessages', () => {
 
     render(
       <TranscriptMessages
-        messages={[]}
         transcript={transcript}
         isStreaming={false}
         sessionId="session-1"
@@ -526,49 +468,41 @@ describe('TranscriptMessages', () => {
     expect(onRetry).toHaveBeenCalledWith('msg-user-1')
   })
 
-  it('handles session switch by clearing anchor and scrolling to bottom', () => {
+  it('handles session switch by clearing anchor and rendering the new transcript', () => {
     defineMockApi()
-    const messages1: AgentMessage[] = [
-      createMessage({ messageId: 'msg-1', role: 'user', content: 'Session 1 message' })
-    ]
+    const transcript1 = createTranscriptSnapshot(
+      [createUserMessageEntry({ content: 'Session 1 message' })],
+      { sessionId: 'session-1' }
+    )
 
     const { rerender } = render(
-      <TranscriptMessages messages={messages1} isStreaming={false} sessionId="session-1" />
+      <TranscriptMessages transcript={transcript1} isStreaming={false} sessionId="session-1" />
     )
 
     expect(screen.getByText('Session 1 message')).toBeInTheDocument()
 
-    const messages2: AgentMessage[] = [
-      createMessage({ messageId: 'msg-2', role: 'user', content: 'Session 2 message' })
-    ]
+    const transcript2 = createTranscriptSnapshot(
+      [createUserMessageEntry({ content: 'Session 2 message' })],
+      { sessionId: 'session-2' }
+    )
+    rerender(
+      <TranscriptMessages transcript={transcript2} isStreaming={false} sessionId="session-2" />
+    )
 
-    // 切换到新会话
-    rerender(<TranscriptMessages messages={messages2} isStreaming={false} sessionId="session-2" />)
-
-    // 新会话的消息应可见
     expect(screen.getByText('Session 2 message')).toBeInTheDocument()
-    // 旧会话的消息不应存在
     expect(screen.queryByText('Session 1 message')).not.toBeInTheDocument()
   })
 
-  it('uses adaptive estimate sizes for different item types', () => {
-    // 此测试验证 estimateItemSize 对不同类型返回不同值
-    // 虚拟列表的 estimateSize 函数会调用它
+  it('uses adaptive estimate sizes for different structured item types', () => {
     defineMockApi()
-    const messages: AgentMessage[] = [
-      createMessage({ messageId: 'msg-1', role: 'user', content: 'Hi' }),
-      createMessage({
-        messageId: 'msg-compact',
-        role: 'compaction',
-        content: '',
-        createdAt: new Date().toISOString()
-      }),
-      createMessage({ messageId: 'msg-2', role: 'agent', content: 'Hello' })
-    ]
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: 'Hi' }),
+      { kind: 'compaction', index: 1, timestamp: FIXED_TIME },
+      createAgentReplyEntry({ index: 2, content: 'Hello' })
+    ])
 
-    render(<TranscriptMessages messages={messages} isStreaming={false} sessionId="session-1" />)
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
-    // 所有条目都应渲染
     expect(screen.getByText('Hi')).toBeInTheDocument()
     expect(screen.getByRole('status')).toBeInTheDocument()
     expect(screen.getByText('Hello')).toBeInTheDocument()
@@ -593,14 +527,7 @@ describe('TranscriptMessages', () => {
 
     const transcript = createTranscriptSnapshot(entries)
 
-    render(
-      <TranscriptMessages
-        messages={[]}
-        transcript={transcript}
-        isStreaming={true}
-        sessionId="session-1"
-      />
-    )
+    render(<TranscriptMessages transcript={transcript} isStreaming={true} sessionId="session-1" />)
 
     // 流式模式下，最后一条 agent 消息的代码块应标记为 incomplete
     const codeBlock = document.querySelector('[data-streamdown="code-block"]')
@@ -608,28 +535,29 @@ describe('TranscriptMessages', () => {
     expect(codeBlock?.getAttribute('data-incomplete')).toBe('true')
   })
 
-  it('renders 200+ messages with virtual list and only mounts visible subset', () => {
+  it('renders 200+ structured entries with virtual list and only mounts visible subset', () => {
     defineMockApi()
-    const messages: AgentMessage[] = Array.from({ length: 250 }, (_, i) =>
-      createMessage({
-        messageId: `msg-${i}`,
-        role: i % 2 === 0 ? 'user' : 'agent',
-        content: `Message ${i}: Some longer content to fill more space`
-      })
+    const entries: TranscriptEntry[] = Array.from({ length: 250 }, (_, index) =>
+      index % 2 === 0
+        ? createUserMessageEntry({
+            index,
+            messageId: `msg-${index}`,
+            content: `Message ${index}: Some longer content to fill more space`
+          })
+        : createAgentReplyEntry({
+            index,
+            messageId: `msg-${index}`,
+            content: `Message ${index}: Some longer content to fill more space`
+          })
     )
+    const transcript = createTranscriptSnapshot(entries)
 
-    render(<TranscriptMessages messages={messages} isStreaming={false} sessionId="session-1" />)
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
-    // 应该有消息渲染
     expect(
       screen.getByText('Message 0: Some longer content to fill more space')
     ).toBeInTheDocument()
-
-    // 虚拟列表应只渲染可见子集——检查 DOM 中渲染的条目数量
-    // 通过 data-index 属性统计
     const renderedItems = document.querySelectorAll('[data-index]')
-    // 对于有滚动容器的虚拟列表（clientHeight=600, estimate=100-120），
-    // 可见区域约为 5-6 条，加上 overscan 5 * 2 = 10，总共约 16~22 条
     expect(renderedItems.length).toBeLessThan(50)
     expect(renderedItems.length).toBeGreaterThan(0)
   })
@@ -667,7 +595,6 @@ describe('TranscriptMessages', () => {
 
     const { rerender } = render(
       <TranscriptMessages
-        messages={[]}
         transcript={transcript}
         isStreaming={false}
         sessionId="session-1"
@@ -702,7 +629,6 @@ describe('TranscriptMessages', () => {
 
     rerender(
       <TranscriptMessages
-        messages={[]}
         transcript={retryTranscript}
         isStreaming={false}
         sessionId="session-1"
@@ -1013,14 +939,7 @@ describe('TranscriptMessages 确定性大数据夹具', () => {
     const entries = createBigDataEntries()
     const transcript = createTranscriptSnapshot(entries)
 
-    render(
-      <TranscriptMessages
-        messages={[]}
-        transcript={transcript}
-        isStreaming={false}
-        sessionId="session-1"
-      />
-    )
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
     // 用户消息应可见
     expect(screen.getByText('请帮我设计一个完整的 REST API 服务')).toBeInTheDocument()
@@ -1053,14 +972,7 @@ describe('TranscriptMessages 确定性大数据夹具', () => {
     const entries = createMultipleAttemptEntries()
     const transcript = createTranscriptSnapshot(entries)
 
-    render(
-      <TranscriptMessages
-        messages={[]}
-        transcript={transcript}
-        isStreaming={false}
-        sessionId="session-1"
-      />
-    )
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
     // 失败的尝试应展示
     const failureLabels = screen.getAllByText('执行失败')
@@ -1080,14 +992,7 @@ describe('TranscriptMessages 确定性大数据夹具', () => {
     const entries = createMultiCompactionEntries()
     const transcript = createTranscriptSnapshot(entries)
 
-    render(
-      <TranscriptMessages
-        messages={[]}
-        transcript={transcript}
-        isStreaming={false}
-        sessionId="session-1"
-      />
-    )
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
     // 前面几轮应可见（虚拟列表只渲染视口内项目）
     expect(screen.getByText('第 1 轮提问')).toBeInTheDocument()
@@ -1109,14 +1014,7 @@ describe('TranscriptMessages 确定性大数据夹具', () => {
     const entries = createBigDataEntries()
     const transcript = createTranscriptSnapshot(entries)
 
-    render(
-      <TranscriptMessages
-        messages={[]}
-        transcript={transcript}
-        isStreaming={false}
-        sessionId="session-1"
-      />
-    )
+    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
     const renderedItems = document.querySelectorAll('[data-index]')
     // 大数据条目共 5 条，clientHeight=600，全部在视口内 → 5 条全部渲染

@@ -26,11 +26,11 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium-fixtures',
-      testMatch: '**/base-components.spec.ts'
+      testMatch: ['**/base-components.spec.ts', '**/conversation-components.spec.ts']
     },
     {
       name: 'chromium-fixtures-visual',
-      testMatch: '**/base-components.visual.spec.ts'
+      testMatch: ['**/base-components.visual.spec.ts', '**/conversation-components.visual.spec.ts']
     }
   ]
 })

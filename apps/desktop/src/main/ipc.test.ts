@@ -36,15 +36,24 @@ describe('registerDesktopAppIpc', () => {
       cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(snapshot),
       listSessions: vi.fn().mockResolvedValue([session]),
       createSession: vi.fn().mockResolvedValue(session),
-      getMessages: vi.fn().mockResolvedValue([]),
       getTranscript: vi.fn().mockResolvedValue({
         sessionId: 'session-1',
         agentId: 'tangyuan',
         entries: [],
         updatedAt: '2026-01-01T00:00:00.000Z'
       }),
-      sendMessage: vi.fn().mockResolvedValue([]),
-      retryMessage: vi.fn().mockResolvedValue([]),
+      sendMessage: vi.fn().mockResolvedValue({
+        sessionId: 'session-1',
+        agentId: 'tangyuan',
+        entries: [],
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }),
+      retryMessage: vi.fn().mockResolvedValue({
+        sessionId: 'session-1',
+        agentId: 'tangyuan',
+        entries: [],
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }),
       cancelRun: vi.fn().mockResolvedValue(session),
       subscribe: vi.fn(),
       cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined),
@@ -147,7 +156,7 @@ describe('registerDesktopAppIpc', () => {
 
     registerDesktopAppIpc(ipcMain, runtime, broadcastAgentEvent, openExternalLink)
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(42)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(41)
     expect(broadcastAgentEvent).toHaveBeenCalledWith(createTurnStartedEvent())
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
@@ -177,18 +186,28 @@ describe('registerDesktopAppIpc', () => {
       })
     ).resolves.toEqual(session)
     await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsGetMessages)(null, {
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsGetTranscript)(null, {
         agentId: 'tangyuan',
         sessionId: 'session-1'
       })
-    ).resolves.toEqual([])
+    ).resolves.toEqual({
+      sessionId: 'session-1',
+      agentId: 'tangyuan',
+      entries: [],
+      updatedAt: '2026-01-01T00:00:00.000Z'
+    })
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsSendMessage)(null, {
         agentId: 'tangyuan',
         sessionId: 'session-1',
         content: '你好'
       })
-    ).resolves.toEqual([])
+    ).resolves.toEqual({
+      sessionId: 'session-1',
+      agentId: 'tangyuan',
+      entries: [],
+      updatedAt: '2026-01-01T00:00:00.000Z'
+    })
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsCancelRun)(null, {
         agentId: 'tangyuan',
@@ -213,7 +232,7 @@ describe('registerDesktopAppIpc', () => {
     expect(runtime.cancelRuntimeConfigurationVerification).toHaveBeenCalledWith({
       verificationId: 'verify-1'
     })
-    expect(runtime.getMessages).toHaveBeenCalledWith({
+    expect(runtime.getTranscript).toHaveBeenCalledWith({
       agentId: 'tangyuan',
       sessionId: 'session-1'
     })
@@ -307,15 +326,24 @@ describe('registerDesktopAppIpc', () => {
       cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(snapshot),
       listSessions: vi.fn().mockResolvedValue([]),
       createSession: vi.fn(),
-      getMessages: vi.fn().mockResolvedValue([]),
       getTranscript: vi.fn().mockResolvedValue({
         sessionId: 'session-1',
         agentId: 'tangyuan',
         entries: [],
         updatedAt: '2026-01-01T00:00:00.000Z'
       }),
-      sendMessage: vi.fn().mockResolvedValue([]),
-      retryMessage: vi.fn().mockResolvedValue([]),
+      sendMessage: vi.fn().mockResolvedValue({
+        sessionId: 'session-1',
+        agentId: 'tangyuan',
+        entries: [],
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }),
+      retryMessage: vi.fn().mockResolvedValue({
+        sessionId: 'session-1',
+        agentId: 'tangyuan',
+        entries: [],
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }),
       cancelRun: vi.fn(),
       subscribe: vi.fn(),
       cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined),
@@ -419,9 +447,13 @@ describe('registerDesktopAppIpc', () => {
       cancelRuntimeConfigurationVerification: vi.fn(),
       listSessions: vi.fn(),
       createSession: vi.fn(),
-      getMessages: vi.fn(),
       sendMessage: vi.fn(),
-      retryMessage: vi.fn().mockResolvedValue([]),
+      retryMessage: vi.fn().mockResolvedValue({
+        sessionId: 'session-1',
+        agentId: 'tangyuan',
+        entries: [],
+        updatedAt: '2026-01-01T00:00:00.000Z'
+      }),
       cancelRun: vi.fn(),
       subscribe: vi.fn(),
       cancelAllActiveRuns: vi.fn(),

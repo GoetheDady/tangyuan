@@ -595,19 +595,6 @@ class DefaultTangyuanRuntime {
   }
 
   /**
-   * 读取指定会话的消息列表。
-   *
-   * @param request - 会话所属 Agent 和会话标识。
-   * @returns 当前会话消息列表。
-   * @throws 当 AgentSessionDriver 读取失败时，Promise 会 reject。
-   */
-  async getMessages(
-    request: GetSessionMessagesRequest,
-  ): Promise<TranscriptSnapshot> {
-    return this.getTranscript(request)
-  }
-
-  /**
    * 读取指定会话的结构化 transcript 快照。
    *
    * 优先使用 TranscriptEmitter 缓存的快照（含 turns/steps）；
@@ -1317,7 +1304,11 @@ class DefaultTangyuanRuntime {
 
     if (driverEvent.type === 'turn-started') {
       this.activeRunIds.set(driverEvent.sessionId, driverEvent.runId)
-      this.upsertSessionState(driverEvent.sessionId, 'running', driverEvent.occurredAt)
+      this.upsertSessionState(
+        driverEvent.sessionId,
+        'running',
+        driverEvent.occurredAt,
+      )
       this.transcriptEmitter.startAttemptForRun(driverEvent)
       this.transcriptEmitter.initializeTurnStateForRun(driverEvent)
       return
@@ -1352,7 +1343,11 @@ class DefaultTangyuanRuntime {
 
     if (driverEvent.type === 'turn-cancelled') {
       this.activeRunIds.delete(driverEvent.sessionId)
-      this.upsertSessionState(driverEvent.sessionId, 'cancelled', driverEvent.occurredAt)
+      this.upsertSessionState(
+        driverEvent.sessionId,
+        'cancelled',
+        driverEvent.occurredAt,
+      )
       this.transcriptEmitter.failAttemptForRun(
         driverEvent.sessionId,
         driverEvent.runId,
@@ -1364,7 +1359,11 @@ class DefaultTangyuanRuntime {
 
     if (driverEvent.type === 'turn-failed') {
       this.activeRunIds.delete(driverEvent.sessionId)
-      this.upsertSessionState(driverEvent.sessionId, 'failed', driverEvent.occurredAt)
+      this.upsertSessionState(
+        driverEvent.sessionId,
+        'failed',
+        driverEvent.occurredAt,
+      )
       this.transcriptEmitter.failAttemptForRun(
         driverEvent.sessionId,
         driverEvent.runId,
@@ -1376,7 +1375,11 @@ class DefaultTangyuanRuntime {
     }
 
     if (driverEvent.type === 'run-state-changed') {
-      this.upsertSessionState(driverEvent.sessionId, driverEvent.state, driverEvent.occurredAt)
+      this.upsertSessionState(
+        driverEvent.sessionId,
+        driverEvent.state,
+        driverEvent.occurredAt,
+      )
 
       if (driverEvent.state !== 'running') {
         this.activeRunIds.delete(driverEvent.sessionId)
@@ -1688,7 +1691,6 @@ export type TangyuanRuntime = Pick<
   | 'resetConfiguration'
   | 'listSessions'
   | 'createSession'
-  | 'getMessages'
   | 'getTranscript'
   | 'sendMessage'
   | 'retryMessage'

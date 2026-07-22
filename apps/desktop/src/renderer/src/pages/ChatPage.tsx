@@ -207,6 +207,8 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     [context.sessions, context.selectedSessionId]
   )
   const isSelectedSessionRunning = selectedSession?.state === 'running'
+  const selectedTranscript =
+    context.transcript?.sessionId === selectedSession?.sessionId ? context.transcript : null
 
   /**
    * 创建默认 Agent 的新会话并放到列表顶部。
@@ -462,7 +464,8 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
 
           <div className="min-h-0 flex-1 px-8 py-7">
             <TranscriptMessages
-              transcript={context.transcript}
+              key={selectedSession?.sessionId ?? 'no-session'}
+              transcript={selectedTranscript}
               isStreaming={isSelectedSessionRunning}
               sessionId={selectedSession?.sessionId ?? null}
               onRetry={(userMessageId) => {
@@ -506,9 +509,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
               <div className="mx-auto space-y-3">
                 {context.pendingClarifications
                   .filter(
-                    (c) =>
-                      c.sessionId === selectedSession.sessionId &&
-                      c.status === 'pending'
+                    (c) => c.sessionId === selectedSession.sessionId && c.status === 'pending'
                   )
                   .map((clarification) => (
                     <QuestionClarificationCard

@@ -1,14 +1,13 @@
-// @ts-nocheck -- TODO: migrate to new TranscriptSnapshot API
 import '@testing-library/jest-dom/vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   type AgentEventListener,
-  type AgentMessage,
   createDefaultSessionSummary,
   createRuntimeSnapshot,
   type DesktopPreloadApi,
-  type RuntimeSnapshot
+  type RuntimeSnapshot,
+  type TranscriptSnapshot
 } from '@tangyuan/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -47,7 +46,6 @@ describe('App', () => {
           updatedAt: '2026-07-08T00:00:00.000Z'
         })
       ),
-      getMessages: vi.fn().mockResolvedValue([]),
       getTranscript: vi.fn().mockResolvedValue({
         sessionId: '',
         agentId: 'tangyuan',
@@ -158,6 +156,9 @@ describe('App', () => {
       approveBash: vi.fn().mockResolvedValue(undefined),
       rejectBash: vi.fn().mockResolvedValue(undefined),
       getPendingApprovals: vi.fn().mockResolvedValue([]),
+      answerClarification: vi.fn().mockResolvedValue(undefined),
+      cancelClarification: vi.fn().mockResolvedValue(undefined),
+      getPendingClarifications: vi.fn().mockResolvedValue([]),
       installSkill: vi.fn().mockResolvedValue([]),
       deleteSkill: vi.fn().mockResolvedValue([]),
       approveSkillOperation: vi.fn().mockResolvedValue(undefined),
@@ -328,7 +329,6 @@ describe('App', () => {
         cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
         listSessions: vi.fn().mockResolvedValue([]),
         createSession: vi.fn(),
-        getMessages: vi.fn().mockResolvedValue([]),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: '',
           agentId: 'tangyuan',
@@ -378,6 +378,9 @@ describe('App', () => {
         approveBash: vi.fn(),
         rejectBash: vi.fn(),
         getPendingApprovals: vi.fn(),
+        answerClarification: vi.fn(),
+        cancelClarification: vi.fn(),
+        getPendingClarifications: vi.fn().mockResolvedValue([]),
         installSkill: vi.fn(),
         deleteSkill: vi.fn(),
         approveSkillOperation: vi.fn(),
@@ -414,7 +417,6 @@ describe('App', () => {
             updatedAt: '2026-07-08T00:00:00.000Z'
           })
         ),
-        getMessages: vi.fn().mockResolvedValue([]),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: '',
           agentId: 'tangyuan',
@@ -464,6 +466,9 @@ describe('App', () => {
         approveBash: vi.fn(),
         rejectBash: vi.fn(),
         getPendingApprovals: vi.fn(),
+        answerClarification: vi.fn(),
+        cancelClarification: vi.fn(),
+        getPendingClarifications: vi.fn().mockResolvedValue([]),
         installSkill: vi.fn(),
         deleteSkill: vi.fn(),
         approveSkillOperation: vi.fn(),
@@ -503,31 +508,36 @@ describe('App', () => {
           })
         ]),
         createSession: vi.fn(),
-        getMessages: vi.fn().mockResolvedValue([]),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: '',
           agentId: 'tangyuan',
           entries: [],
           updatedAt: '2026-01-01T00:00:00.000Z'
         }),
-        sendMessage: vi.fn().mockResolvedValue([
-          {
-            messageId: 'message-1',
-            agentId: 'tangyuan',
-            sessionId: 'welcome',
-            role: 'user',
-            content: '你好',
-            createdAt: '2026-07-08T00:00:00.000Z'
-          },
-          {
-            messageId: 'message-2',
-            agentId: 'tangyuan',
-            sessionId: 'welcome',
-            role: 'agent',
-            content: '收到：你好',
-            createdAt: '2026-07-08T00:00:00.000Z'
-          }
-        ]),
+        sendMessage: vi.fn().mockResolvedValue({
+          sessionId: 'welcome',
+          agentId: 'tangyuan',
+          entries: [
+            {
+              kind: 'user-message',
+              index: 0,
+              messageId: 'message-1',
+              content: '你好',
+              createdAt: '2026-07-08T00:00:00.000Z'
+            },
+            {
+              kind: 'agent-reply',
+              index: 1,
+              messageId: 'message-2',
+              content: '收到：你好',
+              createdAt: '2026-07-08T00:00:00.000Z',
+              attempt: null,
+              turns: [],
+              inReplyTo: 'message-1'
+            }
+          ],
+          updatedAt: '2026-07-08T00:00:01.000Z'
+        }),
         retryMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
@@ -570,6 +580,9 @@ describe('App', () => {
         approveBash: vi.fn(),
         rejectBash: vi.fn(),
         getPendingApprovals: vi.fn(),
+        answerClarification: vi.fn(),
+        cancelClarification: vi.fn(),
+        getPendingClarifications: vi.fn().mockResolvedValue([]),
         installSkill: vi.fn(),
         deleteSkill: vi.fn(),
         approveSkillOperation: vi.fn(),
@@ -578,7 +591,6 @@ describe('App', () => {
         getSkillInstallRecords: vi.fn()
       } satisfies DesktopPreloadApi
     })
-    window.location.hash = '#/chat/tangyuan'
     window.location.hash = '#/chat/tangyuan'
     render(<App />)
 
@@ -631,9 +643,8 @@ describe('App', () => {
           })
         ]),
         createSession: vi.fn(),
-        getMessages: vi.fn().mockResolvedValue([]),
         getTranscript: vi.fn().mockResolvedValue({
-          sessionId: '',
+          sessionId: 'welcome',
           agentId: 'tangyuan',
           entries: [],
           updatedAt: '2026-01-01T00:00:00.000Z'
@@ -641,44 +652,74 @@ describe('App', () => {
         sendMessage: vi.fn(async () => {
           for (const listener of listeners) {
             listener({
-              type: 'turn-started',
+              type: 'run-state-changed',
               agentId: 'tangyuan',
               sessionId: 'welcome',
-              runId: 'run-1',
+              state: 'running',
               occurredAt: '2026-07-08T00:00:01.000Z'
             })
             listener({
-              type: 'message-delta',
+              type: 'transcript-delta',
               agentId: 'tangyuan',
               sessionId: 'welcome',
-              runId: 'run-1',
-              messageId: 'agent-message-1',
-              delta: '你',
+              delta: {
+                type: 'entry-appended',
+                entry: {
+                  kind: 'agent-reply',
+                  index: 0,
+                  messageId: 'agent-message-1',
+                  content: '',
+                  createdAt: '2026-07-08T00:00:02.000Z',
+                  attempt: {
+                    attemptId: 'run-1',
+                    runId: 'run-1',
+                    status: 'running',
+                    startedAt: '2026-07-08T00:00:01.000Z',
+                    completedAt: null
+                  },
+                  turns: []
+                }
+              },
               occurredAt: '2026-07-08T00:00:02.000Z'
             })
-            listener({
-              type: 'message-delta',
-              agentId: 'tangyuan',
-              sessionId: 'welcome',
-              runId: 'run-1',
-              messageId: 'agent-message-1',
-              delta: '好',
-              occurredAt: '2026-07-08T00:00:03.000Z'
-            })
+            for (const [delta, occurredAt] of [
+              ['你', '2026-07-08T00:00:02.000Z'],
+              ['好', '2026-07-08T00:00:03.000Z']
+            ] as const) {
+              listener({
+                type: 'transcript-delta',
+                agentId: 'tangyuan',
+                sessionId: 'welcome',
+                delta: { type: 'delta-appended', index: 0, delta },
+                occurredAt
+              })
+            }
           }
 
           await releaseSend.promise
 
-          return [
-            {
-              messageId: 'agent-message-1',
-              agentId: 'tangyuan',
-              sessionId: 'welcome',
-              role: 'agent',
-              content: '你好',
-              createdAt: '2026-07-08T00:00:02.000Z'
-            }
-          ] satisfies AgentMessage[]
+          return {
+            sessionId: 'welcome',
+            agentId: 'tangyuan',
+            entries: [
+              {
+                kind: 'agent-reply',
+                index: 0,
+                messageId: 'agent-message-1',
+                content: '你好',
+                createdAt: '2026-07-08T00:00:02.000Z',
+                attempt: {
+                  attemptId: 'run-1',
+                  runId: 'run-1',
+                  status: 'completed',
+                  startedAt: '2026-07-08T00:00:01.000Z',
+                  completedAt: '2026-07-08T00:00:03.000Z'
+                },
+                turns: []
+              }
+            ],
+            updatedAt: '2026-07-08T00:00:03.000Z'
+          } satisfies TranscriptSnapshot
         }),
         retryMessage: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
@@ -726,6 +767,9 @@ describe('App', () => {
         approveBash: vi.fn(),
         rejectBash: vi.fn(),
         getPendingApprovals: vi.fn(),
+        answerClarification: vi.fn(),
+        cancelClarification: vi.fn(),
+        getPendingClarifications: vi.fn().mockResolvedValue([]),
         installSkill: vi.fn(),
         deleteSkill: vi.fn(),
         approveSkillOperation: vi.fn(),
@@ -765,37 +809,28 @@ describe('App', () => {
           })
         ]),
         createSession: vi.fn(),
-        getMessages: vi.fn().mockResolvedValue([
-          {
-            messageId: 'message-1',
-            agentId: 'tangyuan',
-            sessionId: 'welcome',
-            role: 'user',
-            content: '你好',
-            createdAt: '2026-07-08T00:00:00.000Z'
-          },
-          {
-            messageId: 'message-2',
-            agentId: 'tangyuan',
-            sessionId: 'welcome',
-            role: 'system',
-            content: '正在调用工具',
-            createdAt: '2026-07-08T00:00:01.000Z'
-          },
-          {
-            messageId: 'message-3',
-            agentId: 'tangyuan',
-            sessionId: 'welcome',
-            role: 'agent',
-            content: '你好呀',
-            createdAt: '2026-07-08T00:00:02.000Z'
-          }
-        ] satisfies AgentMessage[]),
         getTranscript: vi.fn().mockResolvedValue({
-          sessionId: '',
+          sessionId: 'welcome',
           agentId: 'tangyuan',
-          entries: [],
-          updatedAt: '2026-01-01T00:00:00.000Z'
+          entries: [
+            {
+              kind: 'user-message',
+              index: 0,
+              messageId: 'message-1',
+              content: '用户可见消息',
+              createdAt: '2026-07-08T00:00:00.000Z'
+            },
+            {
+              kind: 'agent-reply',
+              index: 1,
+              messageId: 'message-2',
+              content: 'Agent 可见回复',
+              createdAt: '2026-07-08T00:00:01.000Z',
+              attempt: null,
+              turns: []
+            }
+          ],
+          updatedAt: '2026-07-08T00:00:02.000Z'
         }),
         sendMessage: vi.fn(),
         retryMessage: vi.fn().mockResolvedValue([]),
@@ -840,6 +875,9 @@ describe('App', () => {
         approveBash: vi.fn(),
         rejectBash: vi.fn(),
         getPendingApprovals: vi.fn(),
+        answerClarification: vi.fn(),
+        cancelClarification: vi.fn(),
+        getPendingClarifications: vi.fn().mockResolvedValue([]),
         installSkill: vi.fn(),
         deleteSkill: vi.fn(),
         approveSkillOperation: vi.fn(),
@@ -850,8 +888,8 @@ describe('App', () => {
     })
     render(<App />)
 
-    expect(await screen.findByText('你好')).toBeInTheDocument()
-    expect(screen.getByText('你好呀')).toBeInTheDocument()
+    expect(await screen.findByText('用户可见消息')).toBeInTheDocument()
+    expect(screen.getByText('Agent 可见回复')).toBeInTheDocument()
     expect(screen.queryByText('正在调用工具')).not.toBeInTheDocument()
   })
 
@@ -876,21 +914,21 @@ describe('App', () => {
           })
         ]),
         createSession: vi.fn(),
-        getMessages: vi.fn().mockResolvedValue([
-          {
-            messageId: 'message-1',
-            agentId: 'tangyuan',
-            sessionId: 'welcome',
-            role: 'agent',
-            content: '## 你好\n\n这是 **Markdown** 内容，包含 `代码` 和\n\n```\nconst x = 1\n```',
-            createdAt: '2026-07-08T00:00:00.000Z'
-          }
-        ] satisfies AgentMessage[]),
         getTranscript: vi.fn().mockResolvedValue({
-          sessionId: '',
+          sessionId: 'welcome',
           agentId: 'tangyuan',
-          entries: [],
-          updatedAt: '2026-01-01T00:00:00.000Z'
+          entries: [
+            {
+              kind: 'agent-reply',
+              index: 0,
+              messageId: 'message-1',
+              content: '# 你好\n\n这是 `代码`。',
+              createdAt: '2026-07-08T00:00:00.000Z',
+              attempt: null,
+              turns: []
+            }
+          ],
+          updatedAt: '2026-07-08T00:00:02.000Z'
         }),
         sendMessage: vi.fn(),
         retryMessage: vi.fn().mockResolvedValue([]),
@@ -935,6 +973,9 @@ describe('App', () => {
         approveBash: vi.fn(),
         rejectBash: vi.fn(),
         getPendingApprovals: vi.fn(),
+        answerClarification: vi.fn(),
+        cancelClarification: vi.fn(),
+        getPendingClarifications: vi.fn().mockResolvedValue([]),
         installSkill: vi.fn(),
         deleteSkill: vi.fn(),
         approveSkillOperation: vi.fn(),
@@ -974,21 +1015,19 @@ describe('App', () => {
           })
         ]),
         createSession: vi.fn(),
-        getMessages: vi.fn().mockResolvedValue([
-          {
-            messageId: 'message-1',
-            agentId: 'tangyuan',
-            sessionId: 'welcome',
-            role: 'user',
-            content: '# 这不是标题 **不是粗体**',
-            createdAt: '2026-07-08T00:00:00.000Z'
-          }
-        ] satisfies AgentMessage[]),
         getTranscript: vi.fn().mockResolvedValue({
-          sessionId: '',
+          sessionId: 'welcome',
           agentId: 'tangyuan',
-          entries: [],
-          updatedAt: '2026-01-01T00:00:00.000Z'
+          entries: [
+            {
+              kind: 'user-message',
+              index: 0,
+              messageId: 'message-1',
+              content: '# 这不是标题 **不是粗体**',
+              createdAt: '2026-07-08T00:00:00.000Z'
+            }
+          ],
+          updatedAt: '2026-07-08T00:00:02.000Z'
         }),
         sendMessage: vi.fn(),
         retryMessage: vi.fn().mockResolvedValue([]),
@@ -1033,6 +1072,9 @@ describe('App', () => {
         approveBash: vi.fn(),
         rejectBash: vi.fn(),
         getPendingApprovals: vi.fn(),
+        answerClarification: vi.fn(),
+        cancelClarification: vi.fn(),
+        getPendingClarifications: vi.fn().mockResolvedValue([]),
         installSkill: vi.fn(),
         deleteSkill: vi.fn(),
         approveSkillOperation: vi.fn(),

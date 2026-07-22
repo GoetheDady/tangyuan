@@ -107,14 +107,6 @@ export function registerDesktopAppIpc(
       )
     )
   })
-  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsGetMessages, async (_event, payload) => {
-    return parseDesktopIpcResponse(
-      DESKTOP_IPC_CHANNELS.sessionsGetMessages,
-      await runtime.getMessages(
-        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsGetMessages, payload)
-      )
-    )
-  })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsGetTranscript, async (_event, payload) => {
     return parseDesktopIpcResponse(
       DESKTOP_IPC_CHANNELS.sessionsGetTranscript,

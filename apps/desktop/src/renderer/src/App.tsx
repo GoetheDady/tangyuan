@@ -19,11 +19,14 @@ import { ConsoleProviderPage } from '@/pages/ConsoleProviderPage'
 import { ConsoleAgentListPage } from '@/pages/ConsoleAgentListPage'
 import { ConsoleAgentDetailPage } from '@/pages/ConsoleAgentDetailPage'
 
-const baseComponentsFixturesEnabled = import.meta.env.DEV || import.meta.env.MODE === 'test'
-const BaseComponentsFixturePage = baseComponentsFixturesEnabled
+const componentFixturesEnabled = import.meta.env.DEV || import.meta.env.MODE === 'test'
+const BaseComponentsFixturePage = componentFixturesEnabled
   ? lazy(() => import('@/fixtures/BaseComponentsFixturePage'))
   : null
-const RendererRoutes = baseComponentsFixturesEnabled ? FixtureAwareRendererRoutes : DesktopRoutes
+const ConversationComponentsFixturePage = componentFixturesEnabled
+  ? lazy(() => import('@/fixtures/ConversationComponentsFixturePage'))
+  : null
+const RendererRoutes = componentFixturesEnabled ? FixtureAwareRendererRoutes : DesktopRoutes
 
 interface DesktopWorkbenchState {
   runtime: RuntimeSnapshot | null
@@ -97,6 +100,17 @@ function FixtureAwareRendererRoutes(): React.JSX.Element {
     )
   }
 
+  if (
+    location.pathname === '/__fixtures__/conversation-components' &&
+    ConversationComponentsFixturePage
+  ) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <ConversationComponentsFixturePage />
+      </Suspense>
+    )
+  }
+
   return <DesktopRoutes />
 }
 
@@ -112,6 +126,7 @@ function DesktopRoutes(): React.JSX.Element {
   const [agents, setAgents] = useState<AgentSummary[]>([])
   const [sessions, setSessions] = useState<AgentSessionSummary[]>([])
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const selectedSessionIdRef = useRef<string | null>(null)
   const [transcript, setTranscript] = useState<TranscriptSnapshot | null>(null)
   const [composerText, setComposerText] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -121,6 +136,10 @@ function DesktopRoutes(): React.JSX.Element {
     QuestionClarificationRequest[]
   >([])
   const alwaysAllowedCommandsRef = useRef<Map<string, Set<string>>>(new Map())
+
+  useEffect(() => {
+    selectedSessionIdRef.current = selectedSessionId
+  }, [selectedSessionId])
 
   /**
    * 将命令加入指定会话的"始终允许"列表，后续同命令自动免审。
@@ -175,7 +194,17 @@ function DesktopRoutes(): React.JSX.Element {
         setSelectedSessionId(
           (currentSessionId) => currentSessionId ?? workbench.sessions[0]?.sessionId ?? null
         )
-        setTranscript(workbench.transcript)
+        setTranscript((currentTranscript) => {
+          const activeSessionId = selectedSessionIdRef.current
+          if (
+            activeSessionId &&
+            workbench.transcript &&
+            workbench.transcript.sessionId !== activeSessionId
+          ) {
+            return currentTranscript
+          }
+          return workbench.transcript
+        })
 
         // 启动重定向由 StartupRedirect 组件在根路由 '/' 上处理。
         // 此处不再从任意路由无条件跳转，以保留用户直接访问的深层控制台 URI。
@@ -277,10 +306,7 @@ function DesktopRoutes(): React.JSX.Element {
       }
 
       if (event.type === 'clarification-required') {
-        setPendingClarifications((current) => [
-          ...current,
-          event.clarification
-        ])
+        setPendingClarifications((current) => [...current, event.clarification])
         toast.info(`Agent 需要更多信息：${event.clarification.question.slice(0, 60)}...`)
         return
       }
@@ -456,10 +482,6 @@ function getAgentEventRunState(
 
   return null
 }
-
-
-
-
 
 /**
  * 并行读取 Renderer 首屏需要的运行时和会话数据。

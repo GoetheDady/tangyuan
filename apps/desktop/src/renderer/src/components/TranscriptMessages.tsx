@@ -1,8 +1,4 @@
-import type {
-  AgentReplyEntry,
-  TranscriptEntry,
-  TranscriptSnapshot
-} from '@tangyuan/contracts'
+import type { AgentReplyEntry, TranscriptEntry, TranscriptSnapshot } from '@tangyuan/contracts'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Sparkles } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
@@ -14,7 +10,13 @@ import { UserMessage } from './UserMessage'
  * 虚拟列表中的渲染项：对话消息、AssitantMessage 或压缩提示。
  */
 type RenderItem =
-  | { type: 'user-message'; content: string; createdAt: string; renderIndex: number }
+  | {
+      type: 'user-message'
+      messageId: string
+      content: string
+      createdAt: string
+      renderIndex: number
+    }
   | { type: 'assistant-message'; entry: AgentReplyEntry; isLastAgent: boolean; renderIndex: number }
   | { type: 'compaction'; timestamp: string; renderIndex: number }
 
@@ -55,7 +57,7 @@ function estimateItemSize(item: RenderItem): number {
  */
 function getItemStableKey(item: RenderItem): string {
   if (item.type === 'user-message') {
-    return `user-${item.createdAt}-${item.renderIndex}`
+    return `user-${item.messageId}`
   }
   if (item.type === 'assistant-message') {
     const attemptId = item.entry.attempt?.attemptId ?? 'initial'
@@ -101,6 +103,7 @@ function buildRenderItemsFromTranscript(
     } else if (entry.kind === 'user-message') {
       items.push({
         type: 'user-message',
+        messageId: entry.messageId,
         content: entry.content,
         createdAt: entry.createdAt,
         renderIndex: renderIndex++

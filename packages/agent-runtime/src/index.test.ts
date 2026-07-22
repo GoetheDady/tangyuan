@@ -1,4 +1,3 @@
-// @ts-nocheck -- TODO: migrate to DriverEvent for old event types
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,6 +7,8 @@ import {
   AgentRuntimeError,
   type AgentEvent,
   type InternalMessage,
+  type TranscriptEntry,
+  type TranscriptSnapshot,
   PiSdkDriver,
   type PiSdkCreateSessionRequest,
   type PiSdkDriverOptions,
@@ -23,6 +24,36 @@ import {
 } from './index'
 
 const tempDirs: string[] = []
+
+function snapshotFromMessages(
+  sessionId: string,
+  agentId: string,
+  messages: InternalMessage[],
+): TranscriptSnapshot {
+  const entries: TranscriptEntry[] = []
+  for (const [index, message] of messages.entries()) {
+    if (message.role === 'user') {
+      entries.push({
+        kind: 'user-message',
+        index,
+        messageId: message.messageId,
+        content: message.content,
+        createdAt: message.createdAt,
+      })
+    } else if (message.role === 'agent') {
+      entries.push({
+        kind: 'agent-reply',
+        index,
+        messageId: message.messageId,
+        content: message.content,
+        createdAt: message.createdAt,
+        attempt: null,
+        turns: [],
+      })
+    }
+  }
+  return { sessionId, agentId, entries, updatedAt: '2026-07-08T00:00:00.000Z' }
+}
 
 afterEach(async () => {
   for (const directory of tempDirs.splice(0)) {
@@ -144,19 +175,25 @@ describe('TangyuanRuntime', () => {
         state: 'cancelled',
       }),
     )
-    await expect(sendPromise).resolves.toEqual([
-      expect.objectContaining({ role: 'user', content: '你好' }),
-      expect.objectContaining({ role: 'agent', content: '收' }),
-    ])
+    await expect(sendPromise).resolves.toEqual(
+      expect.objectContaining({
+        entries: [
+          expect.objectContaining({ kind: 'user-message', content: '你好' }),
+        ],
+      }),
+    )
     await expect(
       runtime.getTranscript({
         agentId: 'tangyuan',
         sessionId: session.sessionId,
       }),
-    ).resolves.toEqual([
-      expect.objectContaining({ role: 'user', content: '你好' }),
-      expect.objectContaining({ role: 'agent', content: '收' }),
-    ])
+    ).resolves.toEqual(
+      expect.objectContaining({
+        entries: [
+          expect.objectContaining({ kind: 'user-message', content: '你好' }),
+        ],
+      }),
+    )
     expect(events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: 'turn-started' }),
@@ -491,7 +528,10 @@ describe('PiSdkDriver', () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = createPromptingHandle(request.sessionId, (messages) => {
-          sdkMessagesBySessionFile.set(request.sdkSessionFile, messages)
+          sdkMessagesBySessionFile.set(
+            request.sdkSessionFile,
+            snapshotFromMessages(request.sessionId, 'tangyuan', messages),
+          )
         })
         gateway.sessionRequests.push(request)
         gateway.sessionHandles.push(handle)
@@ -506,7 +546,12 @@ describe('PiSdkDriver', () => {
         return handle
       },
       readMessages: async (request) =>
-        sdkMessagesBySessionFile.get(request.sdkSessionFile) ?? { sessionId: request.sessionId, agentId: 'tangyuan', entries: [], updatedAt: new Date().toISOString() },
+        sdkMessagesBySessionFile.get(request.sdkSessionFile) ?? {
+          sessionId: request.sessionId,
+          agentId: 'tangyuan',
+          entries: [],
+          updatedAt: new Date().toISOString(),
+        },
     })
     const { driver, rootPath, userDataPath } = await createDriver({ gateway })
 
@@ -544,16 +589,20 @@ describe('PiSdkDriver', () => {
         agentId: 'tangyuan',
         sessionId: session.sessionId,
       }),
-    ).resolves.toEqual([
+    ).resolves.toEqual(
       expect.objectContaining({
-        role: 'user',
-        content: '重启后还能看到吗',
+        entries: [
+          expect.objectContaining({
+            kind: 'user-message',
+            content: '重启后还能看到吗',
+          }),
+          expect.objectContaining({
+            kind: 'agent-reply',
+            content: '收到：重启后还能看到吗',
+          }),
+        ],
       }),
-      expect.objectContaining({
-        role: 'agent',
-        content: '收到：重启后还能看到吗',
-      }),
-    ])
+    )
     expect(gateway.openSessionRequests).toEqual([
       expect.objectContaining({
         sessionId: session.sessionId,
@@ -637,16 +686,17 @@ describe('PiSdkDriver', () => {
         agentId: 'tangyuan',
         sessionId: session.sessionId,
       }),
-    ).resolves.toEqual([
+    ).resolves.toEqual(
       expect.objectContaining({
-        role: 'user',
-        content: '你好',
+        entries: [
+          expect.objectContaining({ kind: 'user-message', content: '你好' }),
+          expect.objectContaining({
+            kind: 'agent-reply',
+            content: '收到：你好',
+          }),
+        ],
       }),
-      expect.objectContaining({
-        role: 'agent',
-        content: '收到：你好',
-      }),
-    ])
+    )
     expect(gateway.sessionHandles[0]?.prompts[0]).toContain('# Bootstrap')
     expect(events).toEqual(
       expect.arrayContaining([
@@ -735,11 +785,11 @@ describe('PiSdkDriver', () => {
       ]),
     )
     await expect(
-      driver.getTranscript({ agentId: 'tangyuan', sessionId: session.sessionId }),
-    ).resolves.toEqual([
-      expect.objectContaining({ role: 'user', content: '你好' }),
-      expect.objectContaining({ role: 'agent', content: '你好' }),
-    ])
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ entries: [] }))
   })
 
   it('blocks a duplicate active run in the same session but allows another session', async () => {
@@ -882,11 +932,11 @@ describe('PiSdkDriver', () => {
       ],
     )
     await expect(
-      driver.getTranscript({ agentId: 'tangyuan', sessionId: session.sessionId }),
-    ).resolves.toEqual([
-      expect.objectContaining({ role: 'user', content: '开始' }),
-      expect.objectContaining({ role: 'agent', content: '部分内容' }),
-    ])
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ entries: [] }))
   })
 
   it('does not keep an empty agent message when a run fails before deltas arrive', async () => {
@@ -927,10 +977,11 @@ describe('PiSdkDriver', () => {
       }),
     ).rejects.toThrow('provider failed')
     await expect(
-      driver.getTranscript({ agentId: 'tangyuan', sessionId: session.sessionId }),
-    ).resolves.toEqual([
-      expect.objectContaining({ role: 'user', content: '开始' }),
-    ])
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ entries: [] }))
   })
 
   it('injects existing soul.md and user.md into the Pi SDK prompt', async () => {
@@ -1022,14 +1073,14 @@ describe('PiSdkDriver', () => {
     )
     expect(gateway.sessionHandles[0]?.prompts[1]).toContain('soul.history')
     await expect(
-      driver.getTranscript({ agentId: 'tangyuan', sessionId: session.sessionId }),
-    ).resolves.toEqual([
-      expect.objectContaining({ role: 'user', content: '记住我偏好短回答' }),
-      expect.objectContaining({ role: 'agent', content: '主回复完成。' }),
-    ])
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ entries: [] }))
   })
 
-  it('accepts a backed-up user.md update and appends a system message', async () => {
+  it('accepts a backed-up user.md update without adding a system message', async () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
@@ -1098,15 +1149,12 @@ describe('PiSdkDriver', () => {
       ),
     ).resolves.toContain('用户喜欢简洁回答。')
     await expect(
-      driver.getTranscript({ agentId: 'tangyuan', sessionId: session.sessionId }),
-    ).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          role: 'system',
-          content: '已更新用户画像',
-        }),
-      ]),
-    )
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ entries: [] }))
+
     expect(events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: 'profile-updated', target: 'user' }),
@@ -1114,7 +1162,7 @@ describe('PiSdkDriver', () => {
     )
   })
 
-  it('accepts a backed-up soul.md update and appends a system message', async () => {
+  it('accepts a backed-up soul.md update without adding a system message', async () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
@@ -1173,18 +1221,14 @@ describe('PiSdkDriver', () => {
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
     ).resolves.toContain('修改 Git 历史前必须确认')
     await expect(
-      driver.getTranscript({ agentId: 'tangyuan', sessionId: session.sessionId }),
-    ).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          role: 'system',
-          content: '已更新 Agent 规则',
-        }),
-      ]),
-    )
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ entries: [] }))
   })
 
-  it('rejects a profile update that changed a file without a history backup', async () => {
+  it('rejects a profile update without adding a system message', async () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
@@ -1238,15 +1282,12 @@ describe('PiSdkDriver', () => {
       readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
     ).resolves.toContain('用户喜欢简洁回答。')
     await expect(
-      driver.getTranscript({ agentId: 'tangyuan', sessionId: session.sessionId }),
-    ).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          role: 'system',
-          content: '更新用户画像失败：缺少更新前备份，已保留旧版本。',
-        }),
-      ]),
-    )
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ entries: [] }))
+
     expect(events).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: 'profile-updated', target: 'user' }),
@@ -1254,7 +1295,7 @@ describe('PiSdkDriver', () => {
     )
   })
 
-  it('keeps the main reply completed when the hidden maintenance turn fails', async () => {
+  it('keeps the main reply completed without adding a maintenance system message', async () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
@@ -1307,16 +1348,11 @@ describe('PiSdkDriver', () => {
       ],
     )
     await expect(
-      driver.getTranscript({ agentId: 'tangyuan', sessionId: session.sessionId }),
-    ).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ role: 'agent', content: '主回复已经完成。' }),
-        expect.objectContaining({
-          role: 'system',
-          content: 'Profile 维护失败：maintenance failed',
-        }),
-      ]),
-    )
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ entries: [] }))
   })
 
   it('redacts API keys from a backed-up profile update before keeping it', async () => {
@@ -2640,16 +2676,18 @@ describe('PiSdkDriver', () => {
       sessionId: session.sessionId,
     })
     expect(messages).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          role: 'user',
-          content: '你好，新 Agent',
-        }),
-        expect.objectContaining({
-          role: 'agent',
-          content: expect.stringContaining('收到'),
-        }),
-      ]),
+      expect.objectContaining({
+        entries: [
+          expect.objectContaining({
+            kind: 'user-message',
+            content: '你好，新 Agent',
+          }),
+          expect.objectContaining({
+            kind: 'agent-reply',
+            content: expect.stringContaining('收到'),
+          }),
+        ],
+      }),
     )
   })
 
@@ -3002,7 +3040,10 @@ describe('PiSdkDriver', () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = createPromptingHandle(request.sessionId, (messages) => {
-          sdkMessagesBySessionFile.set(request.sdkSessionFile, messages)
+          sdkMessagesBySessionFile.set(
+            request.sdkSessionFile,
+            snapshotFromMessages(request.sessionId, 'tangyuan', messages),
+          )
         })
         gateway.sessionRequests.push(request)
         gateway.sessionHandles.push(handle)
@@ -3017,7 +3058,12 @@ describe('PiSdkDriver', () => {
         return handle
       },
       readMessages: async (request) =>
-        sdkMessagesBySessionFile.get(request.sdkSessionFile) ?? { sessionId: request.sessionId, agentId: 'tangyuan', entries: [], updatedAt: new Date().toISOString() },
+        sdkMessagesBySessionFile.get(request.sdkSessionFile) ?? {
+          sessionId: request.sessionId,
+          agentId: 'tangyuan',
+          entries: [],
+          updatedAt: new Date().toISOString(),
+        },
     })
     const { driver, rootPath, userDataPath } = await createDriver({ gateway })
 
@@ -3085,16 +3131,20 @@ describe('PiSdkDriver', () => {
         agentId: 'tangyuan',
         sessionId: tangyuanSession.sessionId,
       }),
-    ).resolves.toEqual([
+    ).resolves.toEqual(
       expect.objectContaining({
-        role: 'user',
-        content: '重启后读取汤圆消息',
+        entries: [
+          expect.objectContaining({
+            kind: 'user-message',
+            content: '重启后读取汤圆消息',
+          }),
+          expect.objectContaining({
+            kind: 'agent-reply',
+            content: expect.stringContaining('收到'),
+          }),
+        ],
       }),
-      expect.objectContaining({
-        role: 'agent',
-        content: expect.stringContaining('收到'),
-      }),
-    ])
+    )
 
     // 自定义 Agent 的消息可以恢复
     await expect(
@@ -3102,16 +3152,20 @@ describe('PiSdkDriver', () => {
         agentId: agent.agentId,
         sessionId: agentSession.sessionId,
       }),
-    ).resolves.toEqual([
+    ).resolves.toEqual(
       expect.objectContaining({
-        role: 'user',
-        content: '重启后读取助手消息',
+        entries: [
+          expect.objectContaining({
+            kind: 'user-message',
+            content: '重启后读取助手消息',
+          }),
+          expect.objectContaining({
+            kind: 'agent-reply',
+            content: expect.stringContaining('收到'),
+          }),
+        ],
       }),
-      expect.objectContaining({
-        role: 'agent',
-        content: expect.stringContaining('收到'),
-      }),
-    ])
+    )
   })
 
   it('refuses to archive the default tangyuan agent', async () => {
@@ -3736,6 +3790,7 @@ function createPiSdkGateway(
   const listSessionRequests: PiSdkListSessionsRequest[] = []
   const readMessageRequests: PiSdkReadMessagesRequest[] = []
   const sessionHandles: Array<PiSdkSessionHandle & { prompts: string[] }> = []
+  const messagesBySession = new Map<string, InternalMessage[]>()
 
   return {
     requests,
@@ -3760,14 +3815,18 @@ function createPiSdkGateway(
     },
     createSession: async (request) => {
       sessionRequests.push(request)
-      const handle = createPromptingHandle(request.sessionId)
+      const handle = createPromptingHandle(request.sessionId, (messages) => {
+        messagesBySession.set(request.sessionId, messages)
+      })
       sessionHandles.push(handle)
 
       return handle
     },
     openSession: async (request) => {
       openSessionRequests.push(request)
-      const handle = createPromptingHandle(request.sessionId)
+      const handle = createPromptingHandle(request.sessionId, (messages) => {
+        messagesBySession.set(request.sessionId, messages)
+      })
       sessionHandles.push(handle)
 
       return handle
@@ -3778,7 +3837,11 @@ function createPiSdkGateway(
     },
     readMessages: async (request) => {
       readMessageRequests.push(request)
-      return []
+      return snapshotFromMessages(
+        request.sessionId,
+        messagesBySession.get(request.sessionId)?.[0]?.agentId ?? 'tangyuan',
+        messagesBySession.get(request.sessionId) ?? [],
+      )
     },
     ...options,
   }

@@ -1,6 +1,6 @@
 # E2E 测试说明
 
-汤圆桌面端使用真实 Chromium 和 Electron 验证 CSS、路由、Preload/IPC、窗口行为与基础组件验收夹具。
+汤圆桌面端使用真实 Chromium 和 Electron 验证 CSS、路由、Preload/IPC、窗口行为、基础组件验收夹具与对话业务组件验收夹具。
 
 ## 安装
 
@@ -40,15 +40,16 @@ pnpm --filter apps-desktop test:e2e:fixtures
 
 普通 production 构建会额外扫描 `out/renderer`，确认组件夹具模块没有进入正式产物。
 
-## 基础组件验收夹具
+## 组件验收夹具
 
 开发模式和专用 Playwright test 构建可访问：
 
 ```text
 /#/__fixtures__/base-components
+/#/__fixtures__/conversation-components
 ```
 
-夹具只渲染 Renderer 基础组件和固定脱敏数据，不注入 Preload mock、不读取 `window.api`、不加载 Runtime，也不读写真实配置。后续组件 Ticket 应在现有 `data-fixture-section` 分区内增量加入 variant、size、状态和边界场景。
+夹具只渲染 Renderer 组件和固定脱敏数据，不注入 Preload mock、不读取 `window.api`、不加载 Runtime，也不读写真实配置。后续组件 Ticket 应在现有 `data-fixture-section` 分区内增量加入 variant、size、状态和边界场景。
 
 运行结构、ARIA、键盘、焦点、几何、三档桌面宽度溢出与 Portal smoke：
 
@@ -91,7 +92,10 @@ e2e/
 ├── component-fixtures/
 │   ├── base-components.spec.ts
 │   ├── base-components.visual.spec.ts
-│   └── base-components.visual.spec.ts-snapshots/
+│   ├── conversation-components.spec.ts
+│   ├── conversation-components.visual.spec.ts
+│   ├── base-components.visual.spec.ts-snapshots/
+│   └── conversation-components.visual.spec.ts-snapshots/
 ├── fixtures/
 │   └── preload-mock.ts
 ├── renderer/

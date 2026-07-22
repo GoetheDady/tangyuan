@@ -1,476 +1,470 @@
-// @ts-nocheck -- TODO: migrate to TranscriptSnapshot API
 import { expect, test } from '@playwright/test'
+import type {
+  AgentReplyEntry,
+  AgentSessionSummary,
+  RuntimeSnapshot,
+  TranscriptEntry,
+  TranscriptSnapshot,
+  UserMessageEntry
+} from '@tangyuan/contracts'
 import {
-  createReadyRuntimeSnapshot,
-  createTestSessions,
-  createTestMessages,
   createPreloadApiInitScript,
-  createTestMessage,
-  TANGYUAN_DEFAULT_AGENT_ID
+  createReadyRuntimeSnapshot,
+  createTestSessions
 } from '../fixtures/preload-mock'
-import type { AgentSessionSummary, RuntimeSnapshot } from '@tangyuan/contracts'
 
-/**
- * 创建带有事件分发能力的 initScript。
- *
- * 在标准 mock 基础上通过 window.__dispatchAgentEvent__ 暴露
- * subscribeToAgentEvents 的回调，使得测试可以主动推送 AgentEvent。
- */
-function createEventDispatcherInitScript(
-  runtime: RuntimeSnapshot,
-  sessions: AgentSessionSummary[],
-  messages: AgentMessage[]
-): string {
-  const base = createPreloadApiInitScript(runtime, sessions, messages)
+const FIXED_TIME = '2026-07-22T08:30:00.000Z'
 
-  // 在 subscribeToAgentEvents 之后注入事件分发能力
-  const injectDispatcher = `
-    (() => {
-      // 保存原始 subscribeToAgentEvents 返回的 unsubscribe
-      const originalApi = window.api;
-      let listener = null;
-
-      window.api = {
-        ...originalApi,
-        subscribeToAgentEvents: (fn) => {
-          listener = fn
-          return () => { listener = null; }
-        },
-        getTranscript: async () => ({
-          sessionId: '',
-          agentId: 'tangyuan',
-          entries: [],
-          updatedAt: new Date().toISOString()
-        }),
-      }
-
-      window.__dispatchAgentEvent__ = (event) => {
-        if (listener) {
-          listener(event);
-        }
-      };
-    })();
-  `
-
-  return base + '\n' + injectDispatcher
+function userEntry(index: number, content: string, sessionId = 'session-1'): UserMessageEntry {
+  return {
+    kind: 'user-message',
+    index,
+    messageId: `${sessionId}-user-${index}`,
+    content,
+    createdAt: FIXED_TIME
+  }
 }
 
-test.describe('Transcript 虚拟化', () => {
-  test('流式消息内容逐步增长', async ({ page }) => {
+function agentEntry(
+  index: number,
+  content: string,
+  overrides: Partial<AgentReplyEntry> = {}
+): AgentReplyEntry {
+  return {
+    kind: 'agent-reply',
+    index,
+    messageId: `agent-${index}`,
+    content,
+    createdAt: FIXED_TIME,
+    attempt: null,
+    turns: [],
+    ...overrides
+  }
+}
+
+function transcript(
+  sessionId: string,
+  entries: TranscriptEntry[],
+  agentId = 'tangyuan'
+): TranscriptSnapshot {
+  return { sessionId, agentId, entries, updatedAt: FIXED_TIME }
+}
+
+function completedAttempt(runId: string): NonNullable<AgentReplyEntry['attempt']> {
+  return {
+    attemptId: runId,
+    runId,
+    status: 'completed',
+    startedAt: FIXED_TIME,
+    completedAt: '2026-07-22T08:30:04.000Z'
+  }
+}
+
+function createRendererInitScript(
+  runtime: RuntimeSnapshot,
+  sessions: AgentSessionSummary[],
+  transcripts: Record<string, TranscriptSnapshot>
+): string {
+  const base = createPreloadApiInitScript(runtime, sessions, [])
+  const serialized = JSON.stringify(transcripts)
+
+  return `${base}
+    (() => {
+      const transcripts = ${serialized};
+      let listener = null;
+      window.__retryMessageCalls__ = [];
+      window.__getTranscriptCalls__ = [];
+      window.api = {
+        ...window.api,
+        getTranscript: async (request) => {
+          window.__getTranscriptCalls__.push(request);
+          const result = transcripts[request.sessionId] || {
+          sessionId: request.sessionId,
+          agentId: request.agentId,
+          entries: [],
+          updatedAt: '${FIXED_TIME}'
+        };
+          return result;
+        },
+        retryMessage: async (request) => {
+          window.__retryMessageCalls__.push(request);
+          return transcripts[request.sessionId];
+        },
+        subscribeToAgentEvents: (nextListener) => {
+          listener = nextListener;
+          return () => { listener = null; };
+        }
+      };
+      window.__dispatchAgentEvent__ = (event) => listener?.(event);
+    })();`
+}
+
+test.describe('Transcript 真实 Renderer 回归', () => {
+  test('多 turn 工具循环和最终正文共同渲染', async ({ page }) => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
-    const messages = createTestMessages()
-    const initScript = createEventDispatcherInitScript(runtime, sessions, messages)
+    const structured = transcript('session-1', [
+      userEntry(0, '请检查实现并运行测试。'),
+      agentEntry(1, '检查完成，所有关键回归均通过。', {
+        attempt: completedAttempt('run-1'),
+        inReplyTo: 'session-1-user-0',
+        turns: [
+          {
+            index: 0,
+            runId: 'run-1',
+            status: 'completed',
+            startedAt: FIXED_TIME,
+            completedAt: '2026-07-22T08:30:02.000Z',
+            steps: [
+              {
+                index: 0,
+                kind: 'thinking',
+                content: '先定位相关测试与 Renderer 调用路径。',
+                status: 'completed',
+                startedAt: FIXED_TIME,
+                completedAt: '2026-07-22T08:30:01.000Z'
+              },
+              {
+                index: 1,
+                kind: 'tool-call',
+                toolCallId: 'tool-read',
+                toolName: 'read',
+                content: '读取对话组件和测试配置',
+                status: 'completed',
+                startedAt: '2026-07-22T08:30:01.000Z',
+                completedAt: '2026-07-22T08:30:02.000Z'
+              }
+            ]
+          },
+          {
+            index: 1,
+            runId: 'run-1',
+            status: 'completed',
+            startedAt: '2026-07-22T08:30:02.000Z',
+            completedAt: '2026-07-22T08:30:04.000Z',
+            steps: [
+              {
+                index: 0,
+                kind: 'tool-call',
+                toolCallId: 'tool-test',
+                toolName: 'bash',
+                content: '运行 Renderer 测试',
+                status: 'completed',
+                startedAt: '2026-07-22T08:30:02.000Z',
+                completedAt: '2026-07-22T08:30:04.000Z'
+              }
+            ]
+          }
+        ]
+      })
+    ])
 
-    await page.addInitScript({ content: initScript })
+    await page.addInitScript({
+      content: createRendererInitScript(runtime, sessions, { 'session-1': structured })
+    })
     await page.goto('/#/chat/tangyuan')
-    await page.waitForSelector('#composer')
 
-    // 验证初始消息可见
-    await expect(page.getByText('你好汤圆，请帮我写一段代码。')).toBeVisible()
-    await expect(page.getByText('你好！我很乐意帮你写代码。')).toBeVisible()
-
-    // 模拟 message-delta 事件——逐步追加文本到现有消息
-    await page.evaluate(() => {
-      const win = window as unknown as {
-        __dispatchAgentEvent__?: (event: Record<string, unknown>) => void
-      }
-      win.__dispatchAgentEvent__?.({
-        type: 'message-delta',
-        agentId: 'tangyuan',
-        sessionId: 'session-1',
-        runId: 'run-1',
-        messageId: 'new-agent-msg',
-        delta: '这是',
-        occurredAt: new Date().toISOString()
-      })
-    })
-
-    // 第一条 delta 应该创建新消息
-    await expect(page.getByText('这是')).toBeVisible()
-
-    // 继续追加
-    await page.evaluate(() => {
-      const win = window as unknown as {
-        __dispatchAgentEvent__?: (event: Record<string, unknown>) => void
-      }
-      win.__dispatchAgentEvent__?.({
-        type: 'message-delta',
-        agentId: 'tangyuan',
-        sessionId: 'session-1',
-        runId: 'run-1',
-        messageId: 'new-agent-msg',
-        delta: '流式输出的测试文本。',
-        occurredAt: new Date().toISOString()
-      })
-    })
-
-    // 完整文本应可见
-    await expect(page.getByText('这是流式输出的测试文本。')).toBeVisible()
+    await expect(page.getByText('请检查实现并运行测试。')).toBeVisible()
+    await expect(page.getByRole('button', { name: '已完成执行过程' })).toBeVisible()
+    await page.getByRole('button', { name: '已完成执行过程' }).click()
+    await expect(page.getByText('读取对话组件和测试配置')).toBeVisible()
+    await expect(page.getByText('运行 Renderer 测试')).toBeVisible()
   })
 
-  test('用户在底部时新消息自动滚动到视口', async ({ page }) => {
+  test('transcript-delta 让流式正文逐步增长', async ({ page }) => {
     const runtime = createReadyRuntimeSnapshot()
-    const sessions = createTestSessions(1)
-
-    // 创建足够多的消息填满视口，确保滚动条出现
-    const manyMessages: AgentMessage[] = Array.from({ length: 30 }, (_, i) =>
-      createTestMessage({
-        messageId: `msg-fill-${i}`,
-        role: i % 2 === 0 ? 'user' : 'agent',
-        content: `第 ${i + 1} 条消息：${'内容 '.repeat(10)}`
+    const sessions = createTestSessions(1).map((session) => ({
+      ...session,
+      state: 'running' as const
+    }))
+    const initial = transcript('session-1', [
+      userEntry(0, '开始流式测试。'),
+      agentEntry(1, '', {
+        attempt: {
+          attemptId: 'run-stream',
+          runId: 'run-stream',
+          status: 'running',
+          startedAt: FIXED_TIME,
+          completedAt: null
+        },
+        turns: []
       })
-    )
+    ])
 
-    const initScript = createEventDispatcherInitScript(runtime, sessions, manyMessages)
-
-    await page.addInitScript({ content: initScript })
+    await page.addInitScript({
+      content: createRendererInitScript(runtime, sessions, { 'session-1': initial })
+    })
     await page.goto('/#/chat/tangyuan')
     await page.waitForSelector('#composer')
+    await expect(page.getByText('开始流式测试。')).toBeVisible()
 
-    // 等待初始渲染完成
-    await expect(page.getByText('第 1 条消息')).toBeVisible()
+    for (const delta of ['这是', '流式输出的测试文本。']) {
+      await page.evaluate((text) => {
+        window.__dispatchAgentEvent__?.({
+          type: 'transcript-delta',
+          agentId: 'tangyuan',
+          sessionId: 'session-1',
+          delta: { type: 'delta-appended', index: 1, delta: text },
+          occurredAt: '2026-07-22T08:30:01.000Z'
+        })
+      }, delta)
+    }
 
-    // 通过 dispatch 推送新消息
+    await expect(page.getByText('这是流式输出的测试文本。')).toBeVisible()
+    await expect(page.getByRole('button', { name: '停止' })).toBeVisible()
+  })
+
+  test('用户在底部时新增结构化条目自动进入视口', async ({ page }) => {
+    const runtime = createReadyRuntimeSnapshot()
+    const sessions = createTestSessions(1)
+    const entries = createAlternatingEntries(40, '底部消息')
+    await page.addInitScript({
+      content: createRendererInitScript(runtime, sessions, {
+        'session-1': transcript('session-1', entries)
+      })
+    })
+    await page.goto('/#/chat/tangyuan')
+
+    const scrollArea = page.getByTestId('message-scroll-area')
+    await scrollArea.evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+    })
     await page.evaluate(() => {
-      const win = window as unknown as {
-        __dispatchAgentEvent__?: (event: Record<string, unknown>) => void
-      }
-      win.__dispatchAgentEvent__?.({
-        type: 'message-delta',
+      window.__dispatchAgentEvent__?.({
+        type: 'transcript-delta',
         agentId: 'tangyuan',
         sessionId: 'session-1',
-        runId: 'run-1',
-        messageId: 'new-scroll-msg',
-        delta: '新消息已到达',
-        occurredAt: new Date().toISOString()
+        delta: {
+          type: 'entry-appended',
+          entry: {
+            kind: 'agent-reply',
+            index: 40,
+            messageId: 'new-bottom-entry',
+            content: '新消息已到达',
+            createdAt: '2026-07-22T08:31:00.000Z',
+            attempt: null,
+            turns: []
+          }
+        },
+        occurredAt: '2026-07-22T08:31:00.000Z'
       })
     })
 
-    // 验证新消息可见（说明已自动滚动到视口）
     await expect(page.getByText('新消息已到达')).toBeVisible()
   })
 
-  test('阅读历史时新消息不强制拉回底部', async ({ page }) => {
+  test('阅读历史时新增条目不强制拉回底部', async ({ page }) => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
-
-    const manyMessages: AgentMessage[] = Array.from({ length: 40 }, (_, i) =>
-      createTestMessage({
-        messageId: `msg-hist-${i}`,
-        role: i % 2 === 0 ? 'user' : 'agent',
-        content: `历史消息 ${i + 1}：${'文本 '.repeat(5)}`
+    const entries = createAlternatingEntries(60, '历史消息')
+    await page.addInitScript({
+      content: createRendererInitScript(runtime, sessions, {
+        'session-1': transcript('session-1', entries)
       })
-    )
-
-    const initScript = createEventDispatcherInitScript(runtime, sessions, manyMessages)
-
-    await page.addInitScript({ content: initScript })
+    })
     await page.goto('/#/chat/tangyuan')
-    await page.waitForSelector('#composer')
 
-    // 确认最后一条消息初始可见——手动滚动到底部确保虚拟列表已渲染
-    const scrollArea = page.locator('[data-testid="message-scroll-area"]')
-    await scrollArea.evaluate((el) => {
-      el.scrollTop = el.scrollHeight
+    const scrollArea = page.getByTestId('message-scroll-area')
+    await scrollArea.evaluate((element) => {
+      element.scrollTop = element.scrollHeight
     })
-    await page.waitForTimeout(300)
-
-    // 验证最后一条消息现在可见
-    await expect(scrollArea.locator('article').last()).toBeVisible()
-
-    // 向上滚动到较早的消息以模拟阅读历史
-    await scrollArea.evaluate((el) => {
-      el.scrollTop = 0
+    await page.waitForTimeout(100)
+    await scrollArea.evaluate((element) => {
+      element.scrollTop = 0
+      element.dispatchEvent(new Event('scroll'))
     })
-
-    // 等待滚动稳定
-    await page.waitForTimeout(200)
-
-    // 现在第一条消息应该在视口中（或至少接近顶部）
-    await expect(scrollArea.locator('article').first()).toBeVisible()
-
-    // 推送新消息
+    await page.waitForTimeout(100)
     await page.evaluate(() => {
-      const win = window as unknown as {
-        __dispatchAgentEvent__?: (event: Record<string, unknown>) => void
-      }
-      win.__dispatchAgentEvent__?.({
-        type: 'message-delta',
+      window.__dispatchAgentEvent__?.({
+        type: 'transcript-delta',
         agentId: 'tangyuan',
         sessionId: 'session-1',
-        runId: 'run-1',
-        messageId: 'should-not-scroll-msg',
-        delta: '不应该强制滚动',
-        occurredAt: new Date().toISOString()
+        delta: {
+          type: 'entry-appended',
+          entry: {
+            kind: 'agent-reply',
+            index: 60,
+            messageId: 'history-new-entry',
+            content: '不应该强制滚动',
+            createdAt: '2026-07-22T08:31:00.000Z',
+            attempt: null,
+            turns: []
+          }
+        },
+        occurredAt: '2026-07-22T08:31:00.000Z'
       })
     })
 
-    // 验证用户仍在历史位置（第一条消息仍可见）
-    await expect(scrollArea.locator('article').first()).toBeVisible()
+    await expect.poll(() => scrollArea.evaluate((element) => element.scrollTop)).toBeLessThan(80)
   })
 
-  test('500 条消息正常渲染且可滚动', async ({ page }) => {
+  test('500 个结构化条目保持虚拟化和可交互', async ({ page }) => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
-
-    // 生成 500 条混合消息
-    const bulkMessages: AgentMessage[] = Array.from({ length: 500 }, (_, i) =>
-      createTestMessage({
-        messageId: `msg-bulk-${i}`,
-        role: i % 2 === 0 ? 'user' : 'agent',
-        content: [
-          `消息 #${i + 1}`,
-          i % 2 === 0
-            ? '这是一条用户提问。'
-            : '```ts\nfunction test' + i + '() {\n  return ' + i + ';\n}\n```'
-        ].join('\n')
+    const entries = createAlternatingEntries(500, '批量消息')
+    await page.addInitScript({
+      content: createRendererInitScript(runtime, sessions, {
+        'session-1': transcript('session-1', entries)
       })
-    )
-
-    const initScript = createPreloadApiInitScript(runtime, sessions, bulkMessages)
-
-    await page.addInitScript({ content: initScript })
+    })
     await page.goto('/#/chat/tangyuan')
-    await page.waitForSelector('#composer')
 
-    // 首条消息应可见
-    await expect(page.getByText('消息 #1')).toBeVisible()
-
-    // Composer 应可见（页面未崩溃）
-    await expect(page.locator('#composer')).toBeVisible()
-
-    // 滚动区域应存在
-    const scrollArea = page.locator('[data-testid="message-scroll-area"]')
+    const scrollArea = page.getByTestId('message-scroll-area')
     await expect(scrollArea).toBeVisible()
-
-    // 验证页面可交互（没有崩溃）
-    const composer = page.locator('#composer')
-    await composer.fill('测试输入')
-    await expect(composer).toHaveValue('测试输入')
+    const rendered = await scrollArea.locator('[data-index]').count()
+    expect(rendered).toBeGreaterThan(0)
+    expect(rendered).toBeLessThan(100)
+    await page.locator('#composer').fill('仍然可输入')
+    await expect(page.locator('#composer')).toHaveValue('仍然可输入')
   })
 
-  test('compaction 条目渲染为非阻塞状态提示', async ({ page }) => {
+  test('压缩提示作为非阻塞 status 出现在消息流中', async ({ page }) => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
-
-    const messagesWithCompaction: AgentMessage[] = [
-      createTestMessage({
-        messageId: 'msg-1',
-        role: 'user',
-        content: '第一个问题'
-      }),
-      createTestMessage({
-        messageId: 'msg-2',
-        role: 'agent',
-        content: '第一个回复'
-      }),
-      {
-        messageId: 'compact-1',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
-        sessionId: 'session-1',
-        role: 'compaction',
-        content: '',
-        createdAt: '2026-07-17T10:30:00.000Z'
-      },
-      createTestMessage({
-        messageId: 'msg-3',
-        role: 'user',
-        content: '第二个问题'
-      }),
-      createTestMessage({
-        messageId: 'msg-4',
-        role: 'agent',
-        content: '第二个回复'
-      })
-    ]
-
-    const initScript = createPreloadApiInitScript(runtime, sessions, messagesWithCompaction)
-
-    await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
-    await page.waitForSelector('#composer')
-
-    // Compaction 指示器应出现
-    const indicator = page.locator('[role="status"]')
-    await expect(indicator).toBeVisible()
-    await expect(indicator).toContainText('自动压缩')
-
-    // 同时对话消息正常渲染
-    await expect(page.getByText('第一个问题')).toBeVisible()
-    await expect(page.getByText('第二个问题')).toBeVisible()
-  })
-
-  test('发送按钮在流式传输期间显示发送中状态', async ({ page }) => {
-    const runtime = createReadyRuntimeSnapshot()
-    const sessions = [
-      {
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
-        sessionId: 'session-1',
-        title: '测试会话',
-        state: 'running' as const,
-        updatedAt: new Date().toISOString()
-      }
-    ]
-
-    const messages = createTestMessages()
-    const initScript = createPreloadApiInitScript(runtime, sessions, messages)
-
-    await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
-    await page.waitForSelector('#composer')
-
-    // 会话状态为 running 时按钮应显示 "发送中"
-    const sendButton = page.getByRole('button', { name: /发送中/ })
-    await expect(sendButton).toBeVisible()
-  })
-
-  test('空消息列表显示空状态提示', async ({ page }) => {
-    const runtime = createReadyRuntimeSnapshot()
-    const sessions = createTestSessions(1)
-    const messages: AgentMessage[] = []
-
-    const initScript = createPreloadApiInitScript(runtime, sessions, messages)
-
-    await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
-    await page.waitForSelector('#composer')
-
-    // 空状态提示可见
-    await expect(page.getByText('发送第一条消息开始会话。')).toBeVisible()
-  })
-
-  test('会话切换后不再展示旧会话内容', async ({ page }) => {
-    const runtime = createReadyRuntimeSnapshot()
-    const sessions = [
-      {
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
-        sessionId: 'session-1',
-        title: '会话A',
-        state: 'idle' as const,
-        updatedAt: new Date().toISOString()
-      },
-      {
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
-        sessionId: 'session-2',
-        title: '会话B',
-        state: 'idle' as const,
-        updatedAt: new Date().toISOString()
-      }
-    ]
-    const messages: AgentMessage[] = [
-      createTestMessage({
-        messageId: 's1-msg-1',
-        role: 'user',
-        sessionId: 'session-1',
-        content: '专属 Session 1 的消息'
-      })
-    ]
-
-    const initScript = createPreloadApiInitScript(runtime, sessions, messages)
-
-    await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
-    await page.waitForSelector('#composer')
-
-    // 初始：专属内容可见（app 默认选中第一个 session）
-    await expect(page.getByText('专属 Session 1 的消息')).toBeVisible()
-
-    // 确认两个会话标签存在于 DOM 中
-    const sessionButtons = page.locator('aside button')
-    const count = await sessionButtons.count()
-    expect(count).toBeGreaterThanOrEqual(1)
-  })
-
-  test('大量消息场景下滚动区域可交互', async ({ page }) => {
-    const runtime = createReadyRuntimeSnapshot()
-    const sessions = createTestSessions(1)
-
-    // 生成 100 条消息，混合类型
-    const manyMessages: AgentMessage[] = Array.from({ length: 100 }, (_, i) =>
-      createTestMessage({
-        messageId: `msg-interactive-${i}`,
-        role: i % 2 === 0 ? 'user' : 'agent',
-        content: i % 3 === 0
-          ? `消息 ${i + 1}：包含代码块\n\`\`\`ts\nconst x = ${i};\n\`\`\``
-          : `消息 ${i + 1}：${'文本 '.repeat(8)}`
-      })
-    )
-
-    const initScript = createPreloadApiInitScript(runtime, sessions, manyMessages)
-
-    await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
-    await page.waitForSelector('#composer')
-
-    // 滚动区域应存在且可交互
-    const scrollArea = page.locator('[data-testid="message-scroll-area"]')
-    await expect(scrollArea).toBeVisible()
-
-    // 验证首条消息可见
-    await expect(page.getByText('消息 1：')).toBeVisible()
-
-    // 滚动到底部
-    await scrollArea.evaluate((el) => {
-      el.scrollTop = el.scrollHeight
+    const structured = transcript('session-1', [
+      userEntry(0, '压缩前'),
+      { kind: 'compaction', index: 1, timestamp: FIXED_TIME },
+      agentEntry(2, '压缩后继续')
+    ])
+    await page.addInitScript({
+      content: createRendererInitScript(runtime, sessions, { 'session-1': structured })
     })
-    await page.waitForTimeout(300)
+    await page.goto('/#/chat/tangyuan')
 
-    // Composer 仍可见（页面未崩溃）
-    const composer = page.locator('#composer')
-    await expect(composer).toBeVisible()
-    await composer.fill('后续输入')
-    await expect(composer).toHaveValue('后续输入')
+    await expect(page.getByRole('status')).toContainText('自动压缩')
+    await expect(page.locator('#composer')).toBeEnabled()
   })
 
-  test('流式消息增长时虚拟列表高度动态更新', async ({ page }) => {
+  test('重新打开另一会话时只展示对应结构化历史', async ({ page }) => {
     const runtime = createReadyRuntimeSnapshot()
-    const sessions = createTestSessions(1)
-    const messages = createTestMessages()
-    const initScript = createEventDispatcherInitScript(runtime, sessions, messages)
-
-    await page.addInitScript({ content: initScript })
+    const sessions = createTestSessions(2)
+    const first = transcript('session-1', [userEntry(0, '第一会话内容')])
+    const second = transcript('session-2', [userEntry(0, '第二会话内容', 'session-2')])
+    await page.addInitScript({
+      content: createRendererInitScript(runtime, sessions, {
+        'session-1': first,
+        'session-2': second
+      })
+    })
     await page.goto('/#/chat/tangyuan')
-    await page.waitForSelector('#composer')
 
-    // 模拟 message-delta 事件——逐步追加文本到现有消息
+    await expect(page.getByText('第一会话内容')).toBeVisible()
+    await page.getByRole('button', { name: /测试会话 2/ }).click()
+    await expect
+      .poll(() => page.evaluate(() => window.__getTranscriptCalls__))
+      .toContainEqual({ agentId: 'tangyuan', sessionId: 'session-2' })
+    await expect(page.getByText('第二会话内容')).toBeVisible()
+    await expect(page.getByTestId('message-scroll-area').getByText('第一会话内容')).toHaveCount(0)
+  })
+
+  test('失败尝试可以重试且保留原用户消息', async ({ page }) => {
+    const runtime = createReadyRuntimeSnapshot()
+    const sessions = createTestSessions(1).map((session) => ({
+      ...session,
+      state: 'failed' as const
+    }))
+    const failed = transcript('session-1', [
+      userEntry(0, '请重试这个请求。'),
+      agentEntry(1, '失败前已收到部分内容。', {
+        inReplyTo: 'session-1-user-0',
+        attempt: {
+          attemptId: 'run-failed',
+          runId: 'run-failed',
+          status: 'failed',
+          startedAt: FIXED_TIME,
+          completedAt: '2026-07-22T08:30:02.000Z',
+          error: { code: 'unknown', message: '网络中断', recoverable: true }
+        },
+        turns: [
+          {
+            index: 0,
+            runId: 'run-failed',
+            status: 'failed',
+            startedAt: FIXED_TIME,
+            completedAt: '2026-07-22T08:30:02.000Z',
+            steps: [
+              {
+                index: 0,
+                kind: 'thinking',
+                content: '正在处理请求。',
+                status: 'failed',
+                startedAt: FIXED_TIME,
+                completedAt: '2026-07-22T08:30:02.000Z'
+              }
+            ]
+          }
+        ]
+      })
+    ])
+    await page.addInitScript({
+      content: createRendererInitScript(runtime, sessions, { 'session-1': failed })
+    })
+    await page.goto('/#/chat/tangyuan')
+
+    await page.getByRole('button', { name: '重试' }).click()
+    const calls = await page.evaluate(() => window.__retryMessageCalls__)
+    expect(calls).toEqual([
+      { agentId: 'tangyuan', sessionId: 'session-1', userMessageId: 'session-1-user-0' }
+    ])
+    await expect(page.getByText('请重试这个请求。')).toBeVisible()
+  })
+
+  test('流式增长后虚拟列表总高度增加', async ({ page }) => {
+    const runtime = createReadyRuntimeSnapshot()
+    const sessions = createTestSessions(1).map((session) => ({
+      ...session,
+      state: 'running' as const
+    }))
+    const initial = transcript('session-1', [
+      userEntry(0, '检查动态高度。'),
+      agentEntry(1, '短内容', {
+        attempt: {
+          attemptId: 'run-height',
+          runId: 'run-height',
+          status: 'running',
+          startedAt: FIXED_TIME,
+          completedAt: null
+        }
+      })
+    ])
+    await page.addInitScript({
+      content: createRendererInitScript(runtime, sessions, { 'session-1': initial })
+    })
+    await page.goto('/#/chat/tangyuan')
+
+    const inner = page.getByTestId('message-scroll-area').locator(':scope > div')
+    const before = await inner.evaluate((element) => element.getBoundingClientRect().height)
     await page.evaluate(() => {
-      const win = window as unknown as {
-        __dispatchAgentEvent__?: (event: Record<string, unknown>) => void
-      }
-      win.__dispatchAgentEvent__?.({
-        type: 'message-delta',
+      window.__dispatchAgentEvent__?.({
+        type: 'transcript-delta',
         agentId: 'tangyuan',
         sessionId: 'session-1',
-        runId: 'run-1',
-        messageId: 'growing-msg',
-        delta: '这是流式输出的测试文本。',
-        occurredAt: new Date().toISOString()
+        delta: {
+          type: 'delta-appended',
+          index: 1,
+          delta: '\n\n' + '增长后的长段落。'.repeat(120)
+        },
+        occurredAt: '2026-07-22T08:31:00.000Z'
       })
     })
-
-    // 文本应出现在页面上
-    await expect(page.getByText('这是流式输出的测试文本。')).toBeVisible()
-
-    // 再次追加内容
-    await page.evaluate(() => {
-      const win = window as unknown as {
-        __dispatchAgentEvent__?: (event: Record<string, unknown>) => void
-      }
-      win.__dispatchAgentEvent__?.({
-        type: 'message-delta',
-        agentId: 'tangyuan',
-        sessionId: 'session-1',
-        runId: 'run-1',
-        messageId: 'growing-msg',
-        delta: ' 继续追加更多文本。',
-        occurredAt: new Date().toISOString()
-      })
-    })
-
-    // 完整文本应可见
-    await expect(
-      page.getByText('这是流式输出的测试文本。 继续追加更多文本。')
-    ).toBeVisible()
+    await expect
+      .poll(() => inner.evaluate((element) => element.getBoundingClientRect().height))
+      .toBeGreaterThan(before)
   })
 })
+
+function createAlternatingEntries(count: number, prefix: string): TranscriptEntry[] {
+  return Array.from({ length: count }, (_, index) =>
+    index % 2 === 0
+      ? userEntry(index, `${prefix} ${index + 1}：验证虚拟列表。`)
+      : agentEntry(index, `${prefix} ${index + 1}：${'结构化内容 '.repeat(8)}`)
+  )
+}
+
+declare global {
+  interface Window {
+    __dispatchAgentEvent__?: (event: Record<string, unknown>) => void
+    __retryMessageCalls__?: unknown[]
+    __getTranscriptCalls__?: unknown[]
+  }
+}

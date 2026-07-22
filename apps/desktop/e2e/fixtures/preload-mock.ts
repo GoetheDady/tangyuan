@@ -1,13 +1,19 @@
-// @ts-nocheck -- TODO: migrate to TranscriptSnapshot API
 import {
   createRuntimeSnapshot,
   createDefaultSessionSummary,
   TANGYUAN_DEFAULT_AGENT_ID,
-  type AgentMessage,
   type AgentSessionSummary,
   type RuntimeSnapshot
 } from '@tangyuan/contracts'
 
+type LegacyTestMessage = {
+  messageId: string
+  agentId: string
+  sessionId: string
+  role: 'user' | 'agent' | 'compaction'
+  content: string
+  createdAt: string
+}
 /**
  * 生成 status='ready' 的运行时快照，用于聊天页测试。
  *
@@ -99,10 +105,10 @@ export function createMissingConfigSnapshot(overrides?: Partial<RuntimeSnapshot>
  * 生成一条符合 contracts schema 的测试消息。
  *
  * @param overrides - 可选的部分字段覆盖。
- * @returns 可安全传给 Renderer 的 AgentMessage。
+ * @returns 可安全传给 Renderer 的 LegacyTestMessage。
  * @throws 此方法不会主动抛出错误。
  */
-export function createTestMessage(overrides?: Partial<AgentMessage>): AgentMessage {
+export function createTestMessage(overrides?: Partial<LegacyTestMessage>): LegacyTestMessage {
   return {
     messageId: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     agentId: TANGYUAN_DEFAULT_AGENT_ID,
@@ -117,10 +123,10 @@ export function createTestMessage(overrides?: Partial<AgentMessage>): AgentMessa
 /**
  * 生成一条超长测试消息，用于布局检查。
  *
- * @returns 包含 180 行中文内容的 AgentMessage。
+ * @returns 包含 180 行中文内容的 LegacyTestMessage。
  * @throws 此方法不会主动抛出错误。
  */
-export function createLongTestMessage(): AgentMessage {
+export function createLongTestMessage(): LegacyTestMessage {
   const longContent = Array.from(
     { length: 180 },
     (_value, index) =>
@@ -142,7 +148,7 @@ export function createLongTestMessage(): AgentMessage {
 export function createPreloadApiInitScript(
   runtime: RuntimeSnapshot,
   sessions: AgentSessionSummary[] = [],
-  messages: AgentMessage[] = []
+  messages: LegacyTestMessage[] = []
 ): string {
   const serialized = JSON.stringify({ runtime, sessions, messages })
 
@@ -169,7 +175,6 @@ export function createPreloadApiInitScript(
           data.sessions = [session, ...data.sessions];
           return session;
         },
-        getMessages: async () => data.messages,
         getTranscript: async (request) => {
           const entries = [];
           let index = 0;
@@ -184,7 +189,6 @@ export function createPreloadApiInitScript(
           }
           return { sessionId: request.sessionId, agentId: request.agentId, entries, updatedAt: new Date().toISOString() };
         },
-        __getMessagesForTranscriptDispatch: () => data.messages,
         sendMessage: async () => data.messages,
         cancelRun: async () => {
           const session = data.sessions[0] || {
@@ -289,7 +293,7 @@ export function createTestSessions(count = 1): AgentSessionSummary[] {
  * @returns 符合 contracts schema 的消息数组。
  * @throws 此方法不会主动抛出错误。
  */
-export function createTestMessages(): AgentMessage[] {
+export function createTestMessages(): LegacyTestMessage[] {
   return [
     {
       messageId: 'msg-user-1',
@@ -318,7 +322,7 @@ export function createTestMessages(): AgentMessage[] {
  * @returns 符合 contracts schema 的消息数组。
  * @throws 此方法不会主动抛出错误。
  */
-export function createMarkdownTestMessages(): AgentMessage[] {
+export function createMarkdownTestMessages(): LegacyTestMessage[] {
   return [
     {
       messageId: 'msg-user-1',

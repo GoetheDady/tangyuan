@@ -90,7 +90,6 @@ export const DESKTOP_IPC_CHANNELS = {
   runtimeResetConfiguration: 'tangyuan:runtime:reset-configuration',
   sessionsList: 'tangyuan:sessions:list',
   sessionsCreate: 'tangyuan:sessions:create',
-  sessionsGetMessages: 'tangyuan:sessions:get-messages',
   sessionsSendMessage: 'tangyuan:sessions:send-message',
   sessionsCancelRun: 'tangyuan:sessions:cancel-run',
   agentsList: 'tangyuan:agents:list',
@@ -121,7 +120,8 @@ export const DESKTOP_IPC_CHANNELS = {
   sessionsGetPendingApprovals: 'tangyuan:sessions:get-pending-approvals',
   sessionsAnswerClarification: 'tangyuan:sessions:answer-clarification',
   sessionsCancelClarification: 'tangyuan:sessions:cancel-clarification',
-  sessionsGetPendingClarifications: 'tangyuan:sessions:get-pending-clarifications',
+  sessionsGetPendingClarifications:
+    'tangyuan:sessions:get-pending-clarifications',
   sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
   sessionsRetryMessage: 'tangyuan:sessions:retry-message',
 } as const
@@ -149,7 +149,6 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsList]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: CreateSessionRequest
-  [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: GetSessionMessagesRequest
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: SendMessageRequest
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: CancelRunRequest
   [DESKTOP_IPC_CHANNELS.agentsList]: undefined
@@ -198,7 +197,6 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsList]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: createSessionRequestSchema,
-  [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: getSessionMessagesRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: sendMessageRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: cancelRunRequestSchema,
   [DESKTOP_IPC_CHANNELS.agentsList]: z.undefined(),
@@ -228,8 +226,10 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsApproveBash]: approveBashRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: rejectBashRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: z.undefined(),
-  [DESKTOP_IPC_CHANNELS.sessionsAnswerClarification]: answerClarificationRequestSchema,
-  [DESKTOP_IPC_CHANNELS.sessionsCancelClarification]: cancelClarificationRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsAnswerClarification]:
+    answerClarificationRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsCancelClarification]:
+    cancelClarificationRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: getSessionMessagesRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: retryRunRequestSchema,
@@ -264,7 +264,6 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: RuntimeSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsList]: AgentSessionSummary[]
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: AgentSessionSummary
-  [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: TranscriptSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: TranscriptSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: AgentSessionSummary
   [DESKTOP_IPC_CHANNELS.agentsList]: AgentSummary[]
@@ -316,7 +315,6 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: runtimeSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsList]: z.array(agentSessionSummarySchema),
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: agentSessionSummarySchema,
-  [DESKTOP_IPC_CHANNELS.sessionsGetMessages]: transcriptSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: transcriptSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: agentSessionSummarySchema,
   [DESKTOP_IPC_CHANNELS.agentsList]: z.array(

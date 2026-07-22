@@ -8,9 +8,12 @@ const rendererOutput = join(appRoot, 'out', 'renderer')
 const forbiddenValues = [
   '/__fixtures__/base-components',
   'base-components-fixture-v1',
-  '基础组件验收夹具'
+  '基础组件验收夹具',
+  '/__fixtures__/conversation-components',
+  'conversation-components-v1',
+  '对话业务组件跨组件验收'
 ]
-const forbiddenAssetName = 'BaseComponentsFixturePage'
+const forbiddenAssetNames = ['BaseComponentsFixturePage', 'ConversationComponentsFixturePage']
 
 /**
  * 验证普通生产 Renderer 构建没有包含组件验收夹具模块。
@@ -21,7 +24,7 @@ async function main() {
   for (const assetFile of assetFiles) {
     const relativeAssetPath = relative(appRoot, assetFile)
 
-    if (relativeAssetPath.includes(forbiddenAssetName)) {
+    if (forbiddenAssetNames.some((assetName) => relativeAssetPath.includes(assetName))) {
       throw new Error(`生产 Renderer 构建包含组件验收夹具资产：${relativeAssetPath}`)
     }
 

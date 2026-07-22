@@ -3,7 +3,7 @@
 @source "../node_modules/streamdown/dist/*.js";
 @source "../node_modules/@streamdown/code/dist/*.js";
 @source "../node_modules/@streamdown/cjk/dist/*.js";
-@source inline("bg-card bg-sidebar bg-primary-hover bg-primary-active bg-destructive-hover bg-destructive-active border border-input border-input-hover bg-info-soft border-info-border text-info-foreground bg-success-soft border-success-border text-success-foreground bg-warning-soft border-warning-border text-warning-foreground bg-destructive-soft border-destructive-border text-destructive-soft-foreground bg-disabled text-disabled-foreground bg-hover text-hover-foreground bg-active text-active-foreground shadow-level-0 shadow-level-1 shadow-level-2 shadow-level-3");
+@source inline("bg-card bg-sidebar bg-primary-hover bg-primary-active bg-primary-soft border-primary-border bg-destructive-hover bg-destructive-active border border-input border-input-hover bg-info-soft border-info-border text-info-foreground bg-success-soft border-success-border text-success-foreground bg-warning-soft border-warning-border text-warning-foreground bg-destructive-soft border-destructive-border text-destructive-soft-foreground bg-disabled text-disabled-foreground bg-hover text-hover-foreground bg-active text-active-foreground shadow-level-0 shadow-level-1 shadow-level-2 shadow-level-3");
 
 @theme inline {
   /* 背景、表面与文字：沿用唯一一套 shadcn 语义 Token。 */
@@ -48,6 +48,8 @@
   --color-warning-soft: var(--warning-soft);
   --color-warning-border: var(--warning-border);
   --color-warning-foreground: var(--warning-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-border: var(--primary-border);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive-hover: var(--destructive-hover);
@@ -155,6 +157,8 @@
     --destructive-foreground: var(--background); /* 兼容现有实心破坏按钮。 */
     --destructive-hover: oklch(0.5651 0.098 27.1); /* 悬停 #A85E56 */
     --destructive-active: oklch(0.5054 0.0939 26.9); /* 按下 #934E47 */
+    --primary-soft: oklch(0.2219 0.0123 67.1 / 0.08);
+    --primary-border: oklch(0.2219 0.0123 67.1 / 0.2);
     --destructive-soft: oklch(0.6106 0.0962 27.6 / 0.1);
     --destructive-border: oklch(0.6106 0.0962 27.6 / 0.25);
     --destructive-soft-foreground: var(--destructive);
