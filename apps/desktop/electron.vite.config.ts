@@ -25,8 +25,16 @@ export default defineConfig({
       }
     },
     plugins: [react()],
+    // 将 workspace 包从依赖预打包中排除，使 Vite 把它们当源码处理并启用 HMR。
+    optimizeDeps: {
+      exclude: ['@tangyuan/contracts', '@tangyuan/agent-runtime']
+    },
     server: {
-      host: '0.0.0.0'
+      host: '0.0.0.0',
+      watch: {
+        // 跟随软链，监听 workspace 包源码变化。
+        followSymlinks: true
+      }
     }
   }
 })
