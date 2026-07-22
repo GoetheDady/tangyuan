@@ -327,16 +327,17 @@ describe('TranscriptMessages', () => {
     // AssistantMessage 应渲染执行披露栏（已完成的条目默认收起）
     expect(screen.getByText('已完成执行过程')).toBeInTheDocument()
     // 步骤数量标签应显示
-    expect(screen.getByText('2 步 · 1s')).toBeInTheDocument()
+    expect(screen.getByText('2 步 · 01s')).toBeInTheDocument()
     // 点击展开披露栏
     const disclosure = screen.getByText('已完成执行过程').closest('button')
     expect(disclosure).not.toBeNull()
     if (disclosure) {
       fireEvent.click(disclosure)
     }
-    // turns 中的步骤应在时间线中展示
+    // turns 中的步骤应在时间线中展示（标签与内容分行）
     expect(screen.getByText('分析中...')).toBeInTheDocument()
-    expect(screen.getByText('read_file · 读取文件')).toBeInTheDocument()
+    expect(screen.getByText('read_file')).toBeInTheDocument()
+    expect(screen.getByText('读取文件')).toBeInTheDocument()
   })
 
   it('renders AgentReplyEntry with failed attempt', () => {
@@ -395,8 +396,9 @@ describe('TranscriptMessages', () => {
     const failureLabels = screen.getAllByText('执行失败')
     expect(failureLabels.length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('执行失败，请重试')).toBeInTheDocument()
-    // 失败步骤应可见（失败条目默认展开）
-    expect(screen.getByText('bad_tool · 失败步骤')).toBeInTheDocument()
+    // 失败步骤应可见（失败条目默认展开，标签与内容分行）
+    expect(screen.getAllByText('bad_tool').length).toBeGreaterThan(0)
+    expect(screen.getByText('失败步骤')).toBeInTheDocument()
   })
 
   it('passes onRetry callback with inReplyTo from entry', () => {
@@ -963,8 +965,9 @@ describe('TranscriptMessages 确定性大数据夹具', () => {
       fireEvent.click(firstDisclosure)
     }
 
-    // 12 个步骤中有部分应可见
-    expect(screen.getByText('tool_1 · 执行操作 2：调用工具完成子任务')).toBeInTheDocument()
+    // 12 个步骤中有部分应可见（标签与内容分行）
+    expect(screen.getAllByText('tool_1').length).toBeGreaterThan(0)
+    expect(screen.getByText('执行操作 2：调用工具完成子任务')).toBeInTheDocument()
   })
 
   it('渲染多次执行尝试：失败 + 重试成功', () => {

@@ -346,6 +346,95 @@ describe('TranscriptEmitter tool step handling', () => {
     }
   })
 
+  it('starts a new turn when thinking arrives after a completed tool (multi-turn boundary)', () => {
+    const { emitter, getSnapshot } = createEmitter()
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+
+    // 真实多轮序列：thinking → read 启动 → read 完成 → thinking → bash 启动
+    emitThinkingDelta(emitter, { delta: '先读文件' })
+    emitActivityUpdated(emitter, {
+      kind: 'tool',
+      state: 'running',
+      toolName: 'read',
+      toolCallId: 'tc-1',
+    })
+    emitActivityUpdated(emitter, {
+      kind: 'tool',
+      state: 'completed',
+      toolName: 'read',
+      toolCallId: 'tc-1',
+    })
+    // 第二轮思考：应开启新 turn，而不是留在上一轮末尾
+    emitThinkingDelta(emitter, { delta: '再执行命令' })
+    emitActivityUpdated(emitter, {
+      kind: 'tool',
+      state: 'running',
+      toolName: 'bash',
+      toolCallId: 'tc-2',
+    })
+
+    const snapshot = getSnapshot('session-1')
+    const agentEntry = snapshot!.entries[0]
+    if (agentEntry && agentEntry.kind === 'agent-reply') {
+      expect(agentEntry.turns).toHaveLength(2)
+      // 第一轮：thinking + read
+      expect(agentEntry.turns[0]!.steps.map((s) => s.kind)).toEqual([
+        'thinking',
+        'tool-call',
+      ])
+      expect(agentEntry.turns[0]!.steps[1]!.toolName).toBe('read')
+      // 第二轮：thinking + bash（思考跟它触发的工具在同一轮）
+      expect(agentEntry.turns[1]!.steps.map((s) => s.kind)).toEqual([
+        'thinking',
+        'tool-call',
+      ])
+      expect(agentEntry.turns[1]!.steps[1]!.toolName).toBe('bash')
+    }
+  })
+
+  it('attaches second-run steps to the second agent entry (not the first)', () => {
+    const { emitter, getSnapshot } = createEmitter()
+
+    // 第一轮对话（真实顺序：turn-started 先于 agent message-appended）
+    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitThinkingDelta(emitter, { runId: 'run-1', messageId: 'msg-1', delta: '第一轮思考' })
+
+    // 第二轮对话：新 run、新 agent 消息
+    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-2')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-2', 'agent')
+    emitThinkingDelta(emitter, { runId: 'run-2', messageId: 'msg-2', delta: '第二轮思考' })
+    emitActivityUpdated(emitter, {
+      runId: 'run-2',
+      kind: 'tool',
+      state: 'running',
+      toolName: 'read',
+      toolCallId: 'tc-2',
+    })
+
+    const snapshot = getSnapshot('session-1')
+    expect(snapshot!.entries).toHaveLength(2)
+    const first = snapshot!.entries[0]
+    const second = snapshot!.entries[1]
+    // 第一轮 entry 只应含第一轮的思考
+    if (first && first.kind === 'agent-reply') {
+      expect(first.turns).toHaveLength(1)
+      expect(first.turns[0]!.steps).toHaveLength(1)
+      expect(first.turns[0]!.steps[0]!.content).toBe('第一轮思考')
+    }
+    // 第二轮的步骤应挂到第二个 entry
+    if (second && second.kind === 'agent-reply') {
+      expect(second.turns).toHaveLength(1)
+      expect(second.turns[0]!.steps.map((s) => s.kind)).toEqual([
+        'thinking',
+        'tool-call',
+      ])
+      expect(second.turns[0]!.steps[0]!.content).toBe('第二轮思考')
+      expect(second.turns[0]!.steps[1]!.toolName).toBe('read')
+    }
+  })
+
   it('uses safe summary with tool name and status for custom tools', () => {
     const { emitter, getSnapshot } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')

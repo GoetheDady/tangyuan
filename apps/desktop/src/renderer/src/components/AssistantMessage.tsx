@@ -3,6 +3,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  CircleCheck,
   CircleStop,
   CircleX,
   LoaderCircle,
@@ -112,7 +113,7 @@ export function AssistantMessage({
         durationText =
           durationMs >= 60000
             ? `${Math.floor(durationMs / 60000)}m ${Math.round((durationMs % 60000) / 1000)}s`
-            : `${Math.round(durationMs / 1000)}s`
+            : `${String(Math.round(durationMs / 1000)).padStart(2, '0')}s`
       }
     }
 
@@ -266,48 +267,46 @@ function ExecutionDisclosure({
 
 /**
  * 时间线视图：按 turn 分组展示步骤。
+ *
+ * 每个步骤为「Rail（状态图标 + 竖直连接线） + Step body（标签行 + 内容行）」两栏布局。
  */
 function TurnTimeline({ turns }: { turns: RunTurn[] }): React.JSX.Element {
   return (
-    <div className="px-2.5 pb-0.5 pt-1">
-      <div className="flex flex-col gap-1.5">
-        {turns.map((turn, turnIdx) => (
-          <div key={turnIdx}>
-            {/* Turn header */}
-            <div className="mb-1.5 flex items-center gap-1.5">
-              <span
-                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                  turn.status === 'running'
-                    ? 'bg-primary/10 text-primary'
-                    : 'bg-muted text-muted-foreground'
-                }`}
-              >
-                {turnIdx === turns.length - 1 ? '最终回合' : `回合 ${turnIdx + 1}`}
-              </span>
-              {turn.status === 'running' && (
-                <LoaderCircle size={10} className="animate-spin text-primary" aria-hidden="true" />
-              )}
-            </div>
+    <div className="flex flex-col gap-3 px-2.5 pb-0.5 pt-1">
+      {turns.map((turn, turnIdx) => (
+        <div key={turnIdx} className="flex flex-col gap-2">
+          {/* Turn header：英文标签 + 水平分隔线 */}
+          <div className="flex items-center gap-2">
+            <span className="text-[8px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {turnIdx === turns.length - 1 ? 'FINAL TURN' : `TURN ${turnIdx + 1}`}
+            </span>
+            <span className="h-px flex-1 bg-split" aria-hidden="true" />
+          </div>
 
-            {/* Steps */}
-            <div className="space-y-1">
-              {turn.steps.map((step, stepIdx) => (
-                <StepRow key={stepIdx} step={step} />
-              ))}
-              {turn.steps.length === 0 && turn.status === 'running' && (
-                <div className="flex items-center gap-1.5 py-0.5 pl-1">
+          {/* Steps */}
+          <div className="flex flex-col">
+            {turn.steps.map((step, stepIdx) => (
+              <StepRow
+                key={stepIdx}
+                step={step}
+                isLast={stepIdx === turn.steps.length - 1}
+              />
+            ))}
+            {turn.steps.length === 0 && turn.status === 'running' && (
+              <div className="flex items-center gap-2">
+                <span className="grid size-3.5 shrink-0 place-items-center">
                   <LoaderCircle
-                    size={10}
+                    size={13}
                     className="animate-spin text-muted-foreground"
                     aria-hidden="true"
                   />
-                  <span className="text-[11px] text-muted-foreground">等待中…</span>
-                </div>
-              )}
-            </div>
+                </span>
+                <span className="text-[10px] text-muted-foreground">等待中…</span>
+              </div>
+            )}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -315,54 +314,11 @@ function TurnTimeline({ turns }: { turns: RunTurn[] }): React.JSX.Element {
 /**
  * 时间线中的单个步骤行。
  *
+ * 左侧 Rail 为状态图标加竖直连接线，右侧 Step body 分标签行与内容行。
  * 工具步骤显示：工具名、安全摘要、状态图标和耗时。
  * 不暴露完整参数、原始输出或内部调试日志。
  */
-function StepRow({ step }: { step: TurnStep }): React.JSX.Element {
-  let icon: React.JSX.Element
-  let bgClass: string
-  let contentPreview: string
-
-  switch (step.kind) {
-    case 'thinking':
-      icon = (
-        <span className="grid size-4 shrink-0 place-items-center text-[10px] text-muted-foreground">
-          💭
-        </span>
-      )
-      bgClass = 'bg-muted/50'
-      contentPreview = step.content
-        ? step.content.length > 80
-          ? `${step.content.slice(0, 80)}…`
-          : step.content
-        : '思考中…'
-      break
-    case 'tool-call': {
-      const toolDisplayName = step.toolName ?? step.content
-      icon = (
-        <span className="grid size-4 shrink-0 place-items-center text-[10px] text-muted-foreground">
-          🔧
-        </span>
-      )
-      bgClass = step.status === 'failed' ? 'bg-destructive-soft/20' : 'bg-accent/30'
-      contentPreview = step.toolName ? `${toolDisplayName} · ${step.content}` : step.content
-      break
-    }
-    case 'text':
-      icon = (
-        <span className="grid size-4 shrink-0 place-items-center text-[10px] text-muted-foreground">
-          💬
-        </span>
-      )
-      bgClass = ''
-      contentPreview = step.content.length > 80 ? `${step.content.slice(0, 80)}…` : step.content
-      break
-    default:
-      icon = <span className="grid size-4 shrink-0 place-items-center text-[10px]" />
-      bgClass = ''
-      contentPreview = ''
-  }
-
+function StepRow({ step, isLast = true }: { step: TurnStep; isLast?: boolean }): React.JSX.Element {
   const durationMs =
     step.completedAt && step.startedAt
       ? new Date(step.completedAt).getTime() - new Date(step.startedAt).getTime()
@@ -374,22 +330,74 @@ function StepRow({ step }: { step: TurnStep }): React.JSX.Element {
         : `${Math.round(durationMs / 1000)}s`
       : null
 
+  // 标签与内容：thinking 标签为「思考」，tool-call 标签为工具名，text 标签为「回复」。
+  let label: string
+  let note: string
+  let labelClass: string
+  switch (step.kind) {
+    case 'thinking':
+      label = '思考'
+      note = step.content || (step.status === 'running' ? '思考中…' : '')
+      labelClass = 'font-medium text-success'
+      break
+    case 'tool-call':
+      label = step.toolName ?? '工具'
+      note = step.toolName ? step.content : ''
+      labelClass = 'font-semibold capitalize text-foreground'
+      break
+    case 'text':
+      label = '回复'
+      note = step.content
+      labelClass = 'font-semibold text-foreground'
+      break
+    default:
+      label = ''
+      note = ''
+      labelClass = 'text-muted-foreground'
+  }
+
+  // 状态图标与 meta 文案。
+  let StatusIcon: typeof CircleCheck
+  let iconClass: string
+  let iconLabel: string
+  if (step.status === 'failed') {
+    StatusIcon = CircleX
+    iconClass = 'text-destructive-soft-foreground'
+    iconLabel = '失败'
+  } else if (step.status === 'running') {
+    StatusIcon = LoaderCircle
+    iconClass = `animate-spin ${step.kind === 'thinking' ? 'text-success' : 'text-foreground'}`
+    iconLabel = '运行中'
+  } else {
+    StatusIcon = CircleCheck
+    iconClass = 'text-success'
+    iconLabel = '完成'
+  }
+
+  const meta =
+    durationLabel ??
+    (step.status === 'running' ? '执行中' : step.status === 'failed' ? '失败' : '已完成')
+
   return (
-    <div className={`flex items-start gap-1.5 rounded px-1.5 py-0.5 text-[11px] ${bgClass}`}>
-      {icon}
-      <span className="flex-1 truncate text-muted-foreground">{contentPreview}</span>
-      {durationLabel && (
-        <span className="shrink-0 text-[10px] text-muted-foreground/60">{durationLabel}</span>
-      )}
-      <span className="shrink-0 text-[10px] text-muted-foreground/60">
-        {step.status === 'running' ? (
-          <LoaderCircle size={10} className="animate-spin" aria-label="运行中" />
-        ) : step.status === 'completed' ? (
-          <Check size={10} aria-label="完成" />
-        ) : (
-          <CircleX size={10} className="text-destructive-soft-foreground" aria-label="失败" />
+    <div className="flex gap-2">
+      {/* Rail：图标 + 竖直连接线 */}
+      <div className="flex flex-col items-center">
+        <span className="grid size-3.5 shrink-0 place-items-center">
+          <StatusIcon size={13} className={iconClass} aria-label={iconLabel} />
+        </span>
+        {!isLast && <span className="mt-1 w-px flex-1 bg-border" aria-hidden="true" />}
+      </div>
+
+      {/* Step body：标签行 + 内容行 */}
+      <div className="min-w-0 flex-1 pb-2.5">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className={`text-[10px] ${labelClass}`}>{label}</span>
+          <span className="shrink-0 text-[8px] text-muted-foreground">{meta}</span>
+        </div>
+        {note && (
+          <p className="mt-0.5 text-[10px] leading-[1.5] text-muted-foreground">{note}</p>
         )}
-      </span>
+      </div>
     </div>
   )
 }

@@ -121,9 +121,10 @@ export class TranscriptEmitter {
       this.messageToEntryIndex.set(message.messageId, nextIndex)
       this.emitTranscriptDeltaEvent(event.agentId, sessionId, delta)
       this.sessionNextIndex.set(sessionId, nextIndex + 1)
-      // entry 刚创建完成，若对应 attempt 已存在（turn-started 先到），立即初始化 turnState。
+      // entry 刚创建完成，若对应 attempt 已存在（turn-started 先到），立即初始化并
+      // 用本轮真实 entryIndex 修正 turn-started 早到时的猜测。
       if (attempt) {
-        this.ensureTurnStateInitialized(attempt.runId)
+        this.ensureTurnStateInitialized(attempt.runId, nextIndex)
       }
       return
     }
@@ -201,21 +202,33 @@ export class TranscriptEmitter {
   }
 
   /**
-   * 当 agent-reply 条目已存在且尚未初始化时，为指定 run 建立 turn 状态。
+   * 为指定 run 建立或修正 turn 状态，并绑定到正确的 agent-reply 条目。
    *
-   * 兼容 turn-started 与 agent message-appended 两种到达顺序：谁后到谁触发。
+   * 真实顺序下 turn-started 先于 agent message-appended，此时本轮条目尚未创建，
+   * findLastAgentReplyIndex 会误指上一轮条目。因此 message-appended 创建条目时
+   * 会传入确切的 entryIndex 修正此前的猜测。delta 均在 message-appended 之后才发出，
+   * 故修正发生在任何步骤写入之前，不会造成步骤错位。
    *
    * @param runId - 运行标识。
+   * @param entryIndex - 本轮 agent-reply 条目索引；为 undefined 时回退到最后一个条目。
    * @returns 无返回值。
    */
-  private ensureTurnStateInitialized(runId: string): void {
-    if (this.turnStateByRun.has(runId)) return
+  private ensureTurnStateInitialized(
+    runId: string,
+    entryIndex?: number,
+  ): void {
+    const existing = this.turnStateByRun.get(runId)
+    if (existing) {
+      // turn-started 早到时用旧条目猜错了 entryIndex，此处用真实值修正。
+      if (entryIndex !== undefined) existing.entryIndex = entryIndex
+      return
+    }
 
-    const entryIndex = this.findLastAgentReplyIndex()
-    if (entryIndex === undefined) return
+    const resolvedIndex = entryIndex ?? this.findLastAgentReplyIndex()
+    if (resolvedIndex === undefined) return
 
     this.turnStateByRun.set(runId, {
-      entryIndex,
+      entryIndex: resolvedIndex,
       turnIndex: 0,
       stepIndex: 0,
       currentTurnHasToolCall: false,
@@ -236,6 +249,16 @@ export class TranscriptEmitter {
   ): void {
     const turnState = this.turnStateByRun.get(event.runId)
     if (!turnState) return
+
+    // 本轮已启动过工具 → 这段 thinking 属于新一轮，先推进 turn 边界，
+    // 使思考与它触发的后续工具留在同一轮。
+    if (turnState.currentTurnHasToolCall) {
+      turnState.turnIndex++
+      turnState.stepIndex = 0
+      turnState.currentTurnHasToolCall = false
+      turnState.lastStepKind = null
+      turnState.toolCallStepIndex = new Map()
+    }
 
     const now = event.occurredAt
     // If the current step is a thinking step, update it. Otherwise, create new.

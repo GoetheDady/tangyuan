@@ -106,8 +106,8 @@ describe('AssistantMessage', () => {
     expect(screen.getByText('仍在执行')).toBeInTheDocument()
     expect(screen.getByText(/2 回合/)).toBeInTheDocument()
     expect(screen.getByText(/3 步/)).toBeInTheDocument()
-    expect(screen.getByText('回合 1')).toBeInTheDocument()
-    expect(screen.getByText('最终回合')).toBeInTheDocument()
+    expect(screen.getByText('TURN 1')).toBeInTheDocument()
+    expect(screen.getByText('FINAL TURN')).toBeInTheDocument()
   })
 
   it('shows unconfirmed notice in unconfirmed-text state', () => {
@@ -189,14 +189,14 @@ describe('AssistantMessage', () => {
     render(<AssistantMessage entry={entry} isStreaming={false} />)
 
     // Timeline should be hidden initially (collapsed)
-    expect(screen.queryByText(/回合/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/TURN/)).not.toBeInTheDocument()
 
     // Click the disclosure to expand
     const disclosure = screen.getByText('已完成执行过程').closest('button')!
     fireEvent.click(disclosure)
 
     // Timeline should now be visible
-    expect(screen.getByText(/回合/)).toBeInTheDocument()
+    expect(screen.getByText(/TURN/)).toBeInTheDocument()
     expect(screen.getByText('分析完成')).toBeInTheDocument()
   })
 
@@ -476,7 +476,7 @@ describe('AssistantMessage', () => {
     render(<AssistantMessage entry={entry} isStreaming />)
 
     // Should show tool name and fallback summary
-    expect(screen.getByText(/my_tool/)).toBeInTheDocument()
+    expect(screen.getAllByText(/my_tool/).length).toBeGreaterThan(0)
   })
 
   it('shows multi-turn separation correctly', () => {
@@ -526,8 +526,8 @@ describe('AssistantMessage', () => {
     render(<AssistantMessage entry={entry} isStreaming />)
 
     // Should show turn labels
-    expect(screen.getByText('回合 1')).toBeInTheDocument()
-    expect(screen.getByText('最终回合')).toBeInTheDocument()
+    expect(screen.getByText('TURN 1')).toBeInTheDocument()
+    expect(screen.getByText('FINAL TURN')).toBeInTheDocument()
   })
 
   it('does not auto-collapse when turns contain tool calls during streaming', () => {
@@ -582,7 +582,7 @@ describe('AssistantMessage', () => {
     // Should show final content (collapsed state with text visible)
     expect(screen.getByText('final reply text')).toBeInTheDocument()
     // Timeline should be hidden
-    expect(screen.queryByText(/回合/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/TURN/)).not.toBeInTheDocument()
   })
 
   describe('FailedFooter', () => {
