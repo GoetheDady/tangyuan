@@ -179,6 +179,7 @@ describe('TangyuanRuntime', () => {
       expect.objectContaining({
         entries: [
           expect.objectContaining({ kind: 'user-message', content: '你好' }),
+          expect.objectContaining({ kind: 'agent-reply', content: '收' }),
         ],
       }),
     )
@@ -191,6 +192,7 @@ describe('TangyuanRuntime', () => {
       expect.objectContaining({
         entries: [
           expect.objectContaining({ kind: 'user-message', content: '你好' }),
+          expect.objectContaining({ kind: 'agent-reply', content: '收' }),
         ],
       }),
     )

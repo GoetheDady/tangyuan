@@ -939,6 +939,7 @@ describe('transcript delta with turns', () => {
       type: 'step-appended',
       index: 1,
       turnIndex: 0,
+      runId: 'run-1',
       step,
     })
     const entry = result.entries[1]
@@ -950,6 +951,7 @@ describe('transcript delta with turns', () => {
     expect(reply).not.toBeNull()
     if (reply) {
       expect(reply.turns).toHaveLength(1)
+      expect(reply.turns[0]!.runId).toBe('run-1')
       expect(reply.turns[0]!.steps).toHaveLength(1)
       expect(reply.turns[0]!.steps[0]!.kind).toBe('thinking')
     }
@@ -968,6 +970,7 @@ describe('transcript delta with turns', () => {
       type: 'step-appended',
       index: 1,
       turnIndex: 0,
+      runId: 'run-1',
       step: step1,
     })
 
@@ -1012,6 +1015,7 @@ describe('transcript delta with turns', () => {
       type: 'step-appended',
       index: 1,
       turnIndex: 0,
+      runId: 'run-1',
       step,
     })
 
@@ -1037,6 +1041,7 @@ describe('transcript delta with turns', () => {
         type: 'step-appended',
         index: 1,
         turnIndex: 0,
+        runId: 'run-1',
         step: {
           index: 0,
           kind: 'thinking',
@@ -1096,6 +1101,7 @@ describe('agent event with transcript-delta', () => {
           type: 'step-appended',
           index: 0,
           turnIndex: 0,
+          runId: 'run-1',
           step: {
             index: 0,
             kind: 'thinking',

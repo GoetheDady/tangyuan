@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { DriverEvent } from './index'
 import { TranscriptEmitter } from './transcript-emitter'
-import type { TranscriptSnapshot } from '@tangyuan/contracts'
+import {
+  transcriptSnapshotSchema,
+  type TranscriptSnapshot,
+} from '@tangyuan/contracts'
 
 describe('TranscriptEmitter tool step handling', () => {
   function createEmitter(): {
@@ -94,6 +97,63 @@ describe('TranscriptEmitter tool step handling', () => {
     }
     emitter.emitTranscriptDeltaForMessageAppended(event)
   }
+
+  it('produces a snapshot that passes transcriptSnapshotSchema validation', () => {
+    const { emitter, getSnapshot } = createEmitter()
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitActivityUpdated(emitter, {
+      kind: 'tool',
+      state: 'running',
+      toolName: 'read',
+      toolCallId: 'tc-1',
+    })
+
+    const snapshot = getSnapshot('session-1')
+    // 自动补建的 turn 必须带非空 runId，否则 IPC 层 parseDesktopIpcResponse 会抛 ZodError
+    expect(() => transcriptSnapshotSchema.parse(snapshot)).not.toThrow()
+  })
+
+  function emitThinkingDelta(
+    emitter: TranscriptEmitter,
+    overrides: {
+      agentId?: string
+      sessionId?: string
+      runId?: string
+      messageId?: string
+      delta?: string
+    } = {},
+  ) {
+    const event: Extract<DriverEvent, { type: 'message-delta' }> = {
+      type: 'message-delta',
+      agentId: overrides.agentId ?? 'tangyuan',
+      sessionId: overrides.sessionId ?? 'session-1',
+      runId: overrides.runId ?? 'run-1',
+      messageId: overrides.messageId ?? 'msg-1',
+      delta: overrides.delta ?? '正在思考',
+      deltaKind: 'thinking',
+      occurredAt: new Date().toISOString(),
+    }
+    emitter.emitTranscriptDeltaForThinking(event)
+  }
+
+  it('renders thinking step when turn-started arrives before agent message-appended (real order)', () => {
+    const { emitter, getSnapshot } = createEmitter()
+    // 真实运行顺序：turn-started 先于 agent message-appended
+    emitTurnStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitThinkingDelta(emitter, { delta: '正在思考' })
+
+    const snapshot = getSnapshot('session-1')
+    const agentEntry = snapshot!.entries[0]
+    expect(agentEntry).toBeDefined()
+    expect(agentEntry!.kind).toBe('agent-reply')
+    if (agentEntry && agentEntry.kind === 'agent-reply') {
+      expect(agentEntry.turns).toHaveLength(1)
+      expect(agentEntry.turns[0]!.steps).toHaveLength(1)
+      expect(agentEntry.turns[0]!.steps[0]!.kind).toBe('thinking')
+    }
+  })
 
   it('creates a tool step in turn 0 on first tool-started', () => {
     const { emitter, getSnapshot } = createEmitter()

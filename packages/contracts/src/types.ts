@@ -191,6 +191,8 @@ export type TranscriptDelta =
       readonly index: number
       /** 目标 turn 在 turns 数组中的索引。 */
       readonly turnIndex: number
+      /** 关联的 run 标识，用于自动补建 turn 时填充 runId。 */
+      readonly runId: string
       readonly step: TurnStep
     }
   | {

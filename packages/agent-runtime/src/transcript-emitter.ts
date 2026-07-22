@@ -100,6 +100,10 @@ export class TranscriptEmitter {
     }
 
     if (message.role === 'agent') {
+      // 幂等：agent 条目在 turn 开头已宣告，结尾的重复 message-appended 不再建新条目。
+      if (this.messageToEntryIndex.has(message.messageId)) {
+        return
+      }
       const attempt = this.pendingAttemptBySession.get(sessionId) ?? null
       const delta: TranscriptDelta = {
         type: 'entry-appended',
@@ -117,6 +121,10 @@ export class TranscriptEmitter {
       this.messageToEntryIndex.set(message.messageId, nextIndex)
       this.emitTranscriptDeltaEvent(event.agentId, sessionId, delta)
       this.sessionNextIndex.set(sessionId, nextIndex + 1)
+      // entry 刚创建完成，若对应 attempt 已存在（turn-started 先到），立即初始化 turnState。
+      if (attempt) {
+        this.ensureTurnStateInitialized(attempt.runId)
+      }
       return
     }
 
@@ -177,7 +185,10 @@ export class TranscriptEmitter {
   }
 
   /**
-   * 为 turn-started 事件初始化 turn 状态并发出第一个 turn 的 step-appended。
+   * 为 turn-started 事件初始化 turn 状态。
+   *
+   * turnState 依附于 agent-reply 条目，而条目可能在 turn-started 之后才创建。
+   * 因此此处只尝试初始化；若条目尚未存在，则在 agent message-appended 到达时补充初始化。
    *
    * @param event - turn-started 标准事件。
    * @returns 无返回值。
@@ -186,10 +197,24 @@ export class TranscriptEmitter {
   initializeTurnStateForRun(
     event: Extract<DriverEvent, { type: 'turn-started' }>,
   ): void {
+    this.ensureTurnStateInitialized(event.runId)
+  }
+
+  /**
+   * 当 agent-reply 条目已存在且尚未初始化时，为指定 run 建立 turn 状态。
+   *
+   * 兼容 turn-started 与 agent message-appended 两种到达顺序：谁后到谁触发。
+   *
+   * @param runId - 运行标识。
+   * @returns 无返回值。
+   */
+  private ensureTurnStateInitialized(runId: string): void {
+    if (this.turnStateByRun.has(runId)) return
+
     const entryIndex = this.findLastAgentReplyIndex()
     if (entryIndex === undefined) return
 
-    this.turnStateByRun.set(event.runId, {
+    this.turnStateByRun.set(runId, {
       entryIndex,
       turnIndex: 0,
       stepIndex: 0,
@@ -240,6 +265,7 @@ export class TranscriptEmitter {
         type: 'step-appended',
         index: turnState.entryIndex,
         turnIndex: turnState.turnIndex,
+        runId: event.runId,
         step,
       }
       this.emitTranscriptDeltaEvent(event.agentId, event.sessionId, delta)
@@ -315,6 +341,7 @@ export class TranscriptEmitter {
           type: 'step-appended',
           index: turnState.entryIndex,
           turnIndex: turnState.turnIndex,
+          runId: event.runId,
           step,
         }
         this.emitTranscriptDeltaEvent(event.agentId, event.sessionId, delta)

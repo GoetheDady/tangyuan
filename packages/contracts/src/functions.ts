@@ -253,7 +253,7 @@ export function applyTranscriptDelta(
             // Auto-create turn if index points to the next slot
             turns.push({
               index: delta.turnIndex,
-              runId: '',
+              runId: delta.runId,
               steps: [delta.step],
               status: 'running',
               startedAt: delta.step.startedAt,

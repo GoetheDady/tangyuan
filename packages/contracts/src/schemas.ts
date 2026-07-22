@@ -134,6 +134,7 @@ export const transcriptDeltaSchema = z.discriminatedUnion('type', [
     type: z.literal('step-appended'),
     index: z.number().int().min(0),
     turnIndex: z.number().int().min(0),
+    runId: nonEmptyIdentifierSchema,
     step: turnStepSchema,
   }),
   z.strictObject({

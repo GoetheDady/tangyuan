@@ -1417,9 +1417,23 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         request.agentId,
       )
       let accumulatedReply = ''
+      // 惰性宣告：收到第一个真实内容事件时才 emit agent message-appended，
+      // 使运行期 delta 能挂到条目上；若未产生任何内容（如立即取消）则不建空条目。
+      let agentEntryAnnounced = false
+      const announceAgentEntry = (): void => {
+        if (agentEntryAnnounced) return
+        agentEntryAnnounced = true
+        this.emit({
+          type: 'message-appended',
+          agentId: request.agentId,
+          message: agentMessage,
+          occurredAt: this.now(),
+        })
+      }
       const agentReply = await handle.prompt(prompt, {
         onEvent: (event) => {
           if (event.type === 'thinking-started') {
+            announceAgentEntry()
             this.emit({
               type: 'activity-updated',
               agentId: request.agentId,
@@ -1432,6 +1446,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
           }
 
           if (event.type === 'thinking-delta') {
+            announceAgentEntry()
             this.emit({
               type: 'message-delta',
               agentId: request.agentId,
@@ -1446,6 +1461,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
           }
 
           if (event.type === 'text-delta') {
+            announceAgentEntry()
             accumulatedReply += event.delta
             this.appendMessageDelta(agentMessage.messageId, event.delta)
             this.emit({
@@ -1461,6 +1477,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
           }
 
           // tool-started / tool-completed / tool-failed
+          announceAgentEntry()
           this.emit({
             type: 'activity-updated',
             agentId: request.agentId,
@@ -1785,10 +1802,23 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         request.agentId,
       )
       let accumulatedReply = ''
+      // 与主流程一致的惰性宣告：首个真实内容事件到达时才 emit agent message-appended。
+      let agentEntryAnnounced = false
+      const announceAgentEntry = (): void => {
+        if (agentEntryAnnounced) return
+        agentEntryAnnounced = true
+        this.emit({
+          type: 'message-appended',
+          agentId: request.agentId,
+          message: agentMessage,
+          occurredAt: this.now(),
+        })
+      }
 
       const agentReply = await handle.prompt(prompt, {
         onEvent: (event) => {
           if (event.type === 'thinking-started') {
+            announceAgentEntry()
             this.emit({
               type: 'activity-updated',
               agentId: request.agentId,
@@ -1801,6 +1831,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
           }
 
           if (event.type === 'thinking-delta') {
+            announceAgentEntry()
             this.emit({
               type: 'message-delta',
               agentId: request.agentId,
@@ -1815,6 +1846,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
           }
 
           if (event.type === 'text-delta') {
+            announceAgentEntry()
             accumulatedReply += event.delta
             this.appendMessageDelta(agentMessage.messageId, event.delta)
             this.emit({
@@ -1829,6 +1861,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
             return
           }
 
+          announceAgentEntry()
           this.emit({
             type: 'activity-updated',
             agentId: request.agentId,
