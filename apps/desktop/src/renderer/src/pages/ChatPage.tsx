@@ -9,20 +9,13 @@ import type {
   SessionModelInfo,
   TranscriptSnapshot
 } from '@tangyuan/contracts'
-import { MessageSquarePlus, Sparkles, StopCircle } from 'lucide-react'
+import { MessageSquarePlus, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Composer } from '@/components/Composer'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { TranscriptMessages } from '@/components/TranscriptMessages'
 
@@ -427,7 +420,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
         </aside>
 
         <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
-          <header className="flex h-16 items-center justify-between border-b px-8">
+          <header className="flex h-16 items-center border-b px-8">
             <div className="min-w-0">
               <h2 className="truncate text-base font-semibold">
                 {selectedSession?.title ?? '新对话'}
@@ -436,18 +429,6 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                 {selectedSession ? formatRunState(selectedSession.state) : '创建新会话后开始'}
               </p>
             </div>
-            {isSelectedSessionRunning ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  void cancelRun()
-                }}
-              >
-                <StopCircle aria-hidden="true" />
-                停止
-              </Button>
-            ) : null}
           </header>
 
           <div className="min-h-0 flex-1 px-8 py-7">
@@ -519,93 +500,29 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
           )}
 
           <footer className="border-t bg-background px-8 py-4">
-            {/* Session 模型信息栏 */}
-            {selectedSession && sessionModelInfo && (
-              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">当前模型：</span>
-                {/* Provider 选择器 */}
-                <Select
-                  value={sessionModelInfo.providerId}
-                  onValueChange={() => {
-                    // 切换 Provider 时不清除 model，需等待用户选择新 model
-                  }}
-                  disabled={isSwitchingModel || isSelectedSessionRunning}
-                >
-                  <SelectTrigger className="h-7 w-auto gap-1 border-0 bg-muted px-2 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {context.runtime?.providers.map((provider) => (
-                      <SelectItem key={provider.providerId} value={provider.providerId}>
-                        {provider.displayName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <span className="text-muted-foreground">/</span>
-
-                {/* Model 选择器 */}
-                <Select
-                  value={sessionModelInfo.modelId}
-                  onValueChange={(modelId) => {
-                    if (sessionModelInfo.providerId) {
-                      void handleSessionModelChange(sessionModelInfo.providerId, modelId)
-                    }
-                  }}
-                  disabled={isSwitchingModel || isSelectedSessionRunning}
-                >
-                  <SelectTrigger className="h-7 w-auto gap-1 border-0 bg-muted px-2 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {selectableModels.map((model) => (
-                      <SelectItem key={model.modelId} value={model.modelId}>
-                        {model.displayName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Thinking Level 选择器 */}
-                {sessionModelInfo.supportsThinking &&
-                  sessionModelInfo.supportedThinkingLevels.length > 0 && (
-                    <>
-                      <span className="text-muted-foreground">·</span>
-                      <Select
-                        value={sessionModelInfo.thinkingLevel ?? 'off'}
-                        onValueChange={(level) => {
-                          void handleThinkingLevelChange(level)
-                        }}
-                        disabled={isSwitchingModel || isSelectedSessionRunning}
-                      >
-                        <SelectTrigger className="h-7 w-auto gap-1 border-0 bg-muted px-2 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {sessionModelInfo.supportedThinkingLevels.map((level) => (
-                            <SelectItem key={level} value={level}>
-                              Thinking: {level}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </>
-                  )}
-
-                {isLoadingModelInfo && <span className="text-muted-foreground">加载中...</span>}
-              </div>
-            )}
-
             <Composer
               value={context.composerText}
               onChange={context.setComposerText}
               onSubmit={() => {
                 void sendMessage()
               }}
-              disabled={context.isSendingMessage || isSelectedSessionRunning || !selectedSession}
               placeholder={`给${activeAgentDisplayName}发送消息`}
-              isSending={context.isSendingMessage || isSelectedSessionRunning}
+              isRunning={isSelectedSessionRunning || context.isSendingMessage}
+              onCancel={() => {
+                void cancelRun()
+              }}
+              disabled={!selectedSession}
+              sessionModelInfo={selectedSession ? sessionModelInfo : null}
+              isLoadingModelInfo={isLoadingModelInfo}
+              isSwitchingModel={isSwitchingModel}
+              providers={context.runtime?.providers ?? []}
+              selectableModels={selectableModels}
+              onModelChange={(providerId, modelId) => {
+                void handleSessionModelChange(providerId, modelId)
+              }}
+              onThinkingLevelChange={(level) => {
+                void handleThinkingLevelChange(level)
+              }}
             />
           </footer>
         </section>
