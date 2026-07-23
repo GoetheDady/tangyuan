@@ -2,7 +2,7 @@ import type { AgentReplyEntry, TranscriptEntry, TranscriptSnapshot } from '@tang
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Sparkles } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
-import { AssistantMessage } from './AssistantMessage'
+import { AssistantMessage, TIMELINE_TOGGLE_ANIMATION_MS } from './AssistantMessage'
 import { CompactionIndicator } from './CompactionIndicator'
 import { UserMessage } from './UserMessage'
 
@@ -202,6 +202,15 @@ export function TranscriptMessages({
 
   // 用于展开/收起时保持阅读位置的锚点信息
   const anchorRef = useRef<{ index: number; offsetFromTop: number } | null>(null)
+  // 动画结束后清空锚点的定时器；动画期间保留锚点以持续校正。
+  const anchorClearTimerRef = useRef<number | null>(null)
+  useEffect(() => {
+    return () => {
+      if (anchorClearTimerRef.current !== null) {
+        clearTimeout(anchorClearTimerRef.current)
+      }
+    }
+  }, [])
 
   // 监听滚动位置，跟踪用户是否在底部
   useEffect(() => {
@@ -241,6 +250,10 @@ export function TranscriptMessages({
     if (sessionId !== prevSessionIdRef.current) {
       prevSessionIdRef.current = sessionId
       anchorRef.current = null
+      if (anchorClearTimerRef.current !== null) {
+        clearTimeout(anchorClearTimerRef.current)
+        anchorClearTimerRef.current = null
+      }
       if (renderItems.length > 0) {
         // 等待虚拟列表布局完成后滚动
         requestAnimationFrame(() => {
@@ -290,7 +303,8 @@ export function TranscriptMessages({
         const delta = currentOffset - anchor.offsetFromTop
         scrollRef.current.scrollTop += delta
       }
-      anchorRef.current = null
+      // 展开/收起动画期间高度渐变，totalSize 会多次变化；保留锚点持续校正，
+      // 由 handleToggleStart 设置的定时器在动画结束后清空。
     }
     prevTotalSizeRef.current = totalSize
   }, [totalSize]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -312,6 +326,15 @@ export function TranscriptMessages({
           index: renderIndex,
           offsetFromTop: targetItem.start - scrollEl.scrollTop
         }
+        // 展开/收起动画期间持续校正锚点；动画结束后（预留 60ms 缓冲）清空，
+        // 避免后续无关的高度变化被误校正。
+        if (anchorClearTimerRef.current !== null) {
+          clearTimeout(anchorClearTimerRef.current)
+        }
+        anchorClearTimerRef.current = window.setTimeout(() => {
+          anchorRef.current = null
+          anchorClearTimerRef.current = null
+        }, TIMELINE_TOGGLE_ANIMATION_MS + 60)
       }
     },
     [virtualizer]

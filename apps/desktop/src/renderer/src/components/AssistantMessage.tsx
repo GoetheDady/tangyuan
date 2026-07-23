@@ -9,9 +9,18 @@ import {
   LoaderCircle,
   RefreshCw
 } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 
 import { StreamdownMessage } from '@/components/StreamdownMessage'
+
+/**
+ * 执行历史时间线展开/收起动画时长（毫秒）。
+ *
+ * TranscriptMessages 的虚拟列表需依据同一时长决定锚点校正的持续窗口，
+ * 故在此导出供两处共享，避免时长失同。
+ */
+export const TIMELINE_TOGGLE_ANIMATION_MS = 200
 
 /**
  * AssistantMessage 组件的属性。
@@ -55,6 +64,34 @@ function deriveState(entry: AgentReplyEntry, isStreaming: boolean): AssistantSta
   }
 
   return 'final-confirmed'
+}
+
+/**
+ * 完成态下从时间线剔除末回合的最终回复文字步骤。
+ *
+ * 末回合最后一个文字步骤就是 entry.content（最终回复），已独立展示在卡片下方，
+ * 保留在时间线里会造成重复，故只剔除它。末回合内在它之前的中间文字（如
+ * text→工具→text 的开头 text）以及非末回合的中间文字均原样保留。
+ *
+ * @param turns - 原始回合列表。
+ * @returns 剔除末回合最终回复文字步骤后的回合列表。
+ */
+function stripFinalReplyFromTurns(turns: RunTurn[]): RunTurn[] {
+  if (turns.length === 0) return turns
+  const lastIndex = turns.length - 1
+  const lastTurn = turns[lastIndex]
+  let finalTextStepIndex = -1
+  for (let i = lastTurn.steps.length - 1; i >= 0; i--) {
+    if (lastTurn.steps[i].kind === 'text') {
+      finalTextStepIndex = i
+      break
+    }
+  }
+  if (finalTextStepIndex === -1) return turns
+  const remainingSteps = lastTurn.steps.filter((_, i) => i !== finalTextStepIndex)
+  const next = [...turns]
+  next[lastIndex] = { ...lastTurn, steps: remainingSteps }
+  return next
 }
 
 /**
@@ -125,6 +162,10 @@ export function AssistantMessage({
 
   const hasTurns = entry.turns.length > 0
 
+  // 完成态下时间线剔除末回合文字步骤（去重）；其他态原样展示全部步骤。
+  const timelineTurns =
+    state === 'final-confirmed' ? stripFinalReplyFromTurns(entry.turns) : entry.turns
+
   // 无 turns 时回退到纯文本气泡
   if (!hasTurns) {
     return (
@@ -151,10 +192,23 @@ export function AssistantMessage({
         />
 
         {/* Expanded Timeline */}
-        {isExpanded && <TurnTimeline turns={entry.turns} />}
+        <AnimatePresence initial={false}>
+          {isExpanded && (
+            <motion.div
+              key="timeline"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: TIMELINE_TOGGLE_ANIMATION_MS / 1000, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <TurnTimeline turns={timelineTurns} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Final Body (shown when collapsed + final) */}
-        {state === 'final-confirmed' && !isExpanded && entry.content && (
+        {/* Final Body (完成态下始终独立展示，不随展开/收起变化) */}
+        {state === 'final-confirmed' && entry.content && (
           <div className="text-body">
             <StreamdownMessage content={entry.content} isAnimating={false} />
           </div>

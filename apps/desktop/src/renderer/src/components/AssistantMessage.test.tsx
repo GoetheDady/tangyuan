@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentReplyEntry, RunTurn, TurnStep } from '@tangyuan/contracts'
 import { AssistantMessage } from './AssistantMessage'
@@ -542,7 +542,7 @@ describe('AssistantMessage', () => {
     expect(screen.getByText('FINAL TURN')).toBeInTheDocument()
   })
 
-  it('renders turns and steps in source order, then uses entry.content when collapsed', () => {
+  it('renders turns and steps in source order, then uses entry.content when collapsed', async () => {
     const streamingEntry = createEntry({
       content: '真正的最终答复',
       turns: [
@@ -598,9 +598,9 @@ describe('AssistantMessage', () => {
     rerender(<AssistantMessage entry={completedEntry} isStreaming={false} />)
 
     expect(screen.getByText('真正的最终答复')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('FINAL TURN')).not.toBeInTheDocument())
     expect(screen.queryByText('第一回合中间文字')).not.toBeInTheDocument()
     expect(screen.queryByText('最后回合文字')).not.toBeInTheDocument()
-    expect(screen.queryByText('FINAL TURN')).not.toBeInTheDocument()
   })
 
   it('does not auto-collapse when turns contain tool calls during streaming', () => {
@@ -629,7 +629,7 @@ describe('AssistantMessage', () => {
     expect(screen.getByText(/执行命令/)).toBeInTheDocument()
   })
 
-  it('auto-collapses after streaming finishes even if disclosure was clicked while forced open', () => {
+  it('auto-collapses after streaming finishes even if disclosure was clicked while forced open', async () => {
     const runningEntry = createEntry({
       turns: [
         createTurn({
@@ -671,7 +671,7 @@ describe('AssistantMessage', () => {
       'false'
     )
     expect(screen.getByText('最终答复')).toBeInTheDocument()
-    expect(screen.queryByText('FINAL TURN')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('FINAL TURN')).not.toBeInTheDocument())
   })
 
   it('collapses when final confirmed without tool calls', () => {
@@ -701,6 +701,122 @@ describe('AssistantMessage', () => {
     expect(screen.getByText('final reply text')).toBeInTheDocument()
     // Timeline should be hidden
     expect(screen.queryByText(/TURN/)).not.toBeInTheDocument()
+  })
+
+  describe('final reply independent of execution timeline', () => {
+    function createCompletedMultiTurnEntry(): AgentReplyEntry {
+      return createEntry({
+        content: '这是最终答复正文',
+        attempt: {
+          attemptId: 'run-1',
+          runId: 'run-1',
+          status: 'completed',
+          startedAt: '2026-07-21T00:00:00.000Z',
+          completedAt: '2026-07-21T00:00:05.000Z'
+        },
+        turns: [
+          createTurn({
+            steps: [
+              createTextStep({ index: 0, content: '第一回合中间文字' }),
+              createToolStep({
+                index: 1,
+                content: '读取配置',
+                toolName: 'read',
+                status: 'completed',
+                completedAt: '2026-07-21T00:00:02.000Z'
+              })
+            ],
+            status: 'completed',
+            completedAt: '2026-07-21T00:00:02.000Z'
+          }),
+          createTurn({
+            index: 1,
+            steps: [
+              createThinkingStep({
+                content: '末回合思考',
+                status: 'completed',
+                completedAt: '2026-07-21T00:00:04.000Z'
+              }),
+              createTextStep({ index: 1, content: '末回合原始文字应被剔除' })
+            ],
+            status: 'completed',
+            completedAt: '2026-07-21T00:00:05.000Z'
+          })
+        ]
+      })
+    }
+
+    it('shows final reply below even when timeline is expanded, without duplicating it in timeline', async () => {
+      render(<AssistantMessage entry={createCompletedMultiTurnEntry()} isStreaming={false} />)
+
+      // 收起态：最终回复可见，时间线隐藏
+      expect(screen.getByText('这是最终答复正文')).toBeInTheDocument()
+      expect(screen.queryByText(/TURN/)).not.toBeInTheDocument()
+
+      // 展开执行过程
+      fireEvent.click(screen.getByRole('button', { name: /已完成执行过程/ }))
+      await waitFor(() => expect(screen.getByText('末回合思考')).toBeInTheDocument())
+
+      // 展开后最终回复仍独立可见（来自 entry.content），且只出现一次
+      expect(screen.getAllByText('这是最终答复正文')).toHaveLength(1)
+      // 末回合的回复文字步骤从时间线里剔除，不重复展示
+      expect(screen.queryByText('末回合原始文字应被剔除')).not.toBeInTheDocument()
+      // 非末回合的中间文字仍保留在时间线里
+      expect(screen.getByText('第一回合中间文字')).toBeInTheDocument()
+    })
+
+    it('keeps final reply visible after collapsing the timeline again', async () => {
+      render(<AssistantMessage entry={createCompletedMultiTurnEntry()} isStreaming={false} />)
+
+      fireEvent.click(screen.getByRole('button', { name: /已完成执行过程/ }))
+      await waitFor(() => expect(screen.getByText('末回合思考')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByRole('button', { name: /已完成执行过程/ }))
+      await waitFor(() => expect(screen.queryByText('末回合思考')).not.toBeInTheDocument())
+
+      expect(screen.getByText('这是最终答复正文')).toBeInTheDocument()
+    })
+
+    it('only strips the final reply text step, keeping mid-turn text before tool calls in the last turn', async () => {
+      // 末回合内部：中间文字 → 工具 → 最终回复文字（=entry.content）
+      const entry = createEntry({
+        content: '末回合最终回复',
+        attempt: {
+          attemptId: 'run-1',
+          runId: 'run-1',
+          status: 'completed',
+          startedAt: '2026-07-21T00:00:00.000Z',
+          completedAt: '2026-07-21T00:00:05.000Z'
+        },
+        turns: [
+          createTurn({
+            index: 0,
+            steps: [
+              createTextStep({ index: 0, content: '末回合开头的中间文字' }),
+              createToolStep({
+                index: 1,
+                content: '读取文件',
+                toolName: 'read',
+                status: 'completed',
+                completedAt: '2026-07-21T00:00:02.000Z'
+              }),
+              createTextStep({ index: 2, content: '末回合最终回复' })
+            ],
+            status: 'completed',
+            completedAt: '2026-07-21T00:00:05.000Z'
+          })
+        ]
+      })
+
+      render(<AssistantMessage entry={entry} isStreaming={false} />)
+      fireEvent.click(screen.getByRole('button', { name: /已完成执行过程/ }))
+      await waitFor(() => expect(screen.getByText('读取文件')).toBeInTheDocument())
+
+      // 末回合开头的中间文字应保留在时间线里
+      expect(screen.getByText('末回合开头的中间文字')).toBeInTheDocument()
+      // 最终回复只在下方独立展示一次，不在时间线里重复
+      expect(screen.getAllByText('末回合最终回复')).toHaveLength(1)
+    })
   })
 
   describe('FailedFooter', () => {
