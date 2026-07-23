@@ -129,14 +129,16 @@ function buildRenderItemsFromTranscript(
     }
   }
 
-  // 响应等待提示：当本次执行尝试尚未产生可见 Agent 回复内容时，
-  // 在消息流末尾追加一个轻量占位。惰性宣告下，agent-reply 条目只有在
-  // 首个内容（思考 / 文字 / 工具步骤任一）到达时才宣告；因此只要最后一条
-  // 对话条目仍是用户消息（agent-reply 未宣告），就展示占位；一旦变为
-  // assistant-message，说明内容已开始到达，占位被真实执行历史 / 回复取代。
+  // 响应等待提示：当本次正在进行的执行尝试尚未宣告可见 Agent 回复时，
+  // 在消息流末尾追加一个轻量占位。惰性宣告下，agent-reply 条目只有在首个
+  // 内容（思考 / 文字 / 工具步骤任一）到达时才宣告，且带上 status='running'
+  // 的本次 attempt。因此“本次尝试已在响应”的充分条件是：最后一条对话条目
+  // 是 agent-reply 且其 attempt 仍在运行。重试等待窗口内，最后一条是旧的
+  // 已终结（failed / completed / cancelled）agent-reply，故仍展示占位。
   if (isAwaitingResponse) {
     const lastDialog = [...items].reverse().find((item) => item.type !== 'compaction')
-    const hasVisibleReply = lastDialog?.type === 'assistant-message'
+    const hasVisibleReply =
+      lastDialog?.type === 'assistant-message' && lastDialog.entry.attempt?.status === 'running'
     if (!hasVisibleReply) {
       items.push({ type: 'awaiting', renderIndex: renderIndex++ })
     }

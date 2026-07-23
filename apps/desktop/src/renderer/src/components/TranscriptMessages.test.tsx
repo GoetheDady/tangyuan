@@ -586,7 +586,11 @@ describe('TranscriptMessages', () => {
     defineMockApi()
     const transcript = createTranscriptSnapshot([
       createUserMessageEntry({ index: 0, content: '在吗' }),
-      createAgentReplyEntry({ index: 1, content: '在的' })
+      createAgentReplyEntry({
+        index: 1,
+        content: '在的',
+        attempt: createAttempt({ status: 'running', completedAt: null })
+      })
     ])
 
     render(
@@ -660,6 +664,34 @@ describe('TranscriptMessages', () => {
     )
 
     expect(screen.queryByTestId('awaiting-response-indicator')).not.toBeInTheDocument()
+  })
+
+  it('shows waiting indicator during retry before the new attempt announces its reply', () => {
+    defineMockApi()
+    // 重试等待窗口：旧失败的 agent-reply 仍在，新尝试已开始但尚未宣告新回复。
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: '部署' }),
+      createAgentReplyEntry({
+        index: 1,
+        content: '',
+        attempt: createAttempt({
+          attemptId: 'attempt-failed',
+          status: 'failed',
+          error: { code: 'unknown', message: '失败', recoverable: true }
+        })
+      })
+    ])
+
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming
+        isAwaitingResponse
+        sessionId="session-1"
+      />
+    )
+
+    expect(screen.getByTestId('awaiting-response-indicator')).toBeInTheDocument()
   })
 
   it('provides stable key for retry attempts via attemptId', () => {
