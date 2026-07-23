@@ -1210,11 +1210,15 @@ class DefaultTangyuanRuntime {
       requestBashApproval: async (params) => {
         const approvalId = crypto.randomUUID()
         const now = new Date().toISOString()
+        // bash 工具在 session 建立时构造，那时还没有 runId；
+        // 真正执行时一定处于某个 active run 内，用它补齐。
+        const runId =
+          params.runId || this.activeRunIds.get(params.sessionId) || ''
         const request: BashApprovalRequest = {
           approvalId,
           agentId: params.agentId,
           sessionId: params.sessionId,
-          runId: params.runId,
+          runId,
           command: params.command,
           cwd: params.cwd,
           riskDescription: params.riskDescription,
@@ -1242,11 +1246,13 @@ class DefaultTangyuanRuntime {
       requestClarification: async (params) => {
         const clarificationId = crypto.randomUUID()
         const now = new Date().toISOString()
+        const runId =
+          params.runId || this.activeRunIds.get(params.sessionId) || ''
         const request: QuestionClarificationRequest = {
           clarificationId,
           agentId: params.agentId,
           sessionId: params.sessionId,
-          runId: params.runId,
+          runId,
           question: params.question,
           options: params.options,
           allowCustomAnswer: params.allowCustomAnswer,
