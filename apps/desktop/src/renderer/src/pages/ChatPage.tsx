@@ -457,7 +457,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
           >
             <div className="window-no-drag relative z-50 p-[8px_10px_10px]">
               <Button
-                className="h-9 w-full gap-1.5 rounded-lg px-2 text-caption font-semibold"
+                className="h-9 w-full gap-1.5 rounded-lg px-2 text-label font-semibold"
                 onClick={() => {
                   void createSession()
                 }}
