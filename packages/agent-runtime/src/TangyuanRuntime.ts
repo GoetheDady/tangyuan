@@ -48,6 +48,8 @@ const INTERNAL_DRIVER_EVENT_TYPES = new Set([
   'message-delta',
   'message-completed',
   'activity-updated',
+  'turn-started',
+  'turn-ended',
 ])
 
 /**

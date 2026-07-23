@@ -2194,6 +2194,60 @@ describe('transcript turn/step tracking', () => {
       true,
     )
   })
+
+  it('never emits turn-started / turn-ended to public subscribers', async () => {
+    const session = createSessionSummary('session-1')
+    const runtimeDriver = createRuntimeDriver(createReadySnapshot())
+    const sessionDriver = createSessionDriver([session])
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver,
+      sessionDriver,
+    })
+
+    // 复刻 ipc.ts 的行为：每条公开事件都会被 agentEventSchema 校验后广播给渲染层。
+    const received: AgentEvent[] = []
+    runtime.subscribe((event) => {
+      agentEventSchema.parse(event)
+      received.push(event)
+    })
+
+    // turn-started / turn-ended 是 Runtime 内部事件，不应跨 IPC 暴露给 Renderer。
+    // 若泄漏到公开订阅者，会导致 agentEventSchema.parse 抛出 ZodError。
+    expect(() => {
+      sessionDriver.emit({
+        type: 'turn-started',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        runId: 'run-1',
+        turnIndex: 0,
+        occurredAt: '2026-07-21T00:00:00.000Z',
+      })
+    }).not.toThrow()
+
+    expect(() => {
+      sessionDriver.emit({
+        type: 'turn-ended',
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        runId: 'run-1',
+        turnIndex: 0,
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'hi' }],
+        } as never,
+        toolResults: [] as never,
+        occurredAt: '2026-07-21T00:00:00.000Z',
+      })
+    }).not.toThrow()
+
+    expect(
+      received.every(
+        (event) =>
+          (event.type as string) !== 'turn-started' &&
+          (event.type as string) !== 'turn-ended',
+      ),
+    ).toBe(true)
+  })
 })
 
 function createReadySnapshot(): RuntimeSnapshot {
