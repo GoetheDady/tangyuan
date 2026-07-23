@@ -233,7 +233,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-background px-6 py-8 text-foreground">
+      <main className="min-h-full bg-background px-6 py-8 text-foreground">
         <div className="mx-auto max-w-5xl">
           <p className="text-sm text-muted-foreground">正在加载 Agent 详情...</p>
         </div>
@@ -242,7 +242,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
   }
 
   return (
-    <main className="min-h-screen bg-background px-6 py-8 text-foreground">
+    <main className="min-h-full bg-background px-6 py-8 text-foreground">
       <div className="mx-auto max-w-5xl">
         <header className="mb-8">
           <div className="mb-4">

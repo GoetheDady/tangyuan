@@ -14,6 +14,7 @@ import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'r
 import { toast } from 'sonner'
 
 import { Toaster } from '@/components/ui/sonner'
+import { WindowShell } from '@/components/WindowShell'
 import { ChatGuard, LoadingScreen } from '@/pages/ChatPage'
 import { ConsoleProviderPage } from '@/pages/ConsoleProviderPage'
 import { ConsoleAgentListPage } from '@/pages/ConsoleAgentListPage'
@@ -77,7 +78,9 @@ export interface DesktopWorkbenchContext extends DesktopWorkbenchState, DesktopW
 function App(): React.JSX.Element {
   return (
     <HashRouter>
-      <RendererRoutes />
+      <WindowShell>
+        <RendererRoutes />
+      </WindowShell>
       <Toaster />
     </HashRouter>
   )

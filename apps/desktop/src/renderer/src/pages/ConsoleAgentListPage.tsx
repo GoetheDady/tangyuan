@@ -141,7 +141,7 @@ export function ConsoleAgentListPage(): React.JSX.Element {
   }
 
   return (
-    <main className="min-h-screen bg-background px-6 py-8 text-foreground">
+    <main className="min-h-full bg-background px-6 py-8 text-foreground">
       <div className="mx-auto max-w-5xl">
         <header className="mb-8">
           <div className="flex items-center gap-3">

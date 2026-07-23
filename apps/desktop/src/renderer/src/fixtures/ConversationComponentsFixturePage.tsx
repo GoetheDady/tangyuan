@@ -398,7 +398,7 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
 
   return (
     <main
-      className="min-h-screen overflow-x-hidden bg-background px-6 py-10 text-foreground"
+      className="min-h-full overflow-x-hidden bg-background px-6 py-10 text-foreground"
       data-fixture="conversation-components-v1"
     >
       <div className="mx-auto max-w-6xl space-y-12">

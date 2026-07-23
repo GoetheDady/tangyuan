@@ -201,7 +201,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
   // ===== 加载态 =====
   if (isLoading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-background text-foreground">
+      <main className="grid min-h-full place-items-center bg-background text-foreground">
         <div className="text-sm text-muted-foreground">正在打开控制台...</div>
       </main>
     )
@@ -214,7 +214,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
   if (isConfigCorrupted) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
+      <main className="flex min-h-full items-center justify-center bg-background px-6 text-foreground">
         <div className="w-full max-w-[520px] space-y-6">
           {/* 警告图标 */}
           <div className="grid size-11 place-items-center rounded-xl bg-warning-soft">
@@ -297,7 +297,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
   // ===== 默认 / 验证中 / 验证失败态 =====
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
+    <main className="flex min-h-full items-center justify-center bg-background px-6 text-foreground">
       <div className="w-full max-w-[520px] space-y-5">
         {/* 表单头部 */}
         <div className="space-y-2">

@@ -390,11 +390,8 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     }
   }
 
-  const isElectron =
-    typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes(' electron/')
-
   return (
-    <main className="h-screen overflow-hidden bg-background text-foreground">
+    <main className="h-full overflow-hidden bg-background text-foreground">
       <h1 className="sr-only">{activeAgentDisplayName}</h1>
       <p className="sr-only">大语言模型对话</p>
       <div className="grid h-full min-h-0 grid-cols-[292px_minmax(0,1fr)]">
@@ -405,17 +402,8 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
           <nav
             aria-label="Agent 切换"
             data-testid="chat-agent-rail"
-            className="window-drag-region flex min-h-0 flex-col items-center gap-2.5 border-r border-sidebar-border bg-background px-2.5 py-2"
+            className="flex min-h-0 flex-col items-center gap-2.5 border-r border-sidebar-border bg-background px-2.5 py-2"
           >
-            <div
-              aria-hidden="true"
-              className={`flex h-3 w-11 items-center gap-[7px] ${isElectron ? 'opacity-0' : ''}`}
-            >
-              <span className="size-2.5 rounded-full bg-destructive" />
-              <span className="size-2.5 rounded-full bg-warning" />
-              <span className="size-2.5 rounded-full bg-success" />
-            </div>
-
             {context.agents
               .filter((agent) => agent.status === 'active')
               .map((agent) => {
@@ -658,7 +646,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
  */
 export function LoadingScreen(): React.JSX.Element {
   return (
-    <main className="grid min-h-screen place-items-center bg-background text-foreground">
+    <main className="grid min-h-full place-items-center bg-background text-foreground">
       <div className="text-sm text-muted-foreground">正在打开汤圆...</div>
     </main>
   )
