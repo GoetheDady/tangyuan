@@ -209,6 +209,12 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     [context.sessions, context.selectedSessionId]
   )
   const isSelectedSessionRunning = selectedSession?.state === 'running'
+  // 响应等待提示信号：正在发送、排队或运行中。具体是否展示占位
+  // 由 TranscriptMessages 根据本次执行尝试是否已有可见回复内容判定。
+  const isAwaitingResponse =
+    context.isSendingMessage ||
+    selectedSession?.state === 'running' ||
+    selectedSession?.state === 'queued'
   const selectedTranscript =
     context.transcript?.sessionId === selectedSession?.sessionId ? context.transcript : null
 
@@ -542,6 +548,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
               key={selectedSession?.sessionId ?? 'no-session'}
               transcript={selectedTranscript}
               isStreaming={isSelectedSessionRunning}
+              isAwaitingResponse={isAwaitingResponse}
               sessionId={selectedSession?.sessionId ?? null}
               onRetry={(userMessageId) => {
                 void retryMessage(userMessageId)

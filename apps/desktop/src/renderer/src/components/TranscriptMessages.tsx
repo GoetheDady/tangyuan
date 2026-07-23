@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { Sparkles } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { AssistantMessage, TIMELINE_TOGGLE_ANIMATION_MS } from './AssistantMessage'
+import { AwaitingResponseIndicator } from './AwaitingResponseIndicator'
 import { CompactionIndicator } from './CompactionIndicator'
 import { UserMessage } from './UserMessage'
 
@@ -19,6 +20,7 @@ type RenderItem =
     }
   | { type: 'assistant-message'; entry: AgentReplyEntry; isLastAgent: boolean; renderIndex: number }
   | { type: 'compaction'; timestamp: string; renderIndex: number }
+  | { type: 'awaiting'; renderIndex: number }
 
 /**
  * 距底部阈值（px）：scrollHeight - scrollTop - clientHeight 小于此值时视为"在底部"。
@@ -32,7 +34,8 @@ const AT_BOTTOM_THRESHOLD = 50
 const ESTIMATED_SIZES: Record<RenderItem['type'], number> = {
   compaction: 48,
   'user-message': 112,
-  'assistant-message': 160
+  'assistant-message': 160,
+  awaiting: 44
 }
 
 /**
@@ -63,6 +66,9 @@ function getItemStableKey(item: RenderItem): string {
     const attemptId = item.entry.attempt?.attemptId ?? 'initial'
     return `${item.entry.index}-${item.entry.messageId}-${attemptId}`
   }
+  if (item.type === 'awaiting') {
+    return 'awaiting-indicator'
+  }
   return `compaction-${item.timestamp}-${item.renderIndex}`
 }
 
@@ -81,12 +87,14 @@ function isDialogKind(kind: TranscriptEntry['kind']): boolean {
  *
  * @param entries - 结构化 transcript 条目列表。
  * @param isStreaming - 是否正在流式传输中。
+ * @param isAwaitingResponse - 是否处于响应等待提示状态。
  * @returns 可传入虚拟列表的 RenderItem 数组。
  * @throws 此方法不会主动抛出错误。
  */
 function buildRenderItemsFromTranscript(
   entries: readonly TranscriptEntry[],
-  isStreaming: boolean
+  isStreaming: boolean,
+  isAwaitingResponse: boolean
 ): RenderItem[] {
   const dialogCount = entries.filter((e) => isDialogKind(e.kind)).length
   const items: RenderItem[] = []
@@ -121,6 +129,19 @@ function buildRenderItemsFromTranscript(
     }
   }
 
+  // 响应等待提示：当本次执行尝试尚未产生可见 Agent 回复内容时，
+  // 在消息流末尾追加一个轻量占位。惰性宣告下，agent-reply 条目只有在
+  // 首个内容（思考 / 文字 / 工具步骤任一）到达时才宣告；因此只要最后一条
+  // 对话条目仍是用户消息（agent-reply 未宣告），就展示占位；一旦变为
+  // assistant-message，说明内容已开始到达，占位被真实执行历史 / 回复取代。
+  if (isAwaitingResponse) {
+    const lastDialog = [...items].reverse().find((item) => item.type !== 'compaction')
+    const hasVisibleReply = lastDialog?.type === 'assistant-message'
+    if (!hasVisibleReply) {
+      items.push({ type: 'awaiting', renderIndex: renderIndex++ })
+    }
+  }
+
   return items
 }
 
@@ -143,6 +164,8 @@ export interface TranscriptMessagesProps {
   transcript?: TranscriptSnapshot | null
   /** 是否正在流式接收 Agent 回复。 */
   isStreaming: boolean
+  /** 是否处于响应等待提示状态（执行尝试已开始但尚未产生可见内容）。 */
+  isAwaitingResponse?: boolean
   /** 当前选中会话的标识；为 null 时不展示消息。 */
   sessionId: string | null
   /** 重试回调；传入失败条目的 inReplyTo 用户消息标识。 */
@@ -170,6 +193,7 @@ export interface TranscriptMessagesProps {
 export function TranscriptMessages({
   transcript,
   isStreaming,
+  isAwaitingResponse = false,
   sessionId,
   onRetry
 }: TranscriptMessagesProps): React.JSX.Element {
@@ -180,9 +204,9 @@ export function TranscriptMessages({
   const renderItems = useMemo(
     () =>
       transcript && transcript.entries.length > 0
-        ? buildRenderItemsFromTranscript(transcript.entries, isStreaming)
+        ? buildRenderItemsFromTranscript(transcript.entries, isStreaming, isAwaitingResponse)
         : [],
-    [transcript, isStreaming]
+    [transcript, isStreaming, isAwaitingResponse]
   )
 
   const virtualizer = useVirtualizer({
@@ -389,6 +413,8 @@ export function TranscriptMessages({
             >
               {item.type === 'compaction' ? (
                 <CompactionIndicator timestamp={item.timestamp} />
+              ) : item.type === 'awaiting' ? (
+                <AwaitingResponseIndicator />
               ) : item.type === 'user-message' ? (
                 <div className="py-2.5">
                   <article className="flex justify-end">

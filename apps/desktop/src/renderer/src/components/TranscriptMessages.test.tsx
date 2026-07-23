@@ -564,6 +564,104 @@ describe('TranscriptMessages', () => {
     expect(renderedItems.length).toBeGreaterThan(0)
   })
 
+  it('shows waiting indicator when awaiting response after a user message', () => {
+    defineMockApi()
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: '在吗' })
+    ])
+
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        isAwaitingResponse
+        sessionId="session-1"
+      />
+    )
+
+    expect(screen.getByTestId('awaiting-response-indicator')).toBeInTheDocument()
+  })
+
+  it('hides waiting indicator once agent reply has visible content', () => {
+    defineMockApi()
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: '在吗' }),
+      createAgentReplyEntry({ index: 1, content: '在的' })
+    ])
+
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming
+        isAwaitingResponse
+        sessionId="session-1"
+      />
+    )
+
+    expect(screen.queryByTestId('awaiting-response-indicator')).not.toBeInTheDocument()
+  })
+
+  it('does not show waiting indicator when not awaiting response', () => {
+    defineMockApi()
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: '在吗' })
+    ])
+
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        isAwaitingResponse={false}
+        sessionId="session-1"
+      />
+    )
+
+    expect(screen.queryByTestId('awaiting-response-indicator')).not.toBeInTheDocument()
+  })
+
+  it('hides waiting indicator once agent reply is announced with only a thinking step', () => {
+    defineMockApi()
+    // 惰性宣告：首个到达的是思考步骤，agent-reply 已宣告但 content 仍为空。
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: '在吗' }),
+      createAgentReplyEntry({
+        index: 1,
+        content: '',
+        attempt: createAttempt({ status: 'running', completedAt: null }),
+        turns: [
+          {
+            index: 0,
+            runId: 'run-1',
+            steps: [
+              {
+                index: 0,
+                kind: 'thinking',
+                content: '分析中...',
+                status: 'running',
+                startedAt: FIXED_TIME,
+                completedAt: null
+              }
+            ],
+            status: 'running',
+            startedAt: FIXED_TIME,
+            completedAt: null
+          }
+        ]
+      })
+    ])
+
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming
+        isAwaitingResponse
+        sessionId="session-1"
+      />
+    )
+
+    expect(screen.queryByTestId('awaiting-response-indicator')).not.toBeInTheDocument()
+  })
+
   it('provides stable key for retry attempts via attemptId', () => {
     defineMockApi()
     const entry1 = createAgentReplyEntry({
