@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { assembleRunTurn } from './run-turn-assembly'
 import {
   createToolStepSummary,
+  buildTranscriptSnapshotFromSdkEntries,
   createToolActivityLabel,
   normalizePiSdkSessionEvent,
 } from './utils'
@@ -127,7 +129,12 @@ describe('normalizePiSdkSessionEvent turn events', () => {
       content: [{ type: 'text', text: '完成' }],
     }
     const toolResults = [
-      { role: 'toolResult', toolCallId: 'tc-1', toolName: 'read', isError: false },
+      {
+        role: 'toolResult',
+        toolCallId: 'tc-1',
+        toolName: 'read',
+        isError: false,
+      },
     ]
     expect(
       normalizePiSdkSessionEvent({ type: 'turn_end', message, toolResults }),
@@ -136,12 +143,160 @@ describe('normalizePiSdkSessionEvent turn events', () => {
 
   it('defaults toolResults to an empty array when turn_end omits them', () => {
     const message = { role: 'assistant', content: [] }
-    expect(
-      normalizePiSdkSessionEvent({ type: 'turn_end', message }),
-    ).toEqual([{ type: 'turn-ended', message, toolResults: [] }])
+    expect(normalizePiSdkSessionEvent({ type: 'turn_end', message })).toEqual([
+      { type: 'turn-ended', message, toolResults: [] },
+    ])
   })
 
   it('ignores turn_end without a valid message', () => {
     expect(normalizePiSdkSessionEvent({ type: 'turn_end' })).toEqual([])
+  })
+})
+
+describe('buildTranscriptSnapshotFromSdkEntries', () => {
+  type TurnMessage = Parameters<typeof assembleRunTurn>[0]['message']
+  type ToolResult = Parameters<typeof assembleRunTurn>[0]['toolResults'][number]
+
+  const firstTurnMessage = {
+    role: 'assistant',
+    content: [
+      { type: 'thinking', thinking: '先读取配置' },
+      { type: 'text', text: '我先检查配置。' },
+      {
+        type: 'toolCall',
+        id: 'tool-1',
+        name: 'read',
+        arguments: { path: '/secret/config.json' },
+      },
+    ],
+  } as TurnMessage
+  const firstToolResult = {
+    role: 'toolResult',
+    toolCallId: 'tool-1',
+    toolName: 'read',
+    content: [{ type: 'text', text: '敏感原始输出' }],
+    isError: false,
+  } as ToolResult
+  const finalTurnMessage = {
+    role: 'assistant',
+    content: [
+      { type: 'thinking', thinking: '整理结论' },
+      { type: 'text', text: '配置' },
+      { type: 'text', text: '检查完成。' },
+    ],
+  } as TurnMessage
+  const secondReplyMessage = {
+    role: 'assistant',
+    content: [{ type: 'text', text: '第二个请求也完成了。' }],
+  } as TurnMessage
+
+  it('按消息序列重建多回合回复，并与实时组装路径一致', () => {
+    const snapshot = buildTranscriptSnapshotFromSdkEntries(
+      [
+        {
+          type: 'message',
+          id: 'user-1',
+          timestamp: '2026-07-23T01:00:00.000Z',
+          message: { role: 'user', content: '检查配置' },
+        },
+        {
+          type: 'message',
+          id: 'assistant-1',
+          timestamp: '2026-07-23T01:00:01.000Z',
+          message: firstTurnMessage,
+        },
+        {
+          type: 'message',
+          id: 'tool-result-1',
+          timestamp: '2026-07-23T01:00:02.000Z',
+          message: firstToolResult,
+        },
+        {
+          type: 'message',
+          id: 'assistant-2',
+          timestamp: '2026-07-23T01:00:03.000Z',
+          message: finalTurnMessage,
+        },
+        {
+          type: 'message',
+          id: 'user-2',
+          timestamp: '2026-07-23T01:01:00.000Z',
+          message: { role: 'user', content: '继续检查' },
+        },
+        {
+          type: 'message',
+          id: 'assistant-3',
+          timestamp: '2026-07-23T01:01:01.000Z',
+          message: secondReplyMessage,
+        },
+      ],
+      'session-1',
+      'tangyuan',
+    )
+
+    expect(snapshot.entries).toHaveLength(4)
+    expect(snapshot.entries[0]).toMatchObject({
+      kind: 'user-message',
+      index: 0,
+      messageId: 'user-1',
+      content: '检查配置',
+    })
+
+    const firstReply = snapshot.entries[1]
+    expect(firstReply).toMatchObject({
+      kind: 'agent-reply',
+      index: 1,
+      messageId: 'assistant-1',
+      content: '配置检查完成。',
+      createdAt: '2026-07-23T01:00:01.000Z',
+      attempt: null,
+    })
+    if (firstReply?.kind !== 'agent-reply') {
+      throw new Error('预期第二条 transcript entry 为 agent-reply')
+    }
+    expect(firstReply.turns).toEqual([
+      assembleRunTurn({
+        turnIndex: 0,
+        runId: 'assistant-1',
+        message: firstTurnMessage,
+        toolResults: [firstToolResult],
+        startedAt: '2026-07-23T01:00:01.000Z',
+        completedAt: '2026-07-23T01:00:02.000Z',
+      }),
+      assembleRunTurn({
+        turnIndex: 1,
+        runId: 'assistant-1',
+        message: finalTurnMessage,
+        toolResults: [],
+        startedAt: '2026-07-23T01:00:03.000Z',
+        completedAt: '2026-07-23T01:00:03.000Z',
+      }),
+    ])
+    expect(firstReply.turns[0]?.steps[2]?.content).toBe('读取文件')
+    expect(firstReply.turns[0]?.steps[2]?.content).not.toContain('/secret')
+    expect(firstReply.turns[0]?.steps[2]?.content).not.toContain('敏感原始输出')
+
+    expect(snapshot.entries[2]).toMatchObject({
+      kind: 'user-message',
+      index: 2,
+      messageId: 'user-2',
+      content: '继续检查',
+    })
+    expect(snapshot.entries[3]).toMatchObject({
+      kind: 'agent-reply',
+      index: 3,
+      messageId: 'assistant-3',
+      content: '第二个请求也完成了。',
+      turns: [
+        assembleRunTurn({
+          turnIndex: 0,
+          runId: 'assistant-3',
+          message: secondReplyMessage,
+          toolResults: [],
+          startedAt: '2026-07-23T01:01:01.000Z',
+          completedAt: '2026-07-23T01:01:01.000Z',
+        }),
+      ],
+    })
   })
 })

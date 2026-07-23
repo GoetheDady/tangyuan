@@ -301,6 +301,23 @@ describe('TranscriptEmitter tool step handling', () => {
     }
   })
 
+  it('uses the last turn text as the reply content, including an empty final turn', () => {
+    const { emitter, getSnapshot } = createEmitter()
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+
+    emitTurnStarted(emitter, 0)
+    emitTurnEnded(emitter, 0, [{ type: 'text', text: '中间结论' }] as never)
+    emitTurnStarted(emitter, 1)
+    emitTurnEnded(emitter, 1, [{ type: 'thinking', thinking: '收尾' }] as never)
+
+    const entry = getSnapshot('session-1')?.entries[0]
+    expect(entry?.kind).toBe('agent-reply')
+    if (entry?.kind === 'agent-reply') {
+      expect(entry.content).toBe('')
+    }
+  })
+
   it('keeps failed tool in timeline (does not advance turn on failure alone)', () => {
     const { emitter, getSnapshot } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')

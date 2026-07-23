@@ -1,13 +1,16 @@
 import type { TurnEndEvent } from '@earendil-works/pi-coding-agent'
 import type { RunTurn, TurnStep } from '@tangyuan/contracts'
-import { createToolStepSummary } from './utils'
+import { createToolStepSummary } from './tool-step-summary'
 
 /**
  * SDK `turn_end` 携带的 assistant message（从广義 AgentMessage 联合中窄化）。
  *
  * 其 content 为 `(TextContent | ThinkingContent | ToolCall)[]`，按产生顺序保留三类块。
  */
-type TurnAssistantMessage = Extract<TurnEndEvent['message'], { role: 'assistant' }>
+export type TurnAssistantMessage = Extract<
+  TurnEndEvent['message'],
+  { role: 'assistant' }
+>
 
 /**
  * 组装单个回合所需的输入。

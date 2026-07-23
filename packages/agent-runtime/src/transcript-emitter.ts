@@ -272,8 +272,8 @@ export class TranscriptEmitter {
 
     const updatedEntry: AgentReplyEntry = {
       ...entry,
+      content: turnText,
       turns,
-      ...(turnText ? { content: turnText } : {}),
     }
 
     const delta: TranscriptDelta = {

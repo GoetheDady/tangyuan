@@ -1356,6 +1356,10 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
           completedAt: persisted.completedAt,
           ...(persisted.error ? { error: persisted.error } : {}),
         },
+        turns: entry.turns.map((turn) => ({
+          ...turn,
+          runId: persisted.runId,
+        })),
         ...(persisted.inReplyTo ? { inReplyTo: persisted.inReplyTo } : {}),
       }
     })
