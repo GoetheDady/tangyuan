@@ -402,8 +402,10 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
           <nav
             aria-label="Agent 切换"
             data-testid="chat-agent-rail"
-            className="flex min-h-0 flex-col items-center gap-2.5 border-r border-sidebar-border bg-background px-2.5 py-2"
+            className="window-no-drag relative z-50 flex min-h-0 flex-col items-center gap-2.5 border-r border-sidebar-border bg-background px-2.5 py-2"
           >
+            <div aria-hidden="true" className="h-9 shrink-0" />
+
             {context.agents
               .filter((agent) => agent.status === 'active')
               .map((agent) => {
@@ -447,7 +449,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
             data-testid="chat-session-pane"
             className="flex min-h-0 min-w-0 flex-col bg-sidebar"
           >
-            <div className="p-[8px_10px_10px]">
+            <div className="window-no-drag relative z-50 p-[8px_10px_10px]">
               <Button
                 className="h-9 w-full gap-1.5 rounded-lg px-2 text-[11px] font-semibold"
                 onClick={() => {

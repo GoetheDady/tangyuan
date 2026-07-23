@@ -245,7 +245,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
     <main className="min-h-full bg-background px-6 py-8 text-foreground">
       <div className="mx-auto max-w-5xl">
         <header className="mb-8">
-          <div className="mb-4">
+          <div className="window-no-drag relative z-50 mb-4">
             <Link to="/console/agents">
               <Button variant="ghost" size="sm">
                 <ArrowLeft aria-hidden="true" />
