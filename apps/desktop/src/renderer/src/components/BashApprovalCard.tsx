@@ -179,7 +179,7 @@ export function BashApprovalCard({
                 className="shrink-0 text-success-foreground"
                 aria-hidden="true"
               />
-              <span className="text-xs font-semibold text-success-foreground">
+              <span className="text-label font-semibold text-success-foreground">
                 已处理
               </span>
             </>
@@ -190,10 +190,10 @@ export function BashApprovalCard({
                 className="shrink-0 text-warning-foreground"
                 aria-hidden="true"
               />
-              <span className="text-xs font-semibold text-warning-foreground">
+              <span className="text-label font-semibold text-warning-foreground">
                 待审批
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-label text-muted-foreground">
                 Bash 命令执行审批
               </span>
             </>
@@ -212,7 +212,7 @@ export function BashApprovalCard({
             </label>
             <pre
               id={`approval-command-${approval.approvalId}`}
-              className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs leading-5"
+              className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-mono"
               tabIndex={0}
               aria-label={`命令：${approval.command}`}
             >
@@ -221,7 +221,7 @@ export function BashApprovalCard({
           </div>
 
           {/* 工作目录 */}
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-label text-muted-foreground">
             <span className="text-[10px] font-semibold uppercase tracking-wider">
               工作目录
             </span>
@@ -232,7 +232,7 @@ export function BashApprovalCard({
 
           {/* 风险说明 */}
           <div
-            className="rounded-md bg-destructive-soft/10 px-3 py-2 text-xs text-muted-foreground"
+            className="rounded-md bg-destructive-soft/10 px-3 py-2 text-label text-muted-foreground"
             role="alert"
             aria-label={`风险说明：${approval.riskDescription}`}
           >
@@ -248,7 +248,7 @@ export function BashApprovalCard({
 
           {/* 安全警告 */}
           <p
-            className="text-[11px] text-destructive-soft-foreground"
+            className="text-caption text-destructive-soft-foreground"
             role="alert"
           >
             此命令将以当前 macOS 用户权限执行，请确认操作安全。
@@ -257,7 +257,7 @@ export function BashApprovalCard({
           {/* 错误消息 */}
           {errorMessage && (
             <div
-              className="rounded-md bg-destructive-soft/20 px-3 py-2 text-xs text-destructive-foreground"
+              className="rounded-md bg-destructive-soft/20 px-3 py-2 text-label text-destructive-foreground"
               role="alert"
             >
               {errorMessage}
@@ -271,7 +271,7 @@ export function BashApprovalCard({
           <button
             ref={firstButtonRef}
             type="button"
-            className={`inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               isResolved
                 ? 'cursor-not-allowed border-border text-muted-foreground'
                 : 'border-destructive-border bg-background text-destructive hover:bg-destructive-soft/20'
@@ -293,7 +293,7 @@ export function BashApprovalCard({
           {/* 始终允许按钮 */}
           <button
             type="button"
-            className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               isResolved
                 ? 'cursor-not-allowed bg-muted text-muted-foreground'
                 : 'bg-secondary text-secondary-foreground hover:bg-split'
@@ -315,7 +315,7 @@ export function BashApprovalCard({
           {/* 允许本次按钮 */}
           <button
             type="button"
-            className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               isResolved
                 ? 'cursor-not-allowed bg-muted text-muted-foreground'
                 : 'bg-primary text-primary-foreground hover:bg-primary-hover'

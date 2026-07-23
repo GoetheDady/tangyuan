@@ -129,7 +129,7 @@ export function AssistantMessage({
   if (!hasTurns) {
     return (
       <article className="flex justify-start" aria-busy={isStreaming}>
-        <div className="w-full max-w-[640px] min-w-0 rounded-[7px] bg-background p-3.5 text-xs leading-[1.55] text-foreground">
+        <div className="w-full max-w-[640px] min-w-0 rounded-[7px] bg-background p-3.5 text-body text-foreground">
           <StreamdownMessage content={entry.content} isAnimating={isStreaming} />
         </div>
       </article>
@@ -155,27 +155,27 @@ export function AssistantMessage({
 
         {/* Final Body (shown when collapsed + final) */}
         {state === 'final-confirmed' && !isExpanded && entry.content && (
-          <div className="text-xs leading-[1.55]">
+          <div className="text-body">
             <StreamdownMessage content={entry.content} isAnimating={false} />
           </div>
         )}
 
         {/* Unconfirmed text (shown while streaming) */}
         {(state === 'unconfirmed-text' || state === 'active-tool-loop') && entry.content && (
-          <div className="rounded-md border border-warning-border bg-warning-soft px-2.5 py-2 text-[11px] text-warning-foreground">
+          <div className="rounded-md border border-warning-border bg-warning-soft px-2.5 py-2 text-caption text-warning-foreground">
             此文本尚未确认，后续仍可能出现工具调用。
           </div>
         )}
 
         {/* Cancelled / Failed footer */}
         {state === 'ended-nonfinal' && (
-          <div className="text-xs leading-[1.55]">
+          <div className="text-body">
             {entry.content ? (
               <StreamdownMessage content={entry.content} isAnimating={false} />
             ) : null}
             {entry.attempt?.status === 'cancelled' ? (
               <div
-                className="mt-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-foreground"
+                className="mt-2 rounded-md bg-warning-soft px-3 py-2 text-label text-warning-foreground"
                 role="status"
               >
                 此回复已在生成过程中被用户中断
@@ -261,7 +261,7 @@ function ExecutionDisclosure({
         }`}
         aria-hidden="true"
       />
-      <span className="text-[11px] font-semibold text-foreground">{label}</span>
+      <span className="text-caption font-semibold text-foreground">{label}</span>
       <span className="flex-1" />
       {meta && <span className="font-mono text-[9px] text-muted-foreground">{meta}</span>}
     </button>
@@ -436,8 +436,8 @@ function FailedFooter({
             aria-hidden="true"
           />
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-destructive-foreground">执行失败</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{errorMessage}</p>
+            <p className="text-label font-medium text-destructive-foreground">执行失败</p>
+            <p className="mt-0.5 text-label text-muted-foreground">{errorMessage}</p>
           </div>
         </div>
 
@@ -469,14 +469,14 @@ function FailedFooter({
 
       {/* 重试操作 */}
       <div className="rounded-md bg-muted px-3 py-2">
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-caption text-muted-foreground">
           Agent 在产生最终回复前失败。您可以重试本次执行，原始用户请求将被复用。
         </p>
         {onRetry && (
           <button
             type="button"
             onClick={onRetry}
-            className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-label font-medium text-primary-foreground hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <RefreshCw size={11} aria-hidden="true" />
             重试

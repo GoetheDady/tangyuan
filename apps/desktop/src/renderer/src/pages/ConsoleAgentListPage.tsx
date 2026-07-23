@@ -150,7 +150,7 @@ export function ConsoleAgentListPage(): React.JSX.Element {
             </div>
             <div>
               <h1 className="text-2xl font-semibold leading-tight">Agent 管理</h1>
-              <p className="text-sm text-muted-foreground">查看和管理所有 Agent 的状态与默认模型</p>
+              <p className="text-body text-muted-foreground">查看和管理所有 Agent 的状态与默认模型</p>
             </div>
           </div>
         </header>
@@ -159,15 +159,15 @@ export function ConsoleAgentListPage(): React.JSX.Element {
 
         {isLoading ? (
           <div className="rounded-lg border bg-card p-12 text-center">
-            <p className="text-sm text-muted-foreground">正在加载 Agent 列表...</p>
+            <p className="text-body text-muted-foreground">正在加载 Agent 列表...</p>
           </div>
         ) : allAgents.length === 0 ? (
           <div className="rounded-lg border bg-card p-12 text-center">
             <div className="mx-auto mb-4 grid size-12 place-items-center rounded-full bg-muted">
               <Bot size={22} className="text-muted-foreground" aria-hidden="true" />
             </div>
-            <h2 className="text-lg font-medium">暂无 Agent</h2>
-            <p className="mt-2 max-w-md mx-auto text-sm text-muted-foreground">
+            <h2 className="text-section-heading font-medium">暂无 Agent</h2>
+            <p className="mt-2 max-w-md mx-auto text-body text-muted-foreground">
               请先在控制台中配置模型服务，然后在汤圆对话中创建新的 Agent。
             </p>
             <div className="mt-6">
@@ -214,7 +214,7 @@ export function ConsoleAgentListPage(): React.JSX.Element {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2.5">
-                      <h3 className="truncate text-sm font-semibold">{agent.displayName}</h3>
+                      <h3 className="truncate text-body font-semibold">{agent.displayName}</h3>
                       {agent.agentId === 'tangyuan' ? (
                         <Badge variant="secondary">默认</Badge>
                       ) : null}
@@ -236,7 +236,7 @@ export function ConsoleAgentListPage(): React.JSX.Element {
                         </Tooltip>
                       ) : null}
                     </div>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                    <p className="mt-1 truncate text-label text-muted-foreground">
                       ID：{agent.agentId}
                       {agent.defaultProviderId && agent.defaultModelId
                         ? ` · 默认模型：${agent.defaultProviderId}/${agent.defaultModelId}`
@@ -289,8 +289,8 @@ export function ConsoleAgentListPage(): React.JSX.Element {
 
             {unclaimedDirectories.length > 0 ? (
               <div className="mt-8">
-                <h2 className="mb-3 text-lg font-semibold">未归属目录</h2>
-                <p className="mb-4 text-sm text-muted-foreground">
+                <h2 className="mb-3 text-section-heading font-semibold">未归属目录</h2>
+                <p className="mb-4 text-body text-muted-foreground">
                   以下目录存在于磁盘上但未在配置中注册，可认领为活跃 Agent。
                 </p>
                 <div className="space-y-3">
@@ -300,8 +300,8 @@ export function ConsoleAgentListPage(): React.JSX.Element {
                       className="flex items-center justify-between rounded-lg border border-dashed bg-card p-4"
                     >
                       <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-sm font-semibold">{dir.agentId}</h3>
-                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                        <h3 className="truncate text-body font-semibold">{dir.agentId}</h3>
+                        <p className="mt-1 truncate text-label text-muted-foreground">
                           路径：{dir.homePath}
                           {dir.hasSoul ? ' · 包含 soul.md' : ' · 缺少 soul.md'}
                         </p>

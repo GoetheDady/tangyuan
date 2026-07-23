@@ -233,13 +233,13 @@ export function QuestionClarificationCard({
           {isResolved ? (
             <>
               <Check size={14} className="shrink-0 text-success-foreground" aria-hidden="true" />
-              <span className="text-xs font-semibold text-success-foreground">已回答</span>
+              <span className="text-label font-semibold text-success-foreground">已回答</span>
             </>
           ) : (
             <>
               <HelpCircle size={14} className="shrink-0 text-primary" aria-hidden="true" />
-              <span className="text-xs font-semibold text-primary">待回答</span>
-              <span className="text-xs text-muted-foreground">Agent 需要更多信息</span>
+              <span className="text-label font-semibold text-primary">待回答</span>
+              <span className="text-label text-muted-foreground">Agent 需要更多信息</span>
             </>
           )}
         </div>
@@ -249,7 +249,7 @@ export function QuestionClarificationCard({
           {/* 问题文本 */}
           <div>
             <p
-              className="text-sm leading-relaxed text-foreground"
+              className="text-body leading-relaxed text-foreground"
               aria-label={`问题：${clarification.question}`}
             >
               {clarification.question}
@@ -263,7 +263,7 @@ export function QuestionClarificationCard({
                 key={option}
                 ref={index === 0 ? firstOptionRef : undefined}
                 type="button"
-                className={`flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                className={`flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isResolved
                     ? 'cursor-not-allowed border-border text-muted-foreground'
                     : 'border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
@@ -296,7 +296,7 @@ export function QuestionClarificationCard({
               {!showCustomInput && !isResolved ? (
                 <button
                   type="button"
-                  className={`flex w-full items-center gap-2 rounded-md border border-dashed px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  className={`flex w-full items-center gap-2 rounded-md border border-dashed px-3 py-2 text-left text-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     isResolved
                       ? 'cursor-not-allowed border-border text-muted-foreground'
                       : 'border-muted-foreground/30 bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground'
@@ -312,7 +312,7 @@ export function QuestionClarificationCard({
                   <input
                     ref={customInputRef}
                     type="text"
-                    className={`min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    className={`min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                       isResolved ? 'cursor-not-allowed text-muted-foreground' : 'border-input'
                     }`}
                     value={customAnswer}
@@ -323,7 +323,7 @@ export function QuestionClarificationCard({
                   />
                   <button
                     type="button"
-                    className={`inline-flex shrink-0 items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-md px-3 py-2 text-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                       isResolved || !customAnswer.trim()
                         ? 'cursor-not-allowed bg-muted text-muted-foreground'
                         : 'bg-primary text-primary-foreground hover:bg-primary-hover'
@@ -349,7 +349,7 @@ export function QuestionClarificationCard({
           {/* 错误消息 */}
           {errorMessage && (
             <div
-              className="rounded-md bg-destructive-soft/20 px-3 py-2 text-xs text-destructive-foreground"
+              className="rounded-md bg-destructive-soft/20 px-3 py-2 text-label text-destructive-foreground"
               role="alert"
             >
               {errorMessage}
@@ -362,7 +362,7 @@ export function QuestionClarificationCard({
           <div className="flex items-center justify-end gap-2 border-t border-primary-border/30 px-4 py-2.5">
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-label font-medium text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => {
                 void handleCancel()
               }}

@@ -324,7 +324,7 @@ export function TranscriptMessages({
           <div className="mx-auto mb-4 grid size-11 place-items-center rounded-md border bg-card">
             <Sparkles size={20} aria-hidden="true" />
           </div>
-          <p className="text-sm text-muted-foreground">选择一个会话后开始。</p>
+          <p className="text-body text-muted-foreground">选择一个会话后开始。</p>
         </div>
       </div>
     )
@@ -337,7 +337,7 @@ export function TranscriptMessages({
           <div className="mx-auto mb-4 grid size-11 place-items-center rounded-md border bg-card">
             <Sparkles size={20} aria-hidden="true" />
           </div>
-          <p className="text-sm text-muted-foreground">发送第一条消息开始会话。</p>
+          <p className="text-body text-muted-foreground">发送第一条消息开始会话。</p>
         </div>
       </div>
     )
@@ -369,7 +369,7 @@ export function TranscriptMessages({
               ) : item.type === 'user-message' ? (
                 <div className="py-2.5">
                   <article className="flex justify-end">
-                    <div className="flex max-w-[360px] min-w-0 flex-col gap-1.5 rounded-[16px_16px_4px_16px] bg-secondary px-4 py-3 text-sm leading-[1.55] text-secondary-foreground">
+                    <div className="flex max-w-[360px] min-w-0 flex-col gap-1.5 rounded-[16px_16px_4px_16px] bg-secondary px-4 py-3 text-body text-secondary-foreground">
                       <UserMessage content={item.content} />
                       <time
                         dateTime={item.createdAt}

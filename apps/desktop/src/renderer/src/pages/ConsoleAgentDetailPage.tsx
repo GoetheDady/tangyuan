@@ -235,7 +235,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
     return (
       <main className="min-h-full bg-background px-6 py-8 text-foreground">
         <div className="mx-auto max-w-5xl">
-          <p className="text-sm text-muted-foreground">正在加载 Agent 详情...</p>
+          <p className="text-body text-muted-foreground">正在加载 Agent 详情...</p>
         </div>
       </main>
     )
@@ -261,7 +261,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
               <h1 className="text-2xl font-semibold leading-tight">
                 {agent?.displayName ?? 'Agent 详情'}
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-body text-muted-foreground">
                 {agentId ? `ID: ${agentId}` : '配置 Agent 默认模型和状态'}
               </p>
             </div>
@@ -275,23 +275,23 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
             <div className="mx-auto mb-4 grid size-12 place-items-center rounded-full bg-muted">
               <Settings size={22} className="text-muted-foreground" aria-hidden="true" />
             </div>
-            <h2 className="text-lg font-medium">Agent 未找到</h2>
-            <p className="mt-2 max-w-md mx-auto text-sm text-muted-foreground">
+            <h2 className="text-section-heading font-medium">Agent 未找到</h2>
+            <p className="mt-2 max-w-md mx-auto text-body text-muted-foreground">
               找不到 Agent「{agentId}」。可能已被删除或 ID 不正确。
             </p>
           </div>
         ) : (
           <div className="space-y-6">
             <div className="rounded-lg border bg-card p-6">
-              <h2 className="mb-4 text-lg font-semibold">基本信息</h2>
-              <dl className="space-y-3 text-sm">
+              <h2 className="mb-4 text-section-heading font-semibold">基本信息</h2>
+              <dl className="space-y-3 text-body">
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">展示名称</dt>
                   <dd className="font-medium">{agent.displayName}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">Agent ID</dt>
-                  <dd className="max-w-[300px] truncate font-mono text-xs">{agent.agentId}</dd>
+                  <dd className="max-w-[300px] truncate text-mono">{agent.agentId}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">状态</dt>
@@ -326,7 +326,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                         onValueChange={handleProviderChange}
                         disabled={isSaving}
                       >
-                        <SelectTrigger className="h-8 text-xs">
+                        <SelectTrigger className="h-8 text-label">
                           <SelectValue placeholder="选择 Provider" />
                         </SelectTrigger>
                         <SelectContent>
@@ -351,7 +351,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                         onValueChange={handleModelChange}
                         disabled={isSaving || !selectedProviderId}
                       >
-                        <SelectTrigger className="h-8 text-xs">
+                        <SelectTrigger className="h-8 text-label">
                           <SelectValue
                             placeholder={selectedProviderId ? '选择 Model' : '请先选择 Provider'}
                           />
@@ -381,20 +381,20 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
             {/* Skills 区域 */}
             <div className="rounded-lg border bg-card p-6">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Skills</h2>
+                <h2 className="text-section-heading font-semibold">Skills</h2>
                 {skills ? (
-                  <span className="text-xs text-muted-foreground">{skills.length} 个 Skill</span>
+                  <span className="text-label text-muted-foreground">{skills.length} 个 Skill</span>
                 ) : null}
               </div>
               {isLoadingSkills ? (
-                <p className="text-sm text-muted-foreground">正在加载 Skills...</p>
+                <p className="text-body text-muted-foreground">正在加载 Skills...</p>
               ) : !skills || skills.length === 0 ? (
                 <div className="rounded-md bg-muted/50 px-4 py-8 text-center">
                   <div className="mx-auto mb-3 grid size-10 place-items-center rounded-full bg-muted">
                     <Puzzle size={18} className="text-muted-foreground" aria-hidden="true" />
                   </div>
-                  <p className="text-sm font-medium text-muted-foreground">暂无 Skill</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="text-body font-medium text-muted-foreground">暂无 Skill</p>
+                  <p className="mt-1 text-label text-muted-foreground">
                     将 Skill 目录放入 Agent 专属或共享 Skills 目录后即可在此查看。
                   </p>
                 </div>
@@ -410,7 +410,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="truncate text-sm font-medium">{skill.name}</h3>
+                          <h3 className="truncate text-body font-medium">{skill.name}</h3>
                           <Badge
                             variant={skill.source === 'agent' ? 'default' : 'secondary'}
                             className="shrink-0"
@@ -435,7 +435,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                           ) : null}
                         </div>
                         {skill.description ? (
-                          <p className="mt-1 truncate text-xs text-muted-foreground">
+                          <p className="mt-1 truncate text-label text-muted-foreground">
                             {skill.description}
                           </p>
                         ) : null}
@@ -452,17 +452,17 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
             {/* Skill 安装记录 */}
             <div className="rounded-lg border bg-card p-6">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold">安装记录</h2>
+                <h2 className="text-section-heading font-semibold">安装记录</h2>
                 {installRecords ? (
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-label text-muted-foreground">
                     {installRecords.length} 条记录
                   </span>
                 ) : null}
               </div>
               {!installRecords || installRecords.length === 0 ? (
                 <div className="rounded-md bg-muted/50 px-4 py-6 text-center">
-                  <p className="text-sm text-muted-foreground">暂无安装记录</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="text-body text-muted-foreground">暂无安装记录</p>
+                  <p className="mt-1 text-label text-muted-foreground">
                     通过控制台或汤圆对话安装 Skill 后，记录会出现在此处。
                   </p>
                 </div>
@@ -478,7 +478,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="truncate text-sm font-medium">{record.skillName}</h3>
+                          <h3 className="truncate text-body font-medium">{record.skillName}</h3>
                           <Badge
                             variant={record.source === 'agent' ? 'default' : 'secondary'}
                             className="shrink-0"
@@ -546,7 +546,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                 </Button>
               ) : null}
               {agent.agentId === 'tangyuan' && agent.directoryStatus !== 'damaged' ? (
-                <p className="text-xs text-muted-foreground">默认 Agent 不可归档</p>
+                <p className="text-label text-muted-foreground">默认 Agent 不可归档</p>
               ) : null}
             </div>
           </div>

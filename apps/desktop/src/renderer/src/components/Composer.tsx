@@ -158,7 +158,7 @@ export function Composer({
         <Textarea
           ref={textareaRef}
           id="composer"
-          className="max-h-40 min-h-[52px] resize-none rounded-none border-0 bg-transparent px-0 py-0 text-sm leading-[1.55] shadow-none placeholder:text-disabled-foreground hover:border-0 focus-visible:border-0 focus-visible:ring-0"
+          className="max-h-40 min-h-[52px] resize-none rounded-none border-0 bg-transparent px-0 py-0 text-body shadow-none placeholder:text-disabled-foreground hover:border-0 focus-visible:border-0 focus-visible:ring-0"
           placeholder={placeholder}
           value={value}
           onChange={(event) => {
@@ -178,7 +178,7 @@ export function Composer({
         <Separator />
 
         <div className="flex min-h-10 items-end justify-between gap-2 pt-2.5">
-          <div className="flex min-w-0 flex-1 items-center gap-2.5 text-[11px] text-muted-foreground">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 text-caption text-muted-foreground">
             {sessionModelInfo ? (
               <Select
                 value={sessionModelInfo.modelId}
@@ -190,7 +190,7 @@ export function Composer({
                 <SelectTrigger
                   aria-label="模型"
                   size="sm"
-                  className="h-[26px] w-auto min-w-0 gap-1 rounded-md border-0 bg-secondary px-2.5 text-[11px] font-medium text-secondary-foreground"
+                  className="h-[26px] w-auto min-w-0 gap-1 rounded-md border-0 bg-secondary px-2.5 text-caption font-medium text-secondary-foreground"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -215,7 +215,7 @@ export function Composer({
                 <SelectTrigger
                   aria-label="思考强度"
                   size="sm"
-                  className="h-6 w-[96px] gap-1.5 border-0 bg-transparent p-0 text-[11px] text-muted-foreground hover:border-0 [&>svg]:hidden"
+                  className="h-6 w-[96px] gap-1.5 border-0 bg-transparent p-0 text-caption text-muted-foreground hover:border-0 [&>svg]:hidden"
                 >
                   <span>思考</span>
                   <span className="relative h-[5px] w-16 shrink-0 rounded-full bg-border">

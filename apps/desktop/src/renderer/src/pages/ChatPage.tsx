@@ -417,7 +417,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                     aria-label={`切换到 Agent ${agent.displayName}`}
                     aria-current={isActive ? 'page' : undefined}
                     title={agent.displayName}
-                    className={`window-no-drag grid size-9 shrink-0 place-items-center rounded-[10px] border text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
+                    className={`window-no-drag grid size-9 shrink-0 place-items-center rounded-[10px] border text-label font-semibold transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
                       isActive
                         ? 'border-primary bg-primary text-primary-foreground'
                         : 'border-border bg-secondary text-foreground hover:bg-accent'
@@ -451,7 +451,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
           >
             <div className="window-no-drag relative z-50 p-[8px_10px_10px]">
               <Button
-                className="h-9 w-full gap-1.5 rounded-lg px-2 text-[11px] font-semibold"
+                className="h-9 w-full gap-1.5 rounded-lg px-2 text-caption font-semibold"
                 onClick={() => {
                   void createSession()
                 }}
@@ -482,7 +482,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                           <button
                             key={session.sessionId}
                             type="button"
-                            className={`flex h-10 w-full items-center gap-1.5 rounded-lg px-2.5 text-left text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
+                            className={`flex h-10 w-full cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-left text-caption transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
                               isSelected
                                 ? 'bg-secondary text-foreground'
                                 : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -495,7 +495,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                             }}
                           >
                             <span
-                              className={`min-w-0 flex-1 truncate ${isSelected ? 'font-semibold' : 'font-medium'}`}
+                              className={`min-w-0 flex-1 truncate text-body ${isSelected ? 'font-semibold' : 'font-medium'}`}
                             >
                               {session.title}
                             </span>
@@ -520,7 +520,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                   ))}
                 </div>
               ) : (
-                <div className="px-2.5 py-3 text-[11px] text-muted-foreground">
+                <div className="px-2.5 py-3 text-caption text-muted-foreground">
                   <p className="font-medium">暂无会话</p>
                   <p className="mt-1 text-[10px]">新建会话后会显示在这里</p>
                 </div>
@@ -534,7 +534,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
             data-testid="chat-header"
             className="flex h-12 shrink-0 items-center border-b border-border px-[18px]"
           >
-            <h2 className="truncate text-xs font-semibold">{selectedSession?.title ?? '新对话'}</h2>
+            <h2 className="truncate text-section-heading font-semibold">{selectedSession?.title ?? '新对话'}</h2>
           </header>
 
           <div className="min-h-0 flex-1 px-4">
@@ -649,7 +649,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
 export function LoadingScreen(): React.JSX.Element {
   return (
     <main className="grid min-h-full place-items-center bg-background text-foreground">
-      <div className="text-sm text-muted-foreground">正在打开汤圆...</div>
+      <div className="text-body text-muted-foreground">正在打开汤圆...</div>
     </main>
   )
 }

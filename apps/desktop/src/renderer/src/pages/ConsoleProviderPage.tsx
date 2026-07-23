@@ -202,7 +202,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
   if (isLoading) {
     return (
       <main className="grid min-h-full place-items-center bg-background text-foreground">
-        <div className="text-sm text-muted-foreground">正在打开控制台...</div>
+        <div className="text-body text-muted-foreground">正在打开控制台...</div>
       </main>
     )
   }
@@ -222,8 +222,8 @@ export function ConsoleProviderPage(): React.JSX.Element {
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-[26px] font-semibold leading-tight">无法读取本地配置</h1>
-            <p className="text-[13px] leading-[1.5] text-muted-foreground">
+            <h1 className="text-page-title font-semibold leading-tight">无法读取本地配置</h1>
+            <p className="text-body text-muted-foreground">
               {runtime?.configRecovery.state === 'migration-failed'
                 ? '本地配置在迁移过程中出现问题。你可以恢复最近的备份，或清除配置后重新连接模型服务。'
                 : '配置文件已损坏，无法读取。你可以恢复最近的备份，或重置配置后重新连接模型服务。'}
@@ -235,7 +235,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
             <div className="flex items-start gap-2.5 rounded-lg bg-card p-3">
               <History size={15} className="mt-px shrink-0 text-success-foreground" aria-hidden="true" />
               <div>
-                <p className="text-[11px] font-semibold">最近备份可用</p>
+                <p className="text-caption font-semibold">最近备份可用</p>
                 <p className="text-[10px] text-muted-foreground">恢复后将重新检查 Provider 和模型配置</p>
               </div>
             </div>
@@ -304,8 +304,8 @@ export function ConsoleProviderPage(): React.JSX.Element {
           <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
             首次配置
           </p>
-          <h1 className="text-[26px] font-semibold leading-tight">连接模型服务</h1>
-          <p className="text-[13px] leading-[1.5] text-muted-foreground">
+          <h1 className="text-page-title font-semibold leading-tight">连接模型服务</h1>
+          <p className="text-body text-muted-foreground">
             配置一个可用的模型服务，并将所选模型作为默认 Agent 汤圆的初始模型。
           </p>
         </div>
@@ -314,7 +314,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
         <div className="space-y-4">
           {/* Provider */}
           <div className="space-y-[7px]">
-            <Label className="text-xs font-medium">
+            <Label className="text-label font-medium">
               Provider
             </Label>
             <Select
@@ -324,7 +324,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
             >
               <SelectTrigger
                 data-testid="setup-provider-select"
-                className="h-10 bg-card text-[13px]"
+                className="h-10 bg-card text-body"
               >
                 <SelectValue placeholder="选择 Provider" />
               </SelectTrigger>
@@ -340,7 +340,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
           {/* API Key */}
           <div className="space-y-[7px]">
-            <Label htmlFor="setup-api-key-input" className="text-xs font-medium">
+            <Label htmlFor="setup-api-key-input" className="text-label font-medium">
               API Key
             </Label>
             <div className="relative">
@@ -374,7 +374,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
           {/* Model */}
           <div className="space-y-[7px]">
-            <Label className="text-xs font-medium">
+            <Label className="text-label font-medium">
               Model
             </Label>
             <Select
@@ -387,7 +387,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
             >
               <SelectTrigger
                 data-testid="setup-model-select"
-                className="h-10 bg-card text-[13px]"
+                className="h-10 bg-card text-body"
               >
                 <SelectValue placeholder="选择模型" />
               </SelectTrigger>
@@ -413,7 +413,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
           <div className="flex items-start gap-2.5 rounded-lg bg-destructive-soft border border-destructive-border p-3">
             <TriangleAlert size={15} className="mt-px shrink-0 text-destructive-soft-foreground" aria-hidden="true" />
             <div className="space-y-1">
-              <p className="text-[11px] font-semibold text-destructive-soft-foreground">无法连接模型服务</p>
+              <p className="text-caption font-semibold text-destructive-soft-foreground">无法连接模型服务</p>
               <p className="text-[10px] leading-[1.45] text-destructive-soft-foreground">{verificationError}</p>
             </div>
           </div>
@@ -423,7 +423,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
         {isVerifying ? (
           <div className="flex items-center gap-2 rounded-lg bg-info-soft p-2.5">
             <LoaderCircle size={14} className="animate-spin text-info-foreground" aria-hidden="true" />
-            <p className="text-[11px] font-medium text-info-foreground">
+            <p className="text-caption font-medium text-info-foreground">
               正在连接 {selectedProviderDisplayName}
               {selectedModelDisplayName ? ` · ${selectedModelDisplayName}` : ''}
             </p>
@@ -454,7 +454,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
           {isVerifying ? (
             <button
               type="button"
-              className="block w-full rounded-lg py-2 text-[11px] font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground"
+              className="block w-full rounded-lg py-2 text-caption font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground"
               onClick={() => {
                 void cancelVerification()
               }}

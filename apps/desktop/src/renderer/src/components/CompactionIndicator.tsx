@@ -34,7 +34,7 @@ export function CompactionIndicator({ timestamp }: CompactionIndicatorProps): Re
       className="my-4 flex items-center justify-center gap-2"
     >
       <span className="h-px flex-1 bg-border" />
-      <span className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+      <span className="flex items-center gap-1.5 whitespace-nowrap text-label text-muted-foreground">
         <Archive size={12} aria-hidden="true" />
         上下文已于 {formattedTime} 自动压缩
       </span>
