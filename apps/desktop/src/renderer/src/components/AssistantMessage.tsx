@@ -81,6 +81,9 @@ export function AssistantMessage({
    * 切换展开/收起状态，通知外层虚拟列表记录锚点。
    */
   function handleToggle(): void {
+    // 流式执行中始终展开；忽略这期间的点击，避免阻塞完成后的自动收起。
+    if (isStreaming && shouldExpand) return
+
     onToggleStart?.()
     setUserToggled((prev) => !prev)
   }

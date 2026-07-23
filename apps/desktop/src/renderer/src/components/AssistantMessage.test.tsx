@@ -54,6 +54,18 @@ function createToolStep(overrides?: Partial<TurnStep>): TurnStep {
   }
 }
 
+function createTextStep(overrides?: Partial<TurnStep>): TurnStep {
+  return {
+    index: 0,
+    kind: 'text',
+    content: '中间文字',
+    status: 'completed',
+    startedAt: '2026-07-21T00:00:01.000Z',
+    completedAt: '2026-07-21T00:00:02.000Z',
+    ...overrides
+  }
+}
+
 function createTurn(overrides?: Partial<RunTurn>): RunTurn {
   return {
     index: 0,
@@ -530,6 +542,67 @@ describe('AssistantMessage', () => {
     expect(screen.getByText('FINAL TURN')).toBeInTheDocument()
   })
 
+  it('renders turns and steps in source order, then uses entry.content when collapsed', () => {
+    const streamingEntry = createEntry({
+      content: '真正的最终答复',
+      turns: [
+        createTurn({
+          steps: [
+            createThinkingStep({ content: '第一回合思考', status: 'completed' }),
+            createTextStep({ index: 1, content: '第一回合中间文字' }),
+            createToolStep({
+              index: 2,
+              content: '读取配置',
+              toolName: 'read',
+              status: 'completed',
+              completedAt: '2026-07-21T00:00:03.000Z'
+            })
+          ],
+          status: 'completed',
+          completedAt: '2026-07-21T00:00:03.000Z'
+        }),
+        createTurn({
+          index: 1,
+          steps: [
+            createThinkingStep({ content: '最后回合思考', status: 'completed' }),
+            createTextStep({ index: 1, content: '最后回合文字' })
+          ],
+          status: 'completed',
+          completedAt: '2026-07-21T00:00:05.000Z'
+        })
+      ]
+    })
+
+    const { rerender } = render(<AssistantMessage entry={streamingEntry} isStreaming />)
+    const renderedText = document.body.textContent ?? ''
+    const positions = [
+      '第一回合思考',
+      '第一回合中间文字',
+      '读取配置',
+      '最后回合思考',
+      '最后回合文字'
+    ].map((content) => renderedText.indexOf(content))
+
+    expect(positions.every((position, index) => index === 0 || position > positions[index - 1])).toBe(
+      true
+    )
+
+    const completedEntry: AgentReplyEntry = {
+      ...streamingEntry,
+      attempt: {
+        ...streamingEntry.attempt!,
+        status: 'completed',
+        completedAt: '2026-07-21T00:00:05.000Z'
+      }
+    }
+    rerender(<AssistantMessage entry={completedEntry} isStreaming={false} />)
+
+    expect(screen.getByText('真正的最终答复')).toBeInTheDocument()
+    expect(screen.queryByText('第一回合中间文字')).not.toBeInTheDocument()
+    expect(screen.queryByText('最后回合文字')).not.toBeInTheDocument()
+    expect(screen.queryByText('FINAL TURN')).not.toBeInTheDocument()
+  })
+
   it('does not auto-collapse when turns contain tool calls during streaming', () => {
     const entry = createEntry({
       content: 'final text',
@@ -554,6 +627,51 @@ describe('AssistantMessage', () => {
     expect(screen.getByText('仍在执行')).toBeInTheDocument()
     // Timeline should be visible
     expect(screen.getByText(/执行命令/)).toBeInTheDocument()
+  })
+
+  it('auto-collapses after streaming finishes even if disclosure was clicked while forced open', () => {
+    const runningEntry = createEntry({
+      turns: [
+        createTurn({
+          steps: [createToolStep({ content: '执行命令', toolName: 'bash' })]
+        })
+      ]
+    })
+
+    const { rerender } = render(<AssistantMessage entry={runningEntry} isStreaming />)
+    fireEvent.click(screen.getByRole('button', { name: /仍在执行/ }))
+
+    const completedEntry = createEntry({
+      content: '最终答复',
+      attempt: {
+        ...runningEntry.attempt!,
+        status: 'completed',
+        completedAt: '2026-07-21T00:00:05.000Z'
+      },
+      turns: [
+        createTurn({
+          steps: [
+            createToolStep({
+              content: '执行命令',
+              toolName: 'bash',
+              status: 'completed',
+              completedAt: '2026-07-21T00:00:02.000Z'
+            })
+          ],
+          status: 'completed',
+          completedAt: '2026-07-21T00:00:05.000Z'
+        })
+      ]
+    })
+
+    rerender(<AssistantMessage entry={completedEntry} isStreaming={false} />)
+
+    expect(screen.getByRole('button', { name: /已完成执行过程/ })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    )
+    expect(screen.getByText('最终答复')).toBeInTheDocument()
+    expect(screen.queryByText('FINAL TURN')).not.toBeInTheDocument()
   })
 
   it('collapses when final confirmed without tool calls', () => {
