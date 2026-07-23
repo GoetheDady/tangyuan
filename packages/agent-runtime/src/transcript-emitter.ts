@@ -1,12 +1,14 @@
 import type { AgentEventListener, DriverEvent } from './index'
 import {
   applyTranscriptDelta,
+  type AgentReplyEntry,
   type AgentRuntimeErrorPayload,
   type ExecutionAttempt,
   type TranscriptDelta,
   type TranscriptSnapshot,
   type TurnStep,
 } from '@tangyuan/contracts'
+import { assembleRunTurn } from './run-turn-assembly'
 import { createToolStepSummary } from './utils'
 
 /**
@@ -16,8 +18,9 @@ interface TurnState {
   entryIndex: number
   turnIndex: number
   stepIndex: number
-  currentTurnHasToolCall: boolean
   lastStepKind: TurnStep['kind'] | null
+  /** 本回合开始时间，作为 assembleRunTurn 的 startedAt。 */
+  turnStartedAt: string
   /** toolCallId → stepIndex 映射，用于归并同一工具的实时更新与最终结果。 */
   toolCallStepIndex: Map<string, number>
 }
@@ -124,7 +127,11 @@ export class TranscriptEmitter {
       // entry 刚创建完成，若对应 attempt 已存在（attempt-started 先到），立即初始化并
       // 用本轮真实 entryIndex 修正 attempt-started 早到时的猜测。
       if (attempt) {
-        this.ensureTurnStateInitialized(attempt.runId, nextIndex)
+        this.ensureTurnStateInitialized(
+          attempt.runId,
+          message.createdAt,
+          nextIndex,
+        )
       }
       return
     }
@@ -198,7 +205,83 @@ export class TranscriptEmitter {
   initializeTurnStateForRun(
     event: Extract<DriverEvent, { type: 'attempt-started' }>,
   ): void {
-    this.ensureTurnStateInitialized(event.runId)
+    this.ensureTurnStateInitialized(event.runId, event.occurredAt)
+  }
+
+  /**
+   * 处理 SDK 原生 `turn_start`：以权威 turnIndex 界定新回合边界。
+   *
+   * 回合 0 的 turn-started 可能早于 agent message-appended（首个内容事件才建条目），
+   * 此时 turnState 尚未创建，为 no-op；message-appended 会以 turnIndex=0 初始化。
+   * 回合 1+ 时 turnState 已存在，则推进 turnIndex 并重置 step 追踪状态，
+   * 使后续实时 delta 落到新回合。
+   *
+   * @param event - turn-started 内部 DriverEvent。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  startTurn(event: Extract<DriverEvent, { type: 'turn-started' }>): void {
+    const turnState = this.turnStateByRun.get(event.runId)
+    if (!turnState) return
+
+    turnState.turnIndex = event.turnIndex
+    turnState.stepIndex = 0
+    turnState.lastStepKind = null
+    turnState.turnStartedAt = event.occurredAt
+    turnState.toolCallStepIndex = new Map()
+  }
+
+  /**
+   * 处理 SDK 原生 `turn_end`：用权威 message + toolResults 重建本回合步骤。
+   *
+   * 实时预览期间累积的临时步骤可能与最终结果不完全一致（如交错顺序、
+   * 工具状态）；此处用纯函数 assembleRunTurn 从权威 message 重建该回合，
+   * 整体替换 entry.turns[turnIndex]，并把 entry.content 设为本回合文字（最后回合胜出）。
+   *
+   * @param event - turn-ended 内部 DriverEvent。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  endTurn(event: Extract<DriverEvent, { type: 'turn-ended' }>): void {
+    const turnState = this.turnStateByRun.get(event.runId)
+    if (!turnState) return
+
+    const snapshot = this.transcriptSnapshots.get(event.sessionId)
+    if (!snapshot) return
+
+    const entry = snapshot.entries[turnState.entryIndex]
+    if (!entry || entry.kind !== 'agent-reply') return
+
+    const assembledTurn = assembleRunTurn({
+      turnIndex: event.turnIndex,
+      runId: event.runId,
+      message: event.message,
+      toolResults: event.toolResults,
+      startedAt: turnState.turnStartedAt,
+      completedAt: event.occurredAt,
+    })
+
+    // entry.content = 本回合文字（非跨回合累加）；按回合顺序到达，最后一个 turn-ended 胜出。
+    const turnText = assembledTurn.steps
+      .filter((step) => step.kind === 'text')
+      .map((step) => step.content)
+      .join('')
+
+    const turns = [...entry.turns]
+    turns[event.turnIndex] = assembledTurn
+
+    const updatedEntry: AgentReplyEntry = {
+      ...entry,
+      turns,
+      ...(turnText ? { content: turnText } : {}),
+    }
+
+    const delta: TranscriptDelta = {
+      type: 'entry-updated',
+      index: turnState.entryIndex,
+      entry: updatedEntry,
+    }
+    this.emitTranscriptDeltaEvent(event.agentId, event.sessionId, delta)
   }
 
   /**
@@ -215,6 +298,7 @@ export class TranscriptEmitter {
    */
   private ensureTurnStateInitialized(
     runId: string,
+    startedAt: string,
     entryIndex?: number,
   ): void {
     const existing = this.turnStateByRun.get(runId)
@@ -231,8 +315,8 @@ export class TranscriptEmitter {
       entryIndex: resolvedIndex,
       turnIndex: 0,
       stepIndex: 0,
-      currentTurnHasToolCall: false,
       lastStepKind: null,
+      turnStartedAt: startedAt,
       toolCallStepIndex: new Map(),
     })
   }
@@ -250,20 +334,10 @@ export class TranscriptEmitter {
     const turnState = this.turnStateByRun.get(event.runId)
     if (!turnState) return
 
-    // 本轮已启动过工具 → 这段 thinking 属于新一轮，先推进 turn 边界，
-    // 使思考与它触发的后续工具留在同一轮。
-    if (turnState.currentTurnHasToolCall) {
-      turnState.turnIndex++
-      turnState.stepIndex = 0
-      turnState.currentTurnHasToolCall = false
-      turnState.lastStepKind = null
-      turnState.toolCallStepIndex = new Map()
-    }
-
     const now = event.occurredAt
-    // If the current step is a thinking step, update it. Otherwise, create new.
-    // For simplicity, create a step-appended on first thinking delta, step-updated on subsequent.
-    const step: import('@tangyuan/contracts').TurnStep = {
+    // 实时预览：首个 thinking delta 发 step-appended，后续累加的同一 thinking
+    // 发 step-updated。回合边界不在此推断，turn-ended 到达时会用权威 message 重建。
+    const step: TurnStep = {
       index: turnState.stepIndex,
       kind: 'thinking',
       content: event.delta,
@@ -272,7 +346,6 @@ export class TranscriptEmitter {
       completedAt: null,
     }
 
-    // If last step was thinking, update it (accumulate). Otherwise create new.
     if (turnState.lastStepKind === 'thinking') {
       const stepIndex = turnState.stepIndex - 1
       const delta: TranscriptDelta = {
@@ -329,15 +402,6 @@ export class TranscriptEmitter {
             : ('failed' as const)
 
       if (status === 'running') {
-        // 多 turn 规则：如果当前 turn 已有完成的工具调用，推进到下一个 turn
-        if (turnState.currentTurnHasToolCall) {
-          turnState.turnIndex++
-          turnState.stepIndex = 0
-          turnState.currentTurnHasToolCall = false
-          turnState.lastStepKind = null
-          turnState.toolCallStepIndex = new Map()
-        }
-
         const summary = createToolStepSummary(toolName, 'running')
         const step: TurnStep = {
           index: turnState.stepIndex,
@@ -359,7 +423,6 @@ export class TranscriptEmitter {
           turnState.toolCallStepIndex.set(toolCallId, turnState.stepIndex)
         }
 
-        turnState.currentTurnHasToolCall = true
         const delta: TranscriptDelta = {
           type: 'step-appended',
           index: turnState.entryIndex,
@@ -405,10 +468,6 @@ export class TranscriptEmitter {
             step,
           }
           this.emitTranscriptDeltaEvent(event.agentId, event.sessionId, delta)
-
-          // 保持 lastStepKind 为 tool-call（用于后续 turn 边界判断）
-          // 标记当前 turn 已完成（工具已结束）
-          // 但不重置 currentTurnHasToolCall —— 让下一 running 工具触发 turn 推进
         }
       }
     }

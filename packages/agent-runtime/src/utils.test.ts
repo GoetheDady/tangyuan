@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createToolStepSummary, createToolActivityLabel } from './utils'
+import {
+  createToolStepSummary,
+  createToolActivityLabel,
+  normalizePiSdkSessionEvent,
+} from './utils'
 
 describe('createToolStepSummary', () => {
   it('returns deterministic running label for built-in read tool', () => {
@@ -107,5 +111,37 @@ describe('createToolActivityLabel', () => {
     expect(createToolActivityLabel('custom_tool', 'running')).toBe(
       '正在使用工具',
     )
+  })
+})
+
+describe('normalizePiSdkSessionEvent turn events', () => {
+  it('translates SDK turn_start into a turn-started stream event', () => {
+    expect(normalizePiSdkSessionEvent({ type: 'turn_start' })).toEqual([
+      { type: 'turn-started' },
+    ])
+  })
+
+  it('translates SDK turn_end into a turn-ended stream event carrying message and toolResults', () => {
+    const message = {
+      role: 'assistant',
+      content: [{ type: 'text', text: '完成' }],
+    }
+    const toolResults = [
+      { role: 'toolResult', toolCallId: 'tc-1', toolName: 'read', isError: false },
+    ]
+    expect(
+      normalizePiSdkSessionEvent({ type: 'turn_end', message, toolResults }),
+    ).toEqual([{ type: 'turn-ended', message, toolResults }])
+  })
+
+  it('defaults toolResults to an empty array when turn_end omits them', () => {
+    const message = { role: 'assistant', content: [] }
+    expect(
+      normalizePiSdkSessionEvent({ type: 'turn_end', message }),
+    ).toEqual([{ type: 'turn-ended', message, toolResults: [] }])
+  })
+
+  it('ignores turn_end without a valid message', () => {
+    expect(normalizePiSdkSessionEvent({ type: 'turn_end' })).toEqual([])
   })
 })

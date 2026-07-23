@@ -1368,6 +1368,16 @@ class DefaultTangyuanRuntime {
       return
     }
 
+    if (driverEvent.type === 'turn-started') {
+      this.transcriptEmitter.startTurn(driverEvent)
+      return
+    }
+
+    if (driverEvent.type === 'turn-ended') {
+      this.transcriptEmitter.endTurn(driverEvent)
+      return
+    }
+
     if (driverEvent.type === 'turn-cancelled') {
       this.activeRunIds.delete(driverEvent.sessionId)
       this.upsertSessionState(

@@ -137,6 +137,65 @@ describe('TranscriptEmitter tool step handling', () => {
     emitter.emitTranscriptDeltaForThinking(event)
   }
 
+  function emitTurnStarted(
+    emitter: TranscriptEmitter,
+    turnIndex: number,
+    overrides: { runId?: string; sessionId?: string } = {},
+  ) {
+    const event: Extract<DriverEvent, { type: 'turn-started' }> = {
+      type: 'turn-started',
+      agentId: 'tangyuan',
+      sessionId: overrides.sessionId ?? 'session-1',
+      runId: overrides.runId ?? 'run-1',
+      turnIndex,
+      occurredAt: new Date().toISOString(),
+    }
+    emitter.startTurn(event)
+  }
+
+  type AssistantContentBlock =
+    Extract<DriverEvent, { type: 'turn-ended' }>['message']['content'][number]
+  type SdkToolResult =
+    Extract<DriverEvent, { type: 'turn-ended' }>['toolResults'][number]
+
+  function emitTurnEnded(
+    emitter: TranscriptEmitter,
+    turnIndex: number,
+    content: AssistantContentBlock[],
+    toolResults: SdkToolResult[] = [],
+    overrides: { runId?: string; sessionId?: string } = {},
+  ) {
+    const event: Extract<DriverEvent, { type: 'turn-ended' }> = {
+      type: 'turn-ended',
+      agentId: 'tangyuan',
+      sessionId: overrides.sessionId ?? 'session-1',
+      runId: overrides.runId ?? 'run-1',
+      turnIndex,
+      message: {
+        role: 'assistant',
+        content,
+      } as Extract<DriverEvent, { type: 'turn-ended' }>['message'],
+      toolResults,
+      occurredAt: new Date().toISOString(),
+    }
+    emitter.endTurn(event)
+  }
+
+  function toolResult(
+    toolCallId: string,
+    toolName: string,
+    isError = false,
+  ): SdkToolResult {
+    return {
+      role: 'toolResult',
+      toolCallId,
+      toolName,
+      content: [{ type: 'text', text: 'raw output' }],
+      isError,
+      timestamp: 0,
+    } as SdkToolResult
+  }
+
   it('renders thinking step when attempt-started arrives before agent message-appended (real order)', () => {
     const { emitter, getSnapshot } = createEmitter()
     // 真实运行顺序：attempt-started 先于 agent message-appended
@@ -207,41 +266,38 @@ describe('TranscriptEmitter tool step handling', () => {
     }
   })
 
-  it('advances to next turn when a new tool starts after previous tool completed', () => {
+  it('assembles multi-turn tool calls without misalignment (turn events drive boundaries)', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
     emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
 
-    // First tool cycle
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'running',
-      toolName: 'read',
-      toolCallId: 'tc-1',
-    })
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'completed',
-      toolName: 'read',
-      toolCallId: 'tc-1',
-    })
+    // 回合 0：read
+    emitTurnStarted(emitter, 0)
+    emitTurnEnded(
+      emitter,
+      0,
+      [{ type: 'toolCall', id: 'tc-1', name: 'read' }] as never,
+      [toolResult('tc-1', 'read')],
+    )
 
-    // Second tool cycle → new turn
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'running',
-      toolName: 'bash',
-      toolCallId: 'tc-2',
-    })
+    // 回合 1：bash（由 SDK turn_start 界定，而非启发式推断）
+    emitTurnStarted(emitter, 1)
+    emitTurnEnded(
+      emitter,
+      1,
+      [{ type: 'toolCall', id: 'tc-2', name: 'bash' }] as never,
+      [toolResult('tc-2', 'bash')],
+    )
 
     const snapshot = getSnapshot('session-1')
     const agentEntry = snapshot!.entries[0]
+    expect(agentEntry?.kind).toBe('agent-reply')
     if (agentEntry && agentEntry.kind === 'agent-reply') {
       expect(agentEntry.turns).toHaveLength(2)
       expect(agentEntry.turns[0]!.steps[0]!.toolName).toBe('read')
       expect(agentEntry.turns[0]!.steps[0]!.status).toBe('completed')
       expect(agentEntry.turns[1]!.steps[0]!.toolName).toBe('bash')
-      expect(agentEntry.turns[1]!.steps[0]!.status).toBe('running')
+      expect(agentEntry.turns[1]!.steps[0]!.status).toBe('completed')
     }
   })
 
@@ -273,32 +329,28 @@ describe('TranscriptEmitter tool step handling', () => {
     }
   })
 
-  it('advances turn after a failed tool when next tool starts', () => {
+  it('preserves a failed tool step in its own turn across a turn boundary', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
     emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
 
-    // First tool fails
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'running',
-      toolName: 'bash',
-      toolCallId: 'tc-1',
-    })
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'failed',
-      toolName: 'bash',
-      toolCallId: 'tc-1',
-    })
+    // 回合 0：bash 失败
+    emitTurnStarted(emitter, 0)
+    emitTurnEnded(
+      emitter,
+      0,
+      [{ type: 'toolCall', id: 'tc-1', name: 'bash' }] as never,
+      [toolResult('tc-1', 'bash', true)],
+    )
 
-    // Agent continues with another tool → new turn
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'running',
-      toolName: 'read',
-      toolCallId: 'tc-2',
-    })
+    // 回合 1：Agent 继续用另一个工具
+    emitTurnStarted(emitter, 1)
+    emitTurnEnded(
+      emitter,
+      1,
+      [{ type: 'toolCall', id: 'tc-2', name: 'read' }] as never,
+      [toolResult('tc-2', 'read')],
+    )
 
     const snapshot = getSnapshot('session-1')
     const agentEntry = snapshot!.entries[0]
@@ -346,45 +398,44 @@ describe('TranscriptEmitter tool step handling', () => {
     }
   })
 
-  it('starts a new turn when thinking arrives after a completed tool (multi-turn boundary)', () => {
+  it('assembles thinking + tool in each turn driven by turn events', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
     emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
 
-    // 真实多轮序列：thinking → read 启动 → read 完成 → thinking → bash 启动
-    emitThinkingDelta(emitter, { delta: '先读文件' })
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'running',
-      toolName: 'read',
-      toolCallId: 'tc-1',
-    })
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'completed',
-      toolName: 'read',
-      toolCallId: 'tc-1',
-    })
-    // 第二轮思考：应开启新 turn，而不是留在上一轮末尾
-    emitThinkingDelta(emitter, { delta: '再执行命令' })
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'running',
-      toolName: 'bash',
-      toolCallId: 'tc-2',
-    })
+    // 回合 0：thinking + read
+    emitTurnStarted(emitter, 0)
+    emitTurnEnded(
+      emitter,
+      0,
+      [
+        { type: 'thinking', thinking: '先读文件' },
+        { type: 'toolCall', id: 'tc-1', name: 'read' },
+      ] as never,
+      [toolResult('tc-1', 'read')],
+    )
+
+    // 回合 1：thinking + bash
+    emitTurnStarted(emitter, 1)
+    emitTurnEnded(
+      emitter,
+      1,
+      [
+        { type: 'thinking', thinking: '再执行命令' },
+        { type: 'toolCall', id: 'tc-2', name: 'bash' },
+      ] as never,
+      [toolResult('tc-2', 'bash')],
+    )
 
     const snapshot = getSnapshot('session-1')
     const agentEntry = snapshot!.entries[0]
     if (agentEntry && agentEntry.kind === 'agent-reply') {
       expect(agentEntry.turns).toHaveLength(2)
-      // 第一轮：thinking + read
       expect(agentEntry.turns[0]!.steps.map((s) => s.kind)).toEqual([
         'thinking',
         'tool-call',
       ])
       expect(agentEntry.turns[0]!.steps[1]!.toolName).toBe('read')
-      // 第二轮：thinking + bash（思考跟它触发的工具在同一轮）
       expect(agentEntry.turns[1]!.steps.map((s) => s.kind)).toEqual([
         'thinking',
         'tool-call',
@@ -456,46 +507,32 @@ describe('TranscriptEmitter tool step handling', () => {
     }
   })
 
-  it('handles multiple tools in sequence with turn advancement', () => {
+  it('assembles three sequential turns from turn events', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
     emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
 
-    // Turn 0: read
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'running',
-      toolName: 'read',
-      toolCallId: 'tc-1',
-    })
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'completed',
-      toolName: 'read',
-      toolCallId: 'tc-1',
-    })
-
-    // Turn 1: grep
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'running',
-      toolName: 'grep',
-      toolCallId: 'tc-2',
-    })
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'completed',
-      toolName: 'grep',
-      toolCallId: 'tc-2',
-    })
-
-    // Turn 2: bash (running — has tool-call so next tool starts new turn)
-    emitActivityUpdated(emitter, {
-      kind: 'tool',
-      state: 'running',
-      toolName: 'bash',
-      toolCallId: 'tc-3',
-    })
+    emitTurnStarted(emitter, 0)
+    emitTurnEnded(
+      emitter,
+      0,
+      [{ type: 'toolCall', id: 'tc-1', name: 'read' }] as never,
+      [toolResult('tc-1', 'read')],
+    )
+    emitTurnStarted(emitter, 1)
+    emitTurnEnded(
+      emitter,
+      1,
+      [{ type: 'toolCall', id: 'tc-2', name: 'grep' }] as never,
+      [toolResult('tc-2', 'grep')],
+    )
+    emitTurnStarted(emitter, 2)
+    emitTurnEnded(
+      emitter,
+      2,
+      [{ type: 'toolCall', id: 'tc-3', name: 'bash' }] as never,
+      [toolResult('tc-3', 'bash')],
+    )
 
     const snapshot = getSnapshot('session-1')
     const agentEntry = snapshot!.entries[0]
@@ -504,7 +541,88 @@ describe('TranscriptEmitter tool step handling', () => {
       expect(agentEntry.turns[0]!.steps[0]!.toolName).toBe('read')
       expect(agentEntry.turns[1]!.steps[0]!.toolName).toBe('grep')
       expect(agentEntry.turns[2]!.steps[0]!.toolName).toBe('bash')
-      expect(agentEntry.turns[2]!.steps[0]!.status).toBe('running')
+      expect(agentEntry.turns[2]!.steps[0]!.status).toBe('completed')
+    }
+  })
+
+  it('assembles a no-tool final turn (无工具收尾轮)', () => {
+    const { emitter, getSnapshot } = createEmitter()
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+
+    // 回合 0：工具
+    emitTurnStarted(emitter, 0)
+    emitTurnEnded(
+      emitter,
+      0,
+      [{ type: 'toolCall', id: 'tc-1', name: 'read' }] as never,
+      [toolResult('tc-1', 'read')],
+    )
+
+    // 回合 1：纯文字收尾，无工具
+    emitTurnStarted(emitter, 1)
+    emitTurnEnded(emitter, 1, [{ type: 'text', text: '已完成。' }] as never, [])
+
+    const snapshot = getSnapshot('session-1')
+    const agentEntry = snapshot!.entries[0]
+    if (agentEntry && agentEntry.kind === 'agent-reply') {
+      expect(agentEntry.turns).toHaveLength(2)
+      expect(agentEntry.turns[1]!.steps.map((s) => s.kind)).toEqual(['text'])
+      // entry.content = 最后一个回合的文字
+      expect(agentEntry.content).toBe('已完成。')
+    }
+  })
+
+  it('sets entry.content to the last turn text, not cross-turn accumulation', () => {
+    const { emitter, getSnapshot } = createEmitter()
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+
+    emitTurnStarted(emitter, 0)
+    emitTurnEnded(emitter, 0, [{ type: 'text', text: '第一轮文字' }] as never, [])
+    emitTurnStarted(emitter, 1)
+    emitTurnEnded(emitter, 1, [{ type: 'text', text: '第二轮文字' }] as never, [])
+
+    const snapshot = getSnapshot('session-1')
+    const agentEntry = snapshot!.entries[0]
+    if (agentEntry && agentEntry.kind === 'agent-reply') {
+      // 非 '第一轮文字第二轮文字'，只留最后一轮
+      expect(agentEntry.content).toBe('第二轮文字')
+    }
+  })
+
+  it('preserves live-preview steps when a turn is interrupted before turn-ended', () => {
+    const { emitter, getSnapshot } = createEmitter()
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+
+    emitTurnStarted(emitter, 0)
+    // 实时预览：thinking + 进行中的工具，但 turn-ended 未到达（中断）
+    emitThinkingDelta(emitter, { delta: '思考中' })
+    emitActivityUpdated(emitter, {
+      kind: 'tool',
+      state: 'running',
+      toolName: 'read',
+      toolCallId: 'tc-1',
+    })
+    // 运行被中断
+    emitter.failAttemptForRun(
+      'session-1',
+      'run-1',
+      'cancelled',
+      new Date().toISOString(),
+    )
+
+    const snapshot = getSnapshot('session-1')
+    const agentEntry = snapshot!.entries[0]
+    if (agentEntry && agentEntry.kind === 'agent-reply') {
+      // 中断前产生的实时步骤应保留
+      expect(agentEntry.turns).toHaveLength(1)
+      expect(agentEntry.turns[0]!.steps.map((s) => s.kind)).toEqual([
+        'thinking',
+        'tool-call',
+      ])
+      expect(agentEntry.attempt?.status).toBe('cancelled')
     }
   })
 

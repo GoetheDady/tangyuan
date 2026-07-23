@@ -317,6 +317,17 @@ export type PiSdkStreamEvent =
       toolName: string
       toolCallId?: string
     }
+  | {
+      // SDK 原生 `turn_start`：标志一个真实回合开始。核心 subscribe 事件
+      // 不携 turnIndex，turnIndex 由 Runtime 在 prompt 循环内维护。
+      type: 'turn-started'
+    }
+  | {
+      // SDK 原生 `turn_end`：携带本回合完整的 assistant message 与 toolResults。
+      type: 'turn-ended'
+      message: Extract<PiSdkTurnEndEvent['message'], { role: 'assistant' }>
+      toolResults: PiSdkTurnEndEvent['toolResults']
+    }
 
 /**
  * 描述 Pi SDK prompt 调用时可接收的事件回调。
@@ -1036,7 +1047,7 @@ export type DriverEvent = AgentEvent | {
   sessionId: string
   runId: string
   turnIndex: PiSdkTurnEndEvent['turnIndex']
-  message: PiSdkTurnEndEvent['message']
+  message: Extract<PiSdkTurnEndEvent['message'], { role: 'assistant' }>
   toolResults: PiSdkTurnEndEvent['toolResults']
   occurredAt: string
 }
@@ -1443,6 +1454,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         request.agentId,
       )
       let accumulatedReply = ''
+      let turnIndex = 0
       // 惰性宣告：收到第一个真实内容事件时才 emit agent message-appended，
       // 使运行期 delta 能挂到条目上；若未产生任何内容（如立即取消）则不建空条目。
       let agentEntryAnnounced = false
@@ -1499,6 +1511,33 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
               delta: event.delta,
               occurredAt: this.now(),
             })
+            return
+          }
+
+          if (event.type === 'turn-started') {
+            this.emit({
+              type: 'turn-started',
+              agentId: request.agentId,
+              sessionId: request.sessionId,
+              runId,
+              turnIndex,
+              occurredAt: this.now(),
+            })
+            return
+          }
+
+          if (event.type === 'turn-ended') {
+            this.emit({
+              type: 'turn-ended',
+              agentId: request.agentId,
+              sessionId: request.sessionId,
+              runId,
+              turnIndex,
+              message: event.message,
+              toolResults: event.toolResults,
+              occurredAt: this.now(),
+            })
+            turnIndex++
             return
           }
 
@@ -1828,6 +1867,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         request.agentId,
       )
       let accumulatedReply = ''
+      let turnIndex = 0
       // 与主流程一致的惰性宣告：首个真实内容事件到达时才 emit agent message-appended。
       let agentEntryAnnounced = false
       const announceAgentEntry = (): void => {
@@ -1884,6 +1924,33 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
               delta: event.delta,
               occurredAt: this.now(),
             })
+            return
+          }
+
+          if (event.type === 'turn-started') {
+            this.emit({
+              type: 'turn-started',
+              agentId: request.agentId,
+              sessionId: request.sessionId,
+              runId,
+              turnIndex,
+              occurredAt: this.now(),
+            })
+            return
+          }
+
+          if (event.type === 'turn-ended') {
+            this.emit({
+              type: 'turn-ended',
+              agentId: request.agentId,
+              sessionId: request.sessionId,
+              runId,
+              turnIndex,
+              message: event.message,
+              toolResults: event.toolResults,
+              occurredAt: this.now(),
+            })
+            turnIndex++
             return
           }
 

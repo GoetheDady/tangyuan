@@ -283,15 +283,21 @@ export function mapPiSdkStreamEventToActivity(event: PiSdkStreamEvent) {
     }
   }
 
-  return {
-    kind: 'tool' as const,
-    state: 'failed' as const,
-    label: createToolActivityLabel(event.toolName, 'failed'),
-    toolName: event.toolName as string,
-    ...(event.toolCallId !== undefined
-      ? { toolCallId: event.toolCallId as string }
-      : {}),
+  if (event.type === 'tool-failed') {
+    return {
+      kind: 'tool' as const,
+      state: 'failed' as const,
+      label: createToolActivityLabel(event.toolName, 'failed'),
+      toolName: event.toolName as string,
+      ...(event.toolCallId !== undefined
+        ? { toolCallId: event.toolCallId as string }
+        : {}),
+    }
   }
+
+  // turn-started / turn-ended 不是活动事件：调用方（index.ts 的 onEvent）
+  // 已在前置分支拦截它们，不会走到这里。
+  throw new Error(`activity 映射不支持事件类型：${event.type}`)
 }
 
 /**
@@ -473,6 +479,23 @@ export function normalizePiSdkSessionEvent(event: unknown): PiSdkStreamEvent[] {
         toolName: event.toolName,
         ...(toolCallId !== undefined ? { toolCallId } : {}),
         ...(toolInput !== undefined ? { toolInput } : {}),
+      },
+    ]
+  }
+
+  if (event.type === 'turn_start') {
+    return [{ type: 'turn-started' as const }]
+  }
+
+  if (event.type === 'turn_end' && isRecord(event.message)) {
+    type TurnEndedEvent = Extract<PiSdkStreamEvent, { type: 'turn-ended' }>
+    return [
+      {
+        type: 'turn-ended' as const,
+        message: event.message as unknown as TurnEndedEvent['message'],
+        toolResults: (Array.isArray(event.toolResults)
+          ? event.toolResults
+          : []) as TurnEndedEvent['toolResults'],
       },
     ]
   }
