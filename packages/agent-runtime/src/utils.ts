@@ -1,5 +1,5 @@
 import type { PiSdkStreamEvent } from './index'
-import { access } from 'node:fs/promises'
+import { access, readFile, readdir, stat } from 'node:fs/promises'
 import { constants as fsConstants } from 'node:fs'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
@@ -441,6 +441,86 @@ export async function pathExists(path: string): Promise<boolean> {
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
       return false
+    }
+
+    throw error
+  }
+}
+
+/**
+ * 判断错误是否为文件/目录不存在（ENOENT）。
+ *
+ * @param error - 捕获到的未知错误。
+ * @returns 是 ENOENT 错误时返回 true。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function isNotFoundError(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT'
+}
+
+/**
+ * 安全读取文件内容，文件不存在时返回空字符串。
+ *
+ * @param path - 需要读取的文件路径。
+ * @returns 文件内容；文件不存在时返回空字符串。
+ * @throws 当文件读取失败且不是 ENOENT 时，Promise 会 reject。
+ */
+export async function safeReadFile(path: string): Promise<string> {
+  try {
+    return await readFile(path, 'utf8')
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return ''
+    }
+
+    throw error
+  }
+}
+
+/**
+ * 读取目录下的文件名集合，目录不存在时返回空集合。
+ *
+ * @param path - 需要读取的目录路径。
+ * @returns 目录中文件名的集合。
+ * @throws 当目录读取失败且不是 ENOENT 时，Promise 会 reject。
+ */
+export async function readDirectoryFileSet(path: string): Promise<Set<string>> {
+  try {
+    return new Set(await readdir(path))
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return new Set()
+    }
+
+    throw error
+  }
+}
+
+/**
+ * 判断文件是否存在且去除空白后内容非空。
+ *
+ * @param path - 需要检查的文件路径。
+ * @returns 文件存在且含非空白内容时返回 true。
+ * @throws 当读取报错（除 ENOENT 外）时，Promise 会 reject。
+ */
+export async function fileHasContent(path: string): Promise<boolean> {
+  return (await safeReadFile(path)).trim() !== ''
+}
+
+/**
+ * 读取文件最后修改时间。
+ *
+ * @param path - 需要读取更新时间的文件路径。
+ * @returns 以 ISO 字符串表示的修改时间；文件不存在时返回 null。
+ * @throws 当底层文件系统读取失败（除 ENOENT 外）时，Promise 会 reject。
+ */
+export async function getMtimeIso(path: string): Promise<string | null> {
+  try {
+    const fileStat = await stat(path)
+    return fileStat.mtime.toISOString()
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return null
     }
 
     throw error

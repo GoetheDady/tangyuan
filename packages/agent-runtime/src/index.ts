@@ -3,9 +3,7 @@ import {
   copyFile,
   mkdir,
   readFile,
-  readdir,
   rename,
-  stat,
   writeFile,
 } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -32,6 +30,11 @@ import {
   buildInternalConfigForSave,
   extractAgentRuntimeConfig,
   pathExists,
+  safeReadFile,
+  readDirectoryFileSet,
+  fileHasContent,
+  getMtimeIso,
+  isNotFoundError,
 } from './utils'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
@@ -2342,8 +2345,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     // 确保 agent home 目录和 soul 文件存在
     await this.ensureAgentHome(agentId)
 
-    const content = await this.safeReadFile(soulPath)
-    const updatedAt = (await this.getMtimeIso(soulPath)) ?? this.now()
+    const content = await safeReadFile(soulPath)
+    const updatedAt = (await getMtimeIso(soulPath)) ?? this.now()
 
     return { agentId, content, updatedAt }
   }
@@ -2370,8 +2373,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       await writeFile(userPath, '', 'utf8')
     }
 
-    const content = await this.safeReadFile(userPath)
-    const updatedAt = (await this.getMtimeIso(userPath)) ?? this.now()
+    const content = await safeReadFile(userPath)
+    const updatedAt = (await getMtimeIso(userPath)) ?? this.now()
 
     return { content, updatedAt }
   }
@@ -2506,9 +2509,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
     // 读取更新前内容
     const previousContent = (await pathExists(soulPath))
-      ? await this.safeReadFile(soulPath)
+      ? await safeReadFile(soulPath)
       : ''
-    const previousHistoryFiles = await this.readDirectoryFileSet(historyPath)
+    const previousHistoryFiles = await readDirectoryFileSet(historyPath)
 
     // 如果内容没变，跳过
     if (previousContent === content) {
@@ -2540,7 +2543,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     await writeFile(soulPath, redactedContent, 'utf8')
 
     // 广播事件
-    const updatedAt = (await this.getMtimeIso(soulPath)) ?? this.now()
+    const updatedAt = (await getMtimeIso(soulPath)) ?? this.now()
     this.emitProfileUpdated('soul', updatedAt)
 
     // profile 变化点：设置中修改 soul 后刷新该 Agent 会话的系统提示词。
@@ -2571,9 +2574,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
     // 读取更新前内容
     const previousContent = (await pathExists(userPath))
-      ? await this.safeReadFile(userPath)
+      ? await safeReadFile(userPath)
       : ''
-    const previousHistoryFiles = await this.readDirectoryFileSet(historyPath)
+    const previousHistoryFiles = await readDirectoryFileSet(historyPath)
 
     // 如果内容没变，跳过
     if (previousContent === content) {
@@ -2608,7 +2611,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     await writeFile(userPath, redactedContent, 'utf8')
 
     // 广播事件
-    const updatedAt = (await this.getMtimeIso(userPath)) ?? this.now()
+    const updatedAt = (await getMtimeIso(userPath)) ?? this.now()
     this.emitProfileUpdated('user', updatedAt)
 
     // profile 变化点：共享 user.md 影响所有 Agent，刷新全部活跃会话。
@@ -2768,7 +2771,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
       return entries
     } catch (error) {
-      if (this.isNotFoundError(error)) {
+      if (isNotFoundError(error)) {
         return this.rebuildSessionIndexFromSdk()
       }
 
@@ -3174,17 +3177,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
-   * 判断文件系统错误是否表示路径不存在。
-   *
-   * @param error - 捕获到的未知错误。
-   * @returns 是 ENOENT 时返回 true。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private isNotFoundError(error: unknown): boolean {
-    return error instanceof Error && 'code' in error && error.code === 'ENOENT'
-  }
-
-  /**
    * 确保指定 Agent Home 目录结构存在。
    *
    * @param agentId - Agent 标识。
@@ -3254,7 +3246,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     // 迁移 user.history/ 目录下的文件
     if (await pathExists(legacyHistoryPath)) {
       await mkdir(targetHistoryPath, { recursive: true })
-      const historyFiles = await this.readDirectoryFileSet(legacyHistoryPath)
+      const historyFiles = await readDirectoryFileSet(legacyHistoryPath)
 
       for (const fileName of historyFiles) {
         await copyFile(
@@ -3313,8 +3305,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     // 初始化完成的唯一真相：soul.md 与 user.md 均存在且内容非空。
     // 空文件不算完成，仍处于初始化阻断态。
     const [soulHasContent, userHasContent] = await Promise.all([
-      soulFileExists ? this.fileHasContent(soulPath) : Promise.resolve(false),
-      userFileExists ? this.fileHasContent(userPath) : Promise.resolve(false),
+      soulFileExists ? fileHasContent(soulPath) : Promise.resolve(false),
+      userFileExists ? fileHasContent(userPath) : Promise.resolve(false),
     ])
     const profileReady = soulHasContent && userHasContent
 
@@ -3325,8 +3317,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       bootstrapFileExists: await pathExists(bootstrapPath),
       soulFileExists: await pathExists(soulPath),
       userFileExists: await pathExists(userPath),
-      soulUpdatedAt: await this.getMtimeIso(soulPath),
-      userUpdatedAt: await this.getMtimeIso(userPath),
+      soulUpdatedAt: await getMtimeIso(soulPath),
+      userUpdatedAt: await getMtimeIso(userPath),
     }
   }
 
@@ -3506,7 +3498,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       path: input.path,
       historyPath: input.historyPath,
       content: await readFile(input.path, 'utf8'),
-      historyFiles: await this.readDirectoryFileSet(input.historyPath),
+      historyFiles: await readDirectoryFileSet(input.historyPath),
     }
   }
 
@@ -3543,7 +3535,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     )
 
     if (await pathExists(agentHomeUserPath)) {
-      const agentHomeUserContent = await this.safeReadFile(agentHomeUserPath)
+      const agentHomeUserContent = await safeReadFile(agentHomeUserPath)
 
       if (agentHomeUserContent !== input.previousSnapshot.user.content) {
         // LLM 修改了 agent home 下的 user.md，同步到共享路径
@@ -3566,7 +3558,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         })
 
         // 同步到共享路径
-        const updatedContent = await this.safeReadFile(agentHomeUserPath)
+        const updatedContent = await safeReadFile(agentHomeUserPath)
         if (updatedContent !== input.previousSnapshot.user.content) {
           await writeFile(sharedUserPath, updatedContent, 'utf8')
         }
@@ -3628,7 +3620,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
     this.emitProfileUpdated(
       input.previousFile.target,
-      (await this.getMtimeIso(input.previousFile.path)) ?? this.now(),
+      (await getMtimeIso(input.previousFile.path)) ?? this.now(),
       {
         agentId: input.agentId,
         sessionId: input.sessionId,
@@ -3686,7 +3678,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private async hasNewHistoryFile(
     previousFile: ProfileMaintenanceFileSnapshot,
   ): Promise<boolean> {
-    const nextHistoryFiles = await this.readDirectoryFileSet(
+    const nextHistoryFiles = await readDirectoryFileSet(
       previousFile.historyPath,
     )
 
@@ -3697,44 +3689,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     return false
-  }
-
-  /**
-   * 读取目录下的文件名集合，目录不存在时返回空集合。
-   *
-   * @param path - 需要读取的目录路径。
-   * @returns 目录下的文件名集合。
-   * @throws 当目录读取失败且不是 ENOENT 时，Promise 会 reject。
-   */
-  private async readDirectoryFileSet(path: string): Promise<Set<string>> {
-    try {
-      return new Set(await readdir(path))
-    } catch (error) {
-      if (this.isNotFoundError(error)) {
-        return new Set()
-      }
-
-      throw error
-    }
-  }
-
-  /**
-   * 安全读取文件内容，文件不存在时返回空字符串。
-   *
-   * @param path - 需要读取的文件路径。
-   * @returns 文件内容；文件不存在时返回空字符串。
-   * @throws 当文件读取失败且不是 ENOENT 时，Promise 会 reject。
-   */
-  private async safeReadFile(path: string): Promise<string> {
-    try {
-      return await readFile(path, 'utf8')
-    } catch (error) {
-      if (this.isNotFoundError(error)) {
-        return ''
-      }
-
-      throw error
-    }
   }
 
   /**
@@ -3955,41 +3909,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     await Promise.all(
       [...agentIds].map((agentId) => this.refreshAgentProfileContext(agentId)),
     )
-  }
-
-  /**
-   * 判断文件是否存在且去除空白后内容非空。
-   *
-   * @param path - 需要检查的文件路径。
-   * @returns 文件存在且含非空白内容时返回 true。
-   * @throws 当读取报错（除“找不到”外）时，Promise 会 reject。
-   */
-  private async fileHasContent(path: string): Promise<boolean> {
-    return (await this.safeReadFile(path)).trim() !== ''
-  }
-
-  /**
-   * 读取文件最后修改时间。
-   *
-   * @param path - 需要读取更新时间的文件路径。
-   * @returns 以 ISO 字符串表示的修改时间；文件不存在时返回 null。
-   * @throws 当底层文件系统读取失败时，Promise 会 reject。
-   */
-  private async getMtimeIso(path: string): Promise<string | null> {
-    try {
-      const fileStat = await stat(path)
-      return fileStat.mtime.toISOString()
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
-        return null
-      }
-
-      throw error
-    }
   }
 
   /**

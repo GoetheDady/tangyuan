@@ -10,6 +10,11 @@ import {
   extractAgentRuntimeConfig,
   normalizeRuntimeConfiguration,
   pathExists,
+  isNotFoundError,
+  safeReadFile,
+  readDirectoryFileSet,
+  fileHasContent,
+  getMtimeIso,
 } from './utils'
 import { AgentRuntimeError } from './errors'
 
@@ -411,6 +416,48 @@ describe('pathExists', () => {
     try {
       expect(await pathExists(dir)).toBe(true)
       expect(await pathExists(join(dir, 'nope'))).toBe(false)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('fs 工具函数', () => {
+  it('isNotFoundError 只对 ENOENT 返回 true', () => {
+    const enoent = Object.assign(new Error('nope'), { code: 'ENOENT' })
+    expect(isNotFoundError(enoent)).toBe(true)
+    expect(isNotFoundError(new Error('other'))).toBe(false)
+    expect(isNotFoundError('not an error')).toBe(false)
+  })
+
+  it('safeReadFile / readDirectoryFileSet / fileHasContent / getMtimeIso 行为', async () => {
+    const { mkdtemp, rm, writeFile, mkdir } = await import('node:fs/promises')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const dir = await mkdtemp(join(tmpdir(), 'fs-utils-'))
+    try {
+      const filePath = join(dir, 'a.txt')
+      await writeFile(filePath, '  hello  ', 'utf8')
+
+      // safeReadFile
+      expect(await safeReadFile(filePath)).toBe('  hello  ')
+      expect(await safeReadFile(join(dir, 'missing'))).toBe('')
+
+      // fileHasContent
+      expect(await fileHasContent(filePath)).toBe(true)
+      await writeFile(join(dir, 'blank.txt'), '   ', 'utf8')
+      expect(await fileHasContent(join(dir, 'blank.txt'))).toBe(false)
+      expect(await fileHasContent(join(dir, 'missing'))).toBe(false)
+
+      // readDirectoryFileSet
+      await mkdir(join(dir, 'sub'), { recursive: true })
+      const names = await readDirectoryFileSet(dir)
+      expect(names.has('a.txt')).toBe(true)
+      expect((await readDirectoryFileSet(join(dir, 'nope'))).size).toBe(0)
+
+      // getMtimeIso
+      expect(await getMtimeIso(filePath)).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+      expect(await getMtimeIso(join(dir, 'missing'))).toBeNull()
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
