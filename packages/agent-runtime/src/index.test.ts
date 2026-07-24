@@ -107,6 +107,10 @@ describe('TangyuanRuntime', () => {
         let wasCancelled = false
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
             handle.prompts.push(prompt)
             options?.onEvent?.({ type: 'text-delta', delta: '收' })
@@ -718,7 +722,10 @@ describe('PiSdkDriver', () => {
         ],
       }),
     )
-    expect(gateway.sessionHandles[0]?.prompts[0]).toContain('# Bootstrap')
+    expect(gateway.sessionHandles[0]?.systemPromptContexts[0]).toContain(
+      '# Bootstrap',
+    )
+    expect(gateway.sessionHandles[0]?.prompts[0]).toBe('你好')
     expect(events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -738,6 +745,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
             handle.prompts.push(prompt)
             options?.onEvent?.({ type: 'thinking-started' })
@@ -825,6 +836,10 @@ describe('PiSdkDriver', () => {
         }
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
 
@@ -903,6 +918,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
             handle.prompts.push(prompt)
             options?.onEvent?.({ type: 'text-delta', delta: '部分内容' })
@@ -965,6 +984,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
             throw new Error('provider failed')
@@ -1037,11 +1060,12 @@ describe('PiSdkDriver', () => {
       content: '开始',
     })
 
-    expect(gateway.sessionHandles[0]?.prompts[0]).toContain('只说中文。')
-    expect(gateway.sessionHandles[0]?.prompts[0]).toContain(
-      '用户喜欢简洁回答。',
-    )
-    expect(gateway.sessionHandles[0]?.prompts[0]).not.toContain('# Bootstrap')
+    // 身份上下文走系统提示词，不再拼进消息；消息只有用户原文。
+    const context = gateway.sessionHandles[0]?.systemPromptContexts.at(-1)
+    expect(context).toContain('只说中文。')
+    expect(context).toContain('用户喜欢简洁回答。')
+    expect(context).not.toContain('# Bootstrap')
+    expect(gateway.sessionHandles[0]?.prompts[0]).toBe('开始')
   })
 
   it('runs one hidden profile maintenance turn after the main reply when no update is needed', async () => {
@@ -1049,6 +1073,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
 
@@ -1106,6 +1134,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
 
@@ -1188,6 +1220,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
 
@@ -1254,6 +1290,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
 
@@ -1321,6 +1361,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
 
@@ -1381,6 +1425,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
 
@@ -1444,6 +1492,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
             await writeFile(
@@ -1511,13 +1563,14 @@ describe('PiSdkDriver', () => {
     })
 
     const resolvedHomePath = join(rootPath, homePath.slice(2))
-    expect(gateway.sessionHandles[0]?.prompts[0]).toContain('# Bootstrap')
-    expect(gateway.sessionHandles[0]?.prompts[0]).toContain(
+    // bootstrap 回合的身份上下文（建会话时注入）包含 bootstrap 指令。
+    const bootstrapContext =
+      gateway.sessionHandles[0]?.systemPromptContexts[0]
+    expect(bootstrapContext).toContain('# Bootstrap')
+    expect(bootstrapContext).toContain(
       'soul.md 至少必须覆盖：身份、用户偏好、工作范围、沟通方式、权限边界、敏感信息规则、记忆与技能原则、不确定时的处理方式。',
     )
-    expect(gateway.sessionHandles[0]?.prompts[0]).toContain(
-      '完成后删除 bootstrap.md。',
-    )
+    expect(bootstrapContext).toContain('完成后删除 bootstrap.md。')
     await expect(
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
     ).resolves.toContain('身份：汤圆是桌面端 Agent。')
@@ -1559,6 +1612,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
             // Agent 写入两个 profile 文件，但遗留 bootstrap.md
@@ -1628,6 +1685,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
             await writeFile(
@@ -1692,6 +1753,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
             await writeFile(
@@ -1752,6 +1817,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
             await rm(join(request.cwd, 'bootstrap.md'), { force: true })
@@ -1810,6 +1879,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
             turnCount++
@@ -1908,6 +1981,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
             await writeFile(
@@ -1971,6 +2048,10 @@ describe('PiSdkDriver', () => {
       createSession: async (request) => {
         const handle = {
           prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
             turnCount++
@@ -2019,8 +2100,12 @@ describe('PiSdkDriver', () => {
       content: '请开始初始化。',
     })
 
-    // Bootstrap 回合的 prompt 包含 bootstrap 指令
-    expect(gateway.sessionHandles[0]?.prompts[0]).toContain('# Bootstrap')
+    // Bootstrap 回合：初始身份上下文（建会话时注入）包含 bootstrap 指令，
+    // 消息只有用户原文。
+    expect(gateway.sessionHandles[0]?.systemPromptContexts[0]).toContain(
+      '# Bootstrap',
+    )
+    expect(gateway.sessionHandles[0]?.prompts[0]).toBe('请开始初始化。')
     await expect(driver.getSnapshot()).resolves.toMatchObject({
       activeAgent: {
         profile: { initialized: true, bootstrapRequired: false },
@@ -2034,11 +2119,16 @@ describe('PiSdkDriver', () => {
       content: '记住我喜欢用 TypeScript。',
     })
 
-    // 正常回合的 prompt 包含 profile 上下文而非 bootstrap 指令
-    const secondPrompt = gateway.sessionHandles[0]?.prompts[1]
-    expect(secondPrompt).toContain('# Soul')
-    expect(secondPrompt).toContain('# User')
-    expect(secondPrompt).not.toContain('bootstrap.md')
+    // bootstrap 完成后刷新出的身份上下文包含 profile 而非 bootstrap。
+    const latestContext =
+      gateway.sessionHandles[0]?.systemPromptContexts.at(-1)
+    expect(latestContext).toContain('# Soul')
+    expect(latestContext).toContain('# User')
+    expect(latestContext).not.toContain('bootstrap.md')
+    // 消息只有用户原文，不拼 profile。
+    expect(gateway.sessionHandles[0]?.prompts[1]).toBe(
+      '记住我喜欢用 TypeScript。',
+    )
     // 正常回合触发了一次维护回合（共 3 次 prompt 调用：bootstrap 主回合 + 正常主回合 + 维护回合）
     expect(gateway.sessionHandles[0]?.prompts.length).toBe(3)
   })
@@ -3803,14 +3893,14 @@ function createPiSdkGateway(
   openSessionRequests: PiSdkOpenSessionRequest[]
   listSessionRequests: PiSdkListSessionsRequest[]
   readMessageRequests: PiSdkReadMessagesRequest[]
-  sessionHandles: Array<PiSdkSessionHandle & { prompts: string[] }>
+  sessionHandles: Array<PiSdkSessionHandle & { prompts: string[]; systemPromptContexts: string[] }>
 } {
   const requests: PiSdkVerificationRequest[] = []
   const sessionRequests: PiSdkCreateSessionRequest[] = []
   const openSessionRequests: PiSdkOpenSessionRequest[] = []
   const listSessionRequests: PiSdkListSessionsRequest[] = []
   const readMessageRequests: PiSdkReadMessagesRequest[] = []
-  const sessionHandles: Array<PiSdkSessionHandle & { prompts: string[] }> = []
+  const sessionHandles: Array<PiSdkSessionHandle & { prompts: string[]; systemPromptContexts: string[] }> = []
   const messagesBySession = new Map<string, InternalMessage[]>()
 
   return {
@@ -3879,14 +3969,22 @@ function createPiSdkGateway(
 function createPromptingHandle(
   sessionId: string,
   onMessages?: (messages: InternalMessage[]) => void,
-): PiSdkSessionHandle & { prompts: string[] } {
+): PiSdkSessionHandle & {
+  prompts: string[]
+  systemPromptContexts: string[]
+} {
   const prompts: string[] = []
+  const systemPromptContexts: string[] = []
 
   return {
     prompts,
+    systemPromptContexts,
+    setSystemPromptContext: (context: string) => {
+      systemPromptContexts.push(context)
+    },
     prompt: async (prompt: string) => {
       prompts.push(prompt)
-      const userContent = prompt.split('# 用户消息').at(-1)?.trim() ?? prompt
+      const userContent = prompt.trim()
       const messages: InternalMessage[] = [
         {
           messageId: `${sessionId}-sdk-user-1`,

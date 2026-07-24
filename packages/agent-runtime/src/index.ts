@@ -21,6 +21,7 @@ import {
   type TangyuanRuntime,
 } from './TangyuanRuntime'
 import { RealPiSdkGateway } from './gateway'
+import { DirectoryLayout } from './directory-layout'
 import {
   isAbortError,
   mapPiSdkStreamEventToActivity,
@@ -357,12 +358,22 @@ export interface PiSdkSessionHandle {
   /**
    * 向真实 Pi SDK 会话发送 prompt。
    *
-   * @param prompt - 已注入 profile 上下文的用户输入。
+   * @param prompt - 用户输入原文（身份上下文由系统提示词承载，不再拼入）。
    * @param options - 可选流式事件回调。
    * @returns Agent 最后一条文本回复；没有文本回复时返回 null。
    * @throws 当 SDK 调用失败时，Promise 会 reject。
    */
   prompt(prompt: string, options?: PiSdkPromptOptions): Promise<string | null>
+
+  /**
+   * 设置追加到系统提示词末尾的身份上下文片段。
+   *
+   * @remarks 仅记录片段；需要随后调用 {@link reload} 才会生效。
+   *   传入空串或省略即清除已注入的身份上下文。
+   * @param context - 身份上下文片段（soul/user 或 bootstrap）。
+   * @returns 无返回值。
+   */
+  setSystemPromptContext?(context: string): void
 
   /**
    * 取消当前会话正在运行的 Agent 响应。
@@ -1060,6 +1071,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private readonly agentHomePath: string
   private readonly fsRoot: string
   private readonly userDataPath: string
+  private readonly layout: DirectoryLayout
   private readonly gateway: PiSdkGateway
   private readonly encryptionAdapter: ConfigEncryptionAdapter | null
   private readonly listeners = new Set<AgentEventListener>()
@@ -1085,6 +1097,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     this.agentHomePath = options.agentHomePath ?? '~/.tangyuan/agents/tangyuan'
     this.fsRoot = options.fsRoot ?? homedir()
     this.userDataPath = options.userDataPath ?? join(this.fsRoot, '.tangyuan')
+    this.layout = new DirectoryLayout({
+      agentHomePath: this.agentHomePath,
+      fsRoot: this.fsRoot,
+      userDataPath: this.userDataPath,
+    })
     this.gateway = options.gateway ?? new RealPiSdkGateway()
     this.encryptionAdapter = options.encryptionAdapter ?? null
     this.toolApprovalGateway = options.toolApprovalGateway
@@ -1230,19 +1247,19 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     ])
     const sessionId = this.createNextSessionId()
     const now = this.now()
-    const sdkSessionFile = this.resolveSdkSessionFile(sessionId)
+    const sdkSessionFile = this.layout.sdkSessionFile(sessionId)
     const cwd =
       request.agentId === TANGYUAN_DEFAULT_AGENT_ID
-        ? this.resolveAgentHomePath()
-        : this.resolveAgentWorkspacePath(request.agentId)
+        ? this.layout.agentHome()
+        : this.layout.workspace(request.agentId)
     await mkdir(dirname(sdkSessionFile), { recursive: true })
     const baseRequest = {
       ...configuration,
       sessionId,
       sdkSessionFile,
       cwd,
-      agentSkillsPath: this.resolveAgentSkillsPath(request.agentId),
-      sharedSkillsPath: this.resolveSharedSkillsPath(),
+      agentSkillsPath: this.layout.agentSkills(request.agentId),
+      sharedSkillsPath: this.layout.sharedSkills(),
     }
     const createSessionRequest: PiSdkCreateSessionRequest = this
       .toolApprovalGateway
@@ -1280,6 +1297,13 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     this.sessionIndex.set(session.sessionId, indexEntry)
     this.messages.set(session.sessionId, [])
     this.sessionHandles.set(session.sessionId, handle)
+    // 身份上下文走系统提示词：建会话时注入并 reload 使其生效。
+    if (handle.setSystemPromptContext) {
+      handle.setSystemPromptContext(
+        await this.buildProfileSystemPromptContext(request.agentId),
+      )
+      await handle.reload?.()
+    }
     await this.writeSessionIndex()
     this.emit({
       type: 'session-created',
@@ -1453,10 +1477,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
     try {
       const profileStatusBeforeRun = await this.ensureDefaultAgentHome()
-      const prompt = await this.buildPromptWithProfileContext(
-        content,
-        request.agentId,
-      )
       let accumulatedReply = ''
       let turnIndex = 0
       // 惰性宣告：收到第一个真实内容事件时才 emit agent message-appended，
@@ -1472,7 +1492,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
           occurredAt: this.now(),
         })
       }
-      const agentReply = await handle.prompt(prompt, {
+      const agentReply = await handle.prompt(content, {
         onEvent: (event) => {
           if (event.type === 'thinking-started') {
             announceAgentEntry()
@@ -1624,6 +1644,20 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         })
       } else {
         await this.performBootstrapCompletionGating()
+      }
+
+      // profile 变化点：本回合可能写入 soul/user 或完成 bootstrap，
+      // 若状态发生变化则刷新系统提示词上下文。
+      const profileStatusAfterRun = await this.ensureDefaultAgentHome()
+      if (
+        profileStatusAfterRun.initialized !==
+          profileStatusBeforeRun.initialized ||
+        profileStatusAfterRun.soulUpdatedAt !==
+          profileStatusBeforeRun.soulUpdatedAt ||
+        profileStatusAfterRun.userUpdatedAt !==
+          profileStatusBeforeRun.userUpdatedAt
+      ) {
+        await this.refreshAgentProfileContext(request.agentId)
       }
 
       await this.upsertAttemptInIndex(request.sessionId, {
@@ -1866,10 +1900,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
     try {
       const profileStatusBeforeRun = await this.ensureDefaultAgentHome()
-      const prompt = await this.buildPromptWithProfileContext(
-        content,
-        request.agentId,
-      )
       let accumulatedReply = ''
       let turnIndex = 0
       // 与主流程一致的惰性宣告：首个真实内容事件到达时才 emit agent message-appended。
@@ -1885,7 +1915,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         })
       }
 
-      const agentReply = await handle.prompt(prompt, {
+      const agentReply = await handle.prompt(content, {
         onEvent: (event) => {
           if (event.type === 'thinking-started') {
             announceAgentEntry()
@@ -2030,6 +2060,20 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         })
       } else {
         await this.performBootstrapCompletionGating()
+      }
+
+      // profile 变化点：本回合可能写入 soul/user 或完成 bootstrap，
+      // 若状态发生变化则刷新系统提示词上下文。
+      const profileStatusAfterRun = await this.ensureDefaultAgentHome()
+      if (
+        profileStatusAfterRun.initialized !==
+          profileStatusBeforeRun.initialized ||
+        profileStatusAfterRun.soulUpdatedAt !==
+          profileStatusBeforeRun.soulUpdatedAt ||
+        profileStatusAfterRun.userUpdatedAt !==
+          profileStatusBeforeRun.userUpdatedAt
+      ) {
+        await this.refreshAgentProfileContext(request.agentId)
       }
 
       await this.upsertAttemptInIndex(request.sessionId, {
@@ -2227,7 +2271,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     config: InternalRuntimeConfig | null,
   ): Promise<AgentSummary[]> {
     const tangyuanHomeExists = await this.pathExists(
-      join(this.resolveAgentHomePath(TANGYUAN_DEFAULT_AGENT_ID), 'soul.md'),
+      join(this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID), 'soul.md'),
     )
 
     const tangyuanSummary: AgentSummary = {
@@ -2252,7 +2296,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       Object.entries(config.agents)
         .filter(([agentId]) => agentId !== TANGYUAN_DEFAULT_AGENT_ID)
         .map(async ([agentId, agentConfig]) => {
-          const homePath = this.resolveAgentHomePath(agentId)
+          const homePath = this.layout.agentHome(agentId)
           const soulExists = await this.pathExists(join(homePath, 'soul.md'))
 
           return {
@@ -2294,8 +2338,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   async createAgent(displayName: string): Promise<AgentSummary> {
     const agentId = crypto.randomUUID()
     const now = this.now()
-    const homePath = this.resolveAgentHomePath(agentId)
-    const workspacePath = this.resolveAgentWorkspacePath(agentId)
+    const homePath = this.layout.agentHome(agentId)
+    const workspacePath = this.layout.workspace(agentId)
 
     // 1. 读取当前配置并继承 tangyuan 的 Provider/Model
     const readResult = await this.readPersistedConfiguration()
@@ -2417,7 +2461,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     config.agents[agentId] = updatedAgent
     await this.writePersistedConfiguration(config)
 
-    const homePath = this.resolveAgentHomePath(agentId)
+    const homePath = this.layout.agentHome(agentId)
     const soulExists = await this.pathExists(join(homePath, 'soul.md'))
 
     const summary: AgentSummary = {
@@ -2479,7 +2523,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     config.agents[agentId] = updatedAgent
     await this.writePersistedConfiguration(config)
 
-    const homePath = this.resolveAgentHomePath(agentId)
+    const homePath = this.layout.agentHome(agentId)
     const soulExists = await this.pathExists(join(homePath, 'soul.md'))
 
     const summary: AgentSummary = {
@@ -2533,7 +2577,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     config.agents[agentId] = updatedAgent
     await this.writePersistedConfiguration(config)
 
-    const homePath = this.resolveAgentHomePath(agentId)
+    const homePath = this.layout.agentHome(agentId)
     const soulExists = await this.pathExists(join(homePath, 'soul.md'))
 
     const summary: AgentSummary = {
@@ -2574,7 +2618,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
     // 扫描 agents 目录，发现磁盘上有但配置中没有的目录
     const agentsDir = dirname(
-      this.resolveAgentHomePath(TANGYUAN_DEFAULT_AGENT_ID),
+      this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID),
     )
     const unclaimedDirectories: import('@tangyuan/contracts').UnclaimedDirectory[] =
       []
@@ -2594,7 +2638,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         // 跳过已有配置条的目录
         if (configAgentIds.has(agentId)) continue
 
-        const homePath = this.resolveAgentHomePath(agentId)
+        const homePath = this.layout.agentHome(agentId)
         const hasSoul = await this.pathExists(join(homePath, 'soul.md'))
 
         unclaimedDirectories.push({
@@ -2622,7 +2666,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     agentId: string,
     displayName: string,
   ): Promise<AgentSummary> {
-    const homePath = this.resolveAgentHomePath(agentId)
+    const homePath = this.layout.agentHome(agentId)
     const soulExists = await this.pathExists(join(homePath, 'soul.md'))
 
     if (!soulExists) {
@@ -2672,7 +2716,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当目录创建或文件写入失败时，Promise 会 reject。
    */
   async rebuildTangyuanHome(): Promise<AgentSummary> {
-    const homePath = this.resolveAgentHomePath(TANGYUAN_DEFAULT_AGENT_ID)
+    const homePath = this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID)
     const now = this.now()
 
     // 确保目录结构存在
@@ -2734,7 +2778,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当文件读取失败时，Promise 会 reject。
    */
   async getSoul(agentId: AgentId): Promise<SoulContent> {
-    const soulPath = this.resolveSoulPath(agentId)
+    const soulPath = this.layout.soul(agentId)
 
     // 确保 agent home 目录和 soul 文件存在
     await this.ensureAgentHome(agentId)
@@ -2752,7 +2796,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当文件读取失败时，Promise 会 reject。
    */
   async getUserProfile(): Promise<UserProfileContent> {
-    const userPath = this.resolveUserProfilePath()
+    const userPath = this.layout.userProfile()
 
     // 若共享 user.md 不存在，尝试从旧路径迁移
     if (!(await this.pathExists(userPath))) {
@@ -2760,8 +2804,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     // 确保共享 profile 目录和文件存在
-    await mkdir(this.resolveSharedProfilePath(), { recursive: true })
-    await mkdir(this.resolveUserHistoryPath(), { recursive: true })
+    await mkdir(this.layout.sharedProfile(), { recursive: true })
+    await mkdir(this.layout.userHistory(), { recursive: true })
 
     if (!(await this.pathExists(userPath))) {
       await writeFile(userPath, '', 'utf8')
@@ -2784,8 +2828,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当 Pi SDK ResourceLoader 加载失败时，Promise 会 reject。
    */
   async listAgentSkills(agentId: AgentId): Promise<SkillSummary[]> {
-    const agentSkillsPath = this.resolveAgentSkillsPath(agentId)
-    const sharedSkillsPath = this.resolveSharedSkillsPath()
+    const agentSkillsPath = this.layout.agentSkills(agentId)
+    const sharedSkillsPath = this.layout.sharedSkills()
 
     // 确保目录存在
     await mkdir(agentSkillsPath, { recursive: true })
@@ -2795,8 +2839,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       await import('@earendil-works/pi-coding-agent')
 
     const loader = new DefaultResourceLoader({
-      cwd: this.resolveAgentWorkspacePath(agentId),
-      agentDir: this.resolveAgentHomePath(agentId),
+      cwd: this.layout.workspace(agentId),
+      agentDir: this.layout.agentHome(agentId),
       noSkills: true,
       additionalSkillPaths: [agentSkillsPath, sharedSkillsPath],
     })
@@ -2815,7 +2859,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当 Pi SDK ResourceLoader 加载失败时，Promise 会 reject。
    */
   async listSharedSkills(): Promise<SkillSummary[]> {
-    const sharedSkillsPath = this.resolveSharedSkillsPath()
+    const sharedSkillsPath = this.layout.sharedSkills()
 
     await mkdir(sharedSkillsPath, { recursive: true })
 
@@ -2823,8 +2867,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       await import('@earendil-works/pi-coding-agent')
 
     const loader = new DefaultResourceLoader({
-      cwd: this.resolveAgentWorkspacePath(TANGYUAN_DEFAULT_AGENT_ID),
-      agentDir: this.resolveAgentHomePath(),
+      cwd: this.layout.workspace(TANGYUAN_DEFAULT_AGENT_ID),
+      agentDir: this.layout.agentHome(),
       noSkills: true,
       additionalSkillPaths: [sharedSkillsPath],
     })
@@ -2865,10 +2909,10 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       }
     }>,
   ): SkillSummary[] {
-    const agentSkillsPath = this.resolveAgentSkillsPath(
+    const agentSkillsPath = this.layout.agentSkills(
       TANGYUAN_DEFAULT_AGENT_ID,
     )
-    const sharedSkillsPath = this.resolveSharedSkillsPath()
+    const sharedSkillsPath = this.layout.sharedSkills()
 
     // 从 diagnostics 中提取冲突信息（按 loserPath 索引）
     const collisionsByLoserPath = new Map<
@@ -3098,7 +3142,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     allRecords.push(...(await this.readInstallRecords('shared')))
 
     // 读取所有 Agent 的专属 Skill 记录
-    const agentsDir = join(dirname(this.resolveAgentHomePath()))
+    const agentsDir = join(dirname(this.layout.agentHome()))
     try {
       const agentDirs = await readdir(agentsDir)
       for (const agentId of agentDirs) {
@@ -3124,14 +3168,14 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     agentId?: string,
   ): string {
     if (source === 'shared') {
-      return this.resolveSharedSkillsPath()
+      return this.layout.sharedSkills()
     }
 
     if (!agentId) {
       throw new Error('专属 Skill 操作需要提供 agentId。')
     }
 
-    return this.resolveAgentSkillsPath(agentId)
+    return this.layout.agentSkills(agentId)
   }
 
   /**
@@ -3204,7 +3248,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     source: 'shared' | 'agent',
     agentId?: string,
   ): Promise<SkillInstallRecord[]> {
-    const recordsPath = this.resolveInstallRecordsPath(source, agentId)
+    const recordsPath = this.layout.installRecords(source, agentId)
 
     try {
       const content = await readFile(recordsPath, 'utf8')
@@ -3230,7 +3274,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private async recordSkillInstall(
     params: SkillOperationParams,
   ): Promise<void> {
-    const recordsPath = this.resolveInstallRecordsPath(
+    const recordsPath = this.layout.installRecords(
       params.source,
       params.targetAgentId,
     )
@@ -3280,7 +3324,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当写入失败时，Promise 会 reject。
    */
   private async markSkillDeleted(params: SkillOperationParams): Promise<void> {
-    const recordsPath = this.resolveInstallRecordsPath(
+    const recordsPath = this.layout.installRecords(
       params.source,
       params.targetAgentId,
     )
@@ -3327,28 +3371,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
-   * 解析 Skill 安装记录文件路径。
-   *
-   * @param source - 共享或专属。
-   * @param agentId - 专属时的 Agent 标识。
-   * @returns 记录文件绝对路径。
-   */
-  private resolveInstallRecordsPath(
-    source: 'shared' | 'agent',
-    agentId?: string,
-  ): string {
-    if (source === 'shared') {
-      return join(this.resolveSharedSkillsPath(), '.tangyuan-records.json')
-    }
-
-    if (!agentId) {
-      throw new Error('Agent 专属 Skill 记录需要提供 agentId。')
-    }
-
-    return join(this.resolveAgentSkillsPath(agentId), '.tangyuan-records.json')
-  }
-
-  /**
    * 更新指定 Agent 的 soul（含权限校验和备份验证）。
    *
    * @param agentId - 目标 Agent 标识。
@@ -3375,8 +3397,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       }
     }
 
-    const soulPath = this.resolveSoulPath(agentId)
-    const historyPath = this.resolveSoulHistoryPath(agentId)
+    const soulPath = this.layout.soul(agentId)
+    const historyPath = this.layout.soulHistory(agentId)
 
     // 确保目录存在
     await this.ensureAgentHome(agentId)
@@ -3420,6 +3442,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     const updatedAt = (await this.getMtimeIso(soulPath)) ?? this.now()
     this.emitProfileUpdated('soul', updatedAt)
 
+    // profile 变化点：设置中修改 soul 后刷新该 Agent 会话的系统提示词。
+    await this.refreshAgentProfileContext(agentId)
+
     return { target: 'soul', success: true }
   }
 
@@ -3431,11 +3456,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当文件操作失败时，Promise 会 reject。
    */
   async updateUserProfile(content: string): Promise<ProfileMaintenanceResult> {
-    const userPath = this.resolveUserProfilePath()
-    const historyPath = this.resolveUserHistoryPath()
+    const userPath = this.layout.userProfile()
+    const historyPath = this.layout.userHistory()
 
     // 确保目录存在
-    await mkdir(this.resolveSharedProfilePath(), { recursive: true })
+    await mkdir(this.layout.sharedProfile(), { recursive: true })
     await mkdir(historyPath, { recursive: true })
 
     // 若共享 user.md 不存在，尝试从旧路径迁移
@@ -3484,6 +3509,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     // 广播事件
     const updatedAt = (await this.getMtimeIso(userPath)) ?? this.now()
     this.emitProfileUpdated('user', updatedAt)
+
+    // profile 变化点：共享 user.md 影响所有 Agent，刷新全部活跃会话。
+    await this.refreshAllProfileContext()
 
     return { target: 'user', success: true }
   }
@@ -3633,7 +3661,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当文件系统读取失败时，Promise 会 reject。
    */
   private async readPersistedConfiguration(): Promise<ConfigReadResult> {
-    const configPath = this.resolveConfigPath()
+    const configPath = this.layout.config()
 
     try {
       const rawConfig = await readFile(configPath, 'utf8')
@@ -3775,8 +3803,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private async writePersistedConfiguration(
     config: InternalRuntimeConfig,
   ): Promise<void> {
-    const configPath = this.resolveConfigPath()
-    const backupPath = this.resolveConfigBackupPath()
+    const configPath = this.layout.config()
+    const backupPath = this.layout.configBackup()
     const tmpPath = `${configPath}.tmp`
 
     await mkdir(dirname(configPath), { recursive: true })
@@ -3800,26 +3828,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
-   * 解析配置 JSON 的绝对路径。
-   *
-   * @returns Electron userData 下的 config.json 路径。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private resolveConfigPath(): string {
-    return join(this.userDataPath, 'config.json')
-  }
-
-  /**
-   * 解析配置备份 JSON 的绝对路径。
-   *
-   * @returns Electron userData 下的 config.backup.json 路径。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private resolveConfigBackupPath(): string {
-    return join(this.userDataPath, 'config.backup.json')
-  }
-
-  /**
    * 检查配置备份文件是否存在。
    *
    * @returns 备份文件存在返回 true。
@@ -3827,7 +3835,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    */
   private async hasBackupFile(): Promise<boolean> {
     try {
-      await access(this.resolveConfigBackupPath(), fsConstants.F_OK)
+      await access(this.layout.configBackup(), fsConstants.F_OK)
       return true
     } catch {
       return false
@@ -4006,8 +4014,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当备份不存在或恢复失败时，Promise 会 reject。
    */
   async restoreFromBackup(): Promise<RuntimeSnapshot> {
-    const backupPath = this.resolveConfigBackupPath()
-    const configPath = this.resolveConfigPath()
+    const backupPath = this.layout.configBackup()
+    const configPath = this.layout.config()
 
     try {
       await access(backupPath, fsConstants.F_OK)
@@ -4059,8 +4067,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当文件删除失败时，Promise 会 reject。
    */
   async resetConfiguration(): Promise<void> {
-    const configPath = this.resolveConfigPath()
-    const backupPath = this.resolveConfigBackupPath()
+    const configPath = this.layout.config()
+    const backupPath = this.layout.configBackup()
 
     await Promise.all([
       import('node:fs/promises').then(({ rm }) =>
@@ -4085,7 +4093,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当索引 JSON 损坏且 SDK 列表读取也失败时，Promise 会 reject。
    */
   private async loadSessionIndex(): Promise<PersistedSessionIndexEntry[]> {
-    const indexPath = this.resolveSessionIndexPath()
+    const indexPath = this.layout.sessionIndex()
 
     try {
       const rawIndex = await readFile(indexPath, 'utf8')
@@ -4143,13 +4151,13 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       )
       const cwd =
         agentId === TANGYUAN_DEFAULT_AGENT_ID
-          ? this.resolveAgentHomePath()
-          : this.resolveAgentWorkspacePath(agentId)
+          ? this.layout.agentHome()
+          : this.layout.workspace(agentId)
 
       try {
         const sdkSessions = await this.gateway.listSessions({
           cwd,
-          sessionDir: this.resolveSdkSessionDir(),
+          sessionDir: this.layout.sdkSessionDir(),
         })
 
         for (const session of sdkSessions) {
@@ -4190,7 +4198,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     Map<string, PersistedSessionIndexEntry>
   > {
     try {
-      const indexPath = this.resolveSessionIndexPath()
+      const indexPath = this.layout.sessionIndex()
       const rawIndex = await readFile(indexPath, 'utf8')
       const parsedIndex = JSON.parse(rawIndex) as Partial<PersistedSessionIndex>
       const entries = Array.isArray(parsedIndex.sessions)
@@ -4251,7 +4259,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当目录创建或文件写入失败时，Promise 会 reject。
    */
   private async writeSessionIndex(): Promise<void> {
-    const indexPath = this.resolveSessionIndexPath()
+    const indexPath = this.layout.sessionIndex()
     const entries = [...this.sessionIndex.values()].sort((left, right) =>
       right.updatedAt.localeCompare(left.updatedAt),
     )
@@ -4372,15 +4380,15 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     )
     const cwd =
       indexEntry.agentId === TANGYUAN_DEFAULT_AGENT_ID
-        ? this.resolveAgentHomePath()
-        : this.resolveAgentWorkspacePath(indexEntry.agentId)
+        ? this.layout.agentHome()
+        : this.layout.workspace(indexEntry.agentId)
     const openRequest = {
       ...configuration,
       sessionId,
       sdkSessionFile: indexEntry.sdkSessionFile,
       cwd,
-      agentSkillsPath: this.resolveAgentSkillsPath(indexEntry.agentId),
-      sharedSkillsPath: this.resolveSharedSkillsPath(),
+      agentSkillsPath: this.layout.agentSkills(indexEntry.agentId),
+      sharedSkillsPath: this.layout.sharedSkills(),
     }
     const handle = await this.gateway.openSession(
       this.toolApprovalGateway
@@ -4388,6 +4396,13 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         : openRequest,
     )
     this.sessionHandles.set(sessionId, handle)
+    // 身份上下文走系统提示词：重启后打开历史会话时注入并 reload 使其生效。
+    if (handle.setSystemPromptContext) {
+      handle.setSystemPromptContext(
+        await this.buildProfileSystemPromptContext(indexEntry.agentId),
+      )
+      await handle.reload?.()
+    }
 
     return handle
   }
@@ -4413,37 +4428,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     return indexEntry
-  }
-
-  /**
-   * 解析本地会话索引文件路径。
-   *
-   * @returns Electron userData 下的 sessions/index.json 路径。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private resolveSessionIndexPath(): string {
-    return join(this.userDataPath, 'sessions', 'index.json')
-  }
-
-  /**
-   * 解析 Pi SDK 原生 session 文件目录。
-   *
-   * @returns Electron userData 下保存 SDK session 的目录路径。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private resolveSdkSessionDir(): string {
-    return join(this.userDataPath, 'sessions', 'pi-sdk')
-  }
-
-  /**
-   * 解析单个 Pi SDK 原生 session 文件路径。
-   *
-   * @param sessionId - 会话标识。
-   * @returns 对应 session 的 JSONL 文件路径。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private resolveSdkSessionFile(sessionId: string): string {
-    return join(this.resolveSdkSessionDir(), `${sessionId}.jsonl`)
   }
 
   /**
@@ -4547,8 +4531,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当目录创建失败时，Promise 会 reject。
    */
   private async ensureAgentHome(agentId: AgentId): Promise<void> {
-    const homePath = this.resolveAgentHomePath(agentId)
-    const soulHistoryPath = this.resolveSoulHistoryPath(agentId)
+    const homePath = this.layout.agentHome(agentId)
+    const soulHistoryPath = this.layout.soulHistory(agentId)
 
     await mkdir(homePath, { recursive: true })
     await mkdir(soulHistoryPath, { recursive: true })
@@ -4557,7 +4541,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     await mkdir(join(homePath, 'workspace'), { recursive: true })
 
     // 确保 soul.md 存在
-    const soulPath = this.resolveSoulPath(agentId)
+    const soulPath = this.layout.soul(agentId)
 
     if (!(await this.pathExists(soulPath))) {
       const displayName =
@@ -4588,22 +4572,22 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    */
   private async migrateLegacyUserProfile(): Promise<void> {
     const legacyUserPath = join(
-      this.resolveAgentHomePath(TANGYUAN_DEFAULT_AGENT_ID),
+      this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID),
       'user.md',
     )
     const legacyHistoryPath = join(
-      this.resolveAgentHomePath(TANGYUAN_DEFAULT_AGENT_ID),
+      this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID),
       'user.history',
     )
-    const targetPath = this.resolveUserProfilePath()
-    const targetHistoryPath = this.resolveUserHistoryPath()
+    const targetPath = this.layout.userProfile()
+    const targetHistoryPath = this.layout.userHistory()
 
     if (!(await this.pathExists(legacyUserPath))) {
       return
     }
 
     // 迁移 user.md
-    await mkdir(this.resolveSharedProfilePath(), { recursive: true })
+    await mkdir(this.layout.sharedProfile(), { recursive: true })
     await copyFile(legacyUserPath, targetPath)
 
     // 迁移 user.history/ 目录下的文件
@@ -4627,10 +4611,10 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当文件系统创建、读取或写入失败时，Promise 会 reject。
    */
   private async ensureDefaultAgentHome(): Promise<AgentHomeStatus> {
-    const absoluteHomePath = this.resolveAgentHomePath()
+    const absoluteHomePath = this.layout.agentHome()
     const bootstrapPath = join(absoluteHomePath, 'bootstrap.md')
     const soulPath = join(absoluteHomePath, 'soul.md')
-    const userPath = this.resolveUserProfilePath()
+    const userPath = this.layout.userProfile()
     const soulHistoryPath = join(absoluteHomePath, 'soul.history')
     const userHistoryPath = join(absoluteHomePath, 'user.history')
     const memoryPath = join(absoluteHomePath, 'memory')
@@ -4645,9 +4629,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     ])
 
     // 确保共享 profile 和 skills 目录存在
-    await mkdir(this.resolveSharedProfilePath(), { recursive: true })
-    await mkdir(this.resolveUserHistoryPath(), { recursive: true })
-    await mkdir(this.resolveSharedSkillsPath(), { recursive: true })
+    await mkdir(this.layout.sharedProfile(), { recursive: true })
+    await mkdir(this.layout.userHistory(), { recursive: true })
+    await mkdir(this.layout.sharedSkills(), { recursive: true })
 
     // 若共享 user.md 不存在，尝试从旧路径迁移
     if (!(await this.pathExists(userPath))) {
@@ -4665,10 +4649,18 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       await writeFile(bootstrapPath, this.createBootstrapTemplate(), 'utf8')
     }
 
+    // 初始化完成的唯一真相：soul.md 与 user.md 均存在且内容非空。
+    // 空文件不算完成，仍处于初始化阻断态。
+    const [soulHasContent, userHasContent] = await Promise.all([
+      soulFileExists ? this.fileHasContent(soulPath) : Promise.resolve(false),
+      userFileExists ? this.fileHasContent(userPath) : Promise.resolve(false),
+    ])
+    const profileReady = soulHasContent && userHasContent
+
     return {
-      initialized: soulFileExists && userFileExists,
+      initialized: profileReady,
       bootstrapRequired:
-        !soulFileExists && (await this.pathExists(bootstrapPath)),
+        !profileReady && (await this.pathExists(bootstrapPath)),
       bootstrapFileExists: await this.pathExists(bootstrapPath),
       soulFileExists: await this.pathExists(soulPath),
       userFileExists: await this.pathExists(userPath),
@@ -4784,7 +4776,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当 bootstrap.md 重建写入失败时，Promise 会 reject。
    */
   private async performBootstrapCompletionGating(): Promise<void> {
-    const absoluteHomePath = this.resolveAgentHomePath()
+    const absoluteHomePath = this.layout.agentHome()
     const bootstrapPath = join(absoluteHomePath, 'bootstrap.md')
     const soulPath = join(absoluteHomePath, 'soul.md')
     const userPath = join(absoluteHomePath, 'user.md')
@@ -4825,13 +4817,13 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     return {
       soul: await this.readProfileMaintenanceFileSnapshot({
         target: 'soul',
-        path: this.resolveSoulPath(agentId),
-        historyPath: this.resolveSoulHistoryPath(agentId),
+        path: this.layout.soul(agentId),
+        historyPath: this.layout.soulHistory(agentId),
       }),
       user: await this.readProfileMaintenanceFileSnapshot({
         target: 'user',
-        path: this.resolveUserProfilePath(),
-        historyPath: this.resolveUserHistoryPath(),
+        path: this.layout.userProfile(),
+        historyPath: this.layout.userHistory(),
       }),
     }
   }
@@ -4881,11 +4873,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     // user: LLM 可能写入 agent home 或共享 profile 路径
     // 先检查 agent home 下的 user.md（旧位置），再同步到共享路径
     const agentHomeUserPath = join(
-      this.resolveAgentHomePath(input.agentId),
+      this.layout.agentHome(input.agentId),
       'user.md',
     )
     const agentHomeUserHistoryPath = join(
-      this.resolveAgentHomePath(input.agentId),
+      this.layout.agentHome(input.agentId),
       'user.history',
     )
 
@@ -4894,11 +4886,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
       if (agentHomeUserContent !== input.previousSnapshot.user.content) {
         // LLM 修改了 agent home 下的 user.md，同步到共享路径
-        const sharedUserPath = this.resolveUserProfilePath()
+        const sharedUserPath = this.layout.userProfile()
 
         // 确保共享路径存在
-        await mkdir(this.resolveSharedProfilePath(), { recursive: true })
-        await mkdir(this.resolveUserHistoryPath(), { recursive: true })
+        await mkdir(this.layout.sharedProfile(), { recursive: true })
+        await mkdir(this.layout.userHistory(), { recursive: true })
 
         // 应用相同的校验逻辑到 agent home 的 user.md
         await this.applyProfileMaintenanceFileResult({
@@ -5181,19 +5173,22 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
-   * 读取默认 Agent profile 文件并注入到用户 prompt。
+   * 构造需追加到系统提示词末尾的身份上下文片段。
    *
-   * @param userContent - 用户在 Renderer 中输入的原始消息。
-   * @returns 包含 soul.md/user.md 或 bootstrap.md 上下文的 prompt。
+   * soul.md 与 user.md 同时存在且内容非空时注入 profile；否则注入
+   * bootstrap 初始化指令与 bootstrap.md 全文。与对话消息彻底分离，
+   * 不再拼入用户消息，避免污染 SDK transcript。
+   *
+   * @param agentId - Agent 标识；默认为 tangyuan。
+   * @returns 可追加到系统提示词的 profile / bootstrap 上下文字符串。
    * @throws 当 profile 文件读取失败时，Promise 会 reject。
    */
-  private async buildPromptWithProfileContext(
-    userContent: string,
+  private async buildProfileSystemPromptContext(
     agentId: AgentId = TANGYUAN_DEFAULT_AGENT_ID,
   ): Promise<string> {
-    const absoluteHomePath = this.resolveAgentHomePath(agentId)
+    const absoluteHomePath = this.layout.agentHome(agentId)
     const soulPath = join(absoluteHomePath, 'soul.md')
-    const userPath = this.resolveUserProfilePath()
+    const userPath = this.layout.userProfile()
     const bootstrapPath = join(absoluteHomePath, 'bootstrap.md')
 
     // 确保共享 user profile 存在
@@ -5201,17 +5196,18 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       await this.migrateLegacyUserProfile()
     }
 
-    const [soulFileExists, userFileExists] = await Promise.all([
-      this.pathExists(soulPath),
-      this.pathExists(userPath),
+    const [soulContent, profileUserContent] = await Promise.all([
+      (await this.pathExists(soulPath))
+        ? readFile(soulPath, 'utf8')
+        : Promise.resolve(''),
+      (await this.pathExists(userPath))
+        ? readFile(userPath, 'utf8')
+        : Promise.resolve(''),
     ])
 
-    if (soulFileExists && userFileExists) {
-      const [soulContent, profileUserContent] = await Promise.all([
-        readFile(soulPath, 'utf8'),
-        readFile(userPath, 'utf8'),
-      ])
-
+    // 初始化完成的唯一真相：soul.md 与 user.md 均存在且内容非空。
+    // 空文件不算完成，仍需走 bootstrap 流程。
+    if (soulContent.trim() !== '' && profileUserContent.trim() !== '') {
       return [
         `# ${PROFILE_CONTEXT_HEADER}`,
         '',
@@ -5220,9 +5216,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         '',
         '## user.md',
         profileUserContent.trim(),
-        '',
-        '# 用户消息',
-        userContent,
       ].join('\n')
     }
 
@@ -5247,121 +5240,71 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       '',
       '## bootstrap.md',
       bootstrapContent.trim(),
-      '',
-      '# 用户消息',
-      userContent,
     ].join('\n')
   }
 
   /**
-   * 把用户家目录下的 Agent Home 转成绝对路径。
+   * 重算身份上下文并刷新到指定 Agent 的所有活跃会话。
    *
-   * @param agentId - 需要解析路径的 Agent 标识；省略时返回默认 tangyuan 路径。
-   * @returns 指定 Agent Home 的绝对路径。
-   * @throws 此方法不会主动抛出错误。
+   * 先异步算好片段，再对每个 handle 同步 set + reload，绕开
+   * appendSystemPromptOverride 同步签名无法读文件的约束。仅在 profile
+   * 变化点（建会话、打开会话、回合结束、设置中修改 profile）调用。
+   *
+   * @param agentId - Agent 标识。
+   * @returns 无返回值；无匹配 handle 时静默返回。
+   * @throws 当 profile 读取或 reload 失败时，Promise 会 reject。
    */
-  private resolveAgentHomePath(
-    agentId: string = TANGYUAN_DEFAULT_AGENT_ID,
-  ): string {
-    const resolvedDefault = this.agentHomePath.startsWith('~')
-      ? join(this.fsRoot, this.agentHomePath.slice(2))
-      : this.agentHomePath
+  private async refreshAgentProfileContext(agentId: AgentId): Promise<void> {
+    const context = await this.buildProfileSystemPromptContext(agentId)
+    const promises: Promise<void>[] = []
 
-    if (agentId === TANGYUAN_DEFAULT_AGENT_ID) {
-      return resolvedDefault
+    for (const [sessionId, handle] of this.sessionHandles) {
+      if (
+        this.sessionIndex.get(sessionId)?.agentId !== agentId ||
+        !handle.setSystemPromptContext
+      ) {
+        continue
+      }
+      handle.setSystemPromptContext(context)
+      if (handle.reload) {
+        promises.push(handle.reload())
+      }
     }
 
-    return join(dirname(resolvedDefault), agentId)
+    await Promise.all(promises)
   }
 
   /**
-   * 解析指定 Agent 的 workspace 绝对路径。
+   * 刷新全部活跃会话的身份上下文。
    *
-   * @param agentId - Agent 标识。
-   * @returns workspace 目录的绝对路径。
-   * @throws 此方法不会主动抛出错误。
+   * 用于共享 user.md 变更后刷新所有 Agent 的会话。
+   *
+   * @returns 无返回值。
+   * @throws 当 profile 读取或 reload 失败时，Promise 会 reject。
    */
-  private resolveAgentWorkspacePath(agentId: string): string {
-    return join(this.resolveAgentHomePath(agentId), 'workspace')
+  private async refreshAllProfileContext(): Promise<void> {
+    const agentIds = new Set<AgentId>()
+    for (const sessionId of this.sessionHandles.keys()) {
+      const agentId = this.sessionIndex.get(sessionId)?.agentId
+      if (agentId) {
+        agentIds.add(agentId)
+      }
+    }
+
+    await Promise.all(
+      [...agentIds].map((agentId) => this.refreshAgentProfileContext(agentId)),
+    )
   }
 
   /**
-   * 解析共享 Skills 目录的绝对路径。
+   * 判断文件是否存在且去除空白后内容非空。
    *
-   * @returns ~/.tangyuan/skills/ 绝对路径。
-   * @throws 此方法不会主动抛出错误。
+   * @param path - 需要检查的文件路径。
+   * @returns 文件存在且含非空白内容时返回 true。
+   * @throws 当读取报错（除“找不到”外）时，Promise 会 reject。
    */
-  private resolveSharedSkillsPath(): string {
-    // 共享 skills: ~/.tangyuan/skills/
-    // agentHomePath: ~/.tangyuan/agents/tangyuan
-    const tangyuanDir = dirname(this.resolveAgentHomePath()) // ~/.tangyuan/agents
-    return join(dirname(tangyuanDir), 'skills') // ~/.tangyuan/skills
-  }
-
-  /**
-   * 解析指定 Agent 专属 Skills 目录的绝对路径。
-   *
-   * @param agentId - Agent 标识。
-   * @returns ~/.tangyuan/agents/<agentId>/skills/ 绝对路径。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private resolveAgentSkillsPath(agentId: string): string {
-    return join(this.resolveAgentHomePath(agentId), 'skills')
-  }
-
-  /**
-   * 解析共享 profile 目录的绝对路径。
-   *
-   * @returns ~/.tangyuan/profile/ 绝对路径。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private resolveSharedProfilePath(): string {
-    // 共享 profile: ~/.tangyuan/profile/
-    // agentHomePath: ~/.tangyuan/agents/tangyuan
-    const tangyuanDir = dirname(this.resolveAgentHomePath()) // ~/.tangyuan/agents
-    return join(dirname(tangyuanDir), 'profile') // ~/.tangyuan/profile
-  }
-
-  /**
-   * 解析共享 user profile 文件的绝对路径。
-   *
-   * @returns ~/.tangyuan/profile/user.md 绝对路径。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private resolveUserProfilePath(): string {
-    return join(this.resolveSharedProfilePath(), 'user.md')
-  }
-
-  /**
-   * 解析共享 user profile 历史目录的绝对路径。
-   *
-   * @returns ~/.tangyuan/profile/user.history/ 绝对路径。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private resolveUserHistoryPath(): string {
-    return join(this.resolveSharedProfilePath(), 'user.history')
-  }
-
-  /**
-   * 解析指定 Agent 的 soul 文件绝对路径。
-   *
-   * @param agentId - Agent 标识。
-   * @returns agent home 下 soul.md 的绝对路径。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private resolveSoulPath(agentId: AgentId): string {
-    return join(this.resolveAgentHomePath(agentId), 'soul.md')
-  }
-
-  /**
-   * 解析指定 Agent 的 soul 历史目录绝对路径。
-   *
-   * @param agentId - Agent 标识。
-   * @returns agent home 下 soul.history/ 的绝对路径。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private resolveSoulHistoryPath(agentId: AgentId): string {
-    return join(this.resolveAgentHomePath(agentId), 'soul.history')
+  private async fileHasContent(path: string): Promise<boolean> {
+    return (await this.safeReadFile(path)).trim() !== ''
   }
 
   /**

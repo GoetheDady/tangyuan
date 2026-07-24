@@ -319,6 +319,31 @@ describe('AssistantMessage', () => {
     expect(screen.getByText('等待中…')).toBeInTheDocument()
   })
 
+  it('keeps a single spinning indicator regardless of running step count', () => {
+    const entry = createEntry({
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null
+      },
+      turns: [
+        createTurn({
+          steps: [
+            createThinkingStep({ index: 0, status: 'running' }),
+            createToolStep({ index: 1, status: 'running' })
+          ],
+          status: 'running'
+        })
+      ]
+    })
+
+    const { container } = render(<AssistantMessage entry={entry} isStreaming />)
+
+    expect(container.querySelectorAll('.animate-spin')).toHaveLength(1)
+  })
+
   it('shows tool name and safe summary in tool steps', () => {
     const entry = createEntry({
       attempt: {

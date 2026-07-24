@@ -214,6 +214,25 @@ describe('TranscriptEmitter tool step handling', () => {
     }
   })
 
+  it('accumulates multiple thinking deltas into one step instead of replacing', () => {
+    const { emitter, getSnapshot } = createEmitter()
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    for (const delta of ['我', '在', '思', '考']) {
+      emitThinkingDelta(emitter, { delta })
+    }
+
+    const snapshot = getSnapshot('session-1')
+    const agentEntry = snapshot!.entries[0]
+    expect(agentEntry!.kind).toBe('agent-reply')
+    if (agentEntry && agentEntry.kind === 'agent-reply') {
+      expect(agentEntry.turns[0]!.steps).toHaveLength(1)
+      const step = agentEntry.turns[0]!.steps[0]!
+      expect(step.kind).toBe('thinking')
+      expect(step.content).toBe('我在思考')
+    }
+  })
+
   it('creates a tool step in turn 0 on first tool-started', () => {
     const { emitter, getSnapshot } = createEmitter()
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')

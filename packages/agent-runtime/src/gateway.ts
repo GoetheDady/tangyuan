@@ -215,6 +215,11 @@ export class RealPiSdkGateway implements PiSdkGateway {
             request.cwd,
           )
 
+    // 身份上下文片段（soul/user 或 bootstrap）。appendSystemPromptOverride
+    // 是同步签名，无法在其中读文件；因此由 runtime 先异步算好、
+    // 通过 setSystemPromptContext 存入此闭包，reload 时同步取值追加。
+    let systemPromptContext = ''
+
     // 为当前 Agent session 创建受控 ResourceLoader：
     // - 关闭 Pi 默认 Skill 自动发现（noSkills: true）
     // - 只加载 Agent 专属和共享两层 Skill 目录
@@ -224,6 +229,9 @@ export class RealPiSdkGateway implements PiSdkGateway {
       agentDir: dirname(request.agentSkillsPath), // Agent home 目录
       noSkills: true,
       additionalSkillPaths: [request.agentSkillsPath, request.sharedSkillsPath],
+      // 追加式注入身份上下文，不覆盖 Pi 内置系统提示词。
+      appendSystemPromptOverride: (base: string[]) =>
+        systemPromptContext ? [...base, systemPromptContext] : base,
     })
     await resourceLoader.reload()
 
@@ -439,6 +447,9 @@ export class RealPiSdkGateway implements PiSdkGateway {
 
     return {
       sdkSessionFile: sessionManager.getSessionFile() ?? request.sdkSessionFile,
+      setSystemPromptContext: (context: string) => {
+        systemPromptContext = context
+      },
       prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
         const unsubscribe = session.subscribe((event: unknown) => {
           for (const streamEvent of normalizePiSdkSessionEvent(event)) {

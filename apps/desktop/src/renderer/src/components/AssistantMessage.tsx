@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleCheck,
+  CircleDashed,
   CircleStop,
   CircleX,
   LoaderCircle,
@@ -352,9 +353,9 @@ function TurnTimeline({ turns }: { turns: RunTurn[] }): React.JSX.Element {
             {turn.steps.length === 0 && turn.status === 'running' && (
               <div className="flex items-center gap-2">
                 <span className="grid size-3.5 shrink-0 place-items-center">
-                  <LoaderCircle
+                  <CircleDashed
                     size={13}
-                    className="animate-spin text-muted-foreground"
+                    className="text-muted-foreground"
                     aria-hidden="true"
                   />
                 </span>
@@ -422,8 +423,8 @@ function StepRow({ step, isLast = true }: { step: TurnStep; isLast?: boolean }):
     iconClass = 'text-destructive-soft-foreground'
     iconLabel = '失败'
   } else if (step.status === 'running') {
-    StatusIcon = LoaderCircle
-    iconClass = `animate-spin ${step.kind === 'thinking' ? 'text-success' : 'text-foreground'}`
+    StatusIcon = CircleDashed
+    iconClass = step.kind === 'thinking' ? 'text-success' : 'text-foreground'
     iconLabel = '运行中'
   } else {
     StatusIcon = CircleCheck

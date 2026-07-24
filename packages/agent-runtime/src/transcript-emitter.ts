@@ -348,12 +348,24 @@ export class TranscriptEmitter {
 
     if (turnState.lastStepKind === 'thinking') {
       const stepIndex = turnState.stepIndex - 1
+      // step-updated 是整体替换，因此需拼上已累积内容，否则思考文本会被后一片段覆盖。
+      const previous = this.getThinkingStep(
+        event.sessionId,
+        turnState.entryIndex,
+        turnState.turnIndex,
+        stepIndex,
+      )
       const delta: TranscriptDelta = {
         type: 'step-updated',
         index: turnState.entryIndex,
         turnIndex: turnState.turnIndex,
         stepIndex,
-        step: { ...step, index: stepIndex },
+        step: {
+          ...step,
+          index: stepIndex,
+          content: `${previous?.content ?? ''}${event.delta}`,
+          startedAt: previous?.startedAt ?? now,
+        },
       }
       this.emitTranscriptDeltaEvent(event.agentId, event.sessionId, delta)
     } else {
@@ -368,6 +380,27 @@ export class TranscriptEmitter {
       turnState.stepIndex++
       turnState.lastStepKind = 'thinking'
     }
+  }
+
+  /**
+   * 从当前快照读取指定 thinking 步骤，用于累加式更新。
+   *
+   * @param sessionId - 会话标识。
+   * @param entryIndex - agent-reply 条目索引。
+   * @param turnIndex - 回合索引。
+   * @param stepIndex - 步骤索引。
+   * @returns 该 thinking 步骤；不存在时返回 undefined。
+   */
+  private getThinkingStep(
+    sessionId: string,
+    entryIndex: number,
+    turnIndex: number,
+    stepIndex: number,
+  ): TurnStep | undefined {
+    const entry = this.transcriptSnapshots.get(sessionId)?.entries[entryIndex]
+    if (!entry || entry.kind !== 'agent-reply') return undefined
+    const step = entry.turns[turnIndex]?.steps[stepIndex]
+    return step?.kind === 'thinking' ? step : undefined
   }
 
   /**
