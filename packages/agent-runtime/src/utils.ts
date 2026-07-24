@@ -1,4 +1,6 @@
 import type { PiSdkStreamEvent } from './index'
+import { access } from 'node:fs/promises'
+import { constants as fsConstants } from 'node:fs'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type InternalRuntimeConfig,
@@ -422,5 +424,25 @@ export function extractAgentRuntimeConfig(
     providerId: agent.defaultProviderId,
     modelId: agent.defaultModelId,
     apiKey: provider.apiKey,
+  }
+}
+
+/**
+ * 判断给定路径是否存在。
+ *
+ * @param path - 需要检查的文件或目录路径。
+ * @returns 路径存在则返回 true，不存在则返回 false。
+ * @throws 当底层文件系统返回除“找不到”以外的错误时，Promise 会 reject。
+ */
+export async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path, fsConstants.F_OK)
+    return true
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return false
+    }
+
+    throw error
   }
 }

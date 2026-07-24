@@ -23,15 +23,16 @@ import {
 import { RealPiSdkGateway } from './gateway'
 import { DirectoryLayout } from './directory-layout'
 import { ConfigStore } from './config-store'
+import { AgentRegistry } from './agent-registry'
 import { AgentRuntimeError } from './errors'
 import {
   isAbortError,
   mapPiSdkStreamEventToActivity,
   sanitizeErrorMessage,
   normalizeRuntimeConfiguration,
-  createDefaultInternalConfig,
   buildInternalConfigForSave,
   extractAgentRuntimeConfig,
+  pathExists,
 } from './utils'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
@@ -51,7 +52,6 @@ import {
   type CreateSessionRequest,
   type GetSessionMessagesRequest,
   type GetSessionModelInfoRequest,
-  type InternalRuntimeConfig,
   type ListSessionsRequest,
   type ModelDescriptor,
   type ProviderAuthSnapshot,
@@ -1027,6 +1027,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private readonly userDataPath: string
   private readonly layout: DirectoryLayout
   private readonly configStore: ConfigStore
+  private readonly agentRegistry: AgentRegistry
   private readonly gateway: PiSdkGateway
   private readonly encryptionAdapter: ConfigEncryptionAdapter | null
   private readonly listeners = new Set<AgentEventListener>()
@@ -1063,6 +1064,13 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       layout: this.layout,
       encryptionAdapter: this.encryptionAdapter,
       now: this.now,
+    })
+    this.agentRegistry = new AgentRegistry({
+      layout: this.layout,
+      configStore: this.configStore,
+      now: this.now,
+      emit: (event) => this.emit(event),
+      agentHomePath: this.agentHomePath,
     })
     this.toolApprovalGateway = options.toolApprovalGateway
   }
@@ -2181,7 +2189,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         homePath: this.agentHomePath,
         profile: createAgentProfileStatus(homeStatus),
       },
-      agents: await this.buildAgentSummaries(readResult.config),
+      agents: await this.agentRegistry.buildAgentSummaries(readResult.config),
       providers: resources.providers,
       models: resources.models,
       settings: {
@@ -2222,71 +2230,13 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
-   * 从内部配置构建所有 Agent 摘要列表。
-   *
-   * @param config - 解密后的内部运行时配置；为 null 时只返回默认 tangyuan。
-   * @returns Agent 摘要列表，tangyuan 始终排在第一位。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private async buildAgentSummaries(
-    config: InternalRuntimeConfig | null,
-  ): Promise<AgentSummary[]> {
-    const tangyuanHomeExists = await this.pathExists(
-      join(this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID), 'soul.md'),
-    )
-
-    const tangyuanSummary: AgentSummary = {
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
-      displayName:
-        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.displayName ?? '汤圆',
-      status: config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.status ?? 'active',
-      defaultProviderId:
-        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.defaultProviderId ?? null,
-      defaultModelId:
-        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.defaultModelId ?? null,
-      homePath: this.agentHomePath,
-      archivedAt: config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.archivedAt ?? null,
-      directoryStatus: tangyuanHomeExists ? 'healthy' : 'damaged',
-    }
-
-    if (!config) {
-      return [tangyuanSummary]
-    }
-
-    const otherAgents = await Promise.all(
-      Object.entries(config.agents)
-        .filter(([agentId]) => agentId !== TANGYUAN_DEFAULT_AGENT_ID)
-        .map(async ([agentId, agentConfig]) => {
-          const homePath = this.layout.agentHome(agentId)
-          const soulExists = await this.pathExists(join(homePath, 'soul.md'))
-
-          return {
-            agentId,
-            displayName: agentConfig.displayName,
-            status: agentConfig.status,
-            defaultProviderId: agentConfig.defaultProviderId,
-            defaultModelId: agentConfig.defaultModelId,
-            homePath,
-            archivedAt: agentConfig.archivedAt,
-            directoryStatus: soulExists
-              ? ('healthy' as const)
-              : ('damaged' as const),
-          }
-        }),
-    )
-
-    return [tangyuanSummary, ...otherAgents]
-  }
-
-  /**
    * 列出所有已配置的 Agent 摘要。
    *
    * @returns Agent 摘要列表。
    * @throws 当配置读取失败时，Promise 会 reject。
    */
   async listAgents(): Promise<AgentSummary[]> {
-    const readResult = await this.configStore.read()
-    return await this.buildAgentSummaries(readResult.config)
+    return this.agentRegistry.listAgents()
   }
 
   /**
@@ -2297,84 +2247,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当配置读取、目录创建、文件写入或加密失败时，Promise 会 reject。
    */
   async createAgent(displayName: string): Promise<AgentSummary> {
-    const agentId = crypto.randomUUID()
-    const now = this.now()
-    const homePath = this.layout.agentHome(agentId)
-    const workspacePath = this.layout.workspace(agentId)
-
-    // 1. 读取当前配置并继承 tangyuan 的 Provider/Model
-    const readResult = await this.configStore.read()
-    const config = readResult.config ?? createDefaultInternalConfig()
-    const tangyuanConfig = extractAgentRuntimeConfig(
-      config,
-      TANGYUAN_DEFAULT_AGENT_ID,
-    )
-
-    // 2. 原子创建目录和初始文件
-    await mkdir(homePath, { recursive: true })
-
-    try {
-      await Promise.all([
-        mkdir(join(homePath, 'soul.history'), { recursive: true }),
-        mkdir(join(homePath, 'memory'), { recursive: true }),
-        mkdir(join(homePath, 'skills'), { recursive: true }),
-        mkdir(workspacePath, { recursive: true }),
-      ])
-
-      const soulContent = [
-        `# ${displayName}`,
-        '',
-        `创建时间：${now}`,
-        '',
-        '## 身份',
-        `${displayName}是用户创建的 Agent。`,
-        '',
-        '## 职责',
-        '待用户在对话中定义。',
-        '',
-        '## 规则',
-        '遵循用户指令，在执行危险操作前先确认。',
-        '使用中文回复，简洁清晰。',
-        '',
-      ].join('\n')
-      await writeFile(join(homePath, 'soul.md'), soulContent, 'utf8')
-
-      // 3. 更新配置
-      config.agents[agentId] = {
-        displayName,
-        defaultProviderId: tangyuanConfig?.providerId ?? null,
-        defaultModelId: tangyuanConfig?.modelId ?? null,
-        status: 'active',
-        archivedAt: null,
-      }
-      await this.configStore.write(config)
-
-      const summary: AgentSummary = {
-        agentId,
-        displayName,
-        status: 'active',
-        defaultProviderId: tangyuanConfig?.providerId ?? null,
-        defaultModelId: tangyuanConfig?.modelId ?? null,
-        homePath,
-        archivedAt: null,
-        directoryStatus: 'healthy',
-      }
-
-      this.emit({
-        type: 'agent-created',
-        agentId,
-        agent: summary,
-        occurredAt: now,
-      })
-
-      return summary
-    } catch (error) {
-      // 失败回滚：清理已创建的目录
-      await import('node:fs/promises').then(({ rm }) =>
-        rm(homePath, { recursive: true, force: true }),
-      )
-      throw error
-    }
+    return this.agentRegistry.createAgent(displayName)
   }
 
   /**
@@ -2389,61 +2262,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     agentId: AgentId,
     patch: Partial<Pick<AgentConfig, 'defaultProviderId' | 'defaultModelId'>>,
   ): Promise<AgentSummary> {
-    const readResult = await this.configStore.read()
-    const config = readResult.config
-
-    if (!config || !config.agents[agentId]) {
-      throw new AgentRuntimeError({
-        code: 'session-not-found',
-        message: `Agent ${agentId} 不存在或已归档。`,
-        recoverable: true,
-      })
-    }
-
-    const currentAgent = config.agents[agentId]
-
-    if (currentAgent.status !== 'active') {
-      throw new AgentRuntimeError({
-        code: 'session-not-found',
-        message: `Agent ${agentId} 已归档，无法修改配置。`,
-        recoverable: true,
-      })
-    }
-
-    const updatedAgent = {
-      ...currentAgent,
-      ...(patch.defaultProviderId !== undefined
-        ? { defaultProviderId: patch.defaultProviderId }
-        : {}),
-      ...(patch.defaultModelId !== undefined
-        ? { defaultModelId: patch.defaultModelId }
-        : {}),
-    }
-    config.agents[agentId] = updatedAgent
-    await this.configStore.write(config)
-
-    const homePath = this.layout.agentHome(agentId)
-    const soulExists = await this.pathExists(join(homePath, 'soul.md'))
-
-    const summary: AgentSummary = {
-      agentId,
-      displayName: updatedAgent.displayName,
-      status: updatedAgent.status,
-      defaultProviderId: updatedAgent.defaultProviderId,
-      defaultModelId: updatedAgent.defaultModelId,
-      homePath,
-      archivedAt: updatedAgent.archivedAt,
-      directoryStatus: soulExists ? 'healthy' : 'damaged',
-    }
-
-    this.emit({
-      type: 'agent-config-updated',
-      agentId,
-      agent: summary,
-      occurredAt: this.now(),
-    })
-
-    return summary
+    return this.agentRegistry.updateAgentConfig(agentId, patch)
   }
 
   /**
@@ -2454,58 +2273,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当 Agent 是汤圆、不存在或配置保存失败时，Promise 会 reject。
    */
   async archiveAgent(agentId: AgentId): Promise<AgentSummary> {
-    if (agentId === TANGYUAN_DEFAULT_AGENT_ID) {
-      throw new AgentRuntimeError({
-        code: 'session-not-found',
-        message: '默认 Agent「汤圆」不可归档。',
-        recoverable: true,
-      })
-    }
-
-    const readResult = await this.configStore.read()
-    const config = readResult.config
-
-    if (!config || !config.agents[agentId]) {
-      throw new AgentRuntimeError({
-        code: 'session-not-found',
-        message: `Agent ${agentId} 不存在。`,
-        recoverable: true,
-      })
-    }
-
-    const currentAgent = config.agents[agentId]
-    const now = this.now()
-
-    const updatedAgent: AgentConfig = {
-      ...currentAgent,
-      status: 'archived',
-      archivedAt: now,
-    }
-    config.agents[agentId] = updatedAgent
-    await this.configStore.write(config)
-
-    const homePath = this.layout.agentHome(agentId)
-    const soulExists = await this.pathExists(join(homePath, 'soul.md'))
-
-    const summary: AgentSummary = {
-      agentId,
-      displayName: updatedAgent.displayName,
-      status: updatedAgent.status,
-      defaultProviderId: updatedAgent.defaultProviderId,
-      defaultModelId: updatedAgent.defaultModelId,
-      homePath,
-      archivedAt: updatedAgent.archivedAt,
-      directoryStatus: soulExists ? 'healthy' : 'damaged',
-    }
-
-    this.emit({
-      type: 'agent-archived',
-      agentId,
-      agent: summary,
-      occurredAt: now,
-    })
-
-    return summary
+    return this.agentRegistry.archiveAgent(agentId)
   }
 
   /**
@@ -2516,50 +2284,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当 Agent 不存在或配置保存失败时，Promise 会 reject。
    */
   async recoverAgent(agentId: AgentId): Promise<AgentSummary> {
-    const readResult = await this.configStore.read()
-    const config = readResult.config
-
-    if (!config || !config.agents[agentId]) {
-      throw new AgentRuntimeError({
-        code: 'session-not-found',
-        message: `Agent ${agentId} 不存在。`,
-        recoverable: true,
-      })
-    }
-
-    const currentAgent = config.agents[agentId]
-    const now = this.now()
-
-    const updatedAgent: AgentConfig = {
-      ...currentAgent,
-      status: 'active',
-      archivedAt: null,
-    }
-    config.agents[agentId] = updatedAgent
-    await this.configStore.write(config)
-
-    const homePath = this.layout.agentHome(agentId)
-    const soulExists = await this.pathExists(join(homePath, 'soul.md'))
-
-    const summary: AgentSummary = {
-      agentId,
-      displayName: updatedAgent.displayName,
-      status: updatedAgent.status,
-      defaultProviderId: updatedAgent.defaultProviderId,
-      defaultModelId: updatedAgent.defaultModelId,
-      homePath,
-      archivedAt: updatedAgent.archivedAt,
-      directoryStatus: soulExists ? 'healthy' : 'damaged',
-    }
-
-    this.emit({
-      type: 'agent-recovered',
-      agentId,
-      agent: summary,
-      occurredAt: now,
-    })
-
-    return summary
+    return this.agentRegistry.recoverAgent(agentId)
   }
 
   /**
@@ -2572,47 +2297,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     agents: AgentSummary[]
     unclaimedDirectories: import('@tangyuan/contracts').UnclaimedDirectory[]
   }> {
-    const readResult = await this.configStore.read()
-    const config = readResult.config
-
-    const agents = await this.buildAgentSummaries(config)
-
-    // 扫描 agents 目录，发现磁盘上有但配置中没有的目录
-    const agentsDir = dirname(
-      this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID),
-    )
-    const unclaimedDirectories: import('@tangyuan/contracts').UnclaimedDirectory[] =
-      []
-
-    try {
-      const entries = await readdir(agentsDir, { withFileTypes: true })
-      const configAgentIds = new Set(
-        config?.agents ? Object.keys(config.agents) : [],
-      )
-
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue
-        const agentId = entry.name
-
-        // 跳过 tangyuan（始终在配置中）
-        if (agentId === TANGYUAN_DEFAULT_AGENT_ID) continue
-        // 跳过已有配置条的目录
-        if (configAgentIds.has(agentId)) continue
-
-        const homePath = this.layout.agentHome(agentId)
-        const hasSoul = await this.pathExists(join(homePath, 'soul.md'))
-
-        unclaimedDirectories.push({
-          agentId,
-          homePath,
-          hasSoul,
-        })
-      }
-    } catch {
-      // 目录不存在，没有未归属项
-    }
-
-    return { agents, unclaimedDirectories }
+    return this.agentRegistry.reconcileAgentDirectories()
   }
 
   /**
@@ -2627,47 +2312,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     agentId: string,
     displayName: string,
   ): Promise<AgentSummary> {
-    const homePath = this.layout.agentHome(agentId)
-    const soulExists = await this.pathExists(join(homePath, 'soul.md'))
-
-    if (!soulExists) {
-      throw new AgentRuntimeError({
-        code: 'session-not-found',
-        message: `目录 ${agentId} 不存在或缺少 soul.md，无法认领。`,
-        recoverable: true,
-      })
-    }
-
-    const readResult = await this.configStore.read()
-    const config = readResult.config ?? createDefaultInternalConfig()
-
-    // 继承 tangyuan 的 Provider/Model
-    const tangyuanConfig = extractAgentRuntimeConfig(
-      config,
-      TANGYUAN_DEFAULT_AGENT_ID,
-    )
-
-    config.agents[agentId] = {
-      displayName,
-      defaultProviderId: tangyuanConfig?.providerId ?? null,
-      defaultModelId: tangyuanConfig?.modelId ?? null,
-      status: 'active',
-      archivedAt: null,
-    }
-    await this.configStore.write(config)
-
-    const summary: AgentSummary = {
-      agentId,
-      displayName,
-      status: 'active',
-      defaultProviderId: tangyuanConfig?.providerId ?? null,
-      defaultModelId: tangyuanConfig?.modelId ?? null,
-      homePath,
-      archivedAt: null,
-      directoryStatus: 'healthy',
-    }
-
-    return summary
+    return this.agentRegistry.claimAgentDirectory(agentId, displayName)
   }
 
   /**
@@ -2677,58 +2322,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当目录创建或文件写入失败时，Promise 会 reject。
    */
   async rebuildTangyuanHome(): Promise<AgentSummary> {
-    const homePath = this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID)
-    const now = this.now()
-
-    // 确保目录结构存在
-    await mkdir(homePath, { recursive: true })
-    await Promise.all([
-      mkdir(join(homePath, 'soul.history'), { recursive: true }),
-      mkdir(join(homePath, 'user.history'), { recursive: true }),
-      mkdir(join(homePath, 'memory'), { recursive: true }),
-      mkdir(join(homePath, 'skills'), { recursive: true }),
-      mkdir(join(homePath, 'workspace'), { recursive: true }),
-    ])
-
-    // 写出模板 soul.md
-    const soulContent = [
-      '# 汤圆',
-      '',
-      `重建时间：${now}`,
-      '',
-      '## 身份',
-      '汤圆是默认 Agent，负责凭据管理和创建其他 Agent。',
-      '',
-      '## 职责',
-      '- 帮助用户配置模型服务凭据',
-      '- 通过对话创建和管理其他 Agent',
-      '- 维护共享用户资料',
-      '',
-      '## 规则',
-      '遵循用户指令，在执行危险操作前先确认。',
-      '使用中文回复，简洁清晰。',
-      '',
-    ].join('\n')
-    await writeFile(join(homePath, 'soul.md'), soulContent, 'utf8')
-
-    const readResult = await this.configStore.read()
-    const config = readResult.config
-
-    const summary: AgentSummary = {
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
-      displayName:
-        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.displayName ?? '汤圆',
-      status: config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.status ?? 'active',
-      defaultProviderId:
-        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.defaultProviderId ?? null,
-      defaultModelId:
-        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.defaultModelId ?? null,
-      homePath,
-      archivedAt: config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.archivedAt ?? null,
-      directoryStatus: 'healthy',
-    }
-
-    return summary
+    return this.agentRegistry.rebuildTangyuanHome()
   }
 
   /**
@@ -2760,7 +2354,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     const userPath = this.layout.userProfile()
 
     // 若共享 user.md 不存在，尝试从旧路径迁移
-    if (!(await this.pathExists(userPath))) {
+    if (!(await pathExists(userPath))) {
       await this.migrateLegacyUserProfile()
     }
 
@@ -2768,7 +2362,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     await mkdir(this.layout.sharedProfile(), { recursive: true })
     await mkdir(this.layout.userHistory(), { recursive: true })
 
-    if (!(await this.pathExists(userPath))) {
+    if (!(await pathExists(userPath))) {
       await writeFile(userPath, '', 'utf8')
     }
 
@@ -3365,7 +2959,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     await this.ensureAgentHome(agentId)
 
     // 读取更新前内容
-    const previousContent = (await this.pathExists(soulPath))
+    const previousContent = (await pathExists(soulPath))
       ? await this.safeReadFile(soulPath)
       : ''
     const previousHistoryFiles = await this.readDirectoryFileSet(historyPath)
@@ -3425,12 +3019,12 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     await mkdir(historyPath, { recursive: true })
 
     // 若共享 user.md 不存在，尝试从旧路径迁移
-    if (!(await this.pathExists(userPath))) {
+    if (!(await pathExists(userPath))) {
       await this.migrateLegacyUserProfile()
     }
 
     // 读取更新前内容
-    const previousContent = (await this.pathExists(userPath))
+    const previousContent = (await pathExists(userPath))
       ? await this.safeReadFile(userPath)
       : ''
     const previousHistoryFiles = await this.readDirectoryFileSet(historyPath)
@@ -4064,7 +3658,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     // 确保 soul.md 存在
     const soulPath = this.layout.soul(agentId)
 
-    if (!(await this.pathExists(soulPath))) {
+    if (!(await pathExists(soulPath))) {
       const displayName =
         agentId === TANGYUAN_DEFAULT_AGENT_ID ? '汤圆' : agentId
       const soulContent = [
@@ -4103,7 +3697,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     const targetPath = this.layout.userProfile()
     const targetHistoryPath = this.layout.userHistory()
 
-    if (!(await this.pathExists(legacyUserPath))) {
+    if (!(await pathExists(legacyUserPath))) {
       return
     }
 
@@ -4112,7 +3706,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     await copyFile(legacyUserPath, targetPath)
 
     // 迁移 user.history/ 目录下的文件
-    if (await this.pathExists(legacyHistoryPath)) {
+    if (await pathExists(legacyHistoryPath)) {
       await mkdir(targetHistoryPath, { recursive: true })
       const historyFiles = await this.readDirectoryFileSet(legacyHistoryPath)
 
@@ -4155,15 +3749,15 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     await mkdir(this.layout.sharedSkills(), { recursive: true })
 
     // 若共享 user.md 不存在，尝试从旧路径迁移
-    if (!(await this.pathExists(userPath))) {
+    if (!(await pathExists(userPath))) {
       await this.migrateLegacyUserProfile()
     }
 
     const [bootstrapFileExists, soulFileExists, userFileExists] =
       await Promise.all([
-        this.pathExists(bootstrapPath),
-        this.pathExists(soulPath),
-        this.pathExists(userPath),
+        pathExists(bootstrapPath),
+        pathExists(soulPath),
+        pathExists(userPath),
       ])
 
     if (!bootstrapFileExists && !soulFileExists && !userFileExists) {
@@ -4181,10 +3775,10 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     return {
       initialized: profileReady,
       bootstrapRequired:
-        !profileReady && (await this.pathExists(bootstrapPath)),
-      bootstrapFileExists: await this.pathExists(bootstrapPath),
-      soulFileExists: await this.pathExists(soulPath),
-      userFileExists: await this.pathExists(userPath),
+        !profileReady && (await pathExists(bootstrapPath)),
+      bootstrapFileExists: await pathExists(bootstrapPath),
+      soulFileExists: await pathExists(soulPath),
+      userFileExists: await pathExists(userPath),
       soulUpdatedAt: await this.getMtimeIso(soulPath),
       userUpdatedAt: await this.getMtimeIso(userPath),
     }
@@ -4303,9 +3897,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     const userPath = join(absoluteHomePath, 'user.md')
 
     const [bootstrapExists, soulExists, userExists] = await Promise.all([
-      this.pathExists(bootstrapPath),
-      this.pathExists(soulPath),
-      this.pathExists(userPath),
+      pathExists(bootstrapPath),
+      pathExists(soulPath),
+      pathExists(userPath),
     ])
 
     // Gate 1: bootstrap 完成 — 确保 bootstrap.md 已被删除
@@ -4402,7 +3996,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       'user.history',
     )
 
-    if (await this.pathExists(agentHomeUserPath)) {
+    if (await pathExists(agentHomeUserPath)) {
       const agentHomeUserContent = await this.safeReadFile(agentHomeUserPath)
 
       if (agentHomeUserContent !== input.previousSnapshot.user.content) {
@@ -4713,15 +4307,15 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     const bootstrapPath = join(absoluteHomePath, 'bootstrap.md')
 
     // 确保共享 user profile 存在
-    if (!(await this.pathExists(userPath))) {
+    if (!(await pathExists(userPath))) {
       await this.migrateLegacyUserProfile()
     }
 
     const [soulContent, profileUserContent] = await Promise.all([
-      (await this.pathExists(soulPath))
+      (await pathExists(soulPath))
         ? readFile(soulPath, 'utf8')
         : Promise.resolve(''),
-      (await this.pathExists(userPath))
+      (await pathExists(userPath))
         ? readFile(userPath, 'utf8')
         : Promise.resolve(''),
     ])
@@ -4740,7 +4334,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       ].join('\n')
     }
 
-    const bootstrapContent = (await this.pathExists(bootstrapPath))
+    const bootstrapContent = (await pathExists(bootstrapPath))
       ? await readFile(bootstrapPath, 'utf8')
       : this.createBootstrapTemplate()
 
@@ -4826,30 +4420,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    */
   private async fileHasContent(path: string): Promise<boolean> {
     return (await this.safeReadFile(path)).trim() !== ''
-  }
-
-  /**
-   * 判断给定路径是否存在。
-   *
-   * @param path - 需要检查的文件或目录路径。
-   * @returns 路径存在则返回 true，不存在则返回 false。
-   * @throws 当底层文件系统返回除“找不到”以外的错误时，Promise 会 reject。
-   */
-  private async pathExists(path: string): Promise<boolean> {
-    try {
-      await access(path, fsConstants.F_OK)
-      return true
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
-        return false
-      }
-
-      throw error
-    }
   }
 
   /**

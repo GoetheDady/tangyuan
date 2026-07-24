@@ -9,6 +9,7 @@ import {
   createDefaultInternalConfig,
   extractAgentRuntimeConfig,
   normalizeRuntimeConfiguration,
+  pathExists,
 } from './utils'
 import { AgentRuntimeError } from './errors'
 
@@ -398,5 +399,20 @@ describe('extractAgentRuntimeConfig', () => {
 
   it('Agent 不存在时返回 null', () => {
     expect(extractAgentRuntimeConfig(config, 'missing')).toBeNull()
+  })
+})
+
+describe('pathExists', () => {
+  it('存在的路径返回 true，不存在返回 false', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const dir = await mkdtemp(join(tmpdir(), 'path-exists-'))
+    try {
+      expect(await pathExists(dir)).toBe(true)
+      expect(await pathExists(join(dir, 'nope'))).toBe(false)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })
