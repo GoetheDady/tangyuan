@@ -13,7 +13,7 @@ import { BashApprovalRegistry } from './bash-approval-registry'
 import { ClarificationRegistry } from './clarification-registry'
 import { SkillApprovalRegistry } from './skill-approval-registry'
 import { SessionCache } from './session-cache'
-import { resolve as pathResolve } from 'node:path'
+import { validateFilePath } from './file-path-guard'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
@@ -1086,7 +1086,7 @@ class DefaultTangyuanRuntime {
       },
 
       validateFilePath: (params) => {
-        return this.validateFilePath(params)
+        return validateFilePath(params)
       },
 
       requestClarification: async (params) => {
@@ -1398,50 +1398,6 @@ class DefaultTangyuanRuntime {
    */
   private rejectAllPendingSkillApprovals(): void {
     this.skillApprovals.rejectAll()
-  }
-
-  /**
-   * 校验文件路径是否允许当前 Agent 访问。
-   *
-   * @param params - 校验上下文（Agent、路径、操作类型）。
-   * @returns allowed 为 true 表示允许访问；为 false 时 reason 包含拒绝原因。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private validateFilePath(params: {
-    agentId: string
-    path: string
-    operation: 'read' | 'write' | 'edit'
-  }): { allowed: boolean; reason?: string } {
-    const resolvedPath = pathResolve(params.path)
-    const operationLabel =
-      params.operation === 'read'
-        ? '读取'
-        : params.operation === 'write'
-          ? '写入'
-          : '编辑'
-
-    // 检查路径中是否包含受保护的子路径（soul、skills、config、profile）
-    const pathSegments = resolvedPath.split('/')
-    const hasProtectedSegment =
-      pathSegments.includes('soul.md') ||
-      pathSegments.includes('soul.history') ||
-      pathSegments.includes('skills') ||
-      pathSegments.includes('config.json') ||
-      pathSegments.includes('config.backups') ||
-      (pathSegments.includes('profile') &&
-        (pathSegments.includes('user.md') ||
-          pathSegments.includes('user.history')))
-
-    if (hasProtectedSegment) {
-      return {
-        allowed: false,
-        reason: `不允许${operationLabel}受保护的文件：${resolvedPath}。该路径可能包含 Agent 配置、身份文件或 Skill 等受保护数据，请使用专用工具操作。`,
-      }
-    }
-
-    // 检查是否访问了其他 Agent 的目录（soul.md、workspace 除外属于受保护）
-    // agents 目录下的非自己目录中的 soul 相关文件已被上面检查拦截
-    return { allowed: true }
   }
 }
 
