@@ -12,6 +12,7 @@ import { TranscriptEmitter } from './transcript-emitter'
 import { BashApprovalRegistry } from './bash-approval-registry'
 import { ClarificationRegistry } from './clarification-registry'
 import { SkillApprovalRegistry } from './skill-approval-registry'
+import { SessionCache } from './session-cache'
 import { resolve as pathResolve } from 'node:path'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
@@ -84,7 +85,7 @@ class DefaultTangyuanRuntime {
   private readonly activeRunIds = new Map<string, string>()
   private readonly transcriptEmitter: TranscriptEmitter
   private runtimeSnapshot: RuntimeSnapshot | null = null
-  private sessions: AgentSessionSummary[] = []
+  private readonly sessionCache = new SessionCache()
   private runQueue: Array<{
     request: SendMessageRequest
     resolve: (value: TranscriptSnapshot) => void
@@ -234,15 +235,19 @@ class DefaultTangyuanRuntime {
     const driverSessions = await this.sessionDriver.listSessions({
       agentId,
     })
-    this.sessions = driverSessions.map((session) => ({
-      ...session,
-      state: this.activeRunIds.has(session.sessionId)
-        ? 'running'
-        : this.runQueue.some((q) => q.request.sessionId === session.sessionId)
-          ? 'queued'
-          : session.state,
-    }))
-    return this.sessions
+    this.sessionCache.replace(
+      driverSessions.map((session) => ({
+        ...session,
+        state: this.activeRunIds.has(session.sessionId)
+          ? 'running'
+          : this.runQueue.some(
+                (q) => q.request.sessionId === session.sessionId,
+              )
+            ? 'queued'
+            : session.state,
+      })),
+    )
+    return this.sessionCache.list()
   }
 
   /**
@@ -604,12 +609,7 @@ class DefaultTangyuanRuntime {
     await this.assertRuntimeReady()
 
     const session = await this.sessionDriver.createSession(request)
-    this.sessions = [
-      session,
-      ...this.sessions.filter(
-        (candidate) => candidate.sessionId !== session.sessionId,
-      ),
-    ]
+    this.sessionCache.upsert(session)
     return session
   }
 
@@ -657,9 +657,8 @@ class DefaultTangyuanRuntime {
     await this.assertRuntimeReady()
 
     const session =
-      this.sessions.find(
-        (candidate) => candidate.sessionId === request.sessionId,
-      ) ?? (await this.findSession(request.sessionId))
+      this.sessionCache.find(request.sessionId) ??
+      (await this.findSession(request.sessionId))
 
     if (
       this.activeRunIds.has(request.sessionId) ||
@@ -740,7 +739,7 @@ class DefaultTangyuanRuntime {
         updatedAt: now,
       })
       return (
-        this.sessions.find((s) => s.sessionId === request.sessionId) ?? {
+        this.sessionCache.find(request.sessionId) ?? {
           agentId: request.agentId,
           sessionId: request.sessionId,
           title: '',
@@ -753,9 +752,7 @@ class DefaultTangyuanRuntime {
     await this.sessionDriver.cancelRun(request)
     this.activeRunIds.delete(request.sessionId)
     await this.listSessions()
-    const session = this.sessions.find(
-      (candidate) => candidate.sessionId === request.sessionId,
-    )
+    const session = this.sessionCache.find(request.sessionId)
 
     if (!session) {
       throw new Error(`找不到会话 ${request.sessionId}。`)
@@ -804,10 +801,13 @@ class DefaultTangyuanRuntime {
       })
     }
 
-    const runningSessions = this.sessions.filter(
-      (session) =>
-        session.state === 'running' || this.activeRunIds.has(session.sessionId),
-    )
+    const runningSessions = this.sessionCache
+      .list()
+      .filter(
+        (session) =>
+          session.state === 'running' ||
+          this.activeRunIds.has(session.sessionId),
+      )
 
     await Promise.all(
       runningSessions.map((session) =>
@@ -1135,9 +1135,7 @@ class DefaultTangyuanRuntime {
   private async findSession(
     sessionId: string,
   ): Promise<AgentSessionSummary | undefined> {
-    const cachedSession = this.sessions.find(
-      (session) => session.sessionId === sessionId,
-    )
+    const cachedSession = this.sessionCache.find(sessionId)
 
     if (cachedSession) {
       return cachedSession
@@ -1145,7 +1143,7 @@ class DefaultTangyuanRuntime {
 
     await this.listSessions()
 
-    return this.sessions.find((session) => session.sessionId === sessionId)
+    return this.sessionCache.find(sessionId)
   }
 
   /**
@@ -1274,12 +1272,7 @@ class DefaultTangyuanRuntime {
    * @throws 此方法不会主动抛出错误。
    */
   private upsertSession(session: AgentSessionSummary): void {
-    this.sessions = [
-      session,
-      ...this.sessions.filter(
-        (candidate) => candidate.sessionId !== session.sessionId,
-      ),
-    ]
+    this.sessionCache.upsert(session)
   }
 
   /**
@@ -1296,11 +1289,7 @@ class DefaultTangyuanRuntime {
     state: AgentSessionSummary['state'],
     updatedAt: string,
   ): void {
-    this.sessions = this.sessions.map((session) =>
-      session.sessionId === sessionId
-        ? { ...session, state, updatedAt }
-        : session,
-    )
+    this.sessionCache.updateState(sessionId, state, updatedAt)
   }
 
   /**
