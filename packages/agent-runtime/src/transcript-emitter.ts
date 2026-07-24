@@ -4,6 +4,7 @@ import {
   type AgentReplyEntry,
   type AgentRuntimeErrorPayload,
   type ExecutionAttempt,
+  type RunTurn,
   type TranscriptDelta,
   type TranscriptSnapshot,
   type TurnStep,
@@ -267,8 +268,26 @@ export class TranscriptEmitter {
       .map((step) => step.content)
       .join('')
 
-    const turns = [...entry.turns]
-    turns[event.turnIndex] = assembledTurn
+    // 填补中间缺失的回合（SDK 可能跳过某些 turn-ended），防止稀疏数组导致 Zod 校验失败
+    const turns: RunTurn[] = []
+    for (let i = 0; i < entry.turns.length; i++) {
+      turns.push(entry.turns[i]!)
+    }
+    while (turns.length < event.turnIndex) {
+      turns.push({
+        index: turns.length,
+        runId: event.runId,
+        steps: [],
+        status: 'completed',
+        startedAt: turnState.turnStartedAt,
+        completedAt: event.occurredAt,
+      })
+    }
+    if (turns.length === event.turnIndex) {
+      turns.push(assembledTurn)
+    } else {
+      turns[event.turnIndex] = assembledTurn
+    }
 
     const updatedEntry: AgentReplyEntry = {
       ...entry,

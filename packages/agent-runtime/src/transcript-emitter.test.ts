@@ -758,4 +758,41 @@ describe('TranscriptEmitter tool step handling', () => {
       expect(agentEntry.attempt!.error).toBeUndefined()
     }
   })
+
+  it('fills missing turns when turn-ended arrives for non-consecutive indices, preventing sparse array', () => {
+    const { emitter, getSnapshot } = createEmitter()
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+
+    // Simulate SDK emitting turn-started for turns 0..2 but only turn-ended for turn 2
+    // (turns 0 and 1 were 'invisible' — no steps, no events)
+    emitTurnStarted(emitter, 0)
+    emitTurnStarted(emitter, 1)
+    emitTurnStarted(emitter, 2)
+    emitTurnEnded(
+      emitter,
+      2,
+      [{ type: 'text', text: '回复内容' }] as never,
+      [],
+    )
+
+    const snapshot = getSnapshot('session-1')
+    const agentEntry = snapshot!.entries[0]
+    expect(agentEntry?.kind).toBe('agent-reply')
+    if (agentEntry && agentEntry.kind === 'agent-reply') {
+      // turns must not be sparse — must have 3 elements with proper RunTurn objects
+      expect(agentEntry.turns).toHaveLength(3)
+      expect(agentEntry.turns[0]!).toBeDefined()
+      expect(agentEntry.turns[1]!).toBeDefined()
+      expect(agentEntry.turns[2]!).toBeDefined()
+      // turn 0 and 1 were filled as completed placeholders
+      expect(agentEntry.turns[0]!.steps).toHaveLength(0)
+      expect(agentEntry.turns[0]!.status).toBe('completed')
+      expect(agentEntry.turns[1]!.steps).toHaveLength(0)
+      expect(agentEntry.turns[1]!.status).toBe('completed')
+      // turn 2 has the actual assembled content
+      expect(agentEntry.turns[2]!.steps[0]!.kind).toBe('text')
+      expect(agentEntry.turns[2]!.steps[0]!.content).toBe('回复内容')
+    }
+  })
 })

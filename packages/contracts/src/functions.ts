@@ -242,15 +242,29 @@ export function applyTranscriptDelta(
       if (delta.index >= 0 && delta.index < entries.length) {
         const entry = entries[delta.index]
         if (entry && entry.kind === 'agent-reply') {
-          const turns = [...entry.turns]
+          // 防稀疏数组：补齐中间缺失的 turn
+          const rawTurns = entry.turns
+          const turns: AgentReplyEntry['turns'] = []
+          for (let i = 0; i < rawTurns.length; i++) {
+            turns.push(rawTurns[i]!)
+          }
+          while (turns.length < delta.turnIndex) {
+            turns.push({
+              index: turns.length,
+              runId: delta.runId,
+              steps: [],
+              status: 'completed',
+              startedAt: delta.step.startedAt,
+              completedAt: new Date().toISOString(),
+            })
+          }
           const existingTurn = turns[delta.turnIndex]
           if (existingTurn) {
             turns[delta.turnIndex] = {
               ...existingTurn,
               steps: [...existingTurn.steps, delta.step],
             }
-          } else if (delta.turnIndex === turns.length) {
-            // Auto-create turn if index points to the next slot
+          } else {
             turns.push({
               index: delta.turnIndex,
               runId: delta.runId,
