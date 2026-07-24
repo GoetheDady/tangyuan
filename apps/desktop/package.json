@@ -19,6 +19,8 @@
     "test:layout": "playwright test --project=chromium-renderer",
     "test:e2e:renderer": "playwright test --project=chromium-renderer",
     "test:e2e:electron": "playwright test --config=playwright.electron.config.ts --project=electron",
+    "qa": "pnpm build && playwright test --config=playwright.qa.config.ts --project=qa",
+    "qa:nobuild": "playwright test --config=playwright.qa.config.ts --project=qa",
     "test:e2e": "pnpm build && pnpm test:e2e:renderer && pnpm test:e2e:electron && pnpm test:e2e:fixtures",
     "build:unpack": "pnpm build && electron-builder --dir",
     "build:win": "pnpm build && electron-builder --win",

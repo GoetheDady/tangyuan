@@ -1,5 +1,6 @@
 import { app, safeStorage, shell, BrowserWindow, ipcMain, session } from 'electron'
 import { mkdir, writeFile } from 'fs/promises'
+import { homedir } from 'os'
 import { dirname, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createTangyuanRuntime } from '@tangyuan/agent-runtime'
@@ -9,7 +10,7 @@ import icon from '../../resources/icon.png?asset'
 import { buildContentSecurityPolicy } from './content-security-policy'
 import { registerDesktopAppIpc } from './ipc'
 
-const encryptionAdapter: ConfigEncryptionAdapter = {
+const safeStorageAdapter: ConfigEncryptionAdapter = {
   encrypt: async (plaintext: string): Promise<string> => {
     if (!safeStorage.isEncryptionAvailable()) {
       throw new Error('系统加密服务不可用')
@@ -25,7 +26,33 @@ const encryptionAdapter: ConfigEncryptionAdapter = {
   isAvailable: (): boolean => safeStorage.isEncryptionAvailable()
 }
 
-const tangyuanRuntime = createTangyuanRuntime({ encryptionAdapter })
+/**
+ * 自动化 QA 模式：明文加密适配器（encrypt/decrypt 恒等，不触碰 safeStorage）。
+ *
+ * 仅在设置 TANGYUAN_QA_API_KEY 时启用。Playwright electron.launch() 启动的进程
+ * 无法解密日常 app 用 macOS 钥匙串加密的配置，故 QA 用独立数据目录 + 明文适配器 +
+ * 环境变量注入的测试 key，与用户日常配置完全隔离。绝不用于生产。
+ */
+const plaintextAdapter: ConfigEncryptionAdapter = {
+  encrypt: async (plaintext: string): Promise<string> => plaintext,
+  decrypt: async (ciphertext: string): Promise<string> => ciphertext,
+  isAvailable: (): boolean => true,
+}
+
+const qaApiKey = process.env['TANGYUAN_QA_API_KEY']
+const isQaMode = Boolean(qaApiKey)
+
+const encryptionAdapter = isQaMode ? plaintextAdapter : safeStorageAdapter
+
+// QA 模式用独立数据目录，避免污染用户 ~/.tangyuan。
+const tangyuanRuntime = isQaMode
+  ? createTangyuanRuntime({
+      encryptionAdapter,
+      fsRoot: join(homedir(), '.tangyuan-qa-root'),
+      userDataPath: join(homedir(), '.tangyuan-qa-root', '.tangyuan'),
+      agentHomePath: '~/.tangyuan-qa-root/.tangyuan/agents/tangyuan',
+    })
+  : createTangyuanRuntime({ encryptionAdapter })
 const smokeTestResultPath = process.env['TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH']
 let isQuittingAfterCancellingRuns = false
 
