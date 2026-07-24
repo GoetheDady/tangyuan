@@ -9,6 +9,9 @@ import type {
   ToolApprovalGateway,
 } from './index'
 import { TranscriptEmitter } from './transcript-emitter'
+import { BashApprovalRegistry } from './bash-approval-registry'
+import { ClarificationRegistry } from './clarification-registry'
+import { SkillApprovalRegistry } from './skill-approval-registry'
 import { resolve as pathResolve } from 'node:path'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
@@ -87,27 +90,9 @@ class DefaultTangyuanRuntime {
     resolve: (value: TranscriptSnapshot) => void
     reject: (error: Error) => void
   }> = []
-  private readonly pendingApprovals = new Map<
-    string,
-    {
-      request: BashApprovalRequest
-      resolve: (result: { approved: boolean }) => void
-    }
-  >()
-  private readonly skillApprovals = new Map<
-    string,
-    {
-      request: SkillApprovalRequest
-      resolve: (result: { approved: boolean }) => void
-    }
-  >()
-  private readonly pendingClarifications = new Map<
-    string,
-    {
-      request: QuestionClarificationRequest
-      resolve: (result: { answer: string }) => void
-    }
-  >()
+  private readonly bashApprovals: BashApprovalRegistry
+  private readonly skillApprovals: SkillApprovalRegistry
+  private readonly clarifications: ClarificationRegistry
 
   /**
    * 创建默认 TangyuanRuntime。
@@ -120,6 +105,11 @@ class DefaultTangyuanRuntime {
     this.runtimeDriver = dependencies.runtimeDriver
     this.sessionDriver = dependencies.sessionDriver
     this.transcriptEmitter = new TranscriptEmitter(this.emit.bind(this))
+    const emit = this.emit.bind(this)
+    const now = () => new Date().toISOString()
+    this.bashApprovals = new BashApprovalRegistry({ emit, now })
+    this.skillApprovals = new SkillApprovalRegistry({ emit, now })
+    this.clarifications = new ClarificationRegistry({ emit, now })
     this.sessionDriver.subscribe((event) => {
       this.applyAgentEvent(event)
       // 内部驱动事件（message-appended/message-delta/message-completed/
@@ -837,25 +827,7 @@ class DefaultTangyuanRuntime {
    * @throws 当审批不存在或已过期时抛出错误。
    */
   async approveBash(approvalId: string): Promise<void> {
-    const entry = this.pendingApprovals.get(approvalId)
-
-    if (!entry) {
-      throw new Error(`找不到审批请求 ${approvalId}，可能已过期或已被处理。`)
-    }
-
-    this.pendingApprovals.delete(approvalId)
-    const now = new Date().toISOString()
-
-    this.emit({
-      type: 'approval-resolved',
-      agentId: entry.request.agentId,
-      sessionId: entry.request.sessionId,
-      approvalId,
-      status: 'approved',
-      occurredAt: now,
-    })
-
-    entry.resolve({ approved: true })
+    this.bashApprovals.approve(approvalId)
   }
 
   /**
@@ -866,25 +838,7 @@ class DefaultTangyuanRuntime {
    * @throws 当审批不存在或已过期时抛出错误。
    */
   async rejectBash(approvalId: string): Promise<void> {
-    const entry = this.pendingApprovals.get(approvalId)
-
-    if (!entry) {
-      throw new Error(`找不到审批请求 ${approvalId}，可能已过期或已被处理。`)
-    }
-
-    this.pendingApprovals.delete(approvalId)
-    const now = new Date().toISOString()
-
-    this.emit({
-      type: 'approval-resolved',
-      agentId: entry.request.agentId,
-      sessionId: entry.request.sessionId,
-      approvalId,
-      status: 'rejected',
-      occurredAt: now,
-    })
-
-    entry.resolve({ approved: false })
+    this.bashApprovals.reject(approvalId)
   }
 
   /**
@@ -894,7 +848,7 @@ class DefaultTangyuanRuntime {
    * @throws 此方法不会主动抛出错误。
    */
   getPendingApprovals(): BashApprovalRequest[] {
-    return [...this.pendingApprovals.values()].map((entry) => entry.request)
+    return this.bashApprovals.list()
   }
 
   /**
@@ -909,28 +863,7 @@ class DefaultTangyuanRuntime {
     clarificationId: string,
     answer: string,
   ): Promise<void> {
-    const entry = this.pendingClarifications.get(clarificationId)
-
-    if (!entry) {
-      throw new Error(
-        `找不到澄清请求 ${clarificationId}，可能已过期或已被处理。`,
-      )
-    }
-
-    this.pendingClarifications.delete(clarificationId)
-    const now = new Date().toISOString()
-
-    this.emit({
-      type: 'clarification-resolved',
-      agentId: entry.request.agentId,
-      sessionId: entry.request.sessionId,
-      clarificationId,
-      answer,
-      status: 'answered',
-      occurredAt: now,
-    })
-
-    entry.resolve({ answer })
+    this.clarifications.answer(clarificationId, answer)
   }
 
   /**
@@ -941,28 +874,7 @@ class DefaultTangyuanRuntime {
    * @throws 当澄清不存在或已过期时抛出错误。
    */
   async cancelClarification(clarificationId: string): Promise<void> {
-    const entry = this.pendingClarifications.get(clarificationId)
-
-    if (!entry) {
-      throw new Error(
-        `找不到澄清请求 ${clarificationId}，可能已过期或已被处理。`,
-      )
-    }
-
-    this.pendingClarifications.delete(clarificationId)
-    const now = new Date().toISOString()
-
-    this.emit({
-      type: 'clarification-resolved',
-      agentId: entry.request.agentId,
-      sessionId: entry.request.sessionId,
-      clarificationId,
-      answer: '',
-      status: 'cancelled',
-      occurredAt: now,
-    })
-
-    entry.resolve({ answer: '' })
+    this.clarifications.cancel(clarificationId)
   }
 
   /**
@@ -972,9 +884,7 @@ class DefaultTangyuanRuntime {
    * @throws 此方法不会主动抛出错误。
    */
   getPendingClarifications(): QuestionClarificationRequest[] {
-    return [...this.pendingClarifications.values()].map(
-      (entry) => entry.request,
-    )
+    return this.clarifications.list()
   }
 
   /**
@@ -1051,26 +961,7 @@ class DefaultTangyuanRuntime {
    * @throws 当审批不存在或已过期时抛出错误。
    */
   async approveSkillOperation(approvalId: string): Promise<void> {
-    const entry = this.skillApprovals.get(approvalId)
-
-    if (!entry) {
-      throw new Error(
-        `找不到 Skill 审批请求 ${approvalId}，可能已过期或已被处理。`,
-      )
-    }
-
-    this.skillApprovals.delete(approvalId)
-    const now = new Date().toISOString()
-
-    this.emit({
-      type: 'skill-approval-resolved',
-      agentId: entry.request.agentId,
-      approvalId,
-      status: 'approved',
-      occurredAt: now,
-    })
-
-    entry.resolve({ approved: true })
+    this.skillApprovals.approve(approvalId)
   }
 
   /**
@@ -1081,26 +972,7 @@ class DefaultTangyuanRuntime {
    * @throws 当审批不存在或已过期时抛出错误。
    */
   async rejectSkillOperation(approvalId: string): Promise<void> {
-    const entry = this.skillApprovals.get(approvalId)
-
-    if (!entry) {
-      throw new Error(
-        `找不到 Skill 审批请求 ${approvalId}，可能已过期或已被处理。`,
-      )
-    }
-
-    this.skillApprovals.delete(approvalId)
-    const now = new Date().toISOString()
-
-    this.emit({
-      type: 'skill-approval-resolved',
-      agentId: entry.request.agentId,
-      approvalId,
-      status: 'rejected',
-      occurredAt: now,
-    })
-
-    entry.resolve({ approved: false })
+    this.skillApprovals.reject(approvalId)
   }
 
   /**
@@ -1110,7 +982,7 @@ class DefaultTangyuanRuntime {
    * @throws 此方法不会主动抛出错误。
    */
   getPendingSkillApprovals(): SkillApprovalRequest[] {
-    return [...this.skillApprovals.values()].map((entry) => entry.request)
+    return this.skillApprovals.list()
   }
 
   /**
@@ -1166,11 +1038,8 @@ class DefaultTangyuanRuntime {
   private async requestSkillApproval(
     params: SkillOperationParams,
   ): Promise<boolean> {
-    const approvalId = crypto.randomUUID()
-    const now = new Date().toISOString()
-
     const request: SkillApprovalRequest = {
-      approvalId,
+      approvalId: crypto.randomUUID(),
       agentId: params.agentId,
       operation: params.operation,
       source: params.source,
@@ -1181,22 +1050,11 @@ class DefaultTangyuanRuntime {
       description: '',
       hasScripts: false,
       status: 'pending',
-      createdAt: now,
+      createdAt: new Date().toISOString(),
     }
 
-    return new Promise<boolean>((resolve) => {
-      this.skillApprovals.set(approvalId, {
-        request,
-        resolve: (result: { approved: boolean }) => resolve(result.approved),
-      })
-
-      this.emit({
-        type: 'skill-approval-required',
-        agentId: params.agentId,
-        approval: request,
-        occurredAt: now,
-      })
-    })
+    const { approved } = await this.skillApprovals.register(request)
+    return approved
   }
 
   /**
@@ -1208,14 +1066,12 @@ class DefaultTangyuanRuntime {
   createToolApprovalGateway(): ToolApprovalGateway {
     return {
       requestBashApproval: async (params) => {
-        const approvalId = crypto.randomUUID()
-        const now = new Date().toISOString()
         // bash 工具在 session 建立时构造，那时还没有 runId；
         // 真正执行时一定处于某个 active run 内，用它补齐。
         const runId =
           params.runId || this.activeRunIds.get(params.sessionId) || ''
         const request: BashApprovalRequest = {
-          approvalId,
+          approvalId: crypto.randomUUID(),
           agentId: params.agentId,
           sessionId: params.sessionId,
           runId,
@@ -1223,20 +1079,10 @@ class DefaultTangyuanRuntime {
           cwd: params.cwd,
           riskDescription: params.riskDescription,
           status: 'pending',
-          createdAt: now,
+          createdAt: new Date().toISOString(),
         }
 
-        return new Promise<{ approved: boolean }>((resolve) => {
-          this.pendingApprovals.set(approvalId, { request, resolve })
-
-          this.emit({
-            type: 'approval-required',
-            agentId: params.agentId,
-            sessionId: params.sessionId,
-            approval: request,
-            occurredAt: now,
-          })
-        })
+        return this.bashApprovals.register(request)
       },
 
       validateFilePath: (params) => {
@@ -1244,12 +1090,10 @@ class DefaultTangyuanRuntime {
       },
 
       requestClarification: async (params) => {
-        const clarificationId = crypto.randomUUID()
-        const now = new Date().toISOString()
         const runId =
           params.runId || this.activeRunIds.get(params.sessionId) || ''
         const request: QuestionClarificationRequest = {
-          clarificationId,
+          clarificationId: crypto.randomUUID(),
           agentId: params.agentId,
           sessionId: params.sessionId,
           runId,
@@ -1257,20 +1101,10 @@ class DefaultTangyuanRuntime {
           options: params.options,
           allowCustomAnswer: params.allowCustomAnswer,
           status: 'pending',
-          createdAt: now,
+          createdAt: new Date().toISOString(),
         }
 
-        return new Promise<{ answer: string }>((resolve) => {
-          this.pendingClarifications.set(clarificationId, { request, resolve })
-
-          this.emit({
-            type: 'clarification-required',
-            agentId: params.agentId,
-            sessionId: params.sessionId,
-            clarification: request,
-            occurredAt: now,
-          })
-        })
+        return this.clarifications.register(request)
       },
     }
   }
@@ -1551,47 +1385,8 @@ class DefaultTangyuanRuntime {
    * @throws 此方法不会主动抛出错误。
    */
   private rejectAllPendingApprovals(): void {
-    const now = new Date().toISOString()
-
-    for (const [approvalId, entry] of this.pendingApprovals) {
-      this.emit({
-        type: 'approval-resolved',
-        agentId: entry.request.agentId,
-        sessionId: entry.request.sessionId,
-        approvalId,
-        status: 'rejected',
-        occurredAt: now,
-      })
-      entry.resolve({ approved: false })
-    }
-
-    this.pendingApprovals.clear()
-    this.cancelAllPendingClarifications()
-  }
-
-  /**
-   * 自动取消所有待回答的澄清（用于应用退出/全部取消场景）。
-   *
-   * @returns 无返回值。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private cancelAllPendingClarifications(): void {
-    const now = new Date().toISOString()
-
-    for (const [clarificationId, entry] of this.pendingClarifications) {
-      this.emit({
-        type: 'clarification-resolved',
-        agentId: entry.request.agentId,
-        sessionId: entry.request.sessionId,
-        clarificationId,
-        answer: '',
-        status: 'cancelled',
-        occurredAt: now,
-      })
-      entry.resolve({ answer: '' })
-    }
-
-    this.pendingClarifications.clear()
+    this.bashApprovals.rejectAll()
+    this.clarifications.cancelAll()
   }
 
   /**
@@ -1602,44 +1397,8 @@ class DefaultTangyuanRuntime {
    * @throws 此方法不会主动抛出错误。
    */
   private rejectSessionPendingApprovals(sessionId: string): void {
-    const now = new Date().toISOString()
-
-    for (const [approvalId, entry] of this.pendingApprovals) {
-      if (entry.request.sessionId !== sessionId) {
-        continue
-      }
-
-      this.emit({
-        type: 'approval-resolved',
-        agentId: entry.request.agentId,
-        sessionId: entry.request.sessionId,
-        approvalId,
-        status: 'rejected',
-        occurredAt: now,
-      })
-      entry.resolve({ approved: false })
-      this.pendingApprovals.delete(approvalId)
-    }
-
-    // 同时取消该 session 的所有待回答澄清
-    for (const [clarificationId, clarificationEntry] of this
-      .pendingClarifications) {
-      if (clarificationEntry.request.sessionId !== sessionId) {
-        continue
-      }
-
-      this.emit({
-        type: 'clarification-resolved',
-        agentId: clarificationEntry.request.agentId,
-        sessionId: clarificationEntry.request.sessionId,
-        clarificationId,
-        answer: '',
-        status: 'cancelled',
-        occurredAt: now,
-      })
-      clarificationEntry.resolve({ answer: '' })
-      this.pendingClarifications.delete(clarificationId)
-    }
+    this.bashApprovals.rejectSession(sessionId)
+    this.clarifications.cancelSession(sessionId)
   }
 
   /**
@@ -1649,20 +1408,7 @@ class DefaultTangyuanRuntime {
    * @throws 此方法不会主动抛出错误。
    */
   private rejectAllPendingSkillApprovals(): void {
-    const now = new Date().toISOString()
-
-    for (const [approvalId, entry] of this.skillApprovals) {
-      this.emit({
-        type: 'skill-approval-resolved',
-        agentId: entry.request.agentId,
-        approvalId,
-        status: 'rejected',
-        occurredAt: now,
-      })
-      entry.resolve({ approved: false })
-    }
-
-    this.skillApprovals.clear()
+    this.skillApprovals.rejectAll()
   }
 
   /**
