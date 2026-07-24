@@ -2,134 +2,50 @@ import type { AppHarness } from './app-harness'
 import type { InvariantViolation } from './invariants'
 
 /**
- * 一次真实对话的结果。
+ * 一次运行（发消息或重试）的结果。
  */
-export interface ConversationResult {
-  /** 最终 transcript 快照。 */
-  transcript: unknown
-  /** 收到的 Agent 回复文本（可能为空——空即视为违反不变量）。 */
+export interface RunResult {
+  /** 收到的 Agent 回复文本（completed 时应非空）。 */
   replyText: string
-  /** 本次对话违反的技术不变量。 */
+  /** 运行经历的状态序列。 */
+  states: string[]
+  /** 是否收到 completed。 */
+  completed: boolean
+  /** 本次运行违反的技术不变量。 */
   violations: InvariantViolation[]
 }
 
+interface RunOutcome {
+  replyText: string
+  states: string[]
+  runtimeError: string | null
+  sawCompleted: boolean
+  sawFailed: boolean
+  sawCancelled: boolean
+  timedOut: boolean
+}
+
+const VALID_STATES = new Set(['idle', 'running', 'completed', 'cancelled', 'failed'])
+
 /**
- * 通过底层 IPC 发起一次真实对话并等待运行结束。
- *
- * 直接走 window.api（而非点 UI），因为 QA 关注的是全链路技术正确性：
- * 消息能否送达、真实模型能否返回、状态机是否合法流转、有无运行时错误。
- * UI 层的交互细节由 renderer e2e 覆盖，这里不重复。
- *
- * @param harness - 应用夹具。
- * @param content - 要发送的消息内容（由 Hermes 决定，属探索空间）。
- * @param timeoutMs - 等待真实回复的超时上限。
- * @returns 对话结果，含回复文本与技术不变量违反列表。
+ * 触发类型：决定本次运行由哪个 API 发起，以及是否在运行中取消。
  */
-export async function sendAndAwaitReply(
-  harness: AppHarness,
-  content: string,
-  timeoutMs = 120000
-): Promise<ConversationResult> {
+type Trigger =
+  | { kind: 'send'; content: string }
+  | { kind: 'retry'; userMessageId: string }
+  | { kind: 'send-then-cancel'; content: string }
+
+/**
+ * 校验一次运行结果的技术不变量（与场景无关）。
+ */
+function assertRunInvariants(
+  outcome: RunOutcome,
+  timeoutMs: number,
+  expectCancelled: boolean
+): InvariantViolation[] {
   const violations: InvariantViolation[] = []
 
-  const outcome = await harness.window.evaluate(
-    async ({ content, timeoutMs }) => {
-      const api = (
-        window as unknown as {
-          api: {
-            createSession: (r: { agentId: string; title: string }) => Promise<{ sessionId: string }>
-            subscribeToAgentEvents: (
-              l: (e: { type: string; [k: string]: unknown }) => void
-            ) => (() => void) | void
-            sendMessage: (r: {
-              agentId: string
-              sessionId: string
-              content: string
-            }) => Promise<void>
-            getTranscript: (r: { agentId: string; sessionId: string }) => Promise<unknown>
-          }
-        }
-      ).api
-
-      // 新建会话
-      const session = await api.createSession({
-        agentId: 'tangyuan',
-        title: `QA ${new Date().toISOString()}`
-      })
-
-      // 订阅事件，捕获运行状态与错误
-      const states: string[] = []
-      let runtimeError: string | null = null
-      let sawCompleted = false
-      let sawFailed = false
-
-      const done = new Promise<void>((resolve) => {
-        const unsub = api.subscribeToAgentEvents(
-          (event: { type: string; [k: string]: unknown }) => {
-            if (event.type === 'run-state-changed') {
-              const state = String(event.state)
-              states.push(state)
-              if (state === 'completed') {
-                sawCompleted = true
-                if (typeof unsub === 'function') unsub()
-                resolve()
-              } else if (state === 'failed' || state === 'cancelled') {
-                if (state === 'failed') sawFailed = true
-                if (typeof unsub === 'function') unsub()
-                resolve()
-              }
-            } else if (event.type === 'runtime-error' || event.type === 'turn-failed') {
-              runtimeError = String(
-                (event as { error?: { message?: string } }).error?.message ?? 'unknown'
-              )
-            }
-          }
-        )
-
-        setTimeout(() => {
-          if (typeof unsub === 'function') unsub()
-          resolve()
-        }, timeoutMs)
-      })
-
-      const startedAt = Date.now()
-      await api.sendMessage({
-        agentId: 'tangyuan',
-        sessionId: session.sessionId,
-        content
-      })
-      await done
-      const elapsedMs = Date.now() - startedAt
-
-      const transcript = await api.getTranscript({
-        agentId: 'tangyuan',
-        sessionId: session.sessionId
-      })
-
-      // 从 transcript 提取 agent 回复文本
-      const entries =
-        (transcript as { entries?: Array<{ kind: string; content?: string }> }).entries ?? []
-      const replyText = entries
-        .filter((e) => e.kind === 'agent-reply')
-        .map((e) => e.content ?? '')
-        .join('')
-
-      return {
-        transcript,
-        replyText,
-        states,
-        runtimeError,
-        sawCompleted,
-        sawFailed,
-        elapsedMs,
-        timedOut: elapsedMs >= timeoutMs
-      }
-    },
-    { content, timeoutMs }
-  )
-
-  // 硬骨架断言（与场景无关的技术不变量）
-  if (outcome.timedOut && !outcome.sawCompleted && !outcome.sawFailed) {
+  if (outcome.timedOut && !outcome.sawCompleted && !outcome.sawFailed && !outcome.sawCancelled) {
     violations.push({
       code: 'reply-timeout',
       message: `发送消息后 ${timeoutMs}ms 内未收到运行结束事件（真实模型无响应或链路卡住）。`,
@@ -145,16 +61,14 @@ export async function sendAndAwaitReply(
     })
   }
 
-  if (outcome.sawCompleted && outcome.replyText.trim().length === 0) {
+  if (!expectCancelled && outcome.sawCompleted && outcome.replyText.trim().length === 0) {
     violations.push({
       code: 'empty-reply',
       message: '运行标记为 completed，但 transcript 中没有任何 Agent 回复文本。'
     })
   }
 
-  // 状态机合法性：出现的状态必须都是已知值
-  const validStates = new Set(['idle', 'running', 'completed', 'cancelled', 'failed'])
-  const illegal = outcome.states.filter((s) => !validStates.has(s))
+  const illegal = outcome.states.filter((s) => !VALID_STATES.has(s))
   if (illegal.length > 0) {
     violations.push({
       code: 'illegal-run-state',
@@ -163,9 +77,235 @@ export async function sendAndAwaitReply(
     })
   }
 
+  return violations
+}
+
+/**
+ * 在 page context 内发起一次运行并采集结果。
+ *
+ * 整个采集逻辑在 evaluate 内自包含（不引用外部作用域），
+ * 通过 trigger 参数区分 send / retry / send-then-cancel 三种场景。
+ */
+async function runInPage(
+  harness: AppHarness,
+  sessionId: string,
+  trigger: Trigger,
+  timeoutMs: number
+): Promise<RunOutcome> {
+  return await harness.window.evaluate(
+    async ({ sessionId, trigger, timeoutMs }) => {
+      const api = (
+        window as unknown as {
+          api: {
+            sendMessage: (r: {
+              agentId: string
+              sessionId: string
+              content: string
+            }) => Promise<void>
+            retryMessage: (r: {
+              agentId: string
+              sessionId: string
+              userMessageId: string
+            }) => Promise<void>
+            cancelRun: (r: { agentId: string; sessionId: string }) => Promise<unknown>
+            getTranscript: (r: { agentId: string; sessionId: string }) => Promise<{
+              entries?: Array<{ kind: string; content?: string }>
+            }>
+            subscribeToAgentEvents: (
+              l: (e: { type: string; [k: string]: unknown }) => void
+            ) => (() => void) | void
+          }
+        }
+      ).api
+
+      const states: string[] = []
+      let runtimeError: string | null = null
+      let sawCompleted = false
+      let sawFailed = false
+      let sawCancelled = false
+      let cancelTriggered = false
+
+      const done = new Promise<void>((resolve) => {
+        const unsub = api.subscribeToAgentEvents((event) => {
+          if (event.type === 'run-state-changed') {
+            const state = String(event.state)
+            states.push(state)
+
+            // send-then-cancel：收到首个 running 后立即取消
+            if (state === 'running' && trigger.kind === 'send-then-cancel' && !cancelTriggered) {
+              cancelTriggered = true
+              void api.cancelRun({ agentId: 'tangyuan', sessionId })
+            }
+
+            if (state === 'completed') {
+              sawCompleted = true
+              if (typeof unsub === 'function') unsub()
+              resolve()
+            } else if (state === 'failed' || state === 'cancelled') {
+              if (state === 'failed') sawFailed = true
+              if (state === 'cancelled') sawCancelled = true
+              if (typeof unsub === 'function') unsub()
+              resolve()
+            }
+          } else if (event.type === 'runtime-error' || event.type === 'turn-failed') {
+            runtimeError = String(
+              (event as { error?: { message?: string } }).error?.message ?? 'unknown'
+            )
+          }
+        })
+
+        setTimeout(() => {
+          if (typeof unsub === 'function') unsub()
+          resolve()
+        }, timeoutMs)
+      })
+
+      const startedAt = Date.now()
+      if (trigger.kind === 'retry') {
+        await api.retryMessage({
+          agentId: 'tangyuan',
+          sessionId,
+          userMessageId: trigger.userMessageId
+        })
+      } else {
+        await api.sendMessage({
+          agentId: 'tangyuan',
+          sessionId,
+          content: trigger.content
+        })
+      }
+      await done
+      const elapsedMs = Date.now() - startedAt
+
+      const transcript = await api.getTranscript({
+        agentId: 'tangyuan',
+        sessionId
+      })
+      const entries = transcript.entries ?? []
+      const replyText = entries
+        .filter((e) => e.kind === 'agent-reply')
+        .map((e) => e.content ?? '')
+        .join('')
+
+      return {
+        replyText,
+        states,
+        runtimeError,
+        sawCompleted,
+        sawFailed,
+        sawCancelled,
+        timedOut: elapsedMs >= timeoutMs
+      }
+    },
+    { sessionId, trigger, timeoutMs }
+  )
+}
+
+/**
+ * 新建一个会话。
+ *
+ * @param harness - 应用夹具。
+ * @param title - 会话标题。
+ * @returns 新会话 id。
+ */
+export async function createSession(
+  harness: AppHarness,
+  title = `QA ${new Date().toISOString()}`
+): Promise<string> {
+  return await harness.window.evaluate(async (title) => {
+    const api = (
+      window as unknown as {
+        api: {
+          createSession: (r: { agentId: string; title: string }) => Promise<{ sessionId: string }>
+        }
+      }
+    ).api
+    const session = await api.createSession({ agentId: 'tangyuan', title })
+    return session.sessionId
+  }, title)
+}
+
+/**
+ * 在指定会话发送一条消息并等待真实回复。
+ */
+export async function sendMessageAndAwait(
+  harness: AppHarness,
+  sessionId: string,
+  content: string,
+  timeoutMs = 120000
+): Promise<RunResult> {
+  const outcome = await runInPage(harness, sessionId, { kind: 'send', content }, timeoutMs)
   return {
-    transcript: outcome.transcript,
     replyText: outcome.replyText,
-    violations
+    states: outcome.states,
+    completed: outcome.sawCompleted,
+    violations: assertRunInvariants(outcome, timeoutMs, false)
   }
+}
+
+/**
+ * 重试指定用户消息并等待新一次运行结束。
+ */
+export async function retryAndAwait(
+  harness: AppHarness,
+  sessionId: string,
+  userMessageId: string,
+  timeoutMs = 120000
+): Promise<RunResult> {
+  const outcome = await runInPage(harness, sessionId, { kind: 'retry', userMessageId }, timeoutMs)
+  return {
+    replyText: outcome.replyText,
+    states: outcome.states,
+    completed: outcome.sawCompleted,
+    violations: assertRunInvariants(outcome, timeoutMs, false)
+  }
+}
+
+/**
+ * 发送一条消息，收到首个 running 后立即取消，等待运行收敛。
+ *
+ * 真实模型可能很快返回，取消不一定来得及——「无回复」在本场景不视为违反
+ * （尽力而为）；状态机与 Runtime 错误仍做硬断言。
+ */
+export async function sendThenCancel(
+  harness: AppHarness,
+  sessionId: string,
+  content: string,
+  timeoutMs = 120000
+): Promise<RunResult> {
+  const outcome = await runInPage(
+    harness,
+    sessionId,
+    { kind: 'send-then-cancel', content },
+    timeoutMs
+  )
+  return {
+    replyText: outcome.replyText,
+    states: outcome.states,
+    completed: outcome.sawCompleted,
+    violations: assertRunInvariants(outcome, timeoutMs, true)
+  }
+}
+
+/**
+ * 读取会话中第一条用户消息的 id（供重试使用）。
+ */
+export async function firstUserMessageId(
+  harness: AppHarness,
+  sessionId: string
+): Promise<string | null> {
+  return await harness.window.evaluate(async (sessionId) => {
+    const api = (
+      window as unknown as {
+        api: {
+          getTranscript: (r: { agentId: string; sessionId: string }) => Promise<{
+            entries?: Array<{ kind: string; messageId?: string }>
+          }>
+        }
+      }
+    ).api
+    const t = await api.getTranscript({ agentId: 'tangyuan', sessionId })
+    const entry = (t.entries ?? []).find((e) => e.kind === 'user-message')
+    return entry?.messageId ?? null
+  }, sessionId)
 }
