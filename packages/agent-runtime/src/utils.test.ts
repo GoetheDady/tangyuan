@@ -5,7 +5,12 @@ import {
   buildTranscriptSnapshotFromSdkEntries,
   createToolActivityLabel,
   normalizePiSdkSessionEvent,
+  buildInternalConfigForSave,
+  createDefaultInternalConfig,
+  extractAgentRuntimeConfig,
+  normalizeRuntimeConfiguration,
 } from './utils'
+import { AgentRuntimeError } from './errors'
 
 describe('createToolStepSummary', () => {
   it('returns deterministic running label for built-in read tool', () => {
@@ -298,5 +303,100 @@ describe('buildTranscriptSnapshotFromSdkEntries', () => {
         }),
       ],
     })
+  })
+})
+
+describe('normalizeRuntimeConfiguration', () => {
+  it('去除首尾空白', () => {
+    expect(
+      normalizeRuntimeConfiguration({
+        providerId: ' openai ',
+        modelId: ' gpt-4 ',
+        apiKey: ' sk-x ',
+      }),
+    ).toEqual({ providerId: 'openai', modelId: 'gpt-4', apiKey: 'sk-x' })
+  })
+
+  it('任一字段为空时抛 AgentRuntimeError', () => {
+    expect(() =>
+      normalizeRuntimeConfiguration({
+        providerId: 'openai',
+        modelId: '',
+        apiKey: 'sk-x',
+      }),
+    ).toThrow(AgentRuntimeError)
+  })
+})
+
+describe('createDefaultInternalConfig', () => {
+  it('返回带默认汤圆 Agent 的 v2 配置', () => {
+    expect(createDefaultInternalConfig()).toEqual({
+      schemaVersion: 2,
+      providers: {},
+      agents: {
+        tangyuan: {
+          displayName: '汤圆',
+          defaultProviderId: null,
+          defaultModelId: null,
+          status: 'active',
+          archivedAt: null,
+        },
+      },
+    })
+  })
+})
+
+describe('buildInternalConfigForSave', () => {
+  it('existing 为空时基于默认配置写入 provider 与默认 Agent 模型', () => {
+    const result = buildInternalConfigForSave(
+      null,
+      { providerId: 'openai', modelId: 'gpt-4', apiKey: 'sk-x' },
+      '2026-01-01T00:00:00.000Z',
+    )
+    expect(result.providers.openai).toEqual({
+      apiKey: 'sk-x',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    expect(result.agents.tangyuan?.defaultProviderId).toBe('openai')
+    expect(result.agents.tangyuan?.defaultModelId).toBe('gpt-4')
+    expect(result.schemaVersion).toBe(2)
+  })
+})
+
+describe('extractAgentRuntimeConfig', () => {
+  const config = {
+    schemaVersion: 2,
+    providers: { openai: { apiKey: 'sk-x', updatedAt: 'now' } },
+    agents: {
+      tangyuan: {
+        displayName: '汤圆',
+        defaultProviderId: 'openai',
+        defaultModelId: 'gpt-4',
+        status: 'active' as const,
+        archivedAt: null,
+      },
+    },
+  }
+
+  it('返回 Agent 的运行时配置', () => {
+    expect(extractAgentRuntimeConfig(config, 'tangyuan')).toEqual({
+      providerId: 'openai',
+      modelId: 'gpt-4',
+      apiKey: 'sk-x',
+    })
+  })
+
+  it('Agent 未配置默认模型时返回 null', () => {
+    const noModel = {
+      ...config,
+      agents: {
+        tangyuan: { ...config.agents.tangyuan, defaultModelId: null },
+      },
+    }
+    expect(extractAgentRuntimeConfig(noModel, 'tangyuan')).toBeNull()
+  })
+
+  it('Agent 不存在时返回 null', () => {
+    expect(extractAgentRuntimeConfig(config, 'missing')).toBeNull()
   })
 })

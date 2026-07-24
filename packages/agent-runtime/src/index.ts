@@ -22,43 +22,40 @@ import {
 } from './TangyuanRuntime'
 import { RealPiSdkGateway } from './gateway'
 import { DirectoryLayout } from './directory-layout'
+import { ConfigStore } from './config-store'
+import { AgentRuntimeError } from './errors'
 import {
   isAbortError,
   mapPiSdkStreamEventToActivity,
   sanitizeErrorMessage,
+  normalizeRuntimeConfiguration,
+  createDefaultInternalConfig,
+  buildInternalConfigForSave,
+  extractAgentRuntimeConfig,
 } from './utils'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   createAgentProfileStatus,
   createRuntimeSnapshot,
-  migrateConfigV1ToV2,
-  persistedConfigurationV2Schema,
   type AgentConfig,
   type AgentEvent,
   type AgentEventListener,
   type AgentEventSubscription,
   type AgentId,
-  type AgentRuntimeErrorCode,
-  type AgentRuntimeErrorPayload,
   type AgentRunState,
   type AgentSessionSummary,
   type AgentSummary,
   type CancelConfigurationVerificationRequest,
   type CancelRunRequest,
   type ConfigEncryptionAdapter,
-  type ConfigRecoveryState,
   type CreateSessionRequest,
   type GetSessionMessagesRequest,
   type GetSessionModelInfoRequest,
-  type InternalProviderCredentials,
   type InternalRuntimeConfig,
   type ListSessionsRequest,
   type ModelDescriptor,
-  type PersistedConfigurationV1,
-  type PersistedConfigurationV2,
   type ProviderAuthSnapshot,
   type ProfileMaintenanceResult,
-  type ProviderCredentials,
   type ProviderDescriptor,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
@@ -569,11 +566,10 @@ interface ProfileMaintenanceSnapshot {
 }
 
 /**
- * 创建 AgentRuntimeError 时使用的输入。
+ * 创建 AgentRuntimeError 时使用的输入与错误类（定义见 errors.ts）。
  */
-export interface AgentRuntimeErrorInput extends AgentRuntimeErrorPayload {
-  cause?: unknown
-}
+export type { AgentRuntimeErrorInput } from './errors'
+export { AgentRuntimeError } from './errors'
 
 /**
  * 定义 Agent 会话 Driver 需要实现的能力。
@@ -937,39 +933,6 @@ export interface RuntimeResourceDriver {
 /**
  * Agent Runtime 统一错误类型。
  */
-export class AgentRuntimeError extends Error {
-  readonly code: AgentRuntimeErrorCode
-  readonly recoverable: boolean
-
-  /**
-   * 创建一个可安全序列化的 Runtime 错误。
-   *
-   * @param input - 错误码、展示消息、可恢复状态和可选原始原因。
-   * @returns AgentRuntimeError 实例。
-   * @throws 此构造方法不会主动抛出错误。
-   */
-  constructor(input: AgentRuntimeErrorInput) {
-    super(input.message)
-    this.name = 'AgentRuntimeError'
-    this.code = input.code
-    this.recoverable = input.recoverable
-  }
-
-  /**
-   * 转换为可传给 Renderer 的安全 JSON。
-   *
-   * @returns 不包含 cause 和敏感信息的错误载荷。
-   * @throws 此方法不会主动抛出错误。
-   */
-  toJSON(): AgentRuntimeErrorPayload {
-    return {
-      code: this.code,
-      message: this.message,
-      recoverable: this.recoverable,
-    }
-  }
-}
-
 /**
  * 创建 PiSdkDriver 时可注入的依赖。
  */
@@ -982,15 +945,6 @@ export interface PiSdkDriverOptions {
   encryptionAdapter?: ConfigEncryptionAdapter
   /** 工具审批与路径校验网关（用于 bash 审批和文件路径保护）。 */
   toolApprovalGateway?: ToolApprovalGateway
-}
-
-/**
- * 读取持久化配置后的结果。
- */
-interface ConfigReadResult {
-  config: InternalRuntimeConfig | null
-  recoveryState: ConfigRecoveryState
-  hasBackup: boolean
 }
 
 /**
@@ -1072,6 +1026,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private readonly fsRoot: string
   private readonly userDataPath: string
   private readonly layout: DirectoryLayout
+  private readonly configStore: ConfigStore
   private readonly gateway: PiSdkGateway
   private readonly encryptionAdapter: ConfigEncryptionAdapter | null
   private readonly listeners = new Set<AgentEventListener>()
@@ -1104,6 +1059,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     })
     this.gateway = options.gateway ?? new RealPiSdkGateway()
     this.encryptionAdapter = options.encryptionAdapter ?? null
+    this.configStore = new ConfigStore({
+      layout: this.layout,
+      encryptionAdapter: this.encryptionAdapter,
+      now: this.now,
+    })
     this.toolApprovalGateway = options.toolApprovalGateway
   }
 
@@ -1138,7 +1098,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     configuration: RuntimeConfiguration,
   ): Promise<RuntimeSnapshot> {
     const normalizedConfiguration =
-      this.normalizeRuntimeConfiguration(configuration)
+      normalizeRuntimeConfiguration(configuration)
     const controller = new AbortController()
     this.configurationVerificationController = controller
 
@@ -1168,12 +1128,13 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       }
     }
 
-    const readResult = await this.readPersistedConfiguration()
-    const internalConfig = this.buildInternalConfigForSave(
+    const readResult = await this.configStore.read()
+    const internalConfig = buildInternalConfigForSave(
       readResult.config,
       normalizedConfiguration,
+      this.now(),
     )
-    await this.writePersistedConfiguration(internalConfig)
+    await this.configStore.write(internalConfig)
     return this.readRuntimeSnapshot()
   }
 
@@ -1221,7 +1182,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   async createSession(
     request: CreateSessionRequest,
   ): Promise<AgentSessionSummary> {
-    const readResult = await this.readPersistedConfiguration()
+    const readResult = await this.configStore.read()
 
     if (readResult.recoveryState !== 'ok') {
       throw new AgentRuntimeError({
@@ -1242,7 +1203,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     const [configuration] = await Promise.all([
-      this.readRequiredRuntimeConfiguration(request.agentId),
+      this.configStore.readRequired(request.agentId),
       this.loadSessionIndex(),
     ])
     const sessionId = this.createNextSessionId()
@@ -2188,17 +2149,17 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private async readRuntimeSnapshot(): Promise<RuntimeSnapshot> {
     const homeStatus = await this.ensureDefaultAgentHome()
     const [readResult, resources] = await Promise.all([
-      this.readPersistedConfiguration(),
+      this.configStore.read(),
       this.gateway.listProvidersAndModels(),
     ])
 
     const runtimeConfig = readResult.config
-      ? this.extractAgentRuntimeConfig(
+      ? extractAgentRuntimeConfig(
           readResult.config,
           TANGYUAN_DEFAULT_AGENT_ID,
         )
       : null
-    const hasBackup = await this.hasBackupFile()
+    const hasBackup = await this.configStore.hasBackup()
 
     // 构建按 providerId 索引的凭据配置状态，Renderer 只能读取脱敏值
     const configuredProviders: Record<string, ProviderAuthSnapshot> = {}
@@ -2324,7 +2285,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当配置读取失败时，Promise 会 reject。
    */
   async listAgents(): Promise<AgentSummary[]> {
-    const readResult = await this.readPersistedConfiguration()
+    const readResult = await this.configStore.read()
     return await this.buildAgentSummaries(readResult.config)
   }
 
@@ -2342,9 +2303,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     const workspacePath = this.layout.workspace(agentId)
 
     // 1. 读取当前配置并继承 tangyuan 的 Provider/Model
-    const readResult = await this.readPersistedConfiguration()
-    const config = readResult.config ?? this.createDefaultInternalConfig()
-    const tangyuanConfig = this.extractAgentRuntimeConfig(
+    const readResult = await this.configStore.read()
+    const config = readResult.config ?? createDefaultInternalConfig()
+    const tangyuanConfig = extractAgentRuntimeConfig(
       config,
       TANGYUAN_DEFAULT_AGENT_ID,
     )
@@ -2386,7 +2347,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         status: 'active',
         archivedAt: null,
       }
-      await this.writePersistedConfiguration(config)
+      await this.configStore.write(config)
 
       const summary: AgentSummary = {
         agentId,
@@ -2428,7 +2389,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     agentId: AgentId,
     patch: Partial<Pick<AgentConfig, 'defaultProviderId' | 'defaultModelId'>>,
   ): Promise<AgentSummary> {
-    const readResult = await this.readPersistedConfiguration()
+    const readResult = await this.configStore.read()
     const config = readResult.config
 
     if (!config || !config.agents[agentId]) {
@@ -2459,7 +2420,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         : {}),
     }
     config.agents[agentId] = updatedAgent
-    await this.writePersistedConfiguration(config)
+    await this.configStore.write(config)
 
     const homePath = this.layout.agentHome(agentId)
     const soulExists = await this.pathExists(join(homePath, 'soul.md'))
@@ -2501,7 +2462,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       })
     }
 
-    const readResult = await this.readPersistedConfiguration()
+    const readResult = await this.configStore.read()
     const config = readResult.config
 
     if (!config || !config.agents[agentId]) {
@@ -2521,7 +2482,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       archivedAt: now,
     }
     config.agents[agentId] = updatedAgent
-    await this.writePersistedConfiguration(config)
+    await this.configStore.write(config)
 
     const homePath = this.layout.agentHome(agentId)
     const soulExists = await this.pathExists(join(homePath, 'soul.md'))
@@ -2555,7 +2516,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当 Agent 不存在或配置保存失败时，Promise 会 reject。
    */
   async recoverAgent(agentId: AgentId): Promise<AgentSummary> {
-    const readResult = await this.readPersistedConfiguration()
+    const readResult = await this.configStore.read()
     const config = readResult.config
 
     if (!config || !config.agents[agentId]) {
@@ -2575,7 +2536,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       archivedAt: null,
     }
     config.agents[agentId] = updatedAgent
-    await this.writePersistedConfiguration(config)
+    await this.configStore.write(config)
 
     const homePath = this.layout.agentHome(agentId)
     const soulExists = await this.pathExists(join(homePath, 'soul.md'))
@@ -2611,7 +2572,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     agents: AgentSummary[]
     unclaimedDirectories: import('@tangyuan/contracts').UnclaimedDirectory[]
   }> {
-    const readResult = await this.readPersistedConfiguration()
+    const readResult = await this.configStore.read()
     const config = readResult.config
 
     const agents = await this.buildAgentSummaries(config)
@@ -2677,11 +2638,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       })
     }
 
-    const readResult = await this.readPersistedConfiguration()
-    const config = readResult.config ?? this.createDefaultInternalConfig()
+    const readResult = await this.configStore.read()
+    const config = readResult.config ?? createDefaultInternalConfig()
 
     // 继承 tangyuan 的 Provider/Model
-    const tangyuanConfig = this.extractAgentRuntimeConfig(
+    const tangyuanConfig = extractAgentRuntimeConfig(
       config,
       TANGYUAN_DEFAULT_AGENT_ID,
     )
@@ -2693,7 +2654,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       status: 'active',
       archivedAt: null,
     }
-    await this.writePersistedConfiguration(config)
+    await this.configStore.write(config)
 
     const summary: AgentSummary = {
       agentId,
@@ -2750,7 +2711,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     ].join('\n')
     await writeFile(join(homePath, 'soul.md'), soulContent, 'utf8')
 
-    const readResult = await this.readPersistedConfiguration()
+    const readResult = await this.configStore.read()
     const config = readResult.config
 
     const summary: AgentSummary = {
@@ -3426,9 +3387,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     // 敏感信息过滤
-    const readResult = await this.readPersistedConfiguration()
+    const readResult = await this.configStore.read()
     const runtimeConfig = readResult.config
-      ? this.extractAgentRuntimeConfig(readResult.config, agentId)
+      ? extractAgentRuntimeConfig(readResult.config, agentId)
       : null
     const redactedContent = this.redactSensitiveProfileContent(
       content,
@@ -3491,9 +3452,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     // 敏感信息过滤
-    const readResult = await this.readPersistedConfiguration()
+    const readResult = await this.configStore.read()
     const runtimeConfig = readResult.config
-      ? this.extractAgentRuntimeConfig(
+      ? extractAgentRuntimeConfig(
           readResult.config,
           TANGYUAN_DEFAULT_AGENT_ID,
         )
@@ -3563,12 +3524,12 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
     // 读取目标 Provider 的 API Key 用于跨 Provider 切换
     const indexEntry = this.getKnownSessionIndexEntry(request.sessionId)
-    const configuration = await this.readRequiredRuntimeConfiguration(
+    const configuration = await this.configStore.readRequired(
       indexEntry.agentId,
     )
     const targetApiKey =
       request.providerId !== configuration.providerId
-        ? await this.readProviderApiKey(request.providerId)
+        ? await this.configStore.readProviderApiKey(request.providerId)
         : undefined
 
     await handle.setModel(request.providerId, request.modelId, targetApiKey)
@@ -3623,440 +3584,13 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }
 
   /**
-   * 校验并清理用户输入的运行时配置。
-   *
-   * @param configuration - 用户输入的配置。
-   * @returns 去除首尾空白后的 RuntimeConfiguration。
-   * @throws 当 Provider、Model 或 API Key 为空时抛出 AgentRuntimeError。
-   */
-  private normalizeRuntimeConfiguration(
-    configuration: RuntimeConfiguration,
-  ): RuntimeConfiguration {
-    const normalizedConfiguration = {
-      providerId: configuration.providerId.trim(),
-      modelId: configuration.modelId.trim(),
-      apiKey: configuration.apiKey.trim(),
-    }
-
-    if (
-      !normalizedConfiguration.providerId ||
-      !normalizedConfiguration.modelId ||
-      !normalizedConfiguration.apiKey
-    ) {
-      throw new AgentRuntimeError({
-        code: 'configuration-missing',
-        message:
-          '请填写 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。',
-        recoverable: true,
-      })
-    }
-
-    return normalizedConfiguration
-  }
-
-  /**
-   * 从磁盘读取配置 JSON，检测版本、执行迁移、解密 API Key。
-   *
-   * @returns 解密后的内部配置与恢复状态。
-   * @throws 当文件系统读取失败时，Promise 会 reject。
-   */
-  private async readPersistedConfiguration(): Promise<ConfigReadResult> {
-    const configPath = this.layout.config()
-
-    try {
-      const rawConfig = await readFile(configPath, 'utf8')
-      const parsedConfig = JSON.parse(rawConfig) as Record<string, unknown>
-
-      // 检测是否为 v1 格式（无 schemaVersion）
-      if (typeof parsedConfig.schemaVersion !== 'number') {
-        return this.migrateAndReadConfig(
-          parsedConfig as unknown as PersistedConfigurationV1,
-        )
-      }
-
-      // v2 格式：校验 schema
-      const parseResult = persistedConfigurationV2Schema.safeParse(parsedConfig)
-      if (!parseResult.success) {
-        return {
-          config: null,
-          recoveryState: 'corrupted',
-          hasBackup: await this.hasBackupFile(),
-        }
-      }
-
-      // 解密
-      let config: InternalRuntimeConfig
-      try {
-        config = await this.decryptConfigFromDisk(parseResult.data)
-      } catch {
-        return {
-          config: null,
-          recoveryState: 'corrupted',
-          hasBackup: await this.hasBackupFile(),
-        }
-      }
-
-      return {
-        config,
-        recoveryState: 'ok',
-        hasBackup: await this.hasBackupFile(),
-      }
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error as NodeJS.ErrnoException).code === 'ENOENT'
-      ) {
-        return {
-          config: this.createDefaultInternalConfig(),
-          recoveryState: 'ok',
-          hasBackup: false,
-        }
-      }
-
-      return {
-        config: null,
-        recoveryState: 'corrupted',
-        hasBackup: await this.hasBackupFile(),
-      }
-    }
-  }
-
-  /**
-   * 迁移 v1 配置到 v2 并写回磁盘。
-   *
-   * @param v1 - 解析后的 v1 磁盘配置。
-   * @returns 迁移后的内部配置。
-   * @throws 当迁移后写入失败时，Promise 会 reject。
-   */
-  private async migrateAndReadConfig(
-    v1: PersistedConfigurationV1,
-  ): Promise<ConfigReadResult> {
-    try {
-      const internalConfig = migrateConfigV1ToV2(v1, this.now())
-      await this.writePersistedConfiguration(internalConfig)
-      return {
-        config: internalConfig,
-        recoveryState: 'ok',
-        hasBackup: false,
-      }
-    } catch {
-      return {
-        config: null,
-        recoveryState: 'migration-failed',
-        hasBackup: await this.hasBackupFile(),
-      }
-    }
-  }
-
-  /**
-   * 读取已保存且可用于真实会话的运行时配置。
-   *
-   * @returns 解密后的 Provider、模型和 API Key。
-   * @throws 当配置不存在或完整性问题时抛出 AgentRuntimeError。
-   */
-  private async readRequiredRuntimeConfiguration(
-    agentId: string = TANGYUAN_DEFAULT_AGENT_ID,
-  ): Promise<RuntimeConfiguration> {
-    const readResult = await this.readPersistedConfiguration()
-
-    if (readResult.recoveryState !== 'ok') {
-      throw new AgentRuntimeError({
-        code: 'configuration-missing',
-        message: '配置文件已损坏，请先恢复或重置配置。',
-        recoverable: true,
-      })
-    }
-
-    if (!readResult.config) {
-      throw new AgentRuntimeError({
-        code: 'configuration-missing',
-        message:
-          '创建会话前，请先配置 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。',
-        recoverable: true,
-      })
-    }
-
-    const runtimeConfig = this.extractAgentRuntimeConfig(
-      readResult.config,
-      agentId,
-    )
-
-    if (!runtimeConfig) {
-      throw new AgentRuntimeError({
-        code: 'configuration-missing',
-        message: `Agent「${agentId}」尚未配置 Provider 和 Model，请先在控制台中为该 Agent 设置默认模型。`,
-        recoverable: true,
-      })
-    }
-
-    return runtimeConfig
-  }
-
-  /**
-   * 写入加密后的 v2 配置 JSON，包含备份和原子替换。
-   *
-   * @param config - 解密后的内部运行时配置。
-   * @returns 无返回值。
-   * @throws 当加密、备份或写入失败时，Promise 会 reject。
-   */
-  private async writePersistedConfiguration(
-    config: InternalRuntimeConfig,
-  ): Promise<void> {
-    const configPath = this.layout.config()
-    const backupPath = this.layout.configBackup()
-    const tmpPath = `${configPath}.tmp`
-
-    await mkdir(dirname(configPath), { recursive: true })
-
-    // 加密
-    const persisted = await this.encryptConfigForDisk(config)
-    const serialized = `${JSON.stringify(persisted, null, 2)}\n`
-
-    // 备份当前配置
-    try {
-      await import('node:fs/promises').then(({ copyFile }) =>
-        copyFile(configPath, backupPath),
-      )
-    } catch {
-      // 当前配置文件不存在则不备份
-    }
-
-    // 原子写入
-    await writeFile(tmpPath, serialized, 'utf8')
-    await rename(tmpPath, configPath)
-  }
-
-  /**
-   * 检查配置备份文件是否存在。
-   *
-   * @returns 备份文件存在返回 true。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private async hasBackupFile(): Promise<boolean> {
-    try {
-      await access(this.layout.configBackup(), fsConstants.F_OK)
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  /**
-   * 创建默认的内部运行时配置（无 provider 凭据）。
-   *
-   * @returns 包含默认 tangyuan Agent 的空配置。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private createDefaultInternalConfig(): InternalRuntimeConfig {
-    return {
-      schemaVersion: 2,
-      providers: {},
-      agents: {
-        [TANGYUAN_DEFAULT_AGENT_ID]: {
-          displayName: '汤圆',
-          defaultProviderId: null,
-          defaultModelId: null,
-          status: 'active',
-          archivedAt: null,
-        },
-      },
-    }
-  }
-
-  /**
-   * 将用户输入的 RuntimeConfiguration 合并到现有内部配置中。
-   *
-   * @param existing - 现有的内部配置；为 null 则创建默认配置。
-   * @param runtimeConfig - 用户输入的新配置。
-   * @returns 合并后的内部运行时配置。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private buildInternalConfigForSave(
-    existing: InternalRuntimeConfig | null,
-    runtimeConfig: RuntimeConfiguration,
-  ): InternalRuntimeConfig {
-    const config = existing ?? this.createDefaultInternalConfig()
-    const now = this.now()
-
-    config.providers[runtimeConfig.providerId] = {
-      apiKey: runtimeConfig.apiKey,
-      updatedAt: now,
-    }
-
-    const agent = config.agents[TANGYUAN_DEFAULT_AGENT_ID]
-    if (agent) {
-      agent.defaultProviderId = runtimeConfig.providerId
-      agent.defaultModelId = runtimeConfig.modelId
-    }
-
-    config.schemaVersion = 2
-    return config
-  }
-
-  /**
-   * 从内部配置中提取指定 Agent 当前可用的 RuntimeConfiguration。
-   *
-   * @param config - 解密后的内部运行时配置。
-   * @param agentId - 需要查询的 Agent 标识。
-   * @returns 可传给 Pi SDK 的运行时配置；Agent 未配置完整时返回 null。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private extractAgentRuntimeConfig(
-    config: InternalRuntimeConfig,
-    agentId: string,
-  ): RuntimeConfiguration | null {
-    const agent = config.agents[agentId]
-    if (!agent?.defaultProviderId || !agent?.defaultModelId) return null
-    const provider = config.providers[agent.defaultProviderId]
-    if (!provider) return null
-    return {
-      providerId: agent.defaultProviderId,
-      modelId: agent.defaultModelId,
-      apiKey: provider.apiKey,
-    }
-  }
-
-  /**
-   * 从持久化配置中读取指定 Provider 的 API Key。
-   *
-   * @param providerId - Provider 标识。
-   * @returns 明文 API Key；Provider 未配置凭据时返回 undefined。
-   * @throws 当配置文件读取或解密失败时，Promise 会 reject。
-   */
-  private async readProviderApiKey(
-    providerId: string,
-  ): Promise<string | undefined> {
-    const readResult = await this.readPersistedConfiguration()
-    const provider = readResult.config?.providers[providerId]
-    return provider?.apiKey
-  }
-
-  /**
-   * 将解密后的内部配置加密为磁盘格式。
-   *
-   * @param config - 解密后的内部运行时配置。
-   * @returns v2 磁盘配置格式。
-   * @throws 当加密不可用时抛出 AgentRuntimeError。
-   */
-  private async encryptConfigForDisk(
-    config: InternalRuntimeConfig,
-  ): Promise<PersistedConfigurationV2> {
-    const adapter = this.requireEncryptionAdapter()
-    const providers: Record<string, ProviderCredentials> = {}
-    for (const [providerId, creds] of Object.entries(config.providers)) {
-      providers[providerId] = {
-        encryptedApiKey: await adapter.encrypt(creds.apiKey),
-        updatedAt: creds.updatedAt,
-      }
-    }
-    return {
-      schemaVersion: 2,
-      providers,
-      agents: config.agents,
-    }
-  }
-
-  /**
-   * 将 v2 磁盘格式配置解密为内部运行时配置。
-   *
-   * @param persisted - 从磁盘读取的 v2 配置。
-   * @returns 解密后的内部运行时配置。
-   * @throws 当解密失败或加密不可用时抛出 AgentRuntimeError。
-   */
-  private async decryptConfigFromDisk(
-    persisted: PersistedConfigurationV2,
-  ): Promise<InternalRuntimeConfig> {
-    const adapter = this.requireEncryptionAdapter()
-    const providers: Record<string, InternalProviderCredentials> = {}
-    for (const [providerId, creds] of Object.entries(persisted.providers)) {
-      try {
-        providers[providerId] = {
-          apiKey: await adapter.decrypt(creds.encryptedApiKey),
-          updatedAt: creds.updatedAt,
-        }
-      } catch {
-        throw new AgentRuntimeError({
-          code: 'configuration-missing',
-          message: '无法解密配置凭据，操作系统加密服务可能已变更。',
-          recoverable: true,
-        })
-      }
-    }
-    return {
-      schemaVersion: persisted.schemaVersion,
-      providers,
-      agents: persisted.agents,
-    }
-  }
-
-  /**
-   * 检查加密适配器是否可用，不可用时抛出错误。
-   *
-   * @returns 可用的加密适配器。
-   * @throws 当加密适配器未注入或不可用时抛出 AgentRuntimeError。
-   */
-  private requireEncryptionAdapter(): ConfigEncryptionAdapter {
-    if (!this.encryptionAdapter || !this.encryptionAdapter.isAvailable()) {
-      throw new AgentRuntimeError({
-        code: 'driver-unavailable',
-        message: '加密服务不可用，无法保存或读取配置。',
-        recoverable: false,
-      })
-    }
-    return this.encryptionAdapter
-  }
-
-  /**
    * 从最近的备份恢复配置文件。
    *
    * @returns 恢复后的 RuntimeSnapshot。
    * @throws 当备份不存在或恢复失败时，Promise 会 reject。
    */
   async restoreFromBackup(): Promise<RuntimeSnapshot> {
-    const backupPath = this.layout.configBackup()
-    const configPath = this.layout.config()
-
-    try {
-      await access(backupPath, fsConstants.F_OK)
-    } catch {
-      throw new AgentRuntimeError({
-        code: 'configuration-missing',
-        message: '没有可用的配置备份。',
-        recoverable: true,
-      })
-    }
-
-    // 校验备份文件格式
-    const rawBackup = await readFile(backupPath, 'utf8')
-    let parsedBackup: unknown
-    try {
-      parsedBackup = JSON.parse(rawBackup)
-    } catch {
-      throw new AgentRuntimeError({
-        code: 'configuration-missing',
-        message: '备份文件已损坏，无法恢复。',
-        recoverable: true,
-      })
-    }
-
-    const parseResult = persistedConfigurationV2Schema.safeParse(parsedBackup)
-    if (!parseResult.success) {
-      throw new AgentRuntimeError({
-        code: 'configuration-missing',
-        message: '备份文件格式不兼容，无法恢复。',
-        recoverable: true,
-      })
-    }
-
-    // 校验能解密
-    await this.decryptConfigFromDisk(parseResult.data)
-
-    // 写回备份内容
-    await mkdir(dirname(configPath), { recursive: true })
-    await writeFile(`${configPath}.tmp`, rawBackup, 'utf8')
-    await rename(`${configPath}.tmp`, configPath)
-
+    await this.configStore.restore()
     return this.readRuntimeSnapshot()
   }
 
@@ -4067,20 +3601,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当文件删除失败时，Promise 会 reject。
    */
   async resetConfiguration(): Promise<void> {
-    const configPath = this.layout.config()
-    const backupPath = this.layout.configBackup()
-
-    await Promise.all([
-      import('node:fs/promises').then(({ rm }) =>
-        rm(configPath, { force: true }),
-      ),
-      import('node:fs/promises').then(({ rm }) =>
-        rm(backupPath, { force: true }),
-      ),
-      import('node:fs/promises').then(({ rm }) =>
-        rm(`${configPath}.tmp`, { force: true }),
-      ),
-    ])
+    await this.configStore.reset()
   }
 
   /**
@@ -4129,7 +3650,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private async rebuildSessionIndexFromSdk(): Promise<
     PersistedSessionIndexEntry[]
   > {
-    const readResult = await this.readPersistedConfiguration()
+    const readResult = await this.configStore.read()
 
     if (!readResult.config) {
       this.replaceSessionIndex([])
@@ -4145,7 +3666,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     )
 
     for (const [agentId] of agents) {
-      const runtimeConfig = this.extractAgentRuntimeConfig(
+      const runtimeConfig = extractAgentRuntimeConfig(
         readResult.config,
         agentId,
       )
@@ -4375,7 +3896,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     const indexEntry = this.getKnownSessionIndexEntry(sessionId)
-    const configuration = await this.readRequiredRuntimeConfiguration(
+    const configuration = await this.configStore.readRequired(
       indexEntry.agentId,
     )
     const cwd =
@@ -4746,9 +4267,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
       await input.handle.prompt(maintenancePrompt)
 
-      const readResult = await this.readPersistedConfiguration()
+      const readResult = await this.configStore.read()
       const runtimeConfig = readResult.config
-        ? this.extractAgentRuntimeConfig(readResult.config, input.agentId)
+        ? extractAgentRuntimeConfig(readResult.config, input.agentId)
         : null
       await this.applyProfileMaintenanceResults({
         agentId: input.agentId,

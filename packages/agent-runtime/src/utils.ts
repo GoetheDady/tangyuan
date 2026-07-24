@@ -1,4 +1,10 @@
 import type { PiSdkStreamEvent } from './index'
+import {
+  TANGYUAN_DEFAULT_AGENT_ID,
+  type InternalRuntimeConfig,
+  type RuntimeConfiguration,
+} from '@tangyuan/contracts'
+import { AgentRuntimeError } from './errors'
 export {
   buildTranscriptSnapshotFromSdkEntries,
   buildTranscriptWithAttempts,
@@ -309,4 +315,112 @@ export function describeBashRisk(command: string): string {
   }
 
   return `命令将以当前 macOS 用户权限执行。`
+}
+
+/**
+ * 规整用户输入的运行时配置：去除首尾空白，任一字段为空时抛错。
+ *
+ * @param configuration - 用户输入的 Provider、Model 和 API Key。
+ * @returns 去除空白后的运行时配置。
+ * @throws 当任一字段去空白后为空时抛出 configuration-missing。
+ */
+export function normalizeRuntimeConfiguration(
+  configuration: RuntimeConfiguration,
+): RuntimeConfiguration {
+  const normalizedConfiguration = {
+    providerId: configuration.providerId.trim(),
+    modelId: configuration.modelId.trim(),
+    apiKey: configuration.apiKey.trim(),
+  }
+
+  if (
+    !normalizedConfiguration.providerId ||
+    !normalizedConfiguration.modelId ||
+    !normalizedConfiguration.apiKey
+  ) {
+    throw new AgentRuntimeError({
+      code: 'configuration-missing',
+      message:
+        '请填写 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。',
+      recoverable: true,
+    })
+  }
+
+  return normalizedConfiguration
+}
+
+/**
+ * 构造仅含默认汤圆 Agent 的空 v2 配置。
+ *
+ * @returns 默认 InternalRuntimeConfig。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function createDefaultInternalConfig(): InternalRuntimeConfig {
+  return {
+    schemaVersion: 2,
+    providers: {},
+    agents: {
+      [TANGYUAN_DEFAULT_AGENT_ID]: {
+        displayName: '汤圆',
+        defaultProviderId: null,
+        defaultModelId: null,
+        status: 'active',
+        archivedAt: null,
+      },
+    },
+  }
+}
+
+/**
+ * 把用户输入的运行时配置合并进内部配置，供保存到磁盘。
+ *
+ * @param existing - 现有内部配置；为空时基于默认配置。
+ * @param runtimeConfig - 用户输入的运行时配置。
+ * @param now - 当前时间的 ISO 字符串（作为 provider 更新时间）。
+ * @returns 可持久化的 InternalRuntimeConfig。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function buildInternalConfigForSave(
+  existing: InternalRuntimeConfig | null,
+  runtimeConfig: RuntimeConfiguration,
+  now: string,
+): InternalRuntimeConfig {
+  const config = existing ?? createDefaultInternalConfig()
+
+  config.providers[runtimeConfig.providerId] = {
+    apiKey: runtimeConfig.apiKey,
+    updatedAt: now,
+  }
+
+  const agent = config.agents[TANGYUAN_DEFAULT_AGENT_ID]
+  if (agent) {
+    agent.defaultProviderId = runtimeConfig.providerId
+    agent.defaultModelId = runtimeConfig.modelId
+  }
+
+  config.schemaVersion = 2
+  return config
+}
+
+/**
+ * 从内部配置提取指定 Agent 的运行时配置。
+ *
+ * @param config - 内部配置。
+ * @param agentId - Agent 标识。
+ * @returns Agent 已配置默认 Provider/Model 时返回运行时配置，否则返回 null。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function extractAgentRuntimeConfig(
+  config: InternalRuntimeConfig,
+  agentId: string,
+): RuntimeConfiguration | null {
+  const agent = config.agents[agentId]
+  if (!agent?.defaultProviderId || !agent?.defaultModelId) return null
+  const provider = config.providers[agent.defaultProviderId]
+  if (!provider) return null
+  return {
+    providerId: agent.defaultProviderId,
+    modelId: agent.defaultModelId,
+    apiKey: provider.apiKey,
+  }
 }
