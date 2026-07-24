@@ -475,7 +475,7 @@ export class SessionIndexStore {
         agentId: entry.agentId,
         lastMessagePreview: entry.lastMessagePreview,
         status: entry.status,
-        attempts,
+        ...(attempts !== undefined ? { attempts } : {}),
       },
     ]
   }
