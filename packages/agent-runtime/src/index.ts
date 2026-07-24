@@ -1400,272 +1400,15 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       completedAt: null,
     })
 
-    try {
-      const profileStatusBeforeRun = await this.profileStore.ensureDefaultAgentHome()
-      let accumulatedReply = ''
-      let turnIndex = 0
-      // 惰性宣告：收到第一个真实内容事件时才 emit agent message-appended，
-      // 使运行期 delta 能挂到条目上；若未产生任何内容（如立即取消）则不建空条目。
-      let agentEntryAnnounced = false
-      const announceAgentEntry = (): void => {
-        if (agentEntryAnnounced) return
-        agentEntryAnnounced = true
-        this.emit({
-          type: 'message-appended',
-          agentId: request.agentId,
-          message: agentMessage,
-          occurredAt: this.now(),
-        })
-      }
-      const agentReply = await handle.prompt(content, {
-        onEvent: (event) => {
-          if (event.type === 'thinking-started') {
-            announceAgentEntry()
-            this.emit({
-              type: 'activity-updated',
-              agentId: request.agentId,
-              sessionId: request.sessionId,
-              runId,
-              activity: mapPiSdkStreamEventToActivity(event),
-              occurredAt: this.now(),
-            })
-            return
-          }
-
-          if (event.type === 'thinking-delta') {
-            announceAgentEntry()
-            this.emit({
-              type: 'message-delta',
-              agentId: request.agentId,
-              sessionId: request.sessionId,
-              runId,
-              messageId: agentMessage.messageId,
-              delta: event.delta,
-              deltaKind: 'thinking',
-              occurredAt: this.now(),
-            })
-            return
-          }
-
-          if (event.type === 'text-delta') {
-            announceAgentEntry()
-            accumulatedReply += event.delta
-            this.messageStore.appendDelta(agentMessage.messageId, event.delta)
-            this.emit({
-              type: 'message-delta',
-              agentId: request.agentId,
-              sessionId: request.sessionId,
-              runId,
-              messageId: agentMessage.messageId,
-              delta: event.delta,
-              occurredAt: this.now(),
-            })
-            return
-          }
-
-          if (event.type === 'turn-started') {
-            this.emit({
-              type: 'turn-started',
-              agentId: request.agentId,
-              sessionId: request.sessionId,
-              runId,
-              turnIndex,
-              occurredAt: this.now(),
-            })
-            return
-          }
-
-          if (event.type === 'turn-ended') {
-            this.emit({
-              type: 'turn-ended',
-              agentId: request.agentId,
-              sessionId: request.sessionId,
-              runId,
-              turnIndex,
-              message: event.message,
-              toolResults: event.toolResults,
-              occurredAt: this.now(),
-            })
-            turnIndex++
-            return
-          }
-
-          // tool-started / tool-completed / tool-failed
-          announceAgentEntry()
-          this.emit({
-            type: 'activity-updated',
-            agentId: request.agentId,
-            sessionId: request.sessionId,
-            runId,
-            activity: mapPiSdkStreamEventToActivity(event),
-            occurredAt: this.now(),
-          })
-        },
-      })
-
-      if (this.activeRunIds.get(request.sessionId) !== runId) {
-        this.messageStore.removeIfEmpty(agentMessage.messageId)
-        await this.sessionIndexStore.upsertAttempt(request.sessionId, {
-          attemptId: runId,
-          runId,
-          messageId: agentMessage.messageId,
-          status: 'cancelled',
-          startedAt: this.now(),
-          completedAt: this.now(),
-        })
-        this.updateSessionState(session.sessionId, 'cancelled')
-        await this.sessionIndexStore.updateEntry(session.sessionId, {
-          status: 'cancelled',
-          updatedAt: this.now(),
-        })
-        return
-      }
-
-      if (!accumulatedReply && agentReply?.trim()) {
-        accumulatedReply = agentReply.trim()
-        this.messageStore.appendDelta(agentMessage.messageId, accumulatedReply)
-        this.emit({
-          type: 'message-delta',
-          agentId: request.agentId,
-          sessionId: request.sessionId,
-          runId,
-          messageId: agentMessage.messageId,
-          delta: accumulatedReply,
-          occurredAt: this.now(),
-        })
-      }
-
-      const completedMessage = this.messageStore.complete(agentMessage.messageId)
-      this.emit({
-        type: 'message-completed',
-        agentId: request.agentId,
-        sessionId: request.sessionId,
-        runId,
-        message: completedMessage,
-        occurredAt: this.now(),
-      })
-      this.emit({
-        type: 'message-appended',
-        agentId: request.agentId,
-        message: completedMessage,
-        occurredAt: this.now(),
-      })
-      const profileStatusAfterMainReply = await this.emitProfileUpdateEvents(
-        profileStatusBeforeRun,
-        {
-          agentId: request.agentId,
-          sessionId: request.sessionId,
-        },
-      )
-
-      if (profileStatusBeforeRun.initialized) {
-        await this.runProfileMaintenanceTurn({
-          agentId: request.agentId,
-          sessionId: request.sessionId,
-          handle,
-          userContent: content,
-          agentContent: completedMessage.content,
-          profileStatus: profileStatusAfterMainReply,
-        })
-      } else {
-        await this.profileStore.performBootstrapCompletionGating()
-      }
-
-      // profile 变化点：本回合可能写入 soul/user 或完成 bootstrap，
-      // 若状态发生变化则刷新系统提示词上下文。
-      const profileStatusAfterRun = await this.profileStore.ensureDefaultAgentHome()
-      if (
-        profileStatusAfterRun.initialized !==
-          profileStatusBeforeRun.initialized ||
-        profileStatusAfterRun.soulUpdatedAt !==
-          profileStatusBeforeRun.soulUpdatedAt ||
-        profileStatusAfterRun.userUpdatedAt !==
-          profileStatusBeforeRun.userUpdatedAt
-      ) {
-        await this.refreshAgentProfileContext(request.agentId)
-      }
-
-      await this.sessionIndexStore.upsertAttempt(request.sessionId, {
-        attemptId: runId,
-        runId,
-        messageId: agentMessage.messageId,
-        status: 'completed',
-        startedAt: this.now(),
-        completedAt: this.now(),
-      })
-      this.updateSessionState(session.sessionId, 'completed')
-      await this.sessionIndexStore.updateEntry(session.sessionId, {
-        lastMessagePreview: createMessagePreview(completedMessage.content),
-        status: 'completed',
-        updatedAt: this.now(),
-      })
-    } catch (error) {
-      if (isAbortError(error) || !this.activeRunIds.has(request.sessionId)) {
-        this.messageStore.removeIfEmpty(agentMessage.messageId)
-        await this.sessionIndexStore.upsertAttempt(request.sessionId, {
-          attemptId: runId,
-          runId,
-          messageId: agentMessage.messageId,
-          status: 'cancelled',
-          startedAt: this.now(),
-          completedAt: this.now(),
-        })
-        this.updateSessionState(session.sessionId, 'cancelled')
-        await this.sessionIndexStore.updateEntry(session.sessionId, {
-          status: 'cancelled',
-          updatedAt: this.now(),
-        })
-        this.emit({
-          type: 'turn-cancelled',
-          agentId: request.agentId,
-          sessionId: request.sessionId,
-          runId,
-          occurredAt: this.now(),
-        })
-        return
-      }
-
-      const runtimeError = {
-        code: 'unknown' as const,
-        message: sanitizeErrorMessage(error),
-        recoverable: true,
-      }
-      this.messageStore.removeIfEmpty(agentMessage.messageId)
-      await this.sessionIndexStore.upsertAttempt(request.sessionId, {
-        attemptId: runId,
-        runId,
-        messageId: agentMessage.messageId,
-        status: 'failed',
-        startedAt: this.now(),
-        completedAt: this.now(),
-        error: runtimeError,
-      })
-      this.updateSessionState(session.sessionId, 'failed')
-      await this.sessionIndexStore.updateEntry(session.sessionId, {
-        lastMessagePreview: createMessagePreview(runtimeError.message),
-        status: 'failed',
-        updatedAt: this.now(),
-      })
-      this.emit({
-        type: 'turn-failed',
-        agentId: request.agentId,
-        sessionId: request.sessionId,
-        runId,
-        error: runtimeError,
-        occurredAt: this.now(),
-      })
-      this.emit({
-        type: 'runtime-error',
-        agentId: request.agentId,
-        error: runtimeError,
-        occurredAt: this.now(),
-      })
-      throw error
-    } finally {
-      if (this.activeRunIds.get(request.sessionId) === runId) {
-        this.activeRunIds.delete(request.sessionId)
-      }
-    }
+    await this.executePromptRun({
+      agentId: request.agentId,
+      sessionId: request.sessionId,
+      runId,
+      content,
+      session,
+      handle,
+      agentMessage,
+    })
   }
 
   /**
@@ -1771,6 +1514,303 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     return this.executeRetry(request, userMessage.content, session, handle)
   }
 
+
+  /**
+   * 执行一次 Agent prompt 运行的公共核心：流式事件桥接、取消/失败/完成处理、
+   * profile 维护编排与 attempt 持久化。sendMessage 与 retryMessage 共用。
+   *
+   * @param input - 运行所需的会话定位、runId、handle、已建的空 agent 消息等；
+   *   inReplyTo 存在时（重试场景）会写入 attempt 与完成消息。
+   * @returns 无返回值。
+   * @throws 当 SDK 调用失败（非取消）时，Promise 会 reject。
+   */
+  private async executePromptRun(input: {
+    agentId: AgentId
+    sessionId: string
+    runId: string
+    content: string
+    session: AgentSessionSummary
+    handle: PiSdkSessionHandle
+    agentMessage: InternalMessage
+    inReplyTo?: string
+  }): Promise<void> {
+    const { agentId, sessionId, runId, content, session, handle, agentMessage } =
+      input
+    const inReplyToPatch = input.inReplyTo
+      ? { inReplyTo: input.inReplyTo }
+      : {}
+    try {
+      const profileStatusBeforeRun = await this.profileStore.ensureDefaultAgentHome()
+      let accumulatedReply = ''
+      let turnIndex = 0
+      // 惰性宣告：收到第一个真实内容事件时才 emit agent message-appended，
+      // 使运行期 delta 能挂到条目上；若未产生任何内容（如立即取消）则不建空条目。
+      let agentEntryAnnounced = false
+      const announceAgentEntry = (): void => {
+        if (agentEntryAnnounced) return
+        agentEntryAnnounced = true
+        this.emit({
+          type: 'message-appended',
+          agentId,
+          message: agentMessage,
+          occurredAt: this.now(),
+        })
+      }
+      const agentReply = await handle.prompt(content, {
+        onEvent: (event) => {
+          if (event.type === 'thinking-started') {
+            announceAgentEntry()
+            this.emit({
+              type: 'activity-updated',
+              agentId,
+              sessionId,
+              runId,
+              activity: mapPiSdkStreamEventToActivity(event),
+              occurredAt: this.now(),
+            })
+            return
+          }
+
+          if (event.type === 'thinking-delta') {
+            announceAgentEntry()
+            this.emit({
+              type: 'message-delta',
+              agentId,
+              sessionId,
+              runId,
+              messageId: agentMessage.messageId,
+              delta: event.delta,
+              deltaKind: 'thinking',
+              occurredAt: this.now(),
+            })
+            return
+          }
+
+          if (event.type === 'text-delta') {
+            announceAgentEntry()
+            accumulatedReply += event.delta
+            this.messageStore.appendDelta(agentMessage.messageId, event.delta)
+            this.emit({
+              type: 'message-delta',
+              agentId,
+              sessionId,
+              runId,
+              messageId: agentMessage.messageId,
+              delta: event.delta,
+              occurredAt: this.now(),
+            })
+            return
+          }
+
+          if (event.type === 'turn-started') {
+            this.emit({
+              type: 'turn-started',
+              agentId,
+              sessionId,
+              runId,
+              turnIndex,
+              occurredAt: this.now(),
+            })
+            return
+          }
+
+          if (event.type === 'turn-ended') {
+            this.emit({
+              type: 'turn-ended',
+              agentId,
+              sessionId,
+              runId,
+              turnIndex,
+              message: event.message,
+              toolResults: event.toolResults,
+              occurredAt: this.now(),
+            })
+            turnIndex++
+            return
+          }
+
+          // tool-started / tool-completed / tool-failed
+          announceAgentEntry()
+          this.emit({
+            type: 'activity-updated',
+            agentId,
+            sessionId,
+            runId,
+            activity: mapPiSdkStreamEventToActivity(event),
+            occurredAt: this.now(),
+          })
+        },
+      })
+
+      if (this.activeRunIds.get(sessionId) !== runId) {
+        this.messageStore.removeIfEmpty(agentMessage.messageId)
+        await this.sessionIndexStore.upsertAttempt(sessionId, {
+          attemptId: runId,
+          runId,
+          messageId: agentMessage.messageId,
+          status: 'cancelled',
+          startedAt: this.now(),
+          completedAt: this.now(),
+          ...inReplyToPatch,
+        })
+        this.updateSessionState(session.sessionId, 'cancelled')
+        await this.sessionIndexStore.updateEntry(session.sessionId, {
+          status: 'cancelled',
+          updatedAt: this.now(),
+        })
+        return
+      }
+
+      if (!accumulatedReply && agentReply?.trim()) {
+        accumulatedReply = agentReply.trim()
+        this.messageStore.appendDelta(agentMessage.messageId, accumulatedReply)
+        this.emit({
+          type: 'message-delta',
+          agentId,
+          sessionId,
+          runId,
+          messageId: agentMessage.messageId,
+          delta: accumulatedReply,
+          occurredAt: this.now(),
+        })
+      }
+
+      const completedMessage = this.messageStore.complete(agentMessage.messageId)
+      this.emit({
+        type: 'message-completed',
+        agentId,
+        sessionId,
+        runId,
+        message: completedMessage,
+        occurredAt: this.now(),
+      })
+      this.emit({
+        type: 'message-appended',
+        agentId,
+        message: completedMessage,
+        occurredAt: this.now(),
+        ...inReplyToPatch,
+      })
+      const profileStatusAfterMainReply = await this.emitProfileUpdateEvents(
+        profileStatusBeforeRun,
+        {
+          agentId,
+          sessionId,
+        },
+      )
+
+      if (profileStatusBeforeRun.initialized) {
+        await this.runProfileMaintenanceTurn({
+          agentId,
+          sessionId,
+          handle,
+          userContent: content,
+          agentContent: completedMessage.content,
+          profileStatus: profileStatusAfterMainReply,
+        })
+      } else {
+        await this.profileStore.performBootstrapCompletionGating()
+      }
+
+      // profile 变化点：本回合可能写入 soul/user 或完成 bootstrap，
+      // 若状态发生变化则刷新系统提示词上下文。
+      const profileStatusAfterRun = await this.profileStore.ensureDefaultAgentHome()
+      if (
+        profileStatusAfterRun.initialized !==
+          profileStatusBeforeRun.initialized ||
+        profileStatusAfterRun.soulUpdatedAt !==
+          profileStatusBeforeRun.soulUpdatedAt ||
+        profileStatusAfterRun.userUpdatedAt !==
+          profileStatusBeforeRun.userUpdatedAt
+      ) {
+        await this.refreshAgentProfileContext(agentId)
+      }
+
+      await this.sessionIndexStore.upsertAttempt(sessionId, {
+        attemptId: runId,
+        runId,
+        messageId: agentMessage.messageId,
+        status: 'completed',
+        startedAt: this.now(),
+        completedAt: this.now(),
+        ...inReplyToPatch,
+      })
+      this.updateSessionState(session.sessionId, 'completed')
+      await this.sessionIndexStore.updateEntry(session.sessionId, {
+        lastMessagePreview: createMessagePreview(completedMessage.content),
+        status: 'completed',
+        updatedAt: this.now(),
+      })
+    } catch (error) {
+      if (isAbortError(error) || !this.activeRunIds.has(sessionId)) {
+        this.messageStore.removeIfEmpty(agentMessage.messageId)
+        await this.sessionIndexStore.upsertAttempt(sessionId, {
+          attemptId: runId,
+          runId,
+          messageId: agentMessage.messageId,
+          status: 'cancelled',
+          startedAt: this.now(),
+          completedAt: this.now(),
+          ...inReplyToPatch,
+        })
+        this.updateSessionState(session.sessionId, 'cancelled')
+        await this.sessionIndexStore.updateEntry(session.sessionId, {
+          status: 'cancelled',
+          updatedAt: this.now(),
+        })
+        this.emit({
+          type: 'turn-cancelled',
+          agentId,
+          sessionId,
+          runId,
+          occurredAt: this.now(),
+        })
+        return
+      }
+
+      const runtimeError = {
+        code: 'unknown' as const,
+        message: sanitizeErrorMessage(error),
+        recoverable: true,
+      }
+      this.messageStore.removeIfEmpty(agentMessage.messageId)
+      await this.sessionIndexStore.upsertAttempt(sessionId, {
+        attemptId: runId,
+        runId,
+        messageId: agentMessage.messageId,
+        status: 'failed',
+        startedAt: this.now(),
+        completedAt: this.now(),
+        error: runtimeError,
+        ...inReplyToPatch,
+      })
+      this.updateSessionState(session.sessionId, 'failed')
+      await this.sessionIndexStore.updateEntry(session.sessionId, {
+        lastMessagePreview: createMessagePreview(runtimeError.message),
+        status: 'failed',
+        updatedAt: this.now(),
+      })
+      this.emit({
+        type: 'turn-failed',
+        agentId,
+        sessionId,
+        runId,
+        error: runtimeError,
+        occurredAt: this.now(),
+      })
+      this.emit({
+        type: 'runtime-error',
+        agentId,
+        error: runtimeError,
+        occurredAt: this.now(),
+      })
+      throw error
+    } finally {
+      if (this.activeRunIds.get(sessionId) === runId) {
+        this.activeRunIds.delete(sessionId)
+      }
+    }
+  }
   /**
    * 执行重试核心逻辑：创建新 InternalMessage 和 ExecutionAttempt，
    * 发送与原始用户请求相同的 prompt。
@@ -1831,277 +1871,16 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       occurredAt: now,
     })
 
-    try {
-      const profileStatusBeforeRun = await this.profileStore.ensureDefaultAgentHome()
-      let accumulatedReply = ''
-      let turnIndex = 0
-      // 与主流程一致的惰性宣告：首个真实内容事件到达时才 emit agent message-appended。
-      let agentEntryAnnounced = false
-      const announceAgentEntry = (): void => {
-        if (agentEntryAnnounced) return
-        agentEntryAnnounced = true
-        this.emit({
-          type: 'message-appended',
-          agentId: request.agentId,
-          message: agentMessage,
-          occurredAt: this.now(),
-        })
-      }
-
-      const agentReply = await handle.prompt(content, {
-        onEvent: (event) => {
-          if (event.type === 'thinking-started') {
-            announceAgentEntry()
-            this.emit({
-              type: 'activity-updated',
-              agentId: request.agentId,
-              sessionId: request.sessionId,
-              runId,
-              activity: mapPiSdkStreamEventToActivity(event),
-              occurredAt: this.now(),
-            })
-            return
-          }
-
-          if (event.type === 'thinking-delta') {
-            announceAgentEntry()
-            this.emit({
-              type: 'message-delta',
-              agentId: request.agentId,
-              sessionId: request.sessionId,
-              runId,
-              messageId: agentMessage.messageId,
-              delta: event.delta,
-              deltaKind: 'thinking',
-              occurredAt: this.now(),
-            })
-            return
-          }
-
-          if (event.type === 'text-delta') {
-            announceAgentEntry()
-            accumulatedReply += event.delta
-            this.messageStore.appendDelta(agentMessage.messageId, event.delta)
-            this.emit({
-              type: 'message-delta',
-              agentId: request.agentId,
-              sessionId: request.sessionId,
-              runId,
-              messageId: agentMessage.messageId,
-              delta: event.delta,
-              occurredAt: this.now(),
-            })
-            return
-          }
-
-          if (event.type === 'turn-started') {
-            this.emit({
-              type: 'turn-started',
-              agentId: request.agentId,
-              sessionId: request.sessionId,
-              runId,
-              turnIndex,
-              occurredAt: this.now(),
-            })
-            return
-          }
-
-          if (event.type === 'turn-ended') {
-            this.emit({
-              type: 'turn-ended',
-              agentId: request.agentId,
-              sessionId: request.sessionId,
-              runId,
-              turnIndex,
-              message: event.message,
-              toolResults: event.toolResults,
-              occurredAt: this.now(),
-            })
-            turnIndex++
-            return
-          }
-
-          announceAgentEntry()
-          this.emit({
-            type: 'activity-updated',
-            agentId: request.agentId,
-            sessionId: request.sessionId,
-            runId,
-            activity: mapPiSdkStreamEventToActivity(event),
-            occurredAt: this.now(),
-          })
-        },
-      })
-
-      if (this.activeRunIds.get(request.sessionId) !== runId) {
-        this.messageStore.removeIfEmpty(agentMessage.messageId)
-        await this.sessionIndexStore.upsertAttempt(request.sessionId, {
-          attemptId: runId,
-          runId,
-          messageId: agentMessage.messageId,
-          status: 'cancelled',
-          startedAt: this.now(),
-          completedAt: this.now(),
-          inReplyTo: request.userMessageId,
-        })
-        this.updateSessionState(session.sessionId, 'cancelled')
-        await this.sessionIndexStore.updateEntry(session.sessionId, {
-          status: 'cancelled',
-          updatedAt: this.now(),
-        })
-        return
-      }
-
-      if (!accumulatedReply && agentReply?.trim()) {
-        accumulatedReply = agentReply.trim()
-        this.messageStore.appendDelta(agentMessage.messageId, accumulatedReply)
-        this.emit({
-          type: 'message-delta',
-          agentId: request.agentId,
-          sessionId: request.sessionId,
-          runId,
-          messageId: agentMessage.messageId,
-          delta: accumulatedReply,
-          occurredAt: this.now(),
-        })
-      }
-
-      const completedMessage = this.messageStore.complete(agentMessage.messageId)
-      this.emit({
-        type: 'message-completed',
-        agentId: request.agentId,
-        sessionId: request.sessionId,
-        runId,
-        message: completedMessage,
-        occurredAt: this.now(),
-      })
-      this.emit({
-        type: 'message-appended',
-        agentId: request.agentId,
-        message: completedMessage,
-        inReplyTo: request.userMessageId,
-        occurredAt: this.now(),
-      })
-
-      const profileStatusAfterMainReply = await this.emitProfileUpdateEvents(
-        profileStatusBeforeRun,
-        {
-          agentId: request.agentId,
-          sessionId: request.sessionId,
-        },
-      )
-
-      if (profileStatusBeforeRun.initialized) {
-        await this.runProfileMaintenanceTurn({
-          agentId: request.agentId,
-          sessionId: request.sessionId,
-          handle,
-          userContent: content,
-          agentContent: completedMessage.content,
-          profileStatus: profileStatusAfterMainReply,
-        })
-      } else {
-        await this.profileStore.performBootstrapCompletionGating()
-      }
-
-      // profile 变化点：本回合可能写入 soul/user 或完成 bootstrap，
-      // 若状态发生变化则刷新系统提示词上下文。
-      const profileStatusAfterRun = await this.profileStore.ensureDefaultAgentHome()
-      if (
-        profileStatusAfterRun.initialized !==
-          profileStatusBeforeRun.initialized ||
-        profileStatusAfterRun.soulUpdatedAt !==
-          profileStatusBeforeRun.soulUpdatedAt ||
-        profileStatusAfterRun.userUpdatedAt !==
-          profileStatusBeforeRun.userUpdatedAt
-      ) {
-        await this.refreshAgentProfileContext(request.agentId)
-      }
-
-      await this.sessionIndexStore.upsertAttempt(request.sessionId, {
-        attemptId: runId,
-        runId,
-        messageId: agentMessage.messageId,
-        status: 'completed',
-        startedAt: this.now(),
-        completedAt: this.now(),
-        inReplyTo: request.userMessageId,
-      })
-      this.updateSessionState(session.sessionId, 'completed')
-      await this.sessionIndexStore.updateEntry(session.sessionId, {
-        lastMessagePreview: createMessagePreview(completedMessage.content),
-        status: 'completed',
-        updatedAt: this.now(),
-      })
-    } catch (error) {
-      if (isAbortError(error) || !this.activeRunIds.has(request.sessionId)) {
-        this.messageStore.removeIfEmpty(agentMessage.messageId)
-        await this.sessionIndexStore.upsertAttempt(request.sessionId, {
-          attemptId: runId,
-          runId,
-          messageId: agentMessage.messageId,
-          status: 'cancelled',
-          startedAt: this.now(),
-          completedAt: this.now(),
-          inReplyTo: request.userMessageId,
-        })
-        this.updateSessionState(session.sessionId, 'cancelled')
-        await this.sessionIndexStore.updateEntry(session.sessionId, {
-          status: 'cancelled',
-          updatedAt: this.now(),
-        })
-        this.emit({
-          type: 'turn-cancelled',
-          agentId: request.agentId,
-          sessionId: request.sessionId,
-          runId,
-          occurredAt: this.now(),
-        })
-        return
-      }
-
-      const runtimeError = {
-        code: 'unknown' as const,
-        message: sanitizeErrorMessage(error),
-        recoverable: true,
-      }
-      this.messageStore.removeIfEmpty(agentMessage.messageId)
-      await this.sessionIndexStore.upsertAttempt(request.sessionId, {
-        attemptId: runId,
-        runId,
-        messageId: agentMessage.messageId,
-        status: 'failed',
-        startedAt: this.now(),
-        completedAt: this.now(),
-        error: runtimeError,
-        inReplyTo: request.userMessageId,
-      })
-      this.updateSessionState(session.sessionId, 'failed')
-      await this.sessionIndexStore.updateEntry(session.sessionId, {
-        lastMessagePreview: createMessagePreview(runtimeError.message),
-        status: 'failed',
-        updatedAt: this.now(),
-      })
-      this.emit({
-        type: 'turn-failed',
-        agentId: request.agentId,
-        sessionId: request.sessionId,
-        runId,
-        error: runtimeError,
-        occurredAt: this.now(),
-      })
-      this.emit({
-        type: 'runtime-error',
-        agentId: request.agentId,
-        error: runtimeError,
-        occurredAt: this.now(),
-      })
-      throw error
-    } finally {
-      if (this.activeRunIds.get(request.sessionId) === runId) {
-        this.activeRunIds.delete(request.sessionId)
-      }
-    }
+    await this.executePromptRun({
+      agentId: request.agentId,
+      sessionId: request.sessionId,
+      runId,
+      content,
+      session,
+      handle,
+      agentMessage,
+      inReplyTo: request.userMessageId,
+    })
   }
 
   /**
