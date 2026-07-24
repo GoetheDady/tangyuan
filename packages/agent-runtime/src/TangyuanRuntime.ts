@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- TODO: 按职责拆分为 session / transcript 等模块 */
+/* eslint-disable max-lines -- 已抽出 9 个可独测深 module（快照/会话缓存/Agent/Skill/身份/模型/三类审批登记表/网关工厂）；剩余为运行调度（activeRunIds/runQueue/sendMessage/cancelRun）与事件路由（applyAgentEvent）等不可再拆的编排核心。 */
 import type {
   AgentEvent,
   AgentEventListener,
@@ -12,7 +12,7 @@ import { TranscriptEmitter } from './transcript-emitter'
 import { BashApprovalRegistry } from './bash-approval-registry'
 import { ClarificationRegistry } from './clarification-registry'
 import { SessionCache } from './session-cache'
-import { validateFilePath } from './file-path-guard'
+import { createToolApprovalGateway } from './tool-approval-gateway'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
 import { AgentManager } from './agent-manager'
 import { SkillService } from './skill-service'
@@ -845,49 +845,12 @@ class DefaultTangyuanRuntime {
    * @throws 此方法不会主动抛出错误。
    */
   createToolApprovalGateway(): ToolApprovalGateway {
-    return {
-      requestBashApproval: async (params) => {
-        // bash 工具在 session 建立时构造，那时还没有 runId；
-        // 真正执行时一定处于某个 active run 内，用它补齐。
-        const runId =
-          params.runId || this.activeRunIds.get(params.sessionId) || ''
-        const request: BashApprovalRequest = {
-          approvalId: crypto.randomUUID(),
-          agentId: params.agentId,
-          sessionId: params.sessionId,
-          runId,
-          command: params.command,
-          cwd: params.cwd,
-          riskDescription: params.riskDescription,
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-        }
-
-        return this.bashApprovals.register(request)
-      },
-
-      validateFilePath: (params) => {
-        return validateFilePath(params)
-      },
-
-      requestClarification: async (params) => {
-        const runId =
-          params.runId || this.activeRunIds.get(params.sessionId) || ''
-        const request: QuestionClarificationRequest = {
-          clarificationId: crypto.randomUUID(),
-          agentId: params.agentId,
-          sessionId: params.sessionId,
-          runId,
-          question: params.question,
-          options: params.options,
-          allowCustomAnswer: params.allowCustomAnswer,
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-        }
-
-        return this.clarifications.register(request)
-      },
-    }
+    return createToolApprovalGateway({
+      bashApprovals: this.bashApprovals,
+      clarifications: this.clarifications,
+      resolveRunId: (sessionId) => this.activeRunIds.get(sessionId) || '',
+      now: () => new Date().toISOString(),
+    })
   }
 
   /**
