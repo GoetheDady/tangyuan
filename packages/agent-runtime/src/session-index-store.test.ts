@@ -145,6 +145,28 @@ describe('SessionIndexStore.upsertAttempt', () => {
     expect(attempts[0]?.attemptId).toBe('a5')
     expect(attempts[19]?.attemptId).toBe('a24')
   })
+
+  it('写盘后重读仍可取得 attempts', async () => {
+    const store = await makeStore()
+    store.addSession(makeEntry())
+
+    await store.upsertAttempt('s1', {
+      attemptId: 'a1',
+      runId: 'r1',
+      messageId: 'm1',
+      status: 'failed',
+      startedAt: 'now',
+      completedAt: 'later',
+    })
+
+    // 新 store 加载同一份磁盘索引
+    const store2 = await makeStore()
+    await store2.load()
+    const attempts = store2.getAttempts('s1')
+    expect(attempts).toHaveLength(1)
+    expect(attempts[0]?.attemptId).toBe('a1')
+    expect(attempts[0]?.status).toBe('failed')
+  })
 })
 
 describe('SessionIndexStore.load 重建', () => {

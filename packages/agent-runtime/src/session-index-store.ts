@@ -461,6 +461,8 @@ export class SessionIndexStore {
       return []
     }
 
+    const attempts = Array.isArray(entry.attempts) ? entry.attempts : undefined
+
     return [
       {
         sessionId: entry.sessionId,
@@ -473,6 +475,7 @@ export class SessionIndexStore {
         agentId: entry.agentId,
         lastMessagePreview: entry.lastMessagePreview,
         status: entry.status,
+        attempts,
       },
     ]
   }
