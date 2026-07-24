@@ -15,6 +15,7 @@ import { SkillApprovalRegistry } from './skill-approval-registry'
 import { SessionCache } from './session-cache'
 import { validateFilePath } from './file-path-guard'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
+import { AgentManager } from './agent-manager'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
@@ -85,6 +86,7 @@ class DefaultTangyuanRuntime {
   private readonly activeRunIds = new Map<string, string>()
   private readonly transcriptEmitter: TranscriptEmitter
   private readonly snapshotStore: RuntimeSnapshotStore
+  private readonly agentManager: AgentManager
   private readonly sessionCache = new SessionCache()
   private runQueue: Array<{
     request: SendMessageRequest
@@ -107,6 +109,10 @@ class DefaultTangyuanRuntime {
     this.transcriptEmitter = new TranscriptEmitter(this.emit.bind(this))
     this.snapshotStore = new RuntimeSnapshotStore({
       runtimeDriver: dependencies.runtimeDriver,
+    })
+    this.agentManager = new AgentManager({
+      sessionDriver: dependencies.sessionDriver,
+      snapshotStore: this.snapshotStore,
     })
     const emit = this.emit.bind(this)
     const now = () => new Date().toISOString()
@@ -234,8 +240,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 RuntimeResourceDriver 读取配置失败时，Promise 会 reject。
    */
   async listAgents(): Promise<AgentSummary[]> {
-    const snapshot = await this.snapshotStore.getOrLoad()
-    return snapshot.agents
+    return this.agentManager.list()
   }
 
   /**
@@ -246,13 +251,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 AgentSessionDriver 不支持创建或创建失败时，Promise 会 reject。
    */
   async createAgent(displayName: string): Promise<AgentSummary> {
-    if (!this.sessionDriver.createAgent) {
-      throw new Error('当前运行时不支持创建 Agent。')
-    }
-    const summary = await this.sessionDriver.createAgent(displayName)
-    // 刷新运行时快照以包含新 Agent
-    await this.snapshotStore.reload()
-    return summary
+    return this.agentManager.create(displayName)
   }
 
   /**
@@ -265,25 +264,7 @@ class DefaultTangyuanRuntime {
   async updateAgentConfig(
     request: UpdateAgentConfigRequest,
   ): Promise<AgentSummary> {
-    if (!this.sessionDriver.updateAgentConfig) {
-      throw new Error('当前运行时不支持更新 Agent 配置。')
-    }
-
-    const summary = await this.sessionDriver.updateAgentConfig(
-      request.agentId,
-      {
-        ...(request.defaultProviderId !== undefined
-          ? { defaultProviderId: request.defaultProviderId }
-          : {}),
-        ...(request.defaultModelId !== undefined
-          ? { defaultModelId: request.defaultModelId }
-          : {}),
-      },
-    )
-
-    // 刷新运行时快照以反映配置变更
-    await this.snapshotStore.reload()
-    return summary
+    return this.agentManager.updateConfig(request)
   }
 
   /**
@@ -294,13 +275,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 AgentSessionDriver 不支持或归档失败时，Promise 会 reject。
    */
   async archiveAgent(agentId: string): Promise<AgentSummary> {
-    if (!this.sessionDriver.archiveAgent) {
-      throw new Error('当前运行时不支持归档 Agent。')
-    }
-
-    const summary = await this.sessionDriver.archiveAgent(agentId)
-    await this.snapshotStore.reload()
-    return summary
+    return this.agentManager.archive(agentId)
   }
 
   /**
@@ -311,13 +286,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 AgentSessionDriver 不支持或恢复失败时，Promise 会 reject。
    */
   async recoverAgent(agentId: string): Promise<AgentSummary> {
-    if (!this.sessionDriver.recoverAgent) {
-      throw new Error('当前运行时不支持恢复 Agent。')
-    }
-
-    const summary = await this.sessionDriver.recoverAgent(agentId)
-    await this.snapshotStore.reload()
-    return summary
+    return this.agentManager.recover(agentId)
   }
 
   /**
@@ -330,11 +299,7 @@ class DefaultTangyuanRuntime {
     agents: AgentSummary[]
     unclaimedDirectories: import('@tangyuan/contracts').UnclaimedDirectory[]
   }> {
-    if (!this.sessionDriver.reconcileAgentDirectories) {
-      throw new Error('当前运行时不支持目录对账。')
-    }
-
-    return this.sessionDriver.reconcileAgentDirectories()
+    return this.agentManager.reconcileDirectories()
   }
 
   /**
@@ -349,16 +314,7 @@ class DefaultTangyuanRuntime {
     agentId: string,
     displayName: string,
   ): Promise<AgentSummary> {
-    if (!this.sessionDriver.claimAgentDirectory) {
-      throw new Error('当前运行时不支持认领 Agent 目录。')
-    }
-
-    const summary = await this.sessionDriver.claimAgentDirectory(
-      agentId,
-      displayName,
-    )
-    await this.snapshotStore.reload()
-    return summary
+    return this.agentManager.claimDirectory(agentId, displayName)
   }
 
   /**
@@ -368,13 +324,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 AgentSessionDriver 不支持或重建失败时，Promise 会 reject。
    */
   async rebuildTangyuanHome(): Promise<AgentSummary> {
-    if (!this.sessionDriver.rebuildTangyuanHome) {
-      throw new Error('当前运行时不支持重建汤圆目录。')
-    }
-
-    const summary = await this.sessionDriver.rebuildTangyuanHome()
-    await this.snapshotStore.reload()
-    return summary
+    return this.agentManager.rebuildTangyuanHome()
   }
 
   /**
