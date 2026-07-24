@@ -3753,6 +3753,289 @@ describe('PiSdkDriver', () => {
     expect(content).not.toContain('my-secret-pwd')
     expect(content).toContain('[已隐藏敏感凭据]')
   })
+
+  it('retry：完成后持久化带 inReplyTo 的 completed attempt', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+    const events: AgentEvent[] = []
+    driver.subscribe((event) => events.push(event))
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '你好',
+    })
+
+    const userMessageId = `${session.sessionId}-message-1`
+    await driver.retryMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      userMessageId,
+    })
+
+    await expect(
+      driver.listSessions({ agentId: 'tangyuan' }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        sessionId: session.sessionId,
+        state: 'completed',
+      }),
+    ])
+    // retry 完成会 emit attempt-started 与带 inReplyTo 的 message-appended
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'attempt-started' }),
+        expect.objectContaining({
+          type: 'message-appended',
+          inReplyTo: userMessageId,
+        }),
+      ]),
+    )
+    // retry 用原始用户消息内容再次 prompt
+    expect(gateway.sessionHandles[0]?.prompts).toEqual(['你好', '你好'])
+  })
+
+  it('retry：运行中取消保留部分内容并置为 cancelled', async () => {
+    let promptCount = 0
+    const runStarted = createDeferred<void>()
+    const releasePrompt = createDeferred<void>()
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
+          prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
+            handle.prompts.push(prompt)
+            promptCount++
+            if (promptCount === 1) {
+              options?.onEvent?.({ type: 'text-delta', delta: '首条' })
+              return '首条'
+            }
+            options?.onEvent?.({ type: 'text-delta', delta: '部分' })
+            runStarted.resolve()
+            await releasePrompt.promise
+            return '部分'
+          },
+          abort: async () => {
+            releasePrompt.resolve()
+          },
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+        return handle
+      },
+    })
+    const { driver } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '你好',
+    })
+
+    const retryPromise = driver.retryMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      userMessageId: `${session.sessionId}-message-1`,
+    })
+    await runStarted.promise
+    await driver.cancelRun({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+    })
+
+    await expect(retryPromise).resolves.toBeUndefined()
+    await expect(
+      driver.listSessions({ agentId: 'tangyuan' }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        sessionId: session.sessionId,
+        state: 'cancelled',
+      }),
+    ])
+  })
+
+  it('retry：SDK 调用失败时置为 failed 并 reject', async () => {
+    let promptCount = 0
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
+          prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
+            handle.prompts.push(prompt)
+            promptCount++
+            if (promptCount === 1) {
+              options?.onEvent?.({ type: 'text-delta', delta: '首条' })
+              return '首条'
+            }
+            throw new Error('retry provider failed')
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+        return handle
+      },
+    })
+    const { driver } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '你好',
+    })
+
+    const userMessageId = `${session.sessionId}-message-1`
+    const failEvents: AgentEvent[] = []
+    driver.subscribe((event) => failEvents.push(event))
+    await expect(
+      driver.retryMessage({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+        userMessageId,
+      }),
+    ).rejects.toThrow('retry provider failed')
+
+    await expect(
+      driver.listSessions({ agentId: 'tangyuan' }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        sessionId: session.sessionId,
+        state: 'failed',
+      }),
+    ])
+    expect(failEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'turn-failed' }),
+        expect.objectContaining({ type: 'runtime-error' }),
+      ]),
+    )
+  })
+
+  it('retry：找不到原始用户消息时 reject', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '你好',
+    })
+
+    await expect(
+      driver.retryMessage({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+        userMessageId: 'does-not-exist',
+      }),
+    ).rejects.toThrow('找不到要重试的原始用户消息')
+  })
+
+  it('retry：会话正在运行时拒绝', async () => {
+    const runStarted = createDeferred<void>()
+    const releasePrompt = createDeferred<void>()
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle = {
+          prompts: [] as string[],
+          systemPromptContexts: [] as string[],
+          setSystemPromptContext(context: string) {
+            this.systemPromptContexts.push(context)
+          },
+          prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
+            handle.prompts.push(prompt)
+            options?.onEvent?.({ type: 'text-delta', delta: '部分' })
+            runStarted.resolve()
+            await releasePrompt.promise
+            return '部分'
+          },
+          abort: async () => {
+            releasePrompt.resolve()
+          },
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        gateway.sessionHandles.push(handle)
+        return handle
+      },
+    })
+    const { driver } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '新会话',
+    })
+    const sendPromise = driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '你好',
+    })
+    await runStarted.promise
+
+    await expect(
+      driver.retryMessage({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+        userMessageId: `${session.sessionId}-message-1`,
+      }),
+    ).rejects.toThrow('当前会话正在运行')
+
+    await driver.cancelRun({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+    })
+    await expect(sendPromise).resolves.toBeUndefined()
+  })
 })
 
 async function createDriver(
