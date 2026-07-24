@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- TODO: 按职责拆分为 session-driver / gateway / transcript 等模块 */
 import {
-  copyFile,
   mkdir,
   readFile,
   rename,
@@ -21,6 +20,13 @@ import { DirectoryLayout } from './directory-layout'
 import { ConfigStore } from './config-store'
 import { AgentRegistry } from './agent-registry'
 import { SkillStore } from './skill-store'
+import { ProfileStore } from './profile-store'
+import type {
+  AgentHomeStatus,
+  ProfileMaintenanceFileSnapshot,
+  ProfileMaintenanceSnapshot,
+  ProfileMaintenanceTarget,
+} from './profile-store'
 import { AgentRuntimeError } from './errors'
 import {
   isAbortError,
@@ -31,8 +37,6 @@ import {
   extractAgentRuntimeConfig,
   pathExists,
   safeReadFile,
-  readDirectoryFileSet,
-  fileHasContent,
   getMtimeIso,
   isNotFoundError,
 } from './utils'
@@ -160,11 +164,6 @@ export function createTangyuanRuntime(
  * 描述 Pi SDK 临时配置验证时使用的固定 prompt。
  */
 const CONFIGURATION_VERIFICATION_PROMPT = 'Reply with OK.'
-
-/**
- * 默认 Agent profile 注入到 Pi SDK prompt 时使用的分隔标题。
- */
-const PROFILE_CONTEXT_HEADER = '汤圆长期上下文'
 
 /**
  * 描述 Pi SDK 验证配置时需要的参数。
@@ -537,34 +536,6 @@ export interface PersistedSessionIndexEntry {
  */
 export interface PersistedSessionIndex {
   sessions: PersistedSessionIndexEntry[]
-}
-
-/**
- * 描述默认 Agent Home 中 profile/bootstrap 文件的当前状态。
- */
-interface AgentHomeStatus {
-  initialized: boolean
-  bootstrapRequired: boolean
-  bootstrapFileExists: boolean
-  soulFileExists: boolean
-  userFileExists: boolean
-  soulUpdatedAt: string | null
-  userUpdatedAt: string | null
-}
-
-type ProfileMaintenanceTarget = 'soul' | 'user'
-
-interface ProfileMaintenanceFileSnapshot {
-  target: ProfileMaintenanceTarget
-  path: string
-  historyPath: string
-  content: string
-  historyFiles: Set<string>
-}
-
-interface ProfileMaintenanceSnapshot {
-  soul: ProfileMaintenanceFileSnapshot
-  user: ProfileMaintenanceFileSnapshot
 }
 
 /**
@@ -1031,6 +1002,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private readonly configStore: ConfigStore
   private readonly agentRegistry: AgentRegistry
   private readonly skillStore: SkillStore
+  private readonly profileStore: ProfileStore
   private readonly gateway: PiSdkGateway
   private readonly encryptionAdapter: ConfigEncryptionAdapter | null
   private readonly listeners = new Set<AgentEventListener>()
@@ -1077,6 +1049,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     })
     this.skillStore = new SkillStore({
       layout: this.layout,
+      now: this.now,
+    })
+    this.profileStore = new ProfileStore({
+      layout: this.layout,
+      configStore: this.configStore,
       now: this.now,
     })
     this.toolApprovalGateway = options.toolApprovalGateway
@@ -1276,7 +1253,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     // 身份上下文走系统提示词：建会话时注入并 reload 使其生效。
     if (handle.setSystemPromptContext) {
       handle.setSystemPromptContext(
-        await this.buildProfileSystemPromptContext(request.agentId),
+        await this.profileStore.buildSystemPromptContext(request.agentId),
       )
       await handle.reload?.()
     }
@@ -1452,7 +1429,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     })
 
     try {
-      const profileStatusBeforeRun = await this.ensureDefaultAgentHome()
+      const profileStatusBeforeRun = await this.profileStore.ensureDefaultAgentHome()
       let accumulatedReply = ''
       let turnIndex = 0
       // 惰性宣告：收到第一个真实内容事件时才 emit agent message-appended，
@@ -1619,12 +1596,12 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
           profileStatus: profileStatusAfterMainReply,
         })
       } else {
-        await this.performBootstrapCompletionGating()
+        await this.profileStore.performBootstrapCompletionGating()
       }
 
       // profile 变化点：本回合可能写入 soul/user 或完成 bootstrap，
       // 若状态发生变化则刷新系统提示词上下文。
-      const profileStatusAfterRun = await this.ensureDefaultAgentHome()
+      const profileStatusAfterRun = await this.profileStore.ensureDefaultAgentHome()
       if (
         profileStatusAfterRun.initialized !==
           profileStatusBeforeRun.initialized ||
@@ -1875,7 +1852,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     })
 
     try {
-      const profileStatusBeforeRun = await this.ensureDefaultAgentHome()
+      const profileStatusBeforeRun = await this.profileStore.ensureDefaultAgentHome()
       let accumulatedReply = ''
       let turnIndex = 0
       // 与主流程一致的惰性宣告：首个真实内容事件到达时才 emit agent message-appended。
@@ -2035,12 +2012,12 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
           profileStatus: profileStatusAfterMainReply,
         })
       } else {
-        await this.performBootstrapCompletionGating()
+        await this.profileStore.performBootstrapCompletionGating()
       }
 
       // profile 变化点：本回合可能写入 soul/user 或完成 bootstrap，
       // 若状态发生变化则刷新系统提示词上下文。
-      const profileStatusAfterRun = await this.ensureDefaultAgentHome()
+      const profileStatusAfterRun = await this.profileStore.ensureDefaultAgentHome()
       if (
         profileStatusAfterRun.initialized !==
           profileStatusBeforeRun.initialized ||
@@ -2162,7 +2139,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当文件系统访问失败时，Promise 会 reject。
    */
   private async readRuntimeSnapshot(): Promise<RuntimeSnapshot> {
-    const homeStatus = await this.ensureDefaultAgentHome()
+    const homeStatus = await this.profileStore.ensureDefaultAgentHome()
     const [readResult, resources] = await Promise.all([
       this.configStore.read(),
       this.gateway.listProvidersAndModels(),
@@ -2340,15 +2317,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当文件读取失败时，Promise 会 reject。
    */
   async getSoul(agentId: AgentId): Promise<SoulContent> {
-    const soulPath = this.layout.soul(agentId)
-
-    // 确保 agent home 目录和 soul 文件存在
-    await this.ensureAgentHome(agentId)
-
-    const content = await safeReadFile(soulPath)
-    const updatedAt = (await getMtimeIso(soulPath)) ?? this.now()
-
-    return { agentId, content, updatedAt }
+    return this.profileStore.readSoul(agentId)
   }
 
   /**
@@ -2358,25 +2327,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当文件读取失败时，Promise 会 reject。
    */
   async getUserProfile(): Promise<UserProfileContent> {
-    const userPath = this.layout.userProfile()
-
-    // 若共享 user.md 不存在，尝试从旧路径迁移
-    if (!(await pathExists(userPath))) {
-      await this.migrateLegacyUserProfile()
-    }
-
-    // 确保共享 profile 目录和文件存在
-    await mkdir(this.layout.sharedProfile(), { recursive: true })
-    await mkdir(this.layout.userHistory(), { recursive: true })
-
-    if (!(await pathExists(userPath))) {
-      await writeFile(userPath, '', 'utf8')
-    }
-
-    const content = await safeReadFile(userPath)
-    const updatedAt = (await getMtimeIso(userPath)) ?? this.now()
-
-    return { content, updatedAt }
+    return this.profileStore.readUserProfile()
   }
 
   /**
@@ -2488,68 +2439,21 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     content: string,
     requestedByAgentId: AgentId,
   ): Promise<ProfileMaintenanceResult> {
-    // 权限校验：Agent 只能更新自己的 soul
-    // 汤圆可以在创建时写入其他 Agent 的初始 soul（由 createAgent 调用）
-    if (
-      agentId !== requestedByAgentId &&
-      requestedByAgentId !== TANGYUAN_DEFAULT_AGENT_ID
-    ) {
-      return {
-        target: 'soul',
-        success: false,
-        reason: `Agent "${requestedByAgentId}" 无权修改 Agent "${agentId}" 的 soul。只有 Agent 自身或汤圆可以修改。`,
-      }
-    }
-
-    const soulPath = this.layout.soul(agentId)
-    const historyPath = this.layout.soulHistory(agentId)
-
-    // 确保目录存在
-    await this.ensureAgentHome(agentId)
-
-    // 读取更新前内容
-    const previousContent = (await pathExists(soulPath))
-      ? await safeReadFile(soulPath)
-      : ''
-    const previousHistoryFiles = await readDirectoryFileSet(historyPath)
-
-    // 如果内容没变，跳过
-    if (previousContent === content) {
-      return { target: 'soul', success: true }
-    }
-
-    // 检查是否已备份：非空内容需要至少一个备份文件
-    const hasBackup = previousContent === '' || previousHistoryFiles.size > 0
-
-    if (!hasBackup) {
-      return {
-        target: 'soul',
-        success: false,
-        reason: `更新 soul 失败：缺少更新前备份，请先将旧内容备份到 soul.history/ 目录。`,
-      }
-    }
-
-    // 敏感信息过滤
-    const readResult = await this.configStore.read()
-    const runtimeConfig = readResult.config
-      ? extractAgentRuntimeConfig(readResult.config, agentId)
-      : null
-    const redactedContent = this.redactSensitiveProfileContent(
+    const outcome = await this.profileStore.writeSoul(
+      agentId,
       content,
-      runtimeConfig?.apiKey ?? null,
+      requestedByAgentId,
     )
 
-    // 写入
-    await writeFile(soulPath, redactedContent, 'utf8')
+    // 真正写入文件时才广播事件并刷新该 Agent 会话的系统提示词。
+    if (outcome.written) {
+      const updatedAt =
+        (await getMtimeIso(this.layout.soul(agentId))) ?? this.now()
+      this.emitProfileUpdated('soul', updatedAt)
+      await this.refreshAgentProfileContext(agentId)
+    }
 
-    // 广播事件
-    const updatedAt = (await getMtimeIso(soulPath)) ?? this.now()
-    this.emitProfileUpdated('soul', updatedAt)
-
-    // profile 变化点：设置中修改 soul 后刷新该 Agent 会话的系统提示词。
-    await this.refreshAgentProfileContext(agentId)
-
-    return { target: 'soul', success: true }
+    return outcome.result
   }
 
   /**
@@ -2560,64 +2464,18 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当文件操作失败时，Promise 会 reject。
    */
   async updateUserProfile(content: string): Promise<ProfileMaintenanceResult> {
-    const userPath = this.layout.userProfile()
-    const historyPath = this.layout.userHistory()
+    const outcome = await this.profileStore.writeUserProfile(content)
 
-    // 确保目录存在
-    await mkdir(this.layout.sharedProfile(), { recursive: true })
-    await mkdir(historyPath, { recursive: true })
-
-    // 若共享 user.md 不存在，尝试从旧路径迁移
-    if (!(await pathExists(userPath))) {
-      await this.migrateLegacyUserProfile()
+    // 真正写入文件时才广播事件并刷新全部活跃会话。
+    if (outcome.written) {
+      const updatedAt =
+        (await getMtimeIso(this.layout.userProfile())) ?? this.now()
+      this.emitProfileUpdated('user', updatedAt)
+      // profile 变化点：共享 user.md 影响所有 Agent，刷新全部活跃会话。
+      await this.refreshAllProfileContext()
     }
 
-    // 读取更新前内容
-    const previousContent = (await pathExists(userPath))
-      ? await safeReadFile(userPath)
-      : ''
-    const previousHistoryFiles = await readDirectoryFileSet(historyPath)
-
-    // 如果内容没变，跳过
-    if (previousContent === content) {
-      return { target: 'user', success: true }
-    }
-
-    // 检查是否已备份：非空内容需要至少一个备份文件
-    const hasBackup = previousContent === '' || previousHistoryFiles.size > 0
-
-    if (!hasBackup) {
-      return {
-        target: 'user',
-        success: false,
-        reason: `更新 user profile 失败：缺少更新前备份，请先将旧内容备份到 user.history/ 目录。`,
-      }
-    }
-
-    // 敏感信息过滤
-    const readResult = await this.configStore.read()
-    const runtimeConfig = readResult.config
-      ? extractAgentRuntimeConfig(
-          readResult.config,
-          TANGYUAN_DEFAULT_AGENT_ID,
-        )
-      : null
-    const redactedContent = this.redactSensitiveProfileContent(
-      content,
-      runtimeConfig?.apiKey ?? null,
-    )
-
-    // 写入
-    await writeFile(userPath, redactedContent, 'utf8')
-
-    // 广播事件
-    const updatedAt = (await getMtimeIso(userPath)) ?? this.now()
-    this.emitProfileUpdated('user', updatedAt)
-
-    // profile 变化点：共享 user.md 影响所有 Agent，刷新全部活跃会话。
-    await this.refreshAllProfileContext()
-
-    return { target: 'user', success: true }
+    return outcome.result
   }
 
   /**
@@ -3063,7 +2921,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     // 身份上下文走系统提示词：重启后打开历史会话时注入并 reload 使其生效。
     if (handle.setSystemPromptContext) {
       handle.setSystemPromptContext(
-        await this.buildProfileSystemPromptContext(indexEntry.agentId),
+        await this.profileStore.buildSystemPromptContext(indexEntry.agentId),
       )
       await handle.reload?.()
     }
@@ -3176,151 +3034,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     return content.replace(/\s+/g, ' ').trim().slice(0, 120)
   }
 
-  /**
-   * 确保指定 Agent Home 目录结构存在。
-   *
-   * @param agentId - Agent 标识。
-   * @returns 无返回值。
-   * @throws 当目录创建失败时，Promise 会 reject。
-   */
-  private async ensureAgentHome(agentId: AgentId): Promise<void> {
-    const homePath = this.layout.agentHome(agentId)
-    const soulHistoryPath = this.layout.soulHistory(agentId)
 
-    await mkdir(homePath, { recursive: true })
-    await mkdir(soulHistoryPath, { recursive: true })
-    await mkdir(join(homePath, 'memory'), { recursive: true })
-    await mkdir(join(homePath, 'skills'), { recursive: true })
-    await mkdir(join(homePath, 'workspace'), { recursive: true })
 
-    // 确保 soul.md 存在
-    const soulPath = this.layout.soul(agentId)
-
-    if (!(await pathExists(soulPath))) {
-      const displayName =
-        agentId === TANGYUAN_DEFAULT_AGENT_ID ? '汤圆' : agentId
-      const soulContent = [
-        `# ${displayName}`,
-        '',
-        `创建时间：${this.now()}`,
-        '',
-        '## 身份',
-        agentId === TANGYUAN_DEFAULT_AGENT_ID
-          ? '汤圆是默认 Agent，负责凭据管理和创建其他 Agent。'
-          : `${displayName} 是用户创建的 Agent。`,
-        '',
-        '## 规则',
-        '遵循用户指令，在执行危险操作前先确认。',
-        '',
-      ].join('\n')
-      await writeFile(soulPath, soulContent, 'utf8')
-    }
-  }
-
-  /**
-   * 从旧 tangyuan Agent 目录迁移 user.md 到共享 profile 路径。
-   *
-   * @returns 无返回值。
-   * @throws 当文件读取、复制或写入失败时，Promise 会 reject。
-   */
-  private async migrateLegacyUserProfile(): Promise<void> {
-    const legacyUserPath = join(
-      this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID),
-      'user.md',
-    )
-    const legacyHistoryPath = join(
-      this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID),
-      'user.history',
-    )
-    const targetPath = this.layout.userProfile()
-    const targetHistoryPath = this.layout.userHistory()
-
-    if (!(await pathExists(legacyUserPath))) {
-      return
-    }
-
-    // 迁移 user.md
-    await mkdir(this.layout.sharedProfile(), { recursive: true })
-    await copyFile(legacyUserPath, targetPath)
-
-    // 迁移 user.history/ 目录下的文件
-    if (await pathExists(legacyHistoryPath)) {
-      await mkdir(targetHistoryPath, { recursive: true })
-      const historyFiles = await readDirectoryFileSet(legacyHistoryPath)
-
-      for (const fileName of historyFiles) {
-        await copyFile(
-          join(legacyHistoryPath, fileName),
-          join(targetHistoryPath, fileName),
-        )
-      }
-    }
-  }
-
-  /**
-   * 确保默认 Agent Home 及 bootstrap 相关文件存在。
-   *
-   * @returns 默认 Agent Home 的文件状态。
-   * @throws 当文件系统创建、读取或写入失败时，Promise 会 reject。
-   */
-  private async ensureDefaultAgentHome(): Promise<AgentHomeStatus> {
-    const absoluteHomePath = this.layout.agentHome()
-    const bootstrapPath = join(absoluteHomePath, 'bootstrap.md')
-    const soulPath = join(absoluteHomePath, 'soul.md')
-    const userPath = this.layout.userProfile()
-    const soulHistoryPath = join(absoluteHomePath, 'soul.history')
-    const userHistoryPath = join(absoluteHomePath, 'user.history')
-    const memoryPath = join(absoluteHomePath, 'memory')
-    const skillsPath = join(absoluteHomePath, 'skills')
-
-    await mkdir(absoluteHomePath, { recursive: true })
-    await Promise.all([
-      mkdir(soulHistoryPath, { recursive: true }),
-      mkdir(userHistoryPath, { recursive: true }),
-      mkdir(memoryPath, { recursive: true }),
-      mkdir(skillsPath, { recursive: true }),
-    ])
-
-    // 确保共享 profile 和 skills 目录存在
-    await mkdir(this.layout.sharedProfile(), { recursive: true })
-    await mkdir(this.layout.userHistory(), { recursive: true })
-    await mkdir(this.layout.sharedSkills(), { recursive: true })
-
-    // 若共享 user.md 不存在，尝试从旧路径迁移
-    if (!(await pathExists(userPath))) {
-      await this.migrateLegacyUserProfile()
-    }
-
-    const [bootstrapFileExists, soulFileExists, userFileExists] =
-      await Promise.all([
-        pathExists(bootstrapPath),
-        pathExists(soulPath),
-        pathExists(userPath),
-      ])
-
-    if (!bootstrapFileExists && !soulFileExists && !userFileExists) {
-      await writeFile(bootstrapPath, this.createBootstrapTemplate(), 'utf8')
-    }
-
-    // 初始化完成的唯一真相：soul.md 与 user.md 均存在且内容非空。
-    // 空文件不算完成，仍处于初始化阻断态。
-    const [soulHasContent, userHasContent] = await Promise.all([
-      soulFileExists ? fileHasContent(soulPath) : Promise.resolve(false),
-      userFileExists ? fileHasContent(userPath) : Promise.resolve(false),
-    ])
-    const profileReady = soulHasContent && userHasContent
-
-    return {
-      initialized: profileReady,
-      bootstrapRequired:
-        !profileReady && (await pathExists(bootstrapPath)),
-      bootstrapFileExists: await pathExists(bootstrapPath),
-      soulFileExists: await pathExists(soulPath),
-      userFileExists: await pathExists(userPath),
-      soulUpdatedAt: await getMtimeIso(soulPath),
-      userUpdatedAt: await getMtimeIso(userPath),
-    }
-  }
 
   /**
    * 对比单次运行前后的 profile 文件状态，并在文件生成或更新后广播事件。
@@ -3337,7 +3052,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       sessionId: string
     },
   ): Promise<AgentHomeStatus> {
-    const nextStatus = await this.ensureDefaultAgentHome()
+    const nextStatus = await this.profileStore.ensureDefaultAgentHome()
 
     if (
       nextStatus.soulUpdatedAt &&
@@ -3387,10 +3102,10 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     try {
-      const profileSnapshot = await this.readProfileMaintenanceSnapshot(
+      const profileSnapshot = await this.profileStore.readMaintenanceSnapshot(
         input.agentId,
       )
-      const maintenancePrompt = this.buildProfileMaintenancePrompt({
+      const maintenancePrompt = this.profileStore.buildMaintenancePrompt({
         userContent: input.userContent,
         agentContent: input.agentContent,
         soulContent: profileSnapshot.soul.content,
@@ -3418,89 +3133,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
   }
 
-  /**
-   * 在 bootstrap 模式回合结束后施行文件门控。
-   *
-   * - 若 soul.md 与 user.md 同时存在：删除 bootstrap.md（Agent 可能遗漏）。
-   * - 若 bootstrap.md 已被 Agent 删除但 profile 仍未就绪：重新创建 bootstrap.md。
-   * - 其它情况不做任何操作，bootstrap 流程继续。
-   *
-   * @returns 无返回值。
-   * @throws 当 bootstrap.md 重建写入失败时，Promise 会 reject。
-   */
-  private async performBootstrapCompletionGating(): Promise<void> {
-    const absoluteHomePath = this.layout.agentHome()
-    const bootstrapPath = join(absoluteHomePath, 'bootstrap.md')
-    const soulPath = join(absoluteHomePath, 'soul.md')
-    const userPath = join(absoluteHomePath, 'user.md')
 
-    const [bootstrapExists, soulExists, userExists] = await Promise.all([
-      pathExists(bootstrapPath),
-      pathExists(soulPath),
-      pathExists(userPath),
-    ])
 
-    // Gate 1: bootstrap 完成 — 确保 bootstrap.md 已被删除
-    if (soulExists && userExists) {
-      if (bootstrapExists) {
-        await import('node:fs/promises').then(({ rm }) =>
-          rm(bootstrapPath, { force: true }),
-        )
-      }
-      return
-    }
-
-    // Gate 2: 恢复 — bootstrap.md 被误删但 profile 未完成
-    if (!bootstrapExists) {
-      await writeFile(bootstrapPath, this.createBootstrapTemplate(), 'utf8')
-    }
-
-    // Gate 3: bootstrap 仍在进行中 — 不做任何操作
-  }
-
-  /**
-   * 读取维护回合开始前的 profile 文件内容和历史目录状态。
-   *
-   * @returns soul.md、user.md 及其历史目录的快照。
-   * @throws 当 profile 文件或历史目录无法读取时，Promise 会 reject。
-   */
-  private async readProfileMaintenanceSnapshot(
-    agentId: AgentId = TANGYUAN_DEFAULT_AGENT_ID,
-  ): Promise<ProfileMaintenanceSnapshot> {
-    return {
-      soul: await this.readProfileMaintenanceFileSnapshot({
-        target: 'soul',
-        path: this.layout.soul(agentId),
-        historyPath: this.layout.soulHistory(agentId),
-      }),
-      user: await this.readProfileMaintenanceFileSnapshot({
-        target: 'user',
-        path: this.layout.userProfile(),
-        historyPath: this.layout.userHistory(),
-      }),
-    }
-  }
-
-  /**
-   * 读取单个 profile 文件及其历史目录状态。
-   *
-   * @param input - 需要读取的 profile 目标、文件路径和历史目录路径。
-   * @returns 可用于维护结果校验的文件快照。
-   * @throws 当文件读取失败时，Promise 会 reject。
-   */
-  private async readProfileMaintenanceFileSnapshot(input: {
-    target: ProfileMaintenanceTarget
-    path: string
-    historyPath: string
-  }): Promise<ProfileMaintenanceFileSnapshot> {
-    return {
-      target: input.target,
-      path: input.path,
-      historyPath: input.historyPath,
-      content: await readFile(input.path, 'utf8'),
-      historyFiles: await readDirectoryFileSet(input.historyPath),
-    }
-  }
 
   /**
    * 应用维护回合结束后的 profile 文件校验、脱敏和事件广播。
@@ -3593,7 +3227,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       return
     }
 
-    const hasBackup = await this.hasNewHistoryFile(input.previousFile)
+    const hasBackup = await this.profileStore.hasNewHistoryFile(input.previousFile)
 
     if (!hasBackup) {
       await writeFile(
@@ -3609,7 +3243,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       return
     }
 
-    const redactedContent = this.redactSensitiveProfileContent(
+    const redactedContent = this.profileStore.redactSensitiveContent(
       nextContent,
       input.apiKey,
     )
@@ -3628,92 +3262,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     )
   }
 
-  /**
-   * 构造后台 profile 维护回合使用的 prompt。
-   *
-   * @param input - 本轮主回合的用户消息、Agent 回复以及当前 profile 内容。
-   * @returns 只用于后台维护的完整 prompt。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private buildProfileMaintenancePrompt(input: {
-    userContent: string
-    agentContent: string
-    soulContent: string
-    profileUserContent: string
-  }): string {
-    return [
-      '# 后台 profile 维护回合',
-      '',
-      '这是主回复完成后的后台 profile 维护回合，不要回复用户，不要继续主回复，也不要输出会混入 transcript 的总结。',
-      '只在本轮对话明确改变长期偏好、边界、称呼、工作规则或 Agent 行为规则时更新 profile；内容无实质变化时不要写文件。',
-      '',
-      '更新规则：',
-      '1. 单轮最多更新一次 soul.md，最多更新一次 user.md。',
-      '2. 更新前必须使用 read 读取旧文件。',
-      '3. 更新前必须使用 write 把旧内容备份到 soul.history/ 或 user.history/。',
-      '4. 更新必须使用 edit 或 write 完成。',
-      '5. 不得把 API Key、token、password、密码、密钥或令牌写入 soul.md / user.md。',
-      '',
-      '## 当前 soul.md',
-      input.soulContent.trim(),
-      '',
-      '## 当前 user.md',
-      input.profileUserContent.trim(),
-      '',
-      '## 刚完成的用户消息',
-      input.userContent,
-      '',
-      '## 刚完成的 Agent 主回复',
-      input.agentContent,
-    ].join('\n')
-  }
 
-  /**
-   * 判断维护回合是否写入了新的历史备份文件。
-   *
-   * @param previousFile - 维护回合开始前的 profile 文件快照。
-   * @returns 有新增历史文件时返回 true，否则返回 false。
-   * @throws 当历史目录无法读取时，Promise 会 reject。
-   */
-  private async hasNewHistoryFile(
-    previousFile: ProfileMaintenanceFileSnapshot,
-  ): Promise<boolean> {
-    const nextHistoryFiles = await readDirectoryFileSet(
-      previousFile.historyPath,
-    )
 
-    for (const fileName of nextHistoryFiles) {
-      if (!previousFile.historyFiles.has(fileName)) {
-        return true
-      }
-    }
-
-    return false
-  }
-
-  /**
-   * 从 profile 内容中移除敏感凭据。
-   *
-   * @param content - Agent 写入的 profile 原始内容。
-   * @param apiKey - 已保存配置里的 API Key，用于精确替换。
-   * @returns 已脱敏的 profile 内容。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private redactSensitiveProfileContent(
-    content: string,
-    apiKey: string | null,
-  ): string {
-    const exactRedactedContent = apiKey
-      ? content.split(apiKey).join('[已隐藏敏感凭据]')
-      : content
-
-    return exactRedactedContent
-      .replace(/\bsk-[A-Za-z0-9][A-Za-z0-9_-]{6,}\b/g, '[已隐藏敏感凭据]')
-      .replace(
-        /((?:api\s*key|token|password|secret|密钥|令牌|密码)\s*[:：=]\s*)([^\s，。；;]+)/gi,
-        '$1[已隐藏敏感凭据]',
-      )
-  }
 
   /**
    * 广播 profile 更新时间，并可选追加用户可见的系统消息。
@@ -3787,76 +3337,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     return target === 'soul' ? 'Agent 规则' : '用户画像'
   }
 
-  /**
-   * 构造需追加到系统提示词末尾的身份上下文片段。
-   *
-   * soul.md 与 user.md 同时存在且内容非空时注入 profile；否则注入
-   * bootstrap 初始化指令与 bootstrap.md 全文。与对话消息彻底分离，
-   * 不再拼入用户消息，避免污染 SDK transcript。
-   *
-   * @param agentId - Agent 标识；默认为 tangyuan。
-   * @returns 可追加到系统提示词的 profile / bootstrap 上下文字符串。
-   * @throws 当 profile 文件读取失败时，Promise 会 reject。
-   */
-  private async buildProfileSystemPromptContext(
-    agentId: AgentId = TANGYUAN_DEFAULT_AGENT_ID,
-  ): Promise<string> {
-    const absoluteHomePath = this.layout.agentHome(agentId)
-    const soulPath = join(absoluteHomePath, 'soul.md')
-    const userPath = this.layout.userProfile()
-    const bootstrapPath = join(absoluteHomePath, 'bootstrap.md')
-
-    // 确保共享 user profile 存在
-    if (!(await pathExists(userPath))) {
-      await this.migrateLegacyUserProfile()
-    }
-
-    const [soulContent, profileUserContent] = await Promise.all([
-      (await pathExists(soulPath))
-        ? readFile(soulPath, 'utf8')
-        : Promise.resolve(''),
-      (await pathExists(userPath))
-        ? readFile(userPath, 'utf8')
-        : Promise.resolve(''),
-    ])
-
-    // 初始化完成的唯一真相：soul.md 与 user.md 均存在且内容非空。
-    // 空文件不算完成，仍需走 bootstrap 流程。
-    if (soulContent.trim() !== '' && profileUserContent.trim() !== '') {
-      return [
-        `# ${PROFILE_CONTEXT_HEADER}`,
-        '',
-        '## soul.md',
-        soulContent.trim(),
-        '',
-        '## user.md',
-        profileUserContent.trim(),
-      ].join('\n')
-    }
-
-    const bootstrapContent = (await pathExists(bootstrapPath))
-      ? await readFile(bootstrapPath, 'utf8')
-      : this.createBootstrapTemplate()
-
-    return [
-      `# ${PROFILE_CONTEXT_HEADER}`,
-      '',
-      '当前 profile 尚未初始化。请根据 bootstrap.md 的问题推进首次初始化；信息不足时继续追问，不要要求用户点击完成按钮。',
-      '当你判断固定问题已经回答充分时，必须使用 Pi SDK 可用文件工具完成初始化。',
-      '',
-      '初始化完成规则：',
-      '1. 使用 write 或 edit 写入 soul.md。',
-      '2. 使用 write 或 edit 写入 user.md。',
-      '3. 完成后删除 bootstrap.md。',
-      '4. 不得把 API Key、密钥、令牌或其它敏感凭据写入 soul.md 或 user.md。',
-      '',
-      'soul.md 至少必须覆盖：身份、用户偏好、工作范围、沟通方式、权限边界、敏感信息规则、记忆与技能原则、不确定时的处理方式。',
-      'user.md 至少必须覆盖：称呼、语言与语气偏好、常见工作类型、决策偏好、需要先确认的事项、禁止触碰的信息和边界、长期偏好。',
-      '',
-      '## bootstrap.md',
-      bootstrapContent.trim(),
-    ].join('\n')
-  }
 
   /**
    * 重算身份上下文并刷新到指定 Agent 的所有活跃会话。
@@ -3870,7 +3350,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当 profile 读取或 reload 失败时，Promise 会 reject。
    */
   private async refreshAgentProfileContext(agentId: AgentId): Promise<void> {
-    const context = await this.buildProfileSystemPromptContext(agentId)
+    const context = await this.profileStore.buildSystemPromptContext(agentId)
     const promises: Promise<void>[] = []
 
     for (const [sessionId, handle] of this.sessionHandles) {
@@ -3911,27 +3391,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     )
   }
 
-  /**
-   * 生成固定的 bootstrap 问题模板。
-   *
-   * @returns 可写入 bootstrap.md 的 Markdown 内容。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private createBootstrapTemplate(): string {
-    return [
-      '# Bootstrap',
-      '',
-      '1. 用户希望汤圆怎么称呼自己。',
-      '2. 用户希望汤圆默认使用什么语言、语气和沟通密度。',
-      '3. 用户主要希望汤圆帮助完成哪些工作。',
-      '4. 哪些操作必须先征求用户确认。',
-      '5. 哪些目录、文件、信息永远不能触碰或泄露。',
-      '6. 用户希望汤圆如何记录长期偏好和项目经验。',
-      '7. 汤圆在失败、不确定或缺少上下文时应该如何处理。',
-      '8. 哪些规则必须写入 soul.md 并长期遵守。',
-      '',
-    ].join('\n')
-  }
 
   /**
    * 确认会话已存在。
