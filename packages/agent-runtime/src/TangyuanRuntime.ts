@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- 已抽出 9 个可独测深 module（快照/会话缓存/Agent/Skill/身份/模型/三类审批登记表/网关工厂）；剩余为运行调度（activeRunIds/runQueue/sendMessage/cancelRun）与事件路由（applyAgentEvent）等不可再拆的编排核心。 */
 import type {
   AgentEvent,
   AgentEventListener,
