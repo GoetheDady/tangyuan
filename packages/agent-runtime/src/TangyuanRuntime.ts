@@ -14,6 +14,7 @@ import { ClarificationRegistry } from './clarification-registry'
 import { SkillApprovalRegistry } from './skill-approval-registry'
 import { SessionCache } from './session-cache'
 import { validateFilePath } from './file-path-guard'
+import { RuntimeSnapshotStore } from './runtime-snapshot-store'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
@@ -79,12 +80,11 @@ export interface TangyuanRuntimeDependencies {
  */
 class DefaultTangyuanRuntime {
   private static readonly MAX_CONCURRENT_RUNS = 4
-  private readonly runtimeDriver: RuntimeResourceDriver
   private readonly sessionDriver: AgentSessionDriver
   private readonly listeners = new Set<AgentEventListener>()
   private readonly activeRunIds = new Map<string, string>()
   private readonly transcriptEmitter: TranscriptEmitter
-  private runtimeSnapshot: RuntimeSnapshot | null = null
+  private readonly snapshotStore: RuntimeSnapshotStore
   private readonly sessionCache = new SessionCache()
   private runQueue: Array<{
     request: SendMessageRequest
@@ -103,9 +103,11 @@ class DefaultTangyuanRuntime {
    * @throws 此构造方法不会主动抛出错误。
    */
   constructor(dependencies: TangyuanRuntimeDependencies) {
-    this.runtimeDriver = dependencies.runtimeDriver
     this.sessionDriver = dependencies.sessionDriver
     this.transcriptEmitter = new TranscriptEmitter(this.emit.bind(this))
+    this.snapshotStore = new RuntimeSnapshotStore({
+      runtimeDriver: dependencies.runtimeDriver,
+    })
     const emit = this.emit.bind(this)
     const now = () => new Date().toISOString()
     this.bashApprovals = new BashApprovalRegistry({ emit, now })
@@ -139,8 +141,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 RuntimeResourceDriver 读取失败时，Promise 会 reject。
    */
   async getRuntimeSnapshot(): Promise<RuntimeSnapshot> {
-    this.runtimeSnapshot = await this.runtimeDriver.getSnapshot()
-    return this.runtimeSnapshot
+    return this.snapshotStore.reload()
   }
 
   /**
@@ -150,8 +151,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 RuntimeResourceDriver 刷新失败时，Promise 会 reject。
    */
   async refreshRuntime(): Promise<RuntimeSnapshot> {
-    this.runtimeSnapshot = await this.runtimeDriver.refresh()
-    return this.runtimeSnapshot
+    return this.snapshotStore.refresh()
   }
 
   /**
@@ -164,13 +164,7 @@ class DefaultTangyuanRuntime {
   async saveRuntimeConfiguration(
     configuration: RuntimeConfiguration,
   ): Promise<RuntimeSnapshot> {
-    if (!this.runtimeDriver.saveConfiguration) {
-      throw new Error('当前运行时不支持保存配置。')
-    }
-
-    this.runtimeSnapshot =
-      await this.runtimeDriver.saveConfiguration(configuration)
-    return this.runtimeSnapshot
+    return this.snapshotStore.saveConfiguration(configuration)
   }
 
   /**
@@ -183,13 +177,7 @@ class DefaultTangyuanRuntime {
   async cancelRuntimeConfigurationVerification(
     request: CancelConfigurationVerificationRequest,
   ): Promise<RuntimeSnapshot> {
-    if (!this.runtimeDriver.cancelConfigurationVerification) {
-      throw new Error('当前运行时不支持取消配置验证。')
-    }
-
-    this.runtimeSnapshot =
-      await this.runtimeDriver.cancelConfigurationVerification(request)
-    return this.runtimeSnapshot
+    return this.snapshotStore.cancelConfigurationVerification(request)
   }
 
   /**
@@ -199,12 +187,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 RuntimeResourceDriver 缺少恢复能力或恢复失败时，Promise 会 reject。
    */
   async restoreFromBackup(): Promise<RuntimeSnapshot> {
-    if (!this.runtimeDriver.restoreFromBackup) {
-      throw new Error('当前运行时不支持配置恢复。')
-    }
-
-    this.runtimeSnapshot = await this.runtimeDriver.restoreFromBackup()
-    return this.runtimeSnapshot
+    return this.snapshotStore.restoreFromBackup()
   }
 
   /**
@@ -214,13 +197,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 RuntimeResourceDriver 缺少重置能力或重置失败时，Promise 会 reject。
    */
   async resetConfiguration(): Promise<RuntimeSnapshot> {
-    if (!this.runtimeDriver.resetConfiguration) {
-      throw new Error('当前运行时不支持配置重置。')
-    }
-
-    await this.runtimeDriver.resetConfiguration()
-    this.runtimeSnapshot = await this.runtimeDriver.getSnapshot()
-    return this.runtimeSnapshot
+    return this.snapshotStore.resetConfiguration()
   }
 
   /**
@@ -257,7 +234,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 RuntimeResourceDriver 读取配置失败时，Promise 会 reject。
    */
   async listAgents(): Promise<AgentSummary[]> {
-    const snapshot = this.runtimeSnapshot ?? (await this.getRuntimeSnapshot())
+    const snapshot = await this.snapshotStore.getOrLoad()
     return snapshot.agents
   }
 
@@ -274,7 +251,7 @@ class DefaultTangyuanRuntime {
     }
     const summary = await this.sessionDriver.createAgent(displayName)
     // 刷新运行时快照以包含新 Agent
-    this.runtimeSnapshot = await this.runtimeDriver.getSnapshot()
+    await this.snapshotStore.reload()
     return summary
   }
 
@@ -305,7 +282,7 @@ class DefaultTangyuanRuntime {
     )
 
     // 刷新运行时快照以反映配置变更
-    this.runtimeSnapshot = await this.runtimeDriver.getSnapshot()
+    await this.snapshotStore.reload()
     return summary
   }
 
@@ -322,7 +299,7 @@ class DefaultTangyuanRuntime {
     }
 
     const summary = await this.sessionDriver.archiveAgent(agentId)
-    this.runtimeSnapshot = await this.runtimeDriver.getSnapshot()
+    await this.snapshotStore.reload()
     return summary
   }
 
@@ -339,7 +316,7 @@ class DefaultTangyuanRuntime {
     }
 
     const summary = await this.sessionDriver.recoverAgent(agentId)
-    this.runtimeSnapshot = await this.runtimeDriver.getSnapshot()
+    await this.snapshotStore.reload()
     return summary
   }
 
@@ -380,7 +357,7 @@ class DefaultTangyuanRuntime {
       agentId,
       displayName,
     )
-    this.runtimeSnapshot = await this.runtimeDriver.getSnapshot()
+    await this.snapshotStore.reload()
     return summary
   }
 
@@ -396,7 +373,7 @@ class DefaultTangyuanRuntime {
     }
 
     const summary = await this.sessionDriver.rebuildTangyuanHome()
-    this.runtimeSnapshot = await this.runtimeDriver.getSnapshot()
+    await this.snapshotStore.reload()
     return summary
   }
 
@@ -559,7 +536,7 @@ class DefaultTangyuanRuntime {
     }
 
     // 使用 activeAgent 作为请求发起方进行权限校验
-    const snapshot = this.runtimeSnapshot ?? (await this.getRuntimeSnapshot())
+    const snapshot = await this.snapshotStore.getOrLoad()
     const result = await this.sessionDriver.updateSoul(
       agentId,
       content,
@@ -568,7 +545,7 @@ class DefaultTangyuanRuntime {
 
     // 更新成功后刷新运行时快照以获取最新 profile 时间戳
     if (result.success) {
-      this.runtimeSnapshot = await this.runtimeDriver.getSnapshot()
+      await this.snapshotStore.reload()
     }
 
     return result
@@ -590,7 +567,7 @@ class DefaultTangyuanRuntime {
 
     // 更新成功后刷新运行时快照以获取最新 profile 时间戳
     if (result.success) {
-      this.runtimeSnapshot = await this.runtimeDriver.getSnapshot()
+      await this.snapshotStore.reload()
     }
 
     return result
@@ -1116,7 +1093,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 Provider、模型或 API Key 缺失时抛出可读错误。
    */
   private async assertRuntimeReady(): Promise<void> {
-    const snapshot = this.runtimeSnapshot ?? (await this.getRuntimeSnapshot())
+    const snapshot = await this.snapshotStore.getOrLoad()
 
     if (snapshot.status !== 'ready') {
       throw new Error(
