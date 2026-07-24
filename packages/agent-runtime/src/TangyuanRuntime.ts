@@ -11,11 +11,11 @@ import type {
 import { TranscriptEmitter } from './transcript-emitter'
 import { BashApprovalRegistry } from './bash-approval-registry'
 import { ClarificationRegistry } from './clarification-registry'
-import { SkillApprovalRegistry } from './skill-approval-registry'
 import { SessionCache } from './session-cache'
 import { validateFilePath } from './file-path-guard'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
 import { AgentManager } from './agent-manager'
+import { SkillService } from './skill-service'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
@@ -94,7 +94,7 @@ class DefaultTangyuanRuntime {
     reject: (error: Error) => void
   }> = []
   private readonly bashApprovals: BashApprovalRegistry
-  private readonly skillApprovals: SkillApprovalRegistry
+  private readonly skillService: SkillService
   private readonly clarifications: ClarificationRegistry
 
   /**
@@ -117,7 +117,12 @@ class DefaultTangyuanRuntime {
     const emit = this.emit.bind(this)
     const now = () => new Date().toISOString()
     this.bashApprovals = new BashApprovalRegistry({ emit, now })
-    this.skillApprovals = new SkillApprovalRegistry({ emit, now })
+    this.skillService = new SkillService({
+      sessionDriver: dependencies.sessionDriver,
+      defaultAgentId: TANGYUAN_DEFAULT_AGENT_ID,
+      emit,
+      now,
+    })
     this.clarifications = new ClarificationRegistry({ emit, now })
     this.sessionDriver.subscribe((event) => {
       this.applyAgentEvent(event)
@@ -386,11 +391,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 AgentSessionDriver 不支持或读取失败时，Promise 会 reject。
    */
   async listAgentSkills(agentId: string): Promise<SkillSummary[]> {
-    if (!this.sessionDriver.listAgentSkills) {
-      throw new Error('当前运行时不支持读取 Agent Skills。')
-    }
-
-    return this.sessionDriver.listAgentSkills(agentId)
+    return this.skillService.listAgentSkills(agentId)
   }
 
   /**
@@ -400,11 +401,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 AgentSessionDriver 不支持或读取失败时，Promise 会 reject。
    */
   async listSharedSkills(): Promise<SkillSummary[]> {
-    if (!this.sessionDriver.listSharedSkills) {
-      throw new Error('当前运行时不支持读取共享 Skills。')
-    }
-
-    return this.sessionDriver.listSharedSkills()
+    return this.skillService.listSharedSkills()
   }
 
   /**
@@ -822,29 +819,7 @@ class DefaultTangyuanRuntime {
    * @throws 当权限不足、校验失败或 Driver 不支持时，Promise 会 reject。
    */
   async installSkill(params: SkillOperationParams): Promise<SkillSummary[]> {
-    this.validateSkillOperationPermission(params)
-
-    if (!this.sessionDriver.installSkill) {
-      throw new Error('当前运行时不支持安装 Skill。')
-    }
-
-    // 创建审批并等待用户决议
-    const approved = await this.requestSkillApproval(params)
-    if (!approved) {
-      throw new Error('用户拒绝了 Skill 操作。')
-    }
-
-    // 执行安装
-    const result = await this.sessionDriver.installSkill(params)
-
-    // 根据来源决定 reload 范围
-    if (params.source === 'shared') {
-      await this.reloadAllSessions()
-    } else if (params.targetAgentId) {
-      await this.reloadAgentSessions(params.targetAgentId)
-    }
-
-    return result
+    return this.skillService.install(params)
   }
 
   /**
@@ -855,29 +830,7 @@ class DefaultTangyuanRuntime {
    * @throws 当权限不足或 Driver 不支持时，Promise 会 reject。
    */
   async deleteSkill(params: SkillOperationParams): Promise<SkillSummary[]> {
-    this.validateSkillOperationPermission(params)
-
-    if (!this.sessionDriver.deleteSkill) {
-      throw new Error('当前运行时不支持删除 Skill。')
-    }
-
-    // 创建审批并等待用户决议
-    const approved = await this.requestSkillApproval(params)
-    if (!approved) {
-      throw new Error('用户拒绝了 Skill 操作。')
-    }
-
-    // 执行删除
-    const result = await this.sessionDriver.deleteSkill(params)
-
-    // 根据来源决定 reload 范围
-    if (params.source === 'shared') {
-      await this.reloadAllSessions()
-    } else if (params.targetAgentId) {
-      await this.reloadAgentSessions(params.targetAgentId)
-    }
-
-    return result
+    return this.skillService.delete(params)
   }
 
   /**
@@ -888,7 +841,7 @@ class DefaultTangyuanRuntime {
    * @throws 当审批不存在或已过期时抛出错误。
    */
   async approveSkillOperation(approvalId: string): Promise<void> {
-    this.skillApprovals.approve(approvalId)
+    this.skillService.approveOperation(approvalId)
   }
 
   /**
@@ -899,7 +852,7 @@ class DefaultTangyuanRuntime {
    * @throws 当审批不存在或已过期时抛出错误。
    */
   async rejectSkillOperation(approvalId: string): Promise<void> {
-    this.skillApprovals.reject(approvalId)
+    this.skillService.rejectOperation(approvalId)
   }
 
   /**
@@ -909,7 +862,7 @@ class DefaultTangyuanRuntime {
    * @throws 此方法不会主动抛出错误。
    */
   getPendingSkillApprovals(): SkillApprovalRequest[] {
-    return this.skillApprovals.list()
+    return this.skillService.getPendingApprovals()
   }
 
   /**
@@ -919,69 +872,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 Driver 不支持或读取失败时，Promise 会 reject。
    */
   async getSkillInstallRecords(): Promise<SkillInstallRecord[]> {
-    if (!this.sessionDriver.getSkillInstallRecords) {
-      throw new Error('当前运行时不支持读取 Skill 安装记录。')
-    }
-
-    return this.sessionDriver.getSkillInstallRecords()
-  }
-
-  /**
-   * 校验 Skill 操作权限。
-   *
-   * @param params - 操作参数。
-   * @returns 无返回值。
-   * @throws 当权限不足时抛出可读错误。
-   */
-  private validateSkillOperationPermission(params: SkillOperationParams): void {
-    if (params.source === 'shared') {
-      // 共享 Skill 只能由汤圆管理
-      if (params.agentId !== TANGYUAN_DEFAULT_AGENT_ID) {
-        throw new Error(
-          `只有默认 Agent「汤圆」可以管理共享 Skill，当前 Agent "${params.agentId}" 无权操作。`,
-        )
-      }
-    } else {
-      // 专属 Skill：只能由 Agent 自身或汤圆管理
-      const targetId = params.targetAgentId ?? params.agentId
-      if (
-        params.agentId !== targetId &&
-        params.agentId !== TANGYUAN_DEFAULT_AGENT_ID
-      ) {
-        throw new Error(
-          `Agent "${params.agentId}" 无权管理 Agent "${targetId}" 的专属 Skill。只有 Agent 自身或汤圆可以操作。`,
-        )
-      }
-    }
-  }
-
-  /**
-   * 创建 Skill 操作审批请求并等待用户决议。
-   *
-   * @param params - 操作参数。
-   * @returns Promise 在用户批准时 resolve true，拒绝时 resolve false。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private async requestSkillApproval(
-    params: SkillOperationParams,
-  ): Promise<boolean> {
-    const request: SkillApprovalRequest = {
-      approvalId: crypto.randomUUID(),
-      agentId: params.agentId,
-      operation: params.operation,
-      source: params.source,
-      ...(params.targetAgentId !== undefined
-        ? { targetAgentId: params.targetAgentId }
-        : {}),
-      skillName: params.skillName,
-      description: '',
-      hasScripts: false,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    }
-
-    const { approved } = await this.skillApprovals.register(request)
-    return approved
+    return this.skillService.getInstallRecords()
   }
 
   /**
@@ -1324,7 +1215,7 @@ class DefaultTangyuanRuntime {
    * @throws 此方法不会主动抛出错误。
    */
   private rejectAllPendingSkillApprovals(): void {
-    this.skillApprovals.rejectAll()
+    this.skillService.rejectAllApprovals()
   }
 }
 
