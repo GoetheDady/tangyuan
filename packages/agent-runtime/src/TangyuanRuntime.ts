@@ -16,6 +16,8 @@ import { validateFilePath } from './file-path-guard'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
 import { AgentManager } from './agent-manager'
 import { SkillService } from './skill-service'
+import { IdentityService } from './identity-service'
+import { SessionModelService } from './session-model-service'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
@@ -87,6 +89,8 @@ class DefaultTangyuanRuntime {
   private readonly transcriptEmitter: TranscriptEmitter
   private readonly snapshotStore: RuntimeSnapshotStore
   private readonly agentManager: AgentManager
+  private readonly identityService: IdentityService
+  private readonly sessionModelService: SessionModelService
   private readonly sessionCache = new SessionCache()
   private runQueue: Array<{
     request: SendMessageRequest
@@ -113,6 +117,13 @@ class DefaultTangyuanRuntime {
     this.agentManager = new AgentManager({
       sessionDriver: dependencies.sessionDriver,
       snapshotStore: this.snapshotStore,
+    })
+    this.identityService = new IdentityService({
+      sessionDriver: dependencies.sessionDriver,
+      snapshotStore: this.snapshotStore,
+    })
+    this.sessionModelService = new SessionModelService({
+      sessionDriver: dependencies.sessionDriver,
     })
     const emit = this.emit.bind(this)
     const now = () => new Date().toISOString()
@@ -342,11 +353,7 @@ class DefaultTangyuanRuntime {
   async getSessionModelInfo(
     request: GetSessionModelInfoRequest,
   ): Promise<SessionModelInfo> {
-    if (!this.sessionDriver.getSessionModelInfo) {
-      throw new Error('当前运行时不支持读取 Session 模型信息。')
-    }
-
-    return this.sessionDriver.getSessionModelInfo(request)
+    return this.sessionModelService.getInfo(request)
   }
 
   /**
@@ -359,11 +366,7 @@ class DefaultTangyuanRuntime {
   async setSessionModel(
     request: SetSessionModelRequest,
   ): Promise<SessionModelInfo> {
-    if (!this.sessionDriver.setSessionModel) {
-      throw new Error('当前运行时不支持切换 Session 模型。')
-    }
-
-    return this.sessionDriver.setSessionModel(request)
+    return this.sessionModelService.setModel(request)
   }
 
   /**
@@ -376,11 +379,7 @@ class DefaultTangyuanRuntime {
   async setSessionThinkingLevel(
     request: SetSessionThinkingLevelRequest,
   ): Promise<SessionModelInfo> {
-    if (!this.sessionDriver.setSessionThinkingLevel) {
-      throw new Error('当前运行时不支持切换 Thinking Level。')
-    }
-
-    return this.sessionDriver.setSessionThinkingLevel(request)
+    return this.sessionModelService.setThinkingLevel(request)
   }
 
   /**
@@ -445,11 +444,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 AgentSessionDriver 不支持或读取失败时，Promise 会 reject。
    */
   async getSoul(agentId: string): Promise<SoulContent> {
-    if (!this.sessionDriver.getSoul) {
-      throw new Error('当前运行时不支持读取 Agent soul。')
-    }
-
-    return this.sessionDriver.getSoul(agentId)
+    return this.identityService.getSoul(agentId)
   }
 
   /**
@@ -459,11 +454,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 AgentSessionDriver 不支持或读取失败时，Promise 会 reject。
    */
   async getUserProfile(): Promise<UserProfileContent> {
-    if (!this.sessionDriver.getUserProfile) {
-      throw new Error('当前运行时不支持读取 user profile。')
-    }
-
-    return this.sessionDriver.getUserProfile()
+    return this.identityService.getUserProfile()
   }
 
   /**
@@ -478,24 +469,7 @@ class DefaultTangyuanRuntime {
     agentId: string,
     content: string,
   ): Promise<ProfileMaintenanceResult> {
-    if (!this.sessionDriver.updateSoul) {
-      throw new Error('当前运行时不支持更新 Agent soul。')
-    }
-
-    // 使用 activeAgent 作为请求发起方进行权限校验
-    const snapshot = await this.snapshotStore.getOrLoad()
-    const result = await this.sessionDriver.updateSoul(
-      agentId,
-      content,
-      snapshot.activeAgent.agentId,
-    )
-
-    // 更新成功后刷新运行时快照以获取最新 profile 时间戳
-    if (result.success) {
-      await this.snapshotStore.reload()
-    }
-
-    return result
+    return this.identityService.updateSoul(agentId, content)
   }
 
   /**
@@ -506,18 +480,7 @@ class DefaultTangyuanRuntime {
    * @throws 当 AgentSessionDriver 不支持或操作失败时，Promise 会 reject。
    */
   async updateUserProfile(content: string): Promise<ProfileMaintenanceResult> {
-    if (!this.sessionDriver.updateUserProfile) {
-      throw new Error('当前运行时不支持更新 user profile。')
-    }
-
-    const result = await this.sessionDriver.updateUserProfile(content)
-
-    // 更新成功后刷新运行时快照以获取最新 profile 时间戳
-    if (result.success) {
-      await this.snapshotStore.reload()
-    }
-
-    return result
+    return this.identityService.updateUserProfile(content)
   }
 
   /**
