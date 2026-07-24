@@ -31,6 +31,7 @@ import type {
   PersistedAttemptEntry,
   PersistedSessionIndexEntry,
 } from './session-index-store'
+import { MessageStore } from './message-store'
 import { AgentRuntimeError } from './errors'
 import {
   isAbortError,
@@ -42,6 +43,7 @@ import {
   pathExists,
   safeReadFile,
   getMtimeIso,
+  createMessagePreview,
 } from './utils'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
@@ -973,10 +975,10 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private readonly skillStore: SkillStore
   private readonly profileStore: ProfileStore
   private readonly sessionIndexStore: SessionIndexStore
+  private readonly messageStore: MessageStore
   private readonly gateway: PiSdkGateway
   private readonly encryptionAdapter: ConfigEncryptionAdapter | null
   private readonly listeners = new Set<AgentEventListener>()
-  private readonly messages = new Map<string, InternalMessage[]>()
   private readonly transcriptCache = new Map<string, TranscriptSnapshot>()
   private readonly sessionHandles = new Map<string, PiSdkSessionHandle>()
   private readonly activeRunIds = new Map<string, string>()
@@ -1029,6 +1031,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       configStore: this.configStore,
       gateway: this.gateway,
     })
+    this.messageStore = new MessageStore({ now: this.now })
     this.toolApprovalGateway = options.toolApprovalGateway
   }
 
@@ -1218,7 +1221,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     this.sessionIndexStore.addSession(indexEntry)
-    this.messages.set(session.sessionId, [])
+    this.messageStore.initSession(session.sessionId)
     this.sessionHandles.set(session.sessionId, handle)
     // 身份上下文走系统提示词：建会话时注入并 reload 使其生效。
     if (handle.setSystemPromptContext) {
@@ -1376,7 +1379,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     this.activeRunIds.set(request.sessionId, runId)
     this.updateSessionState(session.sessionId, 'running')
     await this.sessionIndexStore.updateEntry(session.sessionId, {
-      lastMessagePreview: this.createMessagePreview(content),
+      lastMessagePreview: createMessagePreview(content),
       status: 'running',
       updatedAt: this.now(),
     })
@@ -1447,7 +1450,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
           if (event.type === 'text-delta') {
             announceAgentEntry()
             accumulatedReply += event.delta
-            this.appendMessageDelta(agentMessage.messageId, event.delta)
+            this.messageStore.appendDelta(agentMessage.messageId, event.delta)
             this.emit({
               type: 'message-delta',
               agentId: request.agentId,
@@ -1501,7 +1504,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       })
 
       if (this.activeRunIds.get(request.sessionId) !== runId) {
-        this.removeMessageIfEmpty(agentMessage.messageId)
+        this.messageStore.removeIfEmpty(agentMessage.messageId)
         await this.sessionIndexStore.upsertAttempt(request.sessionId, {
           attemptId: runId,
           runId,
@@ -1520,7 +1523,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
       if (!accumulatedReply && agentReply?.trim()) {
         accumulatedReply = agentReply.trim()
-        this.appendMessageDelta(agentMessage.messageId, accumulatedReply)
+        this.messageStore.appendDelta(agentMessage.messageId, accumulatedReply)
         this.emit({
           type: 'message-delta',
           agentId: request.agentId,
@@ -1532,7 +1535,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         })
       }
 
-      const completedMessage = this.completeMessage(agentMessage.messageId)
+      const completedMessage = this.messageStore.complete(agentMessage.messageId)
       this.emit({
         type: 'message-completed',
         agentId: request.agentId,
@@ -1592,13 +1595,13 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       })
       this.updateSessionState(session.sessionId, 'completed')
       await this.sessionIndexStore.updateEntry(session.sessionId, {
-        lastMessagePreview: this.createMessagePreview(completedMessage.content),
+        lastMessagePreview: createMessagePreview(completedMessage.content),
         status: 'completed',
         updatedAt: this.now(),
       })
     } catch (error) {
       if (isAbortError(error) || !this.activeRunIds.has(request.sessionId)) {
-        this.removeMessageIfEmpty(agentMessage.messageId)
+        this.messageStore.removeIfEmpty(agentMessage.messageId)
         this.updateSessionState(session.sessionId, 'cancelled')
         await this.sessionIndexStore.updateEntry(session.sessionId, {
           status: 'cancelled',
@@ -1619,7 +1622,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         message: sanitizeErrorMessage(error),
         recoverable: true,
       }
-      this.removeMessageIfEmpty(agentMessage.messageId)
+      this.messageStore.removeIfEmpty(agentMessage.messageId)
       await this.sessionIndexStore.upsertAttempt(request.sessionId, {
         attemptId: runId,
         runId,
@@ -1631,7 +1634,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       })
       this.updateSessionState(session.sessionId, 'failed')
       await this.sessionIndexStore.updateEntry(session.sessionId, {
-        lastMessagePreview: this.createMessagePreview(runtimeError.message),
+        lastMessagePreview: createMessagePreview(runtimeError.message),
         status: 'failed',
         updatedAt: this.now(),
       })
@@ -1725,7 +1728,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     }
 
     // 从缓存中查找原始用户消息内容
-    const messages = this.messages.get(request.sessionId) ?? []
+    const messages = this.messageStore.getMessages(request.sessionId)
     const userMessage = messages.find(
       (m) => m.messageId === request.userMessageId && m.role === 'user',
     )
@@ -1807,7 +1810,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     this.activeRunIds.set(request.sessionId, runId)
     this.updateSessionState(session.sessionId, 'running')
     await this.sessionIndexStore.updateEntry(session.sessionId, {
-      lastMessagePreview: this.createMessagePreview(content),
+      lastMessagePreview: createMessagePreview(content),
       status: 'running',
       updatedAt: now,
     })
@@ -1870,7 +1873,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
           if (event.type === 'text-delta') {
             announceAgentEntry()
             accumulatedReply += event.delta
-            this.appendMessageDelta(agentMessage.messageId, event.delta)
+            this.messageStore.appendDelta(agentMessage.messageId, event.delta)
             this.emit({
               type: 'message-delta',
               agentId: request.agentId,
@@ -1923,7 +1926,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       })
 
       if (this.activeRunIds.get(request.sessionId) !== runId) {
-        this.removeMessageIfEmpty(agentMessage.messageId)
+        this.messageStore.removeIfEmpty(agentMessage.messageId)
         this.updateSessionState(session.sessionId, 'cancelled')
         await this.sessionIndexStore.updateEntry(session.sessionId, {
           status: 'cancelled',
@@ -1934,7 +1937,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
       if (!accumulatedReply && agentReply?.trim()) {
         accumulatedReply = agentReply.trim()
-        this.appendMessageDelta(agentMessage.messageId, accumulatedReply)
+        this.messageStore.appendDelta(agentMessage.messageId, accumulatedReply)
         this.emit({
           type: 'message-delta',
           agentId: request.agentId,
@@ -1946,7 +1949,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         })
       }
 
-      const completedMessage = this.completeMessage(agentMessage.messageId)
+      const completedMessage = this.messageStore.complete(agentMessage.messageId)
       this.emit({
         type: 'message-completed',
         agentId: request.agentId,
@@ -2009,13 +2012,13 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       })
       this.updateSessionState(session.sessionId, 'completed')
       await this.sessionIndexStore.updateEntry(session.sessionId, {
-        lastMessagePreview: this.createMessagePreview(completedMessage.content),
+        lastMessagePreview: createMessagePreview(completedMessage.content),
         status: 'completed',
         updatedAt: this.now(),
       })
     } catch (error) {
       if (isAbortError(error) || !this.activeRunIds.has(request.sessionId)) {
-        this.removeMessageIfEmpty(agentMessage.messageId)
+        this.messageStore.removeIfEmpty(agentMessage.messageId)
         await this.sessionIndexStore.upsertAttempt(request.sessionId, {
           attemptId: runId,
           runId,
@@ -2045,7 +2048,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         message: sanitizeErrorMessage(error),
         recoverable: true,
       }
-      this.removeMessageIfEmpty(agentMessage.messageId)
+      this.messageStore.removeIfEmpty(agentMessage.messageId)
       await this.sessionIndexStore.upsertAttempt(request.sessionId, {
         attemptId: runId,
         runId,
@@ -2058,7 +2061,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       })
       this.updateSessionState(session.sessionId, 'failed')
       await this.sessionIndexStore.updateEntry(session.sessionId, {
-        lastMessagePreview: this.createMessagePreview(runtimeError.message),
+        lastMessagePreview: createMessagePreview(runtimeError.message),
         status: 'failed',
         updatedAt: this.now(),
       })
@@ -2651,16 +2654,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     return crypto.randomUUID()
   }
 
-  /**
-   * 生成会话列表里展示的最后消息预览。
-   *
-   * @param content - 完整消息内容。
-   * @returns 压缩空白并截断后的预览文本。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private createMessagePreview(content: string): string {
-    return content.replace(/\s+/g, ' ').trim().slice(0, 120)
-  }
 
 
 
@@ -3068,18 +3061,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   }): InternalMessage {
     this.assertKnownSession(input.sessionId, input.agentId)
 
-    const messages = this.messages.get(input.sessionId) ?? []
-    const message: InternalMessage = {
-      messageId: `${input.sessionId}-message-${messages.length + 1}`,
-      agentId: input.agentId,
-      sessionId: input.sessionId,
-      role: input.role,
-      content: input.content,
-      createdAt: this.now(),
-    }
-    this.messages.set(input.sessionId, [...messages, message])
-
-    return message
+    return this.messageStore.append(input)
   }
 
   /**
@@ -3096,100 +3078,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     return `${sessionId}-run-${nextSequence}`
   }
 
-  /**
-   * 把 Agent 文本增量拼接到指定消息。
-   *
-   * @param messageId - 需要更新的消息标识。
-   * @param delta - 本次新增的文本片段。
-   * @returns 更新后的 Agent 消息。
-   * @throws 当消息不存在时抛出 AgentRuntimeError。
-   */
-  private appendMessageDelta(messageId: string, delta: string): InternalMessage {
-    for (const [sessionId, messages] of this.messages) {
-      const messageIndex = messages.findIndex(
-        (message) => message.messageId === messageId,
-      )
-
-      if (messageIndex === -1) {
-        continue
-      }
-
-      const currentMessage = messages[messageIndex]
-
-      if (!currentMessage) {
-        break
-      }
-
-      const nextMessage = {
-        ...currentMessage,
-        content: `${currentMessage.content}${delta}`,
-      }
-      const nextMessages = [...messages]
-      nextMessages[messageIndex] = nextMessage
-      this.messages.set(sessionId, nextMessages)
-
-      return nextMessage
-    }
-
-    throw new AgentRuntimeError({
-      code: 'session-not-found',
-      message: `找不到消息 ${messageId}。`,
-      recoverable: true,
-    })
-  }
-
-  /**
-   * 读取已经完成流式拼接的 Agent 消息。
-   *
-   * @param messageId - 需要读取的消息标识。
-   * @returns 完成后的 Agent 消息。
-   * @throws 当消息不存在时抛出 AgentRuntimeError。
-   */
-  private completeMessage(messageId: string): InternalMessage {
-    for (const messages of this.messages.values()) {
-      const message = messages.find(
-        (candidate) => candidate.messageId === messageId,
-      )
-
-      if (message) {
-        return message
-      }
-    }
-
-    throw new AgentRuntimeError({
-      code: 'session-not-found',
-      message: `找不到消息 ${messageId}。`,
-      recoverable: true,
-    })
-  }
-
-  /**
-   * 当指定消息仍为空时从 transcript 中移除。
-   *
-   * @param messageId - 需要按需移除的消息标识。
-   * @returns 如果移除了空消息则返回 true，否则返回 false。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private removeMessageIfEmpty(messageId: string): boolean {
-    for (const [sessionId, messages] of this.messages) {
-      const message = messages.find(
-        (candidate) => candidate.messageId === messageId,
-      )
-
-      if (!message || message.content) {
-        continue
-      }
-
-      this.messages.set(
-        sessionId,
-        messages.filter((candidate) => candidate.messageId !== messageId),
-      )
-
-      return true
-    }
-
-    return false
-  }
 
   /**
    * 更新会话运行状态并广播状态事件。

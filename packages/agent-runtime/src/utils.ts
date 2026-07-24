@@ -526,3 +526,14 @@ export async function getMtimeIso(path: string): Promise<string | null> {
     throw error
   }
 }
+
+/**
+ * 生成会话列表里展示的最后消息预览。
+ *
+ * @param content - 完整消息内容。
+ * @returns 压缩空白并截断到 120 字符后的预览文本。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function createMessagePreview(content: string): string {
+  return content.replace(/\s+/g, ' ').trim().slice(0, 120)
+}
