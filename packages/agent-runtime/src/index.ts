@@ -1602,6 +1602,14 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     } catch (error) {
       if (isAbortError(error) || !this.activeRunIds.has(request.sessionId)) {
         this.messageStore.removeIfEmpty(agentMessage.messageId)
+        await this.sessionIndexStore.upsertAttempt(request.sessionId, {
+          attemptId: runId,
+          runId,
+          messageId: agentMessage.messageId,
+          status: 'cancelled',
+          startedAt: this.now(),
+          completedAt: this.now(),
+        })
         this.updateSessionState(session.sessionId, 'cancelled')
         await this.sessionIndexStore.updateEntry(session.sessionId, {
           status: 'cancelled',
@@ -1927,6 +1935,15 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
       if (this.activeRunIds.get(request.sessionId) !== runId) {
         this.messageStore.removeIfEmpty(agentMessage.messageId)
+        await this.sessionIndexStore.upsertAttempt(request.sessionId, {
+          attemptId: runId,
+          runId,
+          messageId: agentMessage.messageId,
+          status: 'cancelled',
+          startedAt: this.now(),
+          completedAt: this.now(),
+          inReplyTo: request.userMessageId,
+        })
         this.updateSessionState(session.sessionId, 'cancelled')
         await this.sessionIndexStore.updateEntry(session.sessionId, {
           status: 'cancelled',
