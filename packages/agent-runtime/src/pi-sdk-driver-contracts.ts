@@ -112,6 +112,8 @@ export interface PiSdkCreateSessionRequest extends RuntimeConfiguration {
   onCreateAgent?: (displayName: string) => Promise<AgentSummary>
   /** 绑定到当前 Agent 和当前会话观察版本的灵魂更新回调。 */
   onUpdateSoul: (content: string) => Promise<ProfileUpdateResult>
+  /** 绑定到当前会话观察版本的共享用户画像更新回调。 */
+  onUpdateUserProfile: (content: string) => Promise<ProfileUpdateResult>
   /** 工具审批与路径校验网关（用于 bash 审批和文件路径保护）。 */
   toolApprovalGateway?: ToolApprovalGateway
 }
@@ -129,6 +131,8 @@ export interface PiSdkOpenSessionRequest extends RuntimeConfiguration {
   sharedSkillsPath: string
   /** 绑定到当前 Agent 和当前会话观察版本的灵魂更新回调。 */
   onUpdateSoul: (content: string) => Promise<ProfileUpdateResult>
+  /** 绑定到当前会话观察版本的共享用户画像更新回调。 */
+  onUpdateUserProfile: (content: string) => Promise<ProfileUpdateResult>
   /** 工具审批与路径校验网关（用于 bash 审批和文件路径保护）。 */
   toolApprovalGateway?: ToolApprovalGateway
 }
@@ -582,7 +586,7 @@ export interface AgentSessionDriver {
    *
    * @param agentId - 目标 Agent 标识。
    * @param content - 新 soul 内容。
-   * @param requestedByAgentId - 发起更新请求的 Agent 标识（用于权限校验）。
+   * @param expectedVersion - 调用方最后观察到的内容版本。
    * @returns profile 维护结果。
    * @throws 当文件操作失败时，Promise 会 reject。
    */
@@ -596,11 +600,13 @@ export interface AgentSessionDriver {
    * 更新共享 user profile（含备份验证和敏感信息过滤）。
    *
    * @param content - 新 user profile 内容。
+   * @param expectedVersion - 调用方最后观察到的内容版本。
    * @returns profile 维护结果。
    * @throws 当文件操作失败时，Promise 会 reject。
    */
   updateUserProfile?(
     content: string,
+    expectedVersion: string,
   ): Promise<import('@tangyuan/contracts').ProfileUpdateResult>
 
   /**

@@ -345,6 +345,7 @@ export const updateSoulRequestSchema = z.strictObject({
  */
 export const updateUserProfileRequestSchema = z.strictObject({
   content: z.string().refine((content) => content.trim().length > 0),
+  expectedVersion: z.string().min(1),
 })
 
 /**

@@ -122,6 +122,7 @@ describe('profile schemas', () => {
     expect(() =>
       updateUserProfileRequestSchema.parse({
         content: '   ',
+        expectedVersion: 'sha256:observed-version',
       }),
     ).toThrow()
   })
@@ -130,8 +131,12 @@ describe('profile schemas', () => {
     expect(
       updateUserProfileRequestSchema.parse({
         content: 'New user profile.',
+        expectedVersion: 'sha256:observed-version',
       }),
-    ).toEqual({ content: 'New user profile.' })
+    ).toEqual({
+      content: 'New user profile.',
+      expectedVersion: 'sha256:observed-version',
+    })
   })
 
   it('rejects get soul request without agentId', () => {

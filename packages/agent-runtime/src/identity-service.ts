@@ -89,18 +89,25 @@ export class IdentityService {
    * 更新共享 user profile 内容，成功后刷新快照缓存。
    *
    * @param content - 新 user profile 内容。
+   * @param expectedVersion - 调用方最后观察到的内容版本。
    * @returns profile 维护结果。
    * @throws 当 Driver 不支持或操作失败时，Promise 会 reject。
    */
-  async updateUserProfile(content: string): Promise<ProfileUpdateResult> {
+  async updateUserProfile(
+    content: string,
+    expectedVersion: string,
+  ): Promise<ProfileUpdateResult> {
     if (!this.sessionDriver.updateUserProfile) {
       throw new Error('当前运行时不支持更新 user profile。')
     }
 
-    const result = await this.sessionDriver.updateUserProfile(content)
+    const result = await this.sessionDriver.updateUserProfile(
+      content,
+      expectedVersion,
+    )
 
     if (result.status === 'updated') {
-      await this.snapshotStore.reload()
+      await this.snapshotStore.reload().catch(() => undefined)
     }
 
     return result

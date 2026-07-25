@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createUpdateSoulTool } from './profile-tools'
+import {
+  createUpdateSoulTool,
+  createUpdateUserProfileTool,
+} from './profile-tools'
 
 describe('createUpdateSoulTool', () => {
   it('只向模型暴露完整新内容参数', () => {
@@ -24,7 +27,9 @@ describe('createUpdateSoulTool', () => {
     })
     const tool = createUpdateSoulTool(updateSoul)
 
-    await expect(tool.execute('call-1', { content: '新的 Agent 灵魂' })).resolves.toEqual({
+    await expect(
+      tool.execute('call-1', { content: '新的 Agent 灵魂' }),
+    ).resolves.toEqual({
       content: [{ type: 'text', text: 'Agent 灵魂已更新。' }],
     })
     expect(updateSoul).toHaveBeenCalledWith('新的 Agent 灵魂')
@@ -43,7 +48,9 @@ describe('createUpdateSoulTool', () => {
       }),
     )
 
-    await expect(tool.execute('call-1', { content: '新内容' })).resolves.toEqual({
+    await expect(
+      tool.execute('call-1', { content: '新内容' }),
+    ).resolves.toEqual({
       content: [
         {
           type: 'text',
@@ -58,7 +65,9 @@ describe('createUpdateSoulTool', () => {
       vi.fn().mockRejectedValue(new Error('磁盘不可用')),
     )
 
-    await expect(tool.execute('call-1', { content: '新内容' })).resolves.toEqual({
+    await expect(
+      tool.execute('call-1', { content: '新内容' }),
+    ).resolves.toEqual({
       content: [
         {
           type: 'text',
@@ -66,5 +75,42 @@ describe('createUpdateSoulTool', () => {
         },
       ],
     })
+  })
+})
+
+describe('createUpdateUserProfileTool', () => {
+  it('exposes only complete content and forwards failures without throwing', async () => {
+    const updateUserProfile = vi.fn(async () => ({
+      target: 'user' as const,
+      status: 'rejected' as const,
+      version: 'sha256:current',
+      reason: { code: 'version-conflict' as const, message: '版本已变化。' },
+    }))
+    const tool = createUpdateUserProfileTool(updateUserProfile)
+
+    expect(tool.name).toBe('update_user_profile')
+    expect(tool.parameters).toEqual({
+      type: 'object',
+      properties: { content: { type: 'string', minLength: 1 } },
+      required: ['content'],
+      additionalProperties: false,
+    })
+
+    const result = await tool.execute('call-1', { content: '# User\n新偏好' })
+
+    expect(updateUserProfile).toHaveBeenCalledWith('# User\n新偏好')
+    expect(result.content[0]?.text).toContain('version-conflict')
+    expect(result.content[0]?.text).toContain('最终回复')
+  })
+
+  it('returns a non-throwing message when the update callback fails', async () => {
+    const tool = createUpdateUserProfileTool(async () => {
+      throw new Error('写入失败')
+    })
+
+    const result = await tool.execute('call-1', { content: '完整用户画像' })
+
+    expect(result.content[0]?.text).toContain('写入失败')
+    expect(result.content[0]?.text).toContain('最终回复')
   })
 })

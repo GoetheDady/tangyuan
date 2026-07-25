@@ -369,11 +369,18 @@ export class PiSdkDriverResources extends PiSdkDriverState {
    * 更新共享 user profile（含备份验证和敏感信息过滤）。
    *
    * @param content - 新 user profile 内容。
+   * @param expectedVersion - 调用方最后观察到的内容版本。
    * @returns profile 维护结果。
    * @throws 当文件操作失败时，Promise 会 reject。
    */
-  async updateUserProfile(content: string): Promise<ProfileUpdateResult> {
-    const outcome = await this.profileStore.writeUserProfile(content)
+  async updateUserProfile(
+    content: string,
+    expectedVersion: string,
+  ): Promise<ProfileUpdateResult> {
+    const outcome = await this.profileStore.writeUserProfile(
+      content,
+      expectedVersion,
+    )
 
     // 真正写入文件时才广播事件并刷新全部活跃会话。
     if (outcome.written) {
@@ -381,7 +388,9 @@ export class PiSdkDriverResources extends PiSdkDriverState {
         (await getMtimeIso(this.layout.userProfile())) ?? this.now()
       this.emitProfileUpdated('user', updatedAt)
       // profile 变化点：共享 user.md 影响所有 Agent，刷新全部活跃会话。
-      await this.refreshAllProfileContext()
+      await this.refreshAllProfileContext().catch((error) => {
+        this.emitProfileRefreshError(TANGYUAN_DEFAULT_AGENT_ID, error)
+      })
     }
 
     return outcome.result

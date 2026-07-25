@@ -287,14 +287,15 @@ describe('registerDesktopAppIpc', () => {
 
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.profileUpdateUser)(null, {
-        content: 'New user profile'
+        content: 'New user profile',
+        expectedVersion: 'sha256:old'
       })
     ).resolves.toEqual({
       target: 'user',
       status: 'updated',
       version: 'sha256:new-user'
     })
-    expect(runtime.updateUserProfile).toHaveBeenCalledWith('New user profile')
+    expect(runtime.updateUserProfile).toHaveBeenCalledWith('New user profile', 'sha256:old')
 
     // Skills channel tests
     await expect(

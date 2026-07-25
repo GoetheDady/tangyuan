@@ -48,6 +48,7 @@ export abstract class PiSdkDriverState {
   protected readonly transcriptCache = new Map<string, TranscriptSnapshot>()
   protected readonly sessionHandles = new Map<string, PiSdkSessionHandle>()
   protected readonly sessionSoulVersions = new Map<string, string>()
+  protected readonly sessionUserProfileVersions = new Map<string, string>()
   protected readonly pendingProfileRefreshes = new Set<string>()
   protected readonly activeRunIds = new Map<string, string>()
   protected readonly runSequenceBySession = new Map<string, number>()
@@ -109,6 +110,11 @@ export abstract class PiSdkDriverState {
     expectedVersion: string,
   ): Promise<ProfileUpdateResult>
 
+  protected abstract updateUserProfile(
+    content: string,
+    expectedVersion: string,
+  ): Promise<ProfileUpdateResult>
+
   /**
    * 确保指定会话已从索引加载到内存。
    *
@@ -159,9 +165,14 @@ export abstract class PiSdkDriverState {
         sessionId,
         indexEntry.agentId,
       ),
+      onUpdateUserProfile: this.createSessionUserProfileUpdater(sessionId),
     }
-    const soul = await this.profileStore.readSoul(indexEntry.agentId)
+    const [soul, userProfile] = await Promise.all([
+      this.profileStore.readSoul(indexEntry.agentId),
+      this.profileStore.readUserProfile(),
+    ])
     this.sessionSoulVersions.set(sessionId, soul.version)
+    this.sessionUserProfileVersions.set(sessionId, userProfile.version)
     const handle = await this.gateway.openSession(
       this.toolApprovalGateway
         ? { ...openRequest, toolApprovalGateway: this.toolApprovalGateway }
@@ -217,9 +228,10 @@ export abstract class PiSdkDriverState {
    * @throws 当 profile 读取或 reload 失败时，Promise 会 reject。
    */
   protected async refreshAgentProfileContext(agentId: AgentId): Promise<void> {
-    const [context, soul] = await Promise.all([
+    const [context, soul, userProfile] = await Promise.all([
       this.profileStore.buildSystemPromptContext(agentId),
       this.profileStore.readSoul(agentId),
+      this.profileStore.readUserProfile(),
     ])
     const promises: Promise<void>[] = []
 
@@ -239,10 +251,12 @@ export abstract class PiSdkDriverState {
         promises.push(
           handle.reload().then(() => {
             this.sessionSoulVersions.set(sessionId, soul.version)
+            this.sessionUserProfileVersions.set(sessionId, userProfile.version)
           }),
         )
       } else {
         this.sessionSoulVersions.set(sessionId, soul.version)
+        this.sessionUserProfileVersions.set(sessionId, userProfile.version)
       }
     }
 
@@ -268,6 +282,24 @@ export abstract class PiSdkDriverState {
     }
   }
 
+  /** 创建绑定到单个会话最后观察版本的共享用户画像更新回调。 */
+  protected createSessionUserProfileUpdater(
+    sessionId: string,
+  ): (content: string) => Promise<ProfileUpdateResult> {
+    return async (content: string) => {
+      const expectedVersion =
+        this.sessionUserProfileVersions.get(sessionId) ??
+        (await this.profileStore.readUserProfile()).version
+      const result = await this.updateUserProfile(content, expectedVersion)
+
+      if (result.status !== 'rejected') {
+        this.sessionUserProfileVersions.set(sessionId, result.version)
+      }
+
+      return result
+    }
+  }
+
   /** 在生成结束后刷新单个排队会话，不影响已经完成的回复。 */
   protected async refreshSessionProfileContext(
     sessionId: string,
@@ -276,13 +308,15 @@ export abstract class PiSdkDriverState {
     const agentId = this.sessionIndexStore.getEntryOrNull(sessionId)?.agentId
     if (!handle?.setSystemPromptContext || !agentId) return
 
-    const [context, soul] = await Promise.all([
+    const [context, soul, userProfile] = await Promise.all([
       this.profileStore.buildSystemPromptContext(agentId),
       this.profileStore.readSoul(agentId),
+      this.profileStore.readUserProfile(),
     ])
     handle.setSystemPromptContext(context)
     await handle.reload?.()
     this.sessionSoulVersions.set(sessionId, soul.version)
+    this.sessionUserProfileVersions.set(sessionId, userProfile.version)
   }
 
   /** 上下文刷新失败只广播可恢复错误，不改变已经完成的 profile 写入结果。 */
@@ -292,7 +326,7 @@ export abstract class PiSdkDriverState {
       agentId,
       error: {
         code: 'unknown',
-        message: `刷新 Agent 灵魂上下文失败：${sanitizeErrorMessage(error)}`,
+        message: `刷新 Agent 身份上下文失败：${sanitizeErrorMessage(error)}`,
         recoverable: true,
       },
       occurredAt: this.now(),

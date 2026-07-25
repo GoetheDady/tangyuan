@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
 
+import { UserProfileEditor } from '@/components/UserProfileEditor'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
@@ -156,6 +157,10 @@ export function ConsoleAgentListPage(): React.JSX.Element {
         </header>
 
         <Separator className="mb-8" />
+
+        <div className="mb-8">
+          <UserProfileEditor editable />
+        </div>
 
         {isLoading ? (
           <div className="rounded-lg border bg-card p-12 text-center">

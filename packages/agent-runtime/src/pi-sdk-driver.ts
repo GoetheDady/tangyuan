@@ -183,7 +183,10 @@ export class PiSdkDriver
       this.configStore.readRequired(request.agentId),
       this.sessionIndexStore.load(),
     ])
-    const soul = await this.profileStore.readSoul(request.agentId)
+    const [soul, userProfile] = await Promise.all([
+      this.profileStore.readSoul(request.agentId),
+      this.profileStore.readUserProfile(),
+    ])
     const sessionId = this.createNextSessionId()
     const now = this.now()
     const sdkSessionFile = this.layout.sdkSessionFile(sessionId)
@@ -200,8 +203,10 @@ export class PiSdkDriver
       agentSkillsPath: this.layout.agentSkills(request.agentId),
       sharedSkillsPath: this.layout.sharedSkills(),
       onUpdateSoul: this.createSessionSoulUpdater(sessionId, request.agentId),
+      onUpdateUserProfile: this.createSessionUserProfileUpdater(sessionId),
     }
     this.sessionSoulVersions.set(sessionId, soul.version)
+    this.sessionUserProfileVersions.set(sessionId, userProfile.version)
     const createSessionRequest: PiSdkCreateSessionRequest = this
       .toolApprovalGateway
       ? { ...baseRequest, toolApprovalGateway: this.toolApprovalGateway }

@@ -66,6 +66,8 @@ export interface UpdateSoulRequest {
  */
 export interface UpdateUserProfileRequest {
   content: string
+  /** 设置页面或会话最后读取到的共享用户画像版本。 */
+  expectedVersion: string
 }
 
 /**

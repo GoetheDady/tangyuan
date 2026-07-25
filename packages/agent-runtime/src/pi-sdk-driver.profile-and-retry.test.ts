@@ -360,6 +360,99 @@ describe('PiSdkDriver', () => {
       ]),
     })
   })
+  it('updates the shared user profile during a normal turn without duplicate events or system messages', async () => {
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle: PiSdkSessionHandle = {
+          setSystemPromptContext: () => undefined,
+          reload: async () => undefined,
+          prompt: async () => {
+            await request.onUpdateUserProfile('# User\n正常回合内更新。')
+            return '已完成更新。'
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        return handle
+      },
+    })
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+    const events: AgentEvent[] = []
+    driver.subscribe((event) => events.push(event))
+
+    await writeInitializedProfile(join(rootPath, homePath.slice(2)), rootPath)
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '共享画像工具更新',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '记住我的偏好',
+    })
+
+    expect(
+      events.filter(
+        (event) => event.type === 'profile-updated' && event.target === 'user',
+      ),
+    ).toHaveLength(1)
+    await expect(
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toMatchObject({
+      entries: expect.not.arrayContaining([
+        expect.objectContaining({ kind: 'system-message' }),
+      ]),
+    })
+  })
+
+  it('binds shared profile updates to the session-observed version and refreshes every active session', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver, rootPath, homePath } = await createDriver({ gateway })
+    await writeInitializedProfile(join(rootPath, homePath.slice(2)), rootPath)
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+
+    const first = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '第一会话',
+    })
+    await driver.createSession({ agentId: 'tangyuan', title: '第二会话' })
+    const firstRequest = gateway.sessionRequests.find(
+      (request) => request.sessionId === first.sessionId,
+    )
+    expect(firstRequest).toBeDefined()
+
+    const observed = await driver.getUserProfile()
+    await expect(
+      firstRequest?.onUpdateUserProfile('# User\n共享新偏好。'),
+    ).resolves.toMatchObject({ status: 'updated' })
+    expect(
+      gateway.sessionHandles[0]?.systemPromptContexts.length,
+    ).toBeGreaterThan(1)
+    expect(
+      gateway.sessionHandles[1]?.systemPromptContexts.length,
+    ).toBeGreaterThan(1)
+
+    await expect(
+      driver.updateUserProfile('# User\n过期覆盖。', observed.version),
+    ).resolves.toMatchObject({
+      status: 'rejected',
+      reason: { code: 'version-conflict' },
+    })
+  })
+
   it('keeps a successful tool update after cancellation and avoids duplicate backups on retry', async () => {
     const updateCompleted = createDeferred<void>()
     const releasePrompt = createDeferred<void>()
@@ -423,6 +516,71 @@ describe('PiSdkDriver', () => {
     )
     expect(historyFiles).toHaveLength(1)
   })
+  it('creates a shared user profile on first update and does not duplicate unchanged writes', async () => {
+    const { driver, rootPath } = await createDriver()
+    const events: AgentEvent[] = []
+    driver.subscribe((event) => events.push(event))
+    await driver.getSnapshot()
+
+    const initial = await driver.getUserProfile()
+    const firstResult = await driver.updateUserProfile(
+      '# User\n首次记录的偏好。',
+      initial.version,
+    )
+
+    expect(firstResult).toMatchObject({ target: 'user', status: 'updated' })
+    const profileDir = join(rootPath, '.tangyuan/profile')
+    await expect(readFile(join(profileDir, 'user.md'), 'utf8')).resolves.toBe(
+      '# User\n首次记录的偏好。',
+    )
+    await expect(
+      import('node:fs/promises').then(({ readdir }) =>
+        readdir(join(profileDir, 'user.history')),
+      ),
+    ).resolves.toEqual([])
+
+    const unchangedResult = await driver.updateUserProfile(
+      '# User\n首次记录的偏好。',
+      firstResult.version,
+    )
+    expect(unchangedResult).toMatchObject({
+      target: 'user',
+      status: 'unchanged',
+    })
+    expect(
+      events.filter(
+        (event) => event.type === 'profile-updated' && event.target === 'user',
+      ),
+    ).toHaveLength(1)
+  })
+
+  it('keeps shared user profile unchanged when its backup fails', async () => {
+    const { driver, rootPath } = await createDriver()
+    const { mkdir, rm, writeFile } = await import('node:fs/promises')
+    await driver.getSnapshot()
+
+    const profileDir = join(rootPath, '.tangyuan/profile')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'user.md'), '# User\n旧偏好。', 'utf8')
+    const current = await driver.getUserProfile()
+    await rm(join(profileDir, 'user.history'), { recursive: true })
+    await writeFile(join(profileDir, 'user.history'), '阻止创建目录', 'utf8')
+
+    const result = await driver.updateUserProfile(
+      '# User\n新偏好。',
+      current.version,
+    )
+
+    expect(result).toMatchObject({
+      target: 'user',
+      status: 'rejected',
+      reason: { code: 'backup-failed' },
+    })
+    await expect(readFile(join(profileDir, 'user.md'), 'utf8')).resolves.toBe(
+      '# User\n旧偏好。',
+    )
+  })
+
   it('updates shared user profile and emits a profile-updated event', async () => {
     const { driver, rootPath } = await createDriver()
     const { mkdir, writeFile } = await import('node:fs/promises')
@@ -448,7 +606,11 @@ describe('PiSdkDriver', () => {
       'utf8',
     )
 
-    const result = await driver.updateUserProfile('# User\n新用户偏好。')
+    const current = await driver.getUserProfile()
+    const result = await driver.updateUserProfile(
+      '# User\n新用户偏好。',
+      current.version,
+    )
 
     expect(result).toMatchObject({ target: 'user', status: 'updated' })
 
@@ -495,8 +657,10 @@ describe('PiSdkDriver', () => {
     )
 
     // 尝试写入含敏感信息的内容
+    const current = await driver.getUserProfile()
     const result = await driver.updateUserProfile(
       '# User\npassword: my-secret-pwd',
+      current.version,
     )
 
     expect(result).toMatchObject({

@@ -641,7 +641,7 @@ describe('TangyuanRuntime', () => {
     })
 
     await expect(
-      runtime.updateUserProfile('New user profile'),
+      runtime.updateUserProfile('New user profile', 'sha256:old'),
     ).resolves.toEqual({
       target: 'user',
       status: 'updated',
@@ -650,6 +650,7 @@ describe('TangyuanRuntime', () => {
 
     expect(sessionDriver.updateUserProfile).toHaveBeenCalledWith(
       'New user profile',
+      'sha256:old',
     )
     // 成功后应刷新快照
     expect(runtimeDriver.getSnapshot).toHaveBeenCalled()

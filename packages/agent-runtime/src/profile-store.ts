@@ -243,7 +243,7 @@ export class ProfileStore {
   }
 
   /**
-   * 读取共享 user profile 内容（缺失时迁移或创建空文件）。
+   * 读取共享 user profile 内容（缺失时先尝试迁移）。
    *
    * @returns 共享 user profile 内容和更新时间。
    * @throws 当文件读取失败时，Promise 会 reject。
@@ -257,10 +257,6 @@ export class ProfileStore {
 
     await mkdir(this.layout.sharedProfile(), { recursive: true })
     await mkdir(this.layout.userHistory(), { recursive: true })
-
-    if (!(await pathExists(userPath))) {
-      await writeFile(userPath, '', 'utf8')
-    }
 
     const content = await safeReadFile(userPath)
     const updatedAt = (await getMtimeIso(userPath)) ?? this.now()
@@ -300,23 +296,23 @@ export class ProfileStore {
    * 仅返回结果，不广播事件、不刷新会话（由调用方编排）。
    *
    * @param content - 新 user profile 内容。
+   * @param expectedVersion - 调用方最后观察到的内容版本。
    * @returns profile 维护结果。
    * @throws 当文件操作失败时，Promise 会 reject。
    */
-  async writeUserProfile(content: string): Promise<ProfileWriteOutcome> {
+  async writeUserProfile(
+    content: string,
+    expectedVersion: string,
+  ): Promise<ProfileWriteOutcome> {
     const userPath = this.layout.userProfile()
     const historyPath = this.layout.userHistory()
 
     await mkdir(this.layout.sharedProfile(), { recursive: true })
-    await mkdir(historyPath, { recursive: true })
 
     if (!(await pathExists(userPath))) {
       await this.migrateLegacyUserProfile()
     }
 
-    const previousContent = (await pathExists(userPath))
-      ? await safeReadFile(userPath)
-      : ''
     const apiKey = await this.readAgentApiKey(TANGYUAN_DEFAULT_AGENT_ID)
 
     return this.writeProfile({
@@ -324,7 +320,7 @@ export class ProfileStore {
       path: userPath,
       historyPath,
       content,
-      expectedVersion: createProfileVersion(previousContent),
+      expectedVersion,
       apiKey,
     })
   }

@@ -79,7 +79,20 @@ describe('IdentityService', () => {
         async () => ({ status: 'updated', version: 'sha256:new' }) as never,
       ),
     })
-    await service.updateUserProfile('内容')
+    await service.updateUserProfile('内容', 'sha256:old')
     expect(snapshotStore.reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('用户画像更新后快照刷新失败不影响写入结果', async () => {
+    const { service, snapshotStore } = createService({
+      updateUserProfile: vi.fn(
+        async () => ({ status: 'updated', version: 'sha256:new' }) as never,
+      ),
+    })
+    snapshotStore.reload.mockRejectedValueOnce(new Error('reload failed'))
+
+    await expect(
+      service.updateUserProfile('内容', 'sha256:old'),
+    ).resolves.toMatchObject({ status: 'updated' })
   })
 })

@@ -349,11 +349,15 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
    * 更新共享 user profile 内容。
    *
    * @param content - 新 user profile 内容。
+   * @param expectedVersion - 调用方最后观察到的内容版本。
    * @returns profile 维护结果。
    * @throws 当 AgentSessionDriver 不支持或操作失败时，Promise 会 reject。
    */
-  async updateUserProfile(content: string): Promise<ProfileUpdateResult> {
-    return this.identityService.updateUserProfile(content)
+  async updateUserProfile(
+    content: string,
+    expectedVersion: string,
+  ): Promise<ProfileUpdateResult> {
+    return this.identityService.updateUserProfile(content, expectedVersion)
   }
 
   /**

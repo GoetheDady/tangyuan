@@ -716,7 +716,7 @@ export interface DesktopPreloadApi {
   /**
    * 更新共享 user profile 内容。
    *
-   * @param request - 新 user profile 内容。
+   * @param request - 新 user profile 内容和调用方观察到的版本。
    * @returns profile 维护结果，包含成功状态和可能的失败原因。
    * @throws 当文件操作失败时，Promise 会 reject。
    */
