@@ -292,6 +292,7 @@ export const soulContentSchema = z.strictObject({
   agentId: nonEmptyIdentifierSchema,
   content: z.string(),
   updatedAt: timestampSchema,
+  version: z.string().min(1),
 })
 
 /**
@@ -300,16 +301,34 @@ export const soulContentSchema = z.strictObject({
 export const userProfileContentSchema = z.strictObject({
   content: z.string(),
   updatedAt: timestampSchema,
+  version: z.string().min(1),
 })
 
 /**
- * 校验 profile 维护操作结果。
+ * 校验受控 profile 更新结果。
  */
-export const profileMaintenanceResultSchema = z.strictObject({
-  target: z.enum(['soul', 'user']),
-  success: z.boolean(),
-  reason: z.string().optional(),
-})
+export const profileUpdateResultSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    target: z.enum(['soul', 'user']),
+    status: z.enum(['updated', 'unchanged']),
+    version: z.string().min(1),
+  }),
+  z.strictObject({
+    target: z.enum(['soul', 'user']),
+    status: z.literal('rejected'),
+    version: z.string().min(1),
+    reason: z.strictObject({
+      code: z.enum([
+        'version-conflict',
+        'sensitive-content',
+        'backup-failed',
+        'write-failed',
+        'permission-denied',
+      ]),
+      message: z.string().min(1),
+    }),
+  }),
+])
 
 /**
  * 校验更新 soul 请求。
@@ -317,6 +336,7 @@ export const profileMaintenanceResultSchema = z.strictObject({
 export const updateSoulRequestSchema = z.strictObject({
   agentId: nonEmptyIdentifierSchema,
   content: z.string().refine((content) => content.trim().length > 0),
+  expectedVersion: z.string().min(1),
 })
 
 /**

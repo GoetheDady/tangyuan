@@ -28,7 +28,7 @@ import {
   type CreateSessionRequest,
   type GetSessionMessagesRequest,
   type GetSessionModelInfoRequest,
-  type ProfileMaintenanceResult,
+  type ProfileUpdateResult,
   type RetryRunRequest,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
@@ -467,8 +467,9 @@ class DefaultTangyuanRuntime {
   async updateSoul(
     agentId: string,
     content: string,
-  ): Promise<ProfileMaintenanceResult> {
-    return this.identityService.updateSoul(agentId, content)
+    expectedVersion: string,
+  ): Promise<ProfileUpdateResult> {
+    return this.identityService.updateSoul(agentId, content, expectedVersion)
   }
 
   /**
@@ -478,7 +479,7 @@ class DefaultTangyuanRuntime {
    * @returns profile 维护结果。
    * @throws 当 AgentSessionDriver 不支持或操作失败时，Promise 会 reject。
    */
-  async updateUserProfile(content: string): Promise<ProfileMaintenanceResult> {
+  async updateUserProfile(content: string): Promise<ProfileUpdateResult> {
     return this.identityService.updateUserProfile(content)
   }
 

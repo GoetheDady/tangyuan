@@ -17,6 +17,7 @@ import {
   describeBashRisk,
   normalizePiSdkSessionEvent,
 } from './utils'
+import { createUpdateSoulTool } from './profile-tools'
 
 export class RealPiSdkGateway implements PiSdkGateway {
   /**
@@ -236,6 +237,8 @@ export class RealPiSdkGateway implements PiSdkGateway {
     await resourceLoader.reload()
 
     const customTools: Array<Record<string, unknown>> = []
+
+    customTools.push(createUpdateSoulTool(request.onUpdateSoul))
 
     if ('onCreateAgent' in request && request.onCreateAgent) {
       const onCreateAgent = request.onCreateAgent

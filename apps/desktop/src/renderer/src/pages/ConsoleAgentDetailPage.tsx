@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
 
+import { AgentSoulEditor } from '@/components/AgentSoulEditor'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -377,6 +378,8 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                 ) : null}
               </dl>
             </div>
+
+            <AgentSoulEditor key={agent.agentId} agentId={agent.agentId} editable={isEditable} />
 
             {/* Skills 区域 */}
             <div className="rounded-lg border bg-card p-6">

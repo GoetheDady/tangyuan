@@ -242,13 +242,13 @@ export function registerDesktopAppIpc(
     )
   })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.profileUpdateSoul, async (_event, payload) => {
-    const { agentId, content } = parseDesktopIpcRequest(
+    const { agentId, content, expectedVersion } = parseDesktopIpcRequest(
       DESKTOP_IPC_CHANNELS.profileUpdateSoul,
       payload
     )
     return parseDesktopIpcResponse(
       DESKTOP_IPC_CHANNELS.profileUpdateSoul,
-      await runtime.updateSoul(agentId, content)
+      await runtime.updateSoul(agentId, content, expectedVersion)
     )
   })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.profileUpdateUser, async (_event, payload) => {

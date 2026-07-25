@@ -137,19 +137,23 @@ describe('App', () => {
       getSoul: vi.fn().mockResolvedValue({
         agentId: 'tangyuan',
         content: '',
-        updatedAt: ''
+        updatedAt: '',
+        version: 'sha256:empty'
       }),
       getUserProfile: vi.fn().mockResolvedValue({
         content: '',
-        updatedAt: ''
+        updatedAt: '',
+        version: 'sha256:empty'
       }),
       updateSoul: vi.fn().mockResolvedValue({
         target: 'soul' as const,
-        success: true
+        status: 'updated' as const,
+        version: 'sha256:new-soul'
       }),
       updateUserProfile: vi.fn().mockResolvedValue({
         target: 'user' as const,
-        success: true
+        status: 'updated' as const,
+        version: 'sha256:new-user'
       }),
       listAgentSkills: vi.fn().mockResolvedValue([]),
       listSharedSkills: vi.fn().mockResolvedValue([]),
@@ -171,6 +175,15 @@ describe('App', () => {
       configurable: true,
       value: api
     })
+  })
+
+  it('在 Agent 详情设置页展示 Agent 灵魂编辑入口', async () => {
+    window.location.hash = '#/console/agents/tangyuan'
+
+    render(<App />)
+
+    expect(await screen.findByLabelText('Agent 灵魂')).toBeInTheDocument()
+    expect(window.api.getSoul).toHaveBeenCalledWith({ agentId: 'tangyuan' })
   })
 
   it('renders the setup page when configuration is missing', async () => {

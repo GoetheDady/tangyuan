@@ -1,5 +1,5 @@
 import type {
-  ProfileMaintenanceResult,
+  ProfileUpdateResult,
   SoulContent,
   UserProfileContent,
 } from '@tangyuan/contracts'
@@ -16,8 +16,7 @@ export interface IdentityServiceDependencies {
 
 /**
  * 身份与资料服务：承载「Agent soul 与共享 user profile 如何读取、更新」
- * 这一族操作。更新成功后刷新运行时快照缓存以获取最新的 profile 时间戳；
- * soul 更新以当前 activeAgent 作为请求发起方进行权限校验。
+ * 这一族操作。内容实际更新后刷新运行时快照缓存以获取最新的 profile 时间戳。
  */
 export class IdentityService {
   private readonly sessionDriver: AgentSessionDriver
@@ -66,20 +65,19 @@ export class IdentityService {
   async updateSoul(
     agentId: string,
     content: string,
-  ): Promise<ProfileMaintenanceResult> {
+    expectedVersion: string,
+  ): Promise<ProfileUpdateResult> {
     if (!this.sessionDriver.updateSoul) {
       throw new Error('当前运行时不支持更新 Agent soul。')
     }
 
-    // 使用 activeAgent 作为请求发起方进行权限校验
-    const snapshot = await this.snapshotStore.getOrLoad()
     const result = await this.sessionDriver.updateSoul(
       agentId,
       content,
-      snapshot.activeAgent.agentId,
+      expectedVersion,
     )
 
-    if (result.success) {
+    if (result.status === 'updated') {
       await this.snapshotStore.reload()
     }
 
@@ -93,14 +91,14 @@ export class IdentityService {
    * @returns profile 维护结果。
    * @throws 当 Driver 不支持或操作失败时，Promise 会 reject。
    */
-  async updateUserProfile(content: string): Promise<ProfileMaintenanceResult> {
+  async updateUserProfile(content: string): Promise<ProfileUpdateResult> {
     if (!this.sessionDriver.updateUserProfile) {
       throw new Error('当前运行时不支持更新 user profile。')
     }
 
     const result = await this.sessionDriver.updateUserProfile(content)
 
-    if (result.success) {
+    if (result.status === 'updated') {
       await this.snapshotStore.reload()
     }
 

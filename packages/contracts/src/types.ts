@@ -503,6 +503,8 @@ export interface SoulContent {
   agentId: AgentId
   content: string
   updatedAt: string
+  /** 内容版本，用于受控更新时检测旧版本覆盖。 */
+  version: string
 }
 
 /**
@@ -511,17 +513,38 @@ export interface SoulContent {
 export interface UserProfileContent {
   content: string
   updatedAt: string
+  /** 内容版本，用于受控更新时检测旧版本覆盖。 */
+  version: string
 }
 
 /**
- * 描述 profile 维护操作结果。
+ * 描述 profile 更新被拒绝的原因。
  */
-export interface ProfileMaintenanceResult {
-  target: 'soul' | 'user'
-  success: boolean
-  /** 失败原因，如缺少备份、含敏感信息、权限不足等。 */
-  reason?: string
+export interface ProfileUpdateRejection {
+  code:
+    | 'version-conflict'
+    | 'sensitive-content'
+    | 'backup-failed'
+    | 'write-failed'
+    | 'permission-denied'
+  message: string
 }
+
+/**
+ * 描述受控 profile 更新结果。
+ */
+export type ProfileUpdateResult =
+  | {
+      target: 'soul' | 'user'
+      status: 'updated' | 'unchanged'
+      version: string
+    }
+  | {
+      target: 'soul' | 'user'
+      status: 'rejected'
+      version: string
+      reason: ProfileUpdateRejection
+    }
 
 /**
  * 描述更新 Agent soul 的请求。
@@ -529,6 +552,8 @@ export interface ProfileMaintenanceResult {
 export interface UpdateSoulRequest {
   agentId: AgentId
   content: string
+  /** 设置页面最后读取到的 Agent 灵魂版本。 */
+  expectedVersion: string
 }
 
 /**

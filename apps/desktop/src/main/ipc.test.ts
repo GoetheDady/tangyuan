@@ -96,19 +96,23 @@ describe('registerDesktopAppIpc', () => {
       getSoul: vi.fn().mockResolvedValue({
         agentId: 'tangyuan',
         content: '# Soul content',
-        updatedAt: '2026-07-08T00:00:00.000Z'
+        updatedAt: '2026-07-08T00:00:00.000Z',
+        version: 'sha256:soul'
       }),
       getUserProfile: vi.fn().mockResolvedValue({
         content: '# User profile',
-        updatedAt: '2026-07-08T00:00:00.000Z'
+        updatedAt: '2026-07-08T00:00:00.000Z',
+        version: 'sha256:user'
       }),
       updateSoul: vi.fn().mockResolvedValue({
         target: 'soul',
-        success: true
+        status: 'updated',
+        version: 'sha256:new-soul'
       }),
       updateUserProfile: vi.fn().mockResolvedValue({
         target: 'user',
-        success: true
+        status: 'updated',
+        version: 'sha256:new-user'
       }),
       reloadAgentSessions: vi.fn().mockResolvedValue(undefined),
       reloadAllSessions: vi.fn().mockResolvedValue(undefined),
@@ -254,7 +258,8 @@ describe('registerDesktopAppIpc', () => {
     ).resolves.toEqual({
       agentId: 'tangyuan',
       content: '# Soul content',
-      updatedAt: '2026-07-08T00:00:00.000Z'
+      updatedAt: '2026-07-08T00:00:00.000Z',
+      version: 'sha256:soul'
     })
     expect(runtime.getSoul).toHaveBeenCalledWith('tangyuan')
 
@@ -262,23 +267,33 @@ describe('registerDesktopAppIpc', () => {
       getHandler(handlers, DESKTOP_IPC_CHANNELS.profileGetUser)(null, undefined)
     ).resolves.toEqual({
       content: '# User profile',
-      updatedAt: '2026-07-08T00:00:00.000Z'
+      updatedAt: '2026-07-08T00:00:00.000Z',
+      version: 'sha256:user'
     })
     expect(runtime.getUserProfile).toHaveBeenCalledOnce()
 
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.profileUpdateSoul)(null, {
         agentId: 'tangyuan',
-        content: 'New soul'
+        content: 'New soul',
+        expectedVersion: 'sha256:old'
       })
-    ).resolves.toEqual({ target: 'soul', success: true })
-    expect(runtime.updateSoul).toHaveBeenCalledWith('tangyuan', 'New soul')
+    ).resolves.toEqual({
+      target: 'soul',
+      status: 'updated',
+      version: 'sha256:new-soul'
+    })
+    expect(runtime.updateSoul).toHaveBeenCalledWith('tangyuan', 'New soul', 'sha256:old')
 
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.profileUpdateUser)(null, {
         content: 'New user profile'
       })
-    ).resolves.toEqual({ target: 'user', success: true })
+    ).resolves.toEqual({
+      target: 'user',
+      status: 'updated',
+      version: 'sha256:new-user'
+    })
     expect(runtime.updateUserProfile).toHaveBeenCalledWith('New user profile')
 
     // Skills channel tests
@@ -386,19 +401,23 @@ describe('registerDesktopAppIpc', () => {
       getSoul: vi.fn().mockResolvedValue({
         agentId: 'tangyuan',
         content: '',
-        updatedAt: ''
+        updatedAt: '',
+        version: 'sha256:empty'
       }),
       getUserProfile: vi.fn().mockResolvedValue({
         content: '',
-        updatedAt: ''
+        updatedAt: '',
+        version: 'sha256:empty'
       }),
       updateSoul: vi.fn().mockResolvedValue({
         target: 'soul' as const,
-        success: true
+        status: 'updated' as const,
+        version: 'sha256:new-soul'
       }),
       updateUserProfile: vi.fn().mockResolvedValue({
         target: 'user' as const,
-        success: true
+        status: 'updated' as const,
+        version: 'sha256:new-user'
       }),
       listAgentSkills: vi.fn().mockResolvedValue([]),
       listSharedSkills: vi.fn().mockResolvedValue([]),

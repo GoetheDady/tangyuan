@@ -632,6 +632,7 @@ describe('PiSdkDriver', () => {
       expect.objectContaining({
         sessionId: session.sessionId,
         sdkSessionFile: expect.stringContaining('.jsonl'),
+        onUpdateSoul: expect.any(Function),
       }),
     ])
   })
@@ -3394,7 +3395,7 @@ describe('PiSdkDriver', () => {
   it('claims an unclaimed directory and creates config entry', async () => {
     const gateway = createPiSdkGateway()
     const { driver, rootPath } = await createDriver({ gateway })
-    const { mkdir, writeFile } = await import('node:fs/promises')
+    const { mkdir } = await import('node:fs/promises')
 
     // 手动创建一个未归属目录
     const unclaimedPath = join(rootPath, '.tangyuan/agents/unclaimed-agent')
@@ -3453,7 +3454,7 @@ describe('PiSdkDriver', () => {
 
   it('reads shared user profile from the shared profile path', async () => {
     const { driver, rootPath } = await createDriver()
-    const { mkdir, writeFile } = await import('node:fs/promises')
+    const { mkdir } = await import('node:fs/promises')
 
     // 先初始化 driver
     await driver.getSnapshot()
@@ -3519,23 +3520,15 @@ describe('PiSdkDriver', () => {
       events.push(event)
     })
 
-    // 备份（模拟 Agent 先备份再更新）
-    const historyDir = join(resolvedHomePath, 'soul.history')
-    const { writeFile: fsWriteFile } = await import('node:fs/promises')
-    await fsWriteFile(
-      join(historyDir, '2026-07-17-backup.md'),
-      '# 汤圆\n旧 soul。',
-      'utf8',
-    )
+    const current = await driver.getSoul('tangyuan')
 
     const result = await driver.updateSoul(
       'tangyuan',
       '# 汤圆\n新 soul 内容。',
-      'tangyuan',
+      current.version,
     )
 
-    expect(result.success).toBe(true)
-    expect(result.target).toBe('soul')
+    expect(result).toMatchObject({ target: 'soul', status: 'updated' })
 
     // 验证文件已更新
     const { readFile } = await import('node:fs/promises')
@@ -3550,28 +3543,16 @@ describe('PiSdkDriver', () => {
       expect.arrayContaining([
         expect.objectContaining({
           type: 'profile-updated',
+          agentId: 'tangyuan',
           target: 'soul',
         }),
       ]),
     )
   })
 
-  it('rejects soul update from another agent (access control)', async () => {
-    const { driver } = await createDriver()
-
-    await driver.getSnapshot()
-
-    // Agent B 尝试更新 Agent A 的 soul
-    const result = await driver.updateSoul('agent-a', '# New soul', 'agent-b')
-
-    expect(result.success).toBe(false)
-    expect(result.reason).toContain('无权修改')
-    expect(result.reason).toContain('agent-a')
-  })
-
-  it('allows tangyuan to update another agent soul (for creation)', async () => {
+  it('creates another agent soul without an empty backup', async () => {
     const { driver, rootPath } = await createDriver()
-    const { mkdir, writeFile } = await import('node:fs/promises')
+    const { mkdir } = await import('node:fs/promises')
 
     await driver.getSnapshot()
 
@@ -3582,17 +3563,14 @@ describe('PiSdkDriver', () => {
     await mkdir(join(agentBPath, 'memory'), { recursive: true })
     await mkdir(join(agentBPath, 'skills'), { recursive: true })
 
-    // 备份
-    await writeFile(join(agentBPath, 'soul.history/backup.md'), '', 'utf8')
-
-    // 汤圆（tangyuan）更新 agent-b 的 soul
+    const current = await driver.getSoul('agent-b')
     const result = await driver.updateSoul(
       'agent-b',
       '# Agent B\n新创建 Agent 的初始 soul。',
-      'tangyuan',
+      current.version,
     )
 
-    expect(result.success).toBe(true)
+    expect(result.status).toBe('updated')
 
     // 验证文件已创建
     const { readFile } = await import('node:fs/promises')
@@ -3600,7 +3578,7 @@ describe('PiSdkDriver', () => {
     expect(content).toContain('新创建 Agent')
   })
 
-  it('filters sensitive content from soul updates', async () => {
+  it('rejects sensitive content from soul updates', async () => {
     const gateway = createPiSdkGateway()
     const { driver, rootPath } = await createDriver({ gateway })
     const { writeFile } = await import('node:fs/promises')
@@ -3622,27 +3600,25 @@ describe('PiSdkDriver', () => {
       'utf8',
     )
 
-    // 备份
-    const historyDir = join(resolvedHomePath, 'soul.history')
-    await writeFile(join(historyDir, 'backup.md'), '# 汤圆\n旧 soul。', 'utf8')
-
-    // 尝试写入含 API Key 的内容
+    const current = await driver.getSoul('tangyuan')
     const result = await driver.updateSoul(
       'tangyuan',
       '# 汤圆\n我的 API Key 是 sk-test-secret-7890。',
-      'tangyuan',
+      current.version,
     )
 
-    expect(result.success).toBe(true)
+    expect(result).toMatchObject({
+      status: 'rejected',
+      reason: { code: 'sensitive-content' },
+    })
 
-    // 验证敏感内容已脱敏
     const { readFile } = await import('node:fs/promises')
     const content = await readFile(join(resolvedHomePath, 'soul.md'), 'utf8')
     expect(content).not.toContain('sk-test-secret-7890')
-    expect(content).toContain('[已隐藏敏感凭据]')
+    expect(content).toBe('# 汤圆\n旧 soul。')
   })
 
-  it('rejects soul update when no backup exists', async () => {
+  it('automatically backs up the old soul before updating', async () => {
     const { driver, rootPath } = await createDriver()
     const { writeFile } = await import('node:fs/promises')
 
@@ -3656,15 +3632,152 @@ describe('PiSdkDriver', () => {
       'utf8',
     )
 
-    // 尝试更新 soul 但未备份
+    const current = await driver.getSoul('tangyuan')
     const result = await driver.updateSoul(
       'tangyuan',
-      '# 汤圆\n新 soul（无备份）。',
-      'tangyuan',
+      '# 汤圆\n新 soul。',
+      current.version,
     )
 
-    expect(result.success).toBe(false)
-    expect(result.reason).toContain('备份')
+    expect(result.status).toBe('updated')
+    const historyFiles = await import('node:fs/promises').then(({ readdir }) =>
+      readdir(join(resolvedHomePath, 'soul.history')),
+    )
+    expect(historyFiles).toHaveLength(1)
+    await expect(
+      readFile(join(resolvedHomePath, 'soul.history', historyFiles[0]!), 'utf8'),
+    ).resolves.toBe('# 汤圆\n旧 soul。')
+  })
+
+  it('binds update_soul to the current session Agent and reloads after generation', async () => {
+    let reloadCount = 0
+    let reloadCountDuringTool = -1
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle: PiSdkSessionHandle = {
+          setSystemPromptContext: () => undefined,
+          reload: async () => {
+            reloadCount++
+          },
+          prompt: async () => {
+            const result = await request.onUpdateSoul('# 汤圆\n由工具更新。')
+            expect(result.status).toBe('updated')
+            reloadCountDuringTool = reloadCount
+            return '灵魂已更新。'
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        return handle
+      },
+    })
+    const { driver } = await createDriver({ gateway })
+    const events: AgentEvent[] = []
+    driver.subscribe((event) => events.push(event))
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const agent = await driver.createAgent('工具更新助手')
+    const defaultSoulBefore = await driver.getSoul('tangyuan')
+    const session = await driver.createSession({
+      agentId: agent.agentId,
+      title: '工具更新',
+    })
+    expect(gateway.sessionRequests[0]?.onUpdateSoul).toBeTypeOf('function')
+
+    await driver.sendMessage({
+      agentId: agent.agentId,
+      sessionId: session.sessionId,
+      content: '更新你的灵魂',
+    })
+    const transcript = await driver.getTranscript({
+      agentId: agent.agentId,
+      sessionId: session.sessionId,
+    })
+
+    expect(reloadCountDuringTool).toBe(1)
+    expect(reloadCount).toBe(2)
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'profile-updated',
+          agentId: agent.agentId,
+          target: 'soul',
+        }),
+      ]),
+    )
+    expect(transcript.entries).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: 'system-message' })]),
+    )
+    await expect(driver.getSoul(agent.agentId)).resolves.toMatchObject({
+      content: '# 汤圆\n由工具更新。',
+    })
+    await expect(driver.getSoul('tangyuan')).resolves.toEqual(defaultSoulBefore)
+  })
+
+  it('keeps a successful tool update after cancellation and avoids duplicate backups on retry', async () => {
+    const updateCompleted = createDeferred<void>()
+    const releasePrompt = createDeferred<void>()
+    let cancelled = false
+    const gateway = createPiSdkGateway({
+      createSession: async (request) => {
+        const handle: PiSdkSessionHandle = {
+          setSystemPromptContext: () => undefined,
+          reload: async () => undefined,
+          prompt: async () => {
+            await request.onUpdateSoul('# 汤圆\n取消前已更新。')
+            updateCompleted.resolve()
+            await releasePrompt.promise
+            if (cancelled) throw new DOMException('Aborted', 'AbortError')
+            return '完成'
+          },
+          abort: async () => {
+            cancelled = true
+            releasePrompt.resolve()
+          },
+          dispose: () => undefined,
+        }
+        gateway.sessionRequests.push(request)
+        return handle
+      },
+    })
+    const { driver, rootPath } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const initial = await driver.getSoul('tangyuan')
+    await driver.updateSoul('tangyuan', '# 汤圆\n更新前。', initial.version)
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '取消后保留更新',
+    })
+    const sendPromise = driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '更新后取消',
+    })
+    await updateCompleted.promise
+
+    await driver.cancelRun({ agentId: 'tangyuan', sessionId: session.sessionId })
+    await sendPromise
+
+    await expect(driver.getSoul('tangyuan')).resolves.toMatchObject({
+      content: '# 汤圆\n取消前已更新。',
+    })
+    await expect(
+      gateway.sessionRequests[0]?.onUpdateSoul('# 汤圆\n取消前已更新。'),
+    ).resolves.toMatchObject({ status: 'unchanged' })
+    const historyFiles = await import('node:fs/promises').then(({ readdir }) =>
+      readdir(join(rootPath, '.tangyuan/agents/tangyuan/soul.history')),
+    )
+    expect(historyFiles).toHaveLength(1)
   })
 
   it('updates shared user profile and emits a profile-updated event', async () => {
@@ -3694,8 +3807,7 @@ describe('PiSdkDriver', () => {
 
     const result = await driver.updateUserProfile('# User\n新用户偏好。')
 
-    expect(result.success).toBe(true)
-    expect(result.target).toBe('user')
+    expect(result).toMatchObject({ target: 'user', status: 'updated' })
 
     // 验证文件已更新
     const { readFile } = await import('node:fs/promises')
@@ -3713,7 +3825,7 @@ describe('PiSdkDriver', () => {
     )
   })
 
-  it('filters sensitive content from user profile updates', async () => {
+  it('rejects sensitive content from user profile updates', async () => {
     const gateway = createPiSdkGateway()
     const { driver, rootPath } = await createDriver({ gateway })
     const { mkdir, writeFile } = await import('node:fs/promises')
@@ -3745,13 +3857,16 @@ describe('PiSdkDriver', () => {
       '# User\npassword: my-secret-pwd',
     )
 
-    expect(result.success).toBe(true)
+    expect(result).toMatchObject({
+      status: 'rejected',
+      reason: { code: 'sensitive-content' },
+    })
 
     // 验证敏感内容已脱敏
     const { readFile } = await import('node:fs/promises')
     const content = await readFile(join(profileDir, 'user.md'), 'utf8')
     expect(content).not.toContain('my-secret-pwd')
-    expect(content).toContain('[已隐藏敏感凭据]')
+    expect(content).toBe('# User\n旧偏好。')
   })
 
   it('retry：完成后持久化带 inReplyTo 的 completed attempt', async () => {

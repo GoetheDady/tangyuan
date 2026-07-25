@@ -66,7 +66,7 @@ import {
   type ListSessionsRequest,
   type ModelDescriptor,
   type ProviderAuthSnapshot,
-  type ProfileMaintenanceResult,
+  type ProfileUpdateResult,
   type ProviderDescriptor,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
@@ -244,6 +244,8 @@ export interface PiSdkCreateSessionRequest extends RuntimeConfiguration {
   sharedSkillsPath: string
   /** 仅在 tangyuan session 中提供，用于 create_agent 工具回调。 */
   onCreateAgent?: (displayName: string) => Promise<AgentSummary>
+  /** 绑定到当前 Agent 和当前会话观察版本的灵魂更新回调。 */
+  onUpdateSoul: (content: string) => Promise<ProfileUpdateResult>
   /** 工具审批与路径校验网关（用于 bash 审批和文件路径保护）。 */
   toolApprovalGateway?: ToolApprovalGateway
 }
@@ -259,6 +261,8 @@ export interface PiSdkOpenSessionRequest extends RuntimeConfiguration {
   agentSkillsPath: string
   /** 共享 Skills 目录路径（用于 DefaultResourceLoader）。 */
   sharedSkillsPath: string
+  /** 绑定到当前 Agent 和当前会话观察版本的灵魂更新回调。 */
+  onUpdateSoul: (content: string) => Promise<ProfileUpdateResult>
   /** 工具审批与路径校验网关（用于 bash 审批和文件路径保护）。 */
   toolApprovalGateway?: ToolApprovalGateway
 }
@@ -719,8 +723,8 @@ export interface AgentSessionDriver {
   updateSoul?(
     agentId: AgentId,
     content: string,
-    requestedByAgentId: AgentId,
-  ): Promise<import('@tangyuan/contracts').ProfileMaintenanceResult>
+    expectedVersion: string,
+  ): Promise<import('@tangyuan/contracts').ProfileUpdateResult>
 
   /**
    * 更新共享 user profile（含备份验证和敏感信息过滤）。
@@ -731,7 +735,7 @@ export interface AgentSessionDriver {
    */
   updateUserProfile?(
     content: string,
-  ): Promise<import('@tangyuan/contracts').ProfileMaintenanceResult>
+  ): Promise<import('@tangyuan/contracts').ProfileUpdateResult>
 
   /**
    * 列出指定 Agent 实际生效的 Skill 列表（含冲突诊断）。
@@ -981,6 +985,8 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   private readonly listeners = new Set<AgentEventListener>()
   private readonly transcriptCache = new Map<string, TranscriptSnapshot>()
   private readonly sessionHandles = new Map<string, PiSdkSessionHandle>()
+  private readonly sessionSoulVersions = new Map<string, string>()
+  private readonly pendingProfileRefreshes = new Set<string>()
   private readonly activeRunIds = new Map<string, string>()
   private readonly runSequenceBySession = new Map<string, number>()
   private configurationVerificationController: AbortController | null = null
@@ -1172,6 +1178,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       this.configStore.readRequired(request.agentId),
       this.sessionIndexStore.load(),
     ])
+    const soul = await this.profileStore.readSoul(request.agentId)
     const sessionId = this.createNextSessionId()
     const now = this.now()
     const sdkSessionFile = this.layout.sdkSessionFile(sessionId)
@@ -1187,7 +1194,9 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       cwd,
       agentSkillsPath: this.layout.agentSkills(request.agentId),
       sharedSkillsPath: this.layout.sharedSkills(),
+      onUpdateSoul: this.createSessionSoulUpdater(sessionId, request.agentId),
     }
+    this.sessionSoulVersions.set(sessionId, soul.version)
     const createSessionRequest: PiSdkCreateSessionRequest = this
       .toolApprovalGateway
       ? { ...baseRequest, toolApprovalGateway: this.toolApprovalGateway }
@@ -1809,6 +1818,11 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       if (this.activeRunIds.get(sessionId) === runId) {
         this.activeRunIds.delete(sessionId)
       }
+      if (this.pendingProfileRefreshes.delete(sessionId)) {
+        await this.refreshSessionProfileContext(sessionId).catch((error) => {
+          this.emitProfileRefreshError(agentId, error)
+        })
+      }
     }
   }
   /**
@@ -2205,20 +2219,22 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
   async updateSoul(
     agentId: AgentId,
     content: string,
-    requestedByAgentId: AgentId,
-  ): Promise<ProfileMaintenanceResult> {
+    expectedVersion: string,
+  ): Promise<ProfileUpdateResult> {
     const outcome = await this.profileStore.writeSoul(
       agentId,
       content,
-      requestedByAgentId,
+      expectedVersion,
     )
 
     // 真正写入文件时才广播事件并刷新该 Agent 会话的系统提示词。
     if (outcome.written) {
       const updatedAt =
         (await getMtimeIso(this.layout.soul(agentId))) ?? this.now()
-      this.emitProfileUpdated('soul', updatedAt)
-      await this.refreshAgentProfileContext(agentId)
+      this.emitProfileUpdated('soul', updatedAt, undefined, agentId)
+      await this.refreshAgentProfileContext(agentId).catch((error) => {
+        this.emitProfileRefreshError(agentId, error)
+      })
     }
 
     return outcome.result
@@ -2231,7 +2247,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @returns profile 维护结果。
    * @throws 当文件操作失败时，Promise 会 reject。
    */
-  async updateUserProfile(content: string): Promise<ProfileMaintenanceResult> {
+  async updateUserProfile(content: string): Promise<ProfileUpdateResult> {
     const outcome = await this.profileStore.writeUserProfile(content)
 
     // 真正写入文件时才广播事件并刷新全部活跃会话。
@@ -2420,7 +2436,13 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       cwd,
       agentSkillsPath: this.layout.agentSkills(indexEntry.agentId),
       sharedSkillsPath: this.layout.sharedSkills(),
+      onUpdateSoul: this.createSessionSoulUpdater(
+        sessionId,
+        indexEntry.agentId,
+      ),
     }
+    const soul = await this.profileStore.readSoul(indexEntry.agentId)
+    this.sessionSoulVersions.set(sessionId, soul.version)
     const handle = await this.gateway.openSession(
       this.toolApprovalGateway
         ? { ...openRequest, toolApprovalGateway: this.toolApprovalGateway }
@@ -2698,10 +2720,12 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       agentId: AgentId
       sessionId: string
     },
+    eventAgentId?: AgentId,
   ): void {
     this.emit({
       type: 'profile-updated',
-      agentId: transcriptTarget?.agentId ?? TANGYUAN_DEFAULT_AGENT_ID,
+      agentId:
+        transcriptTarget?.agentId ?? eventAgentId ?? TANGYUAN_DEFAULT_AGENT_ID,
       target,
       updatedAt,
       occurredAt: this.now(),
@@ -2767,7 +2791,10 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    * @throws 当 profile 读取或 reload 失败时，Promise 会 reject。
    */
   private async refreshAgentProfileContext(agentId: AgentId): Promise<void> {
-    const context = await this.profileStore.buildSystemPromptContext(agentId)
+    const [context, soul] = await Promise.all([
+      this.profileStore.buildSystemPromptContext(agentId),
+      this.profileStore.readSoul(agentId),
+    ])
     const promises: Promise<void>[] = []
 
     for (const [sessionId, handle] of this.sessionHandles) {
@@ -2777,13 +2804,71 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
       ) {
         continue
       }
+      if (this.activeRunIds.has(sessionId)) {
+        this.pendingProfileRefreshes.add(sessionId)
+        continue
+      }
       handle.setSystemPromptContext(context)
       if (handle.reload) {
-        promises.push(handle.reload())
+        promises.push(
+          handle.reload().then(() => {
+            this.sessionSoulVersions.set(sessionId, soul.version)
+          }),
+        )
+      } else {
+        this.sessionSoulVersions.set(sessionId, soul.version)
       }
     }
 
     await Promise.all(promises)
+  }
+
+  /** 创建绑定到单个会话及其 Agent 的受控灵魂更新回调。 */
+  private createSessionSoulUpdater(
+    sessionId: string,
+    agentId: AgentId,
+  ): (content: string) => Promise<ProfileUpdateResult> {
+    return async (content: string) => {
+      const expectedVersion =
+        this.sessionSoulVersions.get(sessionId) ??
+        (await this.profileStore.readSoul(agentId)).version
+      const result = await this.updateSoul(agentId, content, expectedVersion)
+
+      if (result.status !== 'rejected') {
+        this.sessionSoulVersions.set(sessionId, result.version)
+      }
+
+      return result
+    }
+  }
+
+  /** 在生成结束后刷新单个排队会话，不影响已经完成的回复。 */
+  private async refreshSessionProfileContext(sessionId: string): Promise<void> {
+    const handle = this.sessionHandles.get(sessionId)
+    const agentId = this.sessionIndexStore.getEntryOrNull(sessionId)?.agentId
+    if (!handle?.setSystemPromptContext || !agentId) return
+
+    const [context, soul] = await Promise.all([
+      this.profileStore.buildSystemPromptContext(agentId),
+      this.profileStore.readSoul(agentId),
+    ])
+    handle.setSystemPromptContext(context)
+    await handle.reload?.()
+    this.sessionSoulVersions.set(sessionId, soul.version)
+  }
+
+  /** 上下文刷新失败只广播可恢复错误，不改变已经完成的 profile 写入结果。 */
+  private emitProfileRefreshError(agentId: AgentId, error: unknown): void {
+    this.emit({
+      type: 'runtime-error',
+      agentId,
+      error: {
+        code: 'unknown',
+        message: `刷新 Agent 灵魂上下文失败：${sanitizeErrorMessage(error)}`,
+        recoverable: true,
+      },
+      occurredAt: this.now(),
+    })
   }
 
   /**

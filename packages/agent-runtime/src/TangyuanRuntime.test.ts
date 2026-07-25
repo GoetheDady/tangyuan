@@ -623,7 +623,8 @@ describe('TangyuanRuntime', () => {
     const sessionDriver = createSessionDriver([])
     sessionDriver.updateSoul = vi.fn().mockResolvedValue({
       target: 'soul',
-      success: true,
+      status: 'updated',
+      version: 'sha256:new',
     })
     const runtime = createTangyuanRuntimeForTesting({
       runtimeDriver,
@@ -631,13 +632,17 @@ describe('TangyuanRuntime', () => {
     })
 
     await expect(
-      runtime.updateSoul('agent-1', 'New soul content'),
-    ).resolves.toEqual({ target: 'soul', success: true })
+      runtime.updateSoul('agent-1', 'New soul content', 'sha256:old'),
+    ).resolves.toEqual({
+      target: 'soul',
+      status: 'updated',
+      version: 'sha256:new',
+    })
 
     expect(sessionDriver.updateSoul).toHaveBeenCalledWith(
       'agent-1',
       'New soul content',
-      snapshot.activeAgent.agentId,
+      'sha256:old',
     )
     // 成功后应刷新快照
     expect(runtimeDriver.getSnapshot).toHaveBeenCalled()
@@ -649,7 +654,8 @@ describe('TangyuanRuntime', () => {
     const sessionDriver = createSessionDriver([])
     sessionDriver.updateUserProfile = vi.fn().mockResolvedValue({
       target: 'user',
-      success: true,
+      status: 'updated',
+      version: 'sha256:new',
     })
     const runtime = createTangyuanRuntimeForTesting({
       runtimeDriver,
@@ -658,7 +664,11 @@ describe('TangyuanRuntime', () => {
 
     await expect(
       runtime.updateUserProfile('New user profile'),
-    ).resolves.toEqual({ target: 'user', success: true })
+    ).resolves.toEqual({
+      target: 'user',
+      status: 'updated',
+      version: 'sha256:new',
+    })
 
     expect(sessionDriver.updateUserProfile).toHaveBeenCalledWith(
       'New user profile',
@@ -692,9 +702,9 @@ describe('TangyuanRuntime', () => {
       sessionDriver,
     })
 
-    await expect(runtime.updateSoul('agent-1', 'content')).rejects.toThrow(
-      '当前运行时不支持更新 Agent soul',
-    )
+    await expect(
+      runtime.updateSoul('agent-1', 'content', 'sha256:old'),
+    ).rejects.toThrow('当前运行时不支持更新 Agent soul')
   })
 
   it('delegates listAgentSkills to session driver', async () => {

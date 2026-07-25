@@ -14,7 +14,7 @@ import {
   listAgentSkillsRequestSchema,
   migrateConfigV1ToV2,
   persistedConfigurationV2Schema,
-  profileMaintenanceResultSchema,
+  profileUpdateResultSchema,
   runTurnSchema,
   runtimeSnapshotSchema,
   skillSummarySchema,
@@ -521,11 +521,13 @@ describe('profile schemas', () => {
         agentId: 'agent-1',
         content: '# Soul\n\nAgent identity rules.',
         updatedAt: '2026-07-17T00:00:00.000Z',
+        version: 'sha256:soul-version',
       }),
     ).toEqual({
       agentId: 'agent-1',
       content: '# Soul\n\nAgent identity rules.',
       updatedAt: '2026-07-17T00:00:00.000Z',
+      version: 'sha256:soul-version',
     })
   })
 
@@ -534,30 +536,49 @@ describe('profile schemas', () => {
       userProfileContentSchema.parse({
         content: '# User\n\nUser preferences.',
         updatedAt: '2026-07-17T00:00:00.000Z',
+        version: 'sha256:user-version',
       }),
     ).toEqual({
       content: '# User\n\nUser preferences.',
       updatedAt: '2026-07-17T00:00:00.000Z',
+      version: 'sha256:user-version',
     })
   })
 
-  it('accepts successful profile maintenance result', () => {
+  it('accepts an updated profile result', () => {
     expect(
-      profileMaintenanceResultSchema.parse({
+      profileUpdateResultSchema.parse({
         target: 'soul',
-        success: true,
+        status: 'updated',
+        version: 'sha256:new-version',
       }),
-    ).toEqual({ target: 'soul', success: true })
+    ).toEqual({
+      target: 'soul',
+      status: 'updated',
+      version: 'sha256:new-version',
+    })
   })
 
-  it('accepts failed profile maintenance result with reason', () => {
+  it('accepts a rejected profile result with a structured reason', () => {
     expect(
-      profileMaintenanceResultSchema.parse({
+      profileUpdateResultSchema.parse({
         target: 'user',
-        success: false,
-        reason: '缺少更新前备份',
+        status: 'rejected',
+        version: 'sha256:current-version',
+        reason: {
+          code: 'version-conflict',
+          message: '用户画像已被其他会话更新。',
+        },
       }),
-    ).toEqual({ target: 'user', success: false, reason: '缺少更新前备份' })
+    ).toEqual({
+      target: 'user',
+      status: 'rejected',
+      version: 'sha256:current-version',
+      reason: {
+        code: 'version-conflict',
+        message: '用户画像已被其他会话更新。',
+      },
+    })
   })
 
   it('rejects empty soul content in update request', () => {
@@ -574,8 +595,13 @@ describe('profile schemas', () => {
       updateSoulRequestSchema.parse({
         agentId: 'agent-1',
         content: 'New soul content.',
+        expectedVersion: 'sha256:observed-version',
       }),
-    ).toEqual({ agentId: 'agent-1', content: 'New soul content.' })
+    ).toEqual({
+      agentId: 'agent-1',
+      content: 'New soul content.',
+      expectedVersion: 'sha256:observed-version',
+    })
   })
 
   it('rejects empty user profile content in update request', () => {

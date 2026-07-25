@@ -15,7 +15,7 @@ import {
   listAgentSkillsRequestSchema,
   nonEmptyIdentifierSchema,
   openExternalLinkRequestSchema,
-  profileMaintenanceResultSchema,
+  profileUpdateResultSchema,
   recoverAgentRequestSchema,
   rejectBashRequestSchema,
   retryRunRequestSchema,
@@ -56,7 +56,7 @@ import type {
   GetSoulRequest,
   ListAgentSkillsRequest,
   OpenExternalLinkRequest,
-  ProfileMaintenanceResult,
+  ProfileUpdateResult,
   QuestionClarificationRequest,
   RecoverAgentRequest,
   RejectBashRequest,
@@ -281,8 +281,8 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsSetThinkingLevel]: SessionModelInfo
   [DESKTOP_IPC_CHANNELS.profileGetSoul]: SoulContent
   [DESKTOP_IPC_CHANNELS.profileGetUser]: UserProfileContent
-  [DESKTOP_IPC_CHANNELS.profileUpdateSoul]: ProfileMaintenanceResult
-  [DESKTOP_IPC_CHANNELS.profileUpdateUser]: ProfileMaintenanceResult
+  [DESKTOP_IPC_CHANNELS.profileUpdateSoul]: ProfileUpdateResult
+  [DESKTOP_IPC_CHANNELS.profileUpdateUser]: ProfileUpdateResult
   [DESKTOP_IPC_CHANNELS.skillsListAgent]: SkillSummary[]
   [DESKTOP_IPC_CHANNELS.skillsListShared]: SkillSummary[]
   [DESKTOP_IPC_CHANNELS.skillsInstall]: SkillSummary[]
@@ -405,8 +405,8 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsSetThinkingLevel]: sessionModelInfoSchema,
   [DESKTOP_IPC_CHANNELS.profileGetSoul]: soulContentSchema,
   [DESKTOP_IPC_CHANNELS.profileGetUser]: userProfileContentSchema,
-  [DESKTOP_IPC_CHANNELS.profileUpdateSoul]: profileMaintenanceResultSchema,
-  [DESKTOP_IPC_CHANNELS.profileUpdateUser]: profileMaintenanceResultSchema,
+  [DESKTOP_IPC_CHANNELS.profileUpdateSoul]: profileUpdateResultSchema,
+  [DESKTOP_IPC_CHANNELS.profileUpdateUser]: profileUpdateResultSchema,
   [DESKTOP_IPC_CHANNELS.skillsListAgent]: z.array(skillSummarySchema),
   [DESKTOP_IPC_CHANNELS.skillsListShared]: z.array(skillSummarySchema),
   [DESKTOP_IPC_CHANNELS.skillsInstall]: z.array(skillSummarySchema),
@@ -711,7 +711,7 @@ export interface DesktopPreloadApi {
    * @returns profile 维护结果，包含成功状态和可能的失败原因。
    * @throws 当文件操作失败时，Promise 会 reject。
    */
-  updateSoul(request: UpdateSoulRequest): Promise<ProfileMaintenanceResult>
+  updateSoul(request: UpdateSoulRequest): Promise<ProfileUpdateResult>
 
   /**
    * 更新共享 user profile 内容。
@@ -722,7 +722,7 @@ export interface DesktopPreloadApi {
    */
   updateUserProfile(
     request: UpdateUserProfileRequest,
-  ): Promise<ProfileMaintenanceResult>
+  ): Promise<ProfileUpdateResult>
 
   /**
    * 请求 Main 进程校验协议后使用系统浏览器安全打开外部链接。

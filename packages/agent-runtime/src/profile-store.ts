@@ -1,9 +1,17 @@
-import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { createHash } from 'node:crypto'
+import {
+  copyFile,
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentId,
-  type ProfileMaintenanceResult,
+  type ProfileUpdateResult,
   type SoulContent,
   type UserProfileContent,
 } from '@tangyuan/contracts'
@@ -54,7 +62,7 @@ export interface ProfileMaintenanceSnapshot {
  * 也标记本次是否真的写入了文件（供调用方决定是否广播事件、刷新会话）。
  */
 export interface ProfileWriteOutcome {
-  result: ProfileMaintenanceResult
+  result: ProfileUpdateResult
   written: boolean
 }
 
@@ -77,6 +85,7 @@ export class ProfileStore {
   private readonly layout: DirectoryLayout
   private readonly configStore: ConfigStore
   private readonly now: () => string
+  private readonly writeQueues = new Map<string, Promise<void>>()
 
   constructor(dependencies: ProfileStoreDependencies) {
     this.layout = dependencies.layout
@@ -239,12 +248,13 @@ export class ProfileStore {
   async readSoul(agentId: AgentId): Promise<SoulContent> {
     const soulPath = this.layout.soul(agentId)
 
-    await this.ensureAgentHome(agentId)
+    await mkdir(this.layout.agentHome(agentId), { recursive: true })
+    await mkdir(this.layout.soulHistory(agentId), { recursive: true })
 
     const content = await safeReadFile(soulPath)
     const updatedAt = (await getMtimeIso(soulPath)) ?? this.now()
 
-    return { agentId, content, updatedAt }
+    return { agentId, content, updatedAt, version: createProfileVersion(content) }
   }
 
   /**
@@ -270,74 +280,33 @@ export class ProfileStore {
     const content = await safeReadFile(userPath)
     const updatedAt = (await getMtimeIso(userPath)) ?? this.now()
 
-    return { content, updatedAt }
+    return { content, updatedAt, version: createProfileVersion(content) }
   }
 
   /**
-   * 写入指定 Agent 的 soul（含权限校验、备份验证和敏感信息过滤）。
-   *
-   * 仅返回结果，不广播事件、不刷新会话（由调用方编排）。
+   * 受控写入指定 Agent 的灵魂。
    *
    * @param agentId - 目标 Agent 标识。
-   * @param content - 新 soul 内容。
-   * @param requestedByAgentId - 发起更新请求的 Agent 标识。
-   * @returns profile 维护结果。
-   * @throws 当文件操作失败时，Promise 会 reject。
+   * @param content - 完整的新内容。
+   * @param expectedVersion - 调用方最后观察到的内容版本。
+   * @returns profile 更新结果。
+   * @throws 当读取当前内容或配置失败时，Promise 会 reject。
    */
   async writeSoul(
     agentId: AgentId,
     content: string,
-    requestedByAgentId: AgentId,
+    expectedVersion: string,
   ): Promise<ProfileWriteOutcome> {
-    // 权限校验：Agent 只能更新自己的 soul
-    // 汤圆可以在创建时写入其他 Agent 的初始 soul（由 createAgent 调用）
-    if (
-      agentId !== requestedByAgentId &&
-      requestedByAgentId !== TANGYUAN_DEFAULT_AGENT_ID
-    ) {
-      return {
-        written: false,
-        result: {
-          target: 'soul',
-          success: false,
-          reason: `Agent "${requestedByAgentId}" 无权修改 Agent "${agentId}" 的 soul。只有 Agent 自身或汤圆可以修改。`,
-        },
-      }
-    }
-
-    const soulPath = this.layout.soul(agentId)
-    const historyPath = this.layout.soulHistory(agentId)
-
-    await this.ensureAgentHome(agentId)
-
-    const previousContent = (await pathExists(soulPath))
-      ? await safeReadFile(soulPath)
-      : ''
-    const previousHistoryFiles = await readDirectoryFileSet(historyPath)
-
-    if (previousContent === content) {
-      return { written: false, result: { target: 'soul', success: true } }
-    }
-
-    const hasBackup = previousContent === '' || previousHistoryFiles.size > 0
-
-    if (!hasBackup) {
-      return {
-        written: false,
-        result: {
-          target: 'soul',
-          success: false,
-          reason: `更新 soul 失败：缺少更新前备份，请先将旧内容备份到 soul.history/ 目录。`,
-        },
-      }
-    }
-
     const apiKey = await this.readAgentApiKey(agentId)
-    const redactedContent = this.redactSensitiveContent(content, apiKey)
 
-    await writeFile(soulPath, redactedContent, 'utf8')
-
-    return { written: true, result: { target: 'soul', success: true } }
+    return this.writeProfile({
+      target: 'soul',
+      path: this.layout.soul(agentId),
+      historyPath: this.layout.soulHistory(agentId),
+      content,
+      expectedVersion,
+      apiKey,
+    })
   }
 
   /**
@@ -363,31 +332,154 @@ export class ProfileStore {
     const previousContent = (await pathExists(userPath))
       ? await safeReadFile(userPath)
       : ''
-    const previousHistoryFiles = await readDirectoryFileSet(historyPath)
+    const apiKey = await this.readAgentApiKey(TANGYUAN_DEFAULT_AGENT_ID)
 
-    if (previousContent === content) {
-      return { written: false, result: { target: 'user', success: true } }
+    return this.writeProfile({
+      target: 'user',
+      path: userPath,
+      historyPath,
+      content,
+      expectedVersion: createProfileVersion(previousContent),
+      apiKey,
+    })
+  }
+
+  /**
+   * 执行共享的受控 profile 写入规则。
+   */
+  private async writeProfile(input: {
+    target: 'soul' | 'user'
+    path: string
+    historyPath: string
+    content: string
+    expectedVersion: string
+    apiKey: string | null
+  }): Promise<ProfileWriteOutcome> {
+    const previousWrite = this.writeQueues.get(input.path) ?? Promise.resolve()
+    const write = previousWrite
+      .catch(() => undefined)
+      .then(() => this.writeProfileUnlocked(input))
+    const queueEntry = write.then(
+      () => undefined,
+      () => undefined,
+    )
+    this.writeQueues.set(input.path, queueEntry)
+
+    try {
+      return await write
+    } finally {
+      if (this.writeQueues.get(input.path) === queueEntry) {
+        this.writeQueues.delete(input.path)
+      }
     }
+  }
 
-    const hasBackup = previousContent === '' || previousHistoryFiles.size > 0
+  /** 在单个 profile 文件的串行写入区间内执行版本检查与落盘。 */
+  private async writeProfileUnlocked(input: {
+    target: 'soul' | 'user'
+    path: string
+    historyPath: string
+    content: string
+    expectedVersion: string
+    apiKey: string | null
+  }): Promise<ProfileWriteOutcome> {
+    const previousContent = await safeReadFile(input.path)
+    const currentVersion = createProfileVersion(previousContent)
 
-    if (!hasBackup) {
+    if (previousContent === input.content) {
       return {
         written: false,
         result: {
-          target: 'user',
-          success: false,
-          reason: `更新 user profile 失败：缺少更新前备份，请先将旧内容备份到 user.history/ 目录。`,
+          target: input.target,
+          status: 'unchanged',
+          version: currentVersion,
         },
       }
     }
 
-    const apiKey = await this.readAgentApiKey(TANGYUAN_DEFAULT_AGENT_ID)
-    const redactedContent = this.redactSensitiveContent(content, apiKey)
+    if (input.expectedVersion !== currentVersion) {
+      return this.rejectedUpdate(
+        input.target,
+        currentVersion,
+        'version-conflict',
+        '资料已被其他会话更新，请读取最新内容后重试。',
+      )
+    }
 
-    await writeFile(userPath, redactedContent, 'utf8')
+    if (
+      this.redactSensitiveContent(input.content, input.apiKey) !== input.content
+    ) {
+      return this.rejectedUpdate(
+        input.target,
+        currentVersion,
+        'sensitive-content',
+        '更新内容包含 API Key、密码、令牌或其他敏感凭据，已拒绝整次更新。',
+      )
+    }
 
-    return { written: true, result: { target: 'user', success: true } }
+    if (previousContent !== '') {
+      try {
+        await mkdir(input.historyPath, { recursive: true })
+        await writeFile(
+          join(input.historyPath, `${currentVersion.replace(':', '-')}.md`),
+          previousContent,
+          'utf8',
+        )
+      } catch {
+        return this.rejectedUpdate(
+          input.target,
+          currentVersion,
+          'backup-failed',
+          '更新前自动备份失败，正式内容保持不变。',
+        )
+      }
+    }
+
+    const nextVersion = createProfileVersion(input.content)
+    const tempPath = `${input.path}.${nextVersion.slice(-12)}.tmp`
+    try {
+      await mkdir(dirname(input.path), { recursive: true })
+      await writeFile(tempPath, input.content, 'utf8')
+      await rename(tempPath, input.path)
+    } catch {
+      await rm(tempPath, { force: true }).catch(() => undefined)
+      return this.rejectedUpdate(
+        input.target,
+        currentVersion,
+        'write-failed',
+        '正式内容写入失败，旧内容保持不变。',
+      )
+    }
+
+    return {
+      written: true,
+      result: {
+        target: input.target,
+        status: 'updated',
+        version: nextVersion,
+      },
+    }
+  }
+
+  /** 构造不会写入文件的拒绝结果。 */
+  private rejectedUpdate(
+    target: 'soul' | 'user',
+    version: string,
+    code: Extract<
+      ProfileUpdateResult,
+      { status: 'rejected' }
+    >['reason']['code'],
+    message: string,
+  ): ProfileWriteOutcome {
+    return {
+      written: false,
+      result: {
+        target,
+        status: 'rejected',
+        version,
+        reason: { code, message },
+      },
+    }
   }
 
   /**
@@ -657,4 +749,9 @@ export class ProfileStore {
       '',
     ].join('\n')
   }
+}
+
+/** 为 profile 内容生成稳定的并发控制版本。 */
+function createProfileVersion(content: string): string {
+  return `sha256:${createHash('sha256').update(content).digest('hex')}`
 }
