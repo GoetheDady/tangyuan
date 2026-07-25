@@ -3,7 +3,7 @@ import type {
   UnclaimedDirectory,
   UpdateAgentConfigRequest,
 } from '@tangyuan/contracts'
-import type { AgentSessionDriver } from './index'
+import type { AgentSessionDriver } from './pi-sdk-driver-contracts'
 import type { RuntimeSnapshotStore } from './runtime-snapshot-store'
 
 /**
@@ -68,14 +68,17 @@ export class AgentManager {
       throw new Error('当前运行时不支持更新 Agent 配置。')
     }
 
-    const summary = await this.sessionDriver.updateAgentConfig(request.agentId, {
-      ...(request.defaultProviderId !== undefined
-        ? { defaultProviderId: request.defaultProviderId }
-        : {}),
-      ...(request.defaultModelId !== undefined
-        ? { defaultModelId: request.defaultModelId }
-        : {}),
-    })
+    const summary = await this.sessionDriver.updateAgentConfig(
+      request.agentId,
+      {
+        ...(request.defaultProviderId !== undefined
+          ? { defaultProviderId: request.defaultProviderId }
+          : {}),
+        ...(request.defaultModelId !== undefined
+          ? { defaultModelId: request.defaultModelId }
+          : {}),
+      },
+    )
 
     await this.snapshotStore.reload()
     return summary

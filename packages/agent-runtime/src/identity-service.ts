@@ -3,7 +3,7 @@ import type {
   SoulContent,
   UserProfileContent,
 } from '@tangyuan/contracts'
-import type { AgentSessionDriver } from './index'
+import type { AgentSessionDriver } from './pi-sdk-driver-contracts'
 import type { RuntimeSnapshotStore } from './runtime-snapshot-store'
 
 /**

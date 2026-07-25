@@ -5,7 +5,7 @@ import type {
   AgentSessionDriver,
   DriverEvent,
   ToolApprovalGateway,
-} from './index'
+} from './pi-sdk-driver-contracts'
 import { TranscriptEmitter } from './transcript-emitter'
 import { BashApprovalRegistry } from './bash-approval-registry'
 import { ClarificationRegistry } from './clarification-registry'
@@ -54,7 +54,7 @@ function isInternalDriverEvent(event: AgentEvent | DriverEvent): boolean {
   return INTERNAL_DRIVER_EVENT_TYPES.has(event.type)
 }
 
-import type { TangyuanRuntimeDependencies } from './TangyuanRuntime'
+import type { TangyuanRuntimeDependencies } from './tangyuan-runtime-dependencies'
 
 export abstract class TangyuanRuntimeOrchestrator {
   protected static readonly MAX_CONCURRENT_RUNS = 4

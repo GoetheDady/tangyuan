@@ -16,6 +16,8 @@ import {
   type PiSdkVerificationRequest,
 } from './index'
 
+export { createDeferred } from './test-deferred'
+
 const tempDirs: string[] = []
 
 export async function cleanupTempDirs(): Promise<void> {
@@ -326,22 +328,4 @@ export function createPromptingHandle(
  */
 export async function readJson(path: string): Promise<unknown> {
   return JSON.parse(await readFile(path, 'utf8')) as unknown
-}
-
-/**
- * 创建可手动 resolve 的 Promise，用于控制 Driver 并发测试。
- *
- * @returns Promise 和对应 resolve 函数。
- * @throws 此测试辅助方法不会主动抛出错误。
- */
-export function createDeferred<T>(): {
-  promise: Promise<T>
-  resolve(value?: T): void
-} {
-  let resolve!: (value?: T) => void
-  const promise = new Promise<T>((innerResolve) => {
-    resolve = innerResolve as (value?: T) => void
-  })
-
-  return { promise, resolve }
 }

@@ -34,7 +34,7 @@ import type {
   PiSdkCreateSessionRequest,
   PiSdkSessionHandle,
   RuntimeResourceDriver,
-} from './index'
+} from './pi-sdk-driver-contracts'
 
 import { PiSdkDriverResources } from './pi-sdk-driver-resources'
 

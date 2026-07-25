@@ -2,56 +2,25 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
-  type AgentId,
   type AgentRunState,
   type AgentSessionSummary,
 } from '@tangyuan/contracts'
 import type { DirectoryLayout } from './directory-layout'
 import type { ConfigStore } from './config-store'
-import type { PiSdkGateway } from './index'
+import type { PiSdkGateway } from './pi-sdk-driver-contracts'
 import { AgentRuntimeError } from './errors'
 import { extractAgentRuntimeConfig, isNotFoundError } from './utils'
+import type {
+  PersistedAttemptEntry,
+  PersistedSessionIndex,
+  PersistedSessionIndexEntry,
+} from './session-index-types'
 
-/**
- * 描述会话的一次执行尝试记录，用于会话重建时还原 attempt 状态。
- */
-export interface PersistedAttemptEntry {
-  attemptId: string
-  runId: string
-  /** 该尝试对应的 Agent 消息标识。 */
-  messageId: string
-  status: 'running' | 'completed' | 'cancelled' | 'failed'
-  startedAt: string
-  completedAt: string | null
-  error?: import('@tangyuan/contracts').AgentRuntimeErrorPayload
-  /** 关联的用户消息标识；重试场景的 inReplyTo。 */
-  inReplyTo?: string
-}
-
-/**
- * 描述汤圆写入 userData/sessions/index.json 的单个会话索引条目。
- */
-export interface PersistedSessionIndexEntry {
-  sessionId: string
-  sdkSessionFile: string
-  title: string
-  createdAt: string
-  updatedAt: string
-  provider: string
-  model: string
-  agentId: AgentId
-  lastMessagePreview: string
-  status: AgentRunState
-  /** 执行尝试记录列表，用于会话重建时还原 attempt 状态。 */
-  attempts?: PersistedAttemptEntry[]
-}
-
-/**
- * 描述汤圆本地会话索引文件结构。
- */
-export interface PersistedSessionIndex {
-  sessions: PersistedSessionIndexEntry[]
-}
+export type {
+  PersistedAttemptEntry,
+  PersistedSessionIndex,
+  PersistedSessionIndexEntry,
+} from './session-index-types'
 
 /**
  * 创建 SessionIndexStore 所需的依赖。
@@ -93,9 +62,7 @@ export class SessionIndexStore {
       const rawIndex = await readFile(indexPath, 'utf8')
       const parsedIndex = JSON.parse(rawIndex) as Partial<PersistedSessionIndex>
       const entries = Array.isArray(parsedIndex.sessions)
-        ? parsedIndex.sessions.flatMap((entry) =>
-            this.normalizeEntry(entry),
-          )
+        ? parsedIndex.sessions.flatMap((entry) => this.normalizeEntry(entry))
         : []
       this.replaceAll(entries)
 
@@ -133,7 +100,10 @@ export class SessionIndexStore {
     )
 
     for (const [agentId] of agents) {
-      const runtimeConfig = extractAgentRuntimeConfig(readResult.config, agentId)
+      const runtimeConfig = extractAgentRuntimeConfig(
+        readResult.config,
+        agentId,
+      )
       const cwd =
         agentId === TANGYUAN_DEFAULT_AGENT_ID
           ? this.layout.agentHome()

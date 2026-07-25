@@ -1,3 +1,7 @@
+import type { AgentId } from './identifiers'
+
+export type { AgentId } from './identifiers'
+
 /**
  * v1 默认 Agent 的稳定标识。
  */
@@ -7,11 +11,6 @@ export const TANGYUAN_DEFAULT_AGENT_ID = 'tangyuan'
  * 当前配置文件的 schema 版本，用于顺序迁移。
  */
 export const CURRENT_SCHEMA_VERSION = 2
-
-/**
- * 描述 Agent 的唯一标识。
- */
-export type AgentId = string
 
 /**
  * 描述桌面会话当前可展示给用户的运行状态。

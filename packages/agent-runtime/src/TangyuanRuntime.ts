@@ -1,5 +1,5 @@
-import type { AgentSessionDriver, RuntimeResourceDriver } from './index'
 import { TangyuanRuntimeOrchestrator } from './tangyuan-runtime-orchestrator'
+import type { TangyuanRuntimeDependencies } from './tangyuan-runtime-dependencies'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
@@ -24,13 +24,7 @@ import {
   type UserProfileContent,
 } from '@tangyuan/contracts'
 
-/**
- * 创建 TangyuanRuntime 时需要注入的内部 Driver。
- */
-export interface TangyuanRuntimeDependencies {
-  runtimeDriver: RuntimeResourceDriver
-  sessionDriver: AgentSessionDriver
-}
+export type { TangyuanRuntimeDependencies } from './tangyuan-runtime-dependencies'
 
 /**
  * Electron Main 调用运行时行为的唯一高层接口。

@@ -4,7 +4,7 @@ import type {
   SetSessionModelRequest,
   SetSessionThinkingLevelRequest,
 } from '@tangyuan/contracts'
-import type { AgentSessionDriver } from './index'
+import type { AgentSessionDriver } from './pi-sdk-driver-contracts'
 
 /**
  * 创建 SessionModelService 所需的依赖。
@@ -31,7 +31,9 @@ export class SessionModelService {
    * @returns Session 模型信息。
    * @throws 当 Driver 不支持或读取失败时，Promise 会 reject。
    */
-  async getInfo(request: GetSessionModelInfoRequest): Promise<SessionModelInfo> {
+  async getInfo(
+    request: GetSessionModelInfoRequest,
+  ): Promise<SessionModelInfo> {
     if (!this.sessionDriver.getSessionModelInfo) {
       throw new Error('当前运行时不支持读取 Session 模型信息。')
     }

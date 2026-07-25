@@ -1,4 +1,4 @@
-import type { PiSdkStreamEvent } from './index'
+import type { PiSdkStreamEvent } from './pi-sdk-driver-contracts'
 import { access, readFile, readdir, stat } from 'node:fs/promises'
 import { constants as fsConstants } from 'node:fs'
 import {

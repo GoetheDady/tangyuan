@@ -3,7 +3,7 @@ import type {
   RuntimeConfiguration,
   RuntimeSnapshot,
 } from '@tangyuan/contracts'
-import type { RuntimeResourceDriver } from './index'
+import type { RuntimeResourceDriver } from './pi-sdk-driver-contracts'
 
 /**
  * 创建 RuntimeSnapshotStore 所需的依赖。

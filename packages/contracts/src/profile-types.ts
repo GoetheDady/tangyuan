@@ -1,4 +1,4 @@
-import type { AgentId } from './types'
+import type { AgentId } from './identifiers'
 
 /**
  * 描述 Agent 的 soul（身份/角色）内容。

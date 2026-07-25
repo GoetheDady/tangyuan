@@ -28,7 +28,7 @@ import type {
   PiSdkGateway,
   PiSdkSessionHandle,
   ToolApprovalGateway,
-} from './index'
+} from './pi-sdk-driver-contracts'
 
 export abstract class PiSdkDriverState {
   protected readonly now: () => string

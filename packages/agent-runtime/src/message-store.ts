@@ -1,5 +1,5 @@
 import type { AgentId } from '@tangyuan/contracts'
-import type { InternalMessage } from './index'
+import type { InternalMessage } from './pi-sdk-driver-contracts'
 import { AgentRuntimeError } from './errors'
 
 /**

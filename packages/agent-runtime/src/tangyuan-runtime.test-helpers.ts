@@ -13,6 +13,8 @@ import {
 } from '@tangyuan/contracts'
 import { vi } from 'vitest'
 
+export { createDeferred } from './test-deferred'
+
 /**
  * 创建用于 Runtime 单元测试的运行时快照。
  *
@@ -206,24 +208,6 @@ export function createSessionSummary(sessionId: string): AgentSessionSummary {
     state: 'idle',
     updatedAt: '2026-07-08T00:00:00.000Z',
   }
-}
-
-/**
- * 创建可手动 resolve 的 Promise，用于测试并发状态。
- *
- * @returns Promise 和对应 resolve 函数。
- * @throws 此测试辅助方法不会主动抛出错误。
- */
-export function createDeferred<T>(): {
-  promise: Promise<T>
-  resolve(value?: T): void
-} {
-  let resolve!: (value?: T) => void
-  const promise = new Promise<T>((innerResolve) => {
-    resolve = innerResolve as (value?: T) => void
-  })
-
-  return { promise, resolve }
 }
 
 export function createReadySnapshot(): RuntimeSnapshot {

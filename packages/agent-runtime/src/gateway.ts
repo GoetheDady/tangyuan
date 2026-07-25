@@ -11,7 +11,7 @@ import {
   type PiSdkSessionHandle,
   type PiSdkStoredSession,
   type PiSdkVerificationRequest,
-} from './index'
+} from './pi-sdk-driver-contracts'
 import {
   buildTranscriptSnapshotFromSdkEntries,
   describeBashRisk,

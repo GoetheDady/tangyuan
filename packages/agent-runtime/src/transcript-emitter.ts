@@ -1,4 +1,4 @@
-import type { AgentEventListener, DriverEvent } from './index'
+import type { AgentEventListener, DriverEvent } from './pi-sdk-driver-contracts'
 import {
   applyTranscriptDelta,
   type AgentReplyEntry,
