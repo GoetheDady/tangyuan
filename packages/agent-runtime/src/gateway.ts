@@ -1,4 +1,5 @@
-import { dirname } from 'node:path'
+import { dirname, resolve as pathResolve } from 'node:path'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import type { TranscriptSnapshot } from '@tangyuan/contracts'
 import {
   type PiSdkCreateSessionRequest,
@@ -283,7 +284,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
     const approvalGateway = request.toolApprovalGateway
     if (approvalGateway) {
       const approvalRunContext = {
-        agentId: request.sessionId ? '' : '',
+        agentId: request.agentId,
         sessionId: request.sessionId,
         cwd: request.cwd,
       }
@@ -362,6 +363,144 @@ export class RealPiSdkGateway implements PiSdkGateway {
         },
       })
 
+      // 自定义写入工具（带路径保护）
+      customTools.push({
+        name: 'write',
+        label: '写入文件',
+        description:
+          '创建或覆盖文件。父目录不存在时会自动创建。不能写入 Agent 灵魂、共享用户画像或 Skill 等受保护文件，这些内容请使用 update_soul 或 update_user_profile 工具。',
+        promptSnippet: 'write(path: string, content: string) → 写入文件',
+        promptGuidelines: [
+          '不能写入 Agent 灵魂（soul.md）或用户画像（user.md），请使用 update_soul 或 update_user_profile',
+          '不能写入 soul.history/ 或 user.history/ 中的历史备份文件',
+        ],
+        parameters: {
+          type: 'object',
+          properties: {
+            path: { type: 'string', minLength: 1 },
+            content: { type: 'string' },
+          },
+          required: ['path', 'content'],
+          additionalProperties: false,
+        },
+        async execute(
+          _toolCallId: string,
+          params: { path: string; content: string },
+        ) {
+          const resolvedPath = pathResolve(approvalRunContext.cwd, params.path)
+          const guard = approvalGateway.validateFilePath({
+            agentId: approvalRunContext.agentId,
+            path: resolvedPath,
+            operation: 'write',
+          })
+
+          if (!guard.allowed) {
+            return {
+              content: [{ type: 'text', text: guard.reason! }],
+            }
+          }
+
+          await mkdir(dirname(resolvedPath), { recursive: true })
+          await writeFile(resolvedPath, params.content, 'utf8')
+          return {
+            content: [{ type: 'text', text: `已写入 ${resolvedPath}` }],
+          }
+        },
+      })
+
+      // 自定义编辑工具（带路径保护）
+      customTools.push({
+        name: 'edit',
+        label: '编辑文件',
+        description:
+          '对现有文件做精确文本替换。每次编辑匹配原始文件中唯一的 oldText，替换为 newText。不能编辑 Agent 灵魂、共享用户画像或 Skill 等受保护文件，这些内容请使用 update_soul 或 update_user_profile 工具。',
+        promptSnippet:
+          'edit(path: string, edits: {oldText, newText}[]) → 编辑文件',
+        promptGuidelines: [
+          '不能编辑 Agent 灵魂（soul.md）或用户画像（user.md），请使用 update_soul 或 update_user_profile',
+          '不能编辑 soul.history/ 或 user.history/ 中的历史备份文件',
+          'oldText 必须在文件中唯一存在，且不同的 edits 不得重叠',
+        ],
+        parameters: {
+          type: 'object',
+          properties: {
+            path: { type: 'string', minLength: 1 },
+            edits: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  oldText: { type: 'string', minLength: 1 },
+                  newText: { type: 'string' },
+                },
+                required: ['oldText', 'newText'],
+                additionalProperties: false,
+              },
+              minItems: 1,
+            },
+          },
+          required: ['path', 'edits'],
+          additionalProperties: false,
+        },
+        async execute(
+          _toolCallId: string,
+          params: {
+            path: string
+            edits: Array<{ oldText: string; newText: string }>
+          },
+        ) {
+          const resolvedPath = pathResolve(approvalRunContext.cwd, params.path)
+          const guard = approvalGateway.validateFilePath({
+            agentId: approvalRunContext.agentId,
+            path: resolvedPath,
+            operation: 'edit',
+          })
+
+          if (!guard.allowed) {
+            return {
+              content: [{ type: 'text', text: guard.reason! }],
+            }
+          }
+
+          const original = await readFile(resolvedPath, 'utf8')
+          let result = original
+
+          for (const edit of params.edits) {
+            const occurrences =
+              result.split(edit.oldText).length - 1
+
+            if (occurrences === 0) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: `编辑失败：在文件中找不到要替换的文本。`,
+                  },
+                ],
+              }
+            }
+
+            if (occurrences > 1) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: `编辑失败：要替换的文本在文件中出现了 ${occurrences} 次，oldText 必须在文件中唯一。`,
+                  },
+                ],
+              }
+            }
+
+            result = result.replace(edit.oldText, edit.newText)
+          }
+
+          await writeFile(resolvedPath, result, 'utf8')
+          return {
+            content: [{ type: 'text', text: `已编辑 ${resolvedPath}` }],
+          }
+        },
+      })
+
       // 自定义单问题澄清工具
       customTools.push({
         name: 'ask_clarification',
@@ -431,10 +570,10 @@ export class RealPiSdkGateway implements PiSdkGateway {
       })
     }
 
-    // 使用 excludedToolNames 排除内置工具（当存在审批网关时由自定义工具接管）
+    // 使用 excludeTools 排除内置工具（当存在审批网关时由自定义工具接管）
     const excludedToolNames: string[] = []
     if (approvalGateway) {
-      excludedToolNames.push('bash')
+      excludedToolNames.push('bash', 'write', 'edit')
     }
 
     const { session } = await createAgentSession({

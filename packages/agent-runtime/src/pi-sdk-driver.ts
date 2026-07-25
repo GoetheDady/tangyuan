@@ -197,6 +197,7 @@ export class PiSdkDriver
     await mkdir(dirname(sdkSessionFile), { recursive: true })
     const baseRequest = {
       ...configuration,
+      agentId: request.agentId,
       sessionId,
       sdkSessionFile,
       cwd,

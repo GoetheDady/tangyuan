@@ -12,25 +12,45 @@ describe('validateFilePath', () => {
   })
 
   it.each([
-    ['/home/agents/tangyuan/soul.md', 'soul.md'],
-    ['/home/agents/tangyuan/soul.history/1.md', 'soul.history'],
-    ['/home/agents/tangyuan/skills/demo/SKILL.md', 'skills'],
-    ['/home/config.json', 'config.json'],
-    ['/home/config.backups/2024.json', 'config.backups'],
-  ])('拦截受保护路径 %s', (path) => {
+    ['/home/agents/tangyuan/soul.md', 'update_soul'],
+    ['/home/agents/tangyuan/soul.history/1.md', 'update_soul'],
+    ['/home/agents/other-agent/soul.md', 'update_soul'],
+    ['/home/agents/other-agent/soul.history/backup.md', 'update_soul'],
+  ])('拦截 Agent 灵魂路径 %s 并引导使用 update_soul', (path) => {
+    const result = validateFilePath({ agentId: 'tangyuan', path, operation: 'write' })
+    expect(result.allowed).toBe(false)
+    expect(result.reason).toContain('update_soul')
+  })
+
+  it.each([
+    ['/home/profile/user.md', 'update_user_profile'],
+    ['/home/profile/user.history/1.md', 'update_user_profile'],
+  ])('拦截用户画像路径 %s 并引导使用 update_user_profile', (path) => {
+    const result = validateFilePath({ agentId: 'tangyuan', path, operation: 'write' })
+    expect(result.allowed).toBe(false)
+    expect(result.reason).toContain('update_user_profile')
+  })
+
+  it.each([
+    ['/home/agents/tangyuan/skills/demo/SKILL.md'],
+    ['/home/config.json'],
+    ['/home/config.backups/2024.json'],
+  ])('拦截其他受保护路径 %s', (path) => {
     const result = validateFilePath({ agentId: 'tangyuan', path, operation: 'write' })
     expect(result.allowed).toBe(false)
     expect(result.reason).toContain('不允许')
+    expect(result.reason).toContain('专用工具')
   })
 
-  it('profile 目录仅在命中 user.md/user.history 时拦截', () => {
-    expect(
-      validateFilePath({
-        agentId: 'tangyuan',
-        path: '/home/profile/user.md',
-        operation: 'edit',
-      }).allowed,
-    ).toBe(false)
+  it('profile 目录仅在命中 user.md/user.history 时拦截并引导使用 update_user_profile', () => {
+    const userMd = validateFilePath({
+      agentId: 'tangyuan',
+      path: '/home/profile/user.md',
+      operation: 'edit',
+    })
+    expect(userMd.allowed).toBe(false)
+    expect(userMd.reason).toContain('update_user_profile')
+
     expect(
       validateFilePath({
         agentId: 'tangyuan',

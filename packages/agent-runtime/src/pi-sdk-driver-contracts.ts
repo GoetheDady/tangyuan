@@ -101,6 +101,7 @@ export interface ToolApprovalGateway {
  * 描述创建真实 Pi SDK 会话时需要的参数。
  */
 export interface PiSdkCreateSessionRequest extends RuntimeConfiguration {
+  agentId: string
   sessionId: string
   sdkSessionFile: string
   cwd: string
@@ -122,6 +123,7 @@ export interface PiSdkCreateSessionRequest extends RuntimeConfiguration {
  * 描述打开已有 Pi SDK 会话时需要的参数。
  */
 export interface PiSdkOpenSessionRequest extends RuntimeConfiguration {
+  agentId: string
   sessionId: string
   sdkSessionFile: string
   cwd: string

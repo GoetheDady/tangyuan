@@ -40,24 +40,41 @@ export function validateFilePath(
 
   // 检查路径中是否包含受保护的子路径（soul、skills、config、profile）
   const pathSegments = resolvedPath.split('/')
-  const hasProtectedSegment =
-    pathSegments.includes('soul.md') ||
-    pathSegments.includes('soul.history') ||
-    pathSegments.includes('skills') ||
-    pathSegments.includes('config.json') ||
-    pathSegments.includes('config.backups') ||
-    (pathSegments.includes('profile') &&
-      (pathSegments.includes('user.md') ||
-        pathSegments.includes('user.history')))
 
-  if (hasProtectedSegment) {
+  // Agent 灵魂及历史备份 → 引导使用 update_soul
+  if (
+    pathSegments.includes('soul.md') ||
+    pathSegments.includes('soul.history')
+  ) {
     return {
       allowed: false,
-      reason: `不允许${operationLabel}受保护的文件：${resolvedPath}。该路径可能包含 Agent 配置、身份文件或 Skill 等受保护数据，请使用专用工具操作。`,
+      reason: `不允许${operationLabel} Agent 灵魂文件：${resolvedPath}。请使用 update_soul 工具修改 Agent 灵魂。`,
     }
   }
 
-  // 检查是否访问了其他 Agent 的目录（soul.md、workspace 除外属于受保护）
-  // agents 目录下的非自己目录中的 soul 相关文件已被上面检查拦截
+  // 共享用户画像及历史备份 → 引导使用 update_user_profile
+  if (
+    pathSegments.includes('profile') &&
+    (pathSegments.includes('user.md') ||
+      pathSegments.includes('user.history'))
+  ) {
+    return {
+      allowed: false,
+      reason: `不允许${operationLabel}共享用户画像文件：${resolvedPath}。请使用 update_user_profile 工具修改用户画像。`,
+    }
+  }
+
+  // Skill 和配置文件 → 通用专用工具引导
+  if (
+    pathSegments.includes('skills') ||
+    pathSegments.includes('config.json') ||
+    pathSegments.includes('config.backups')
+  ) {
+    return {
+      allowed: false,
+      reason: `不允许${operationLabel}受保护的文件：${resolvedPath}。该路径包含 Agent 配置或 Skill 等受保护数据，请使用专用工具操作。`,
+    }
+  }
+
   return { allowed: true }
 }

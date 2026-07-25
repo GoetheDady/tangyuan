@@ -156,6 +156,7 @@ export abstract class PiSdkDriverState {
         : this.layout.workspace(indexEntry.agentId)
     const openRequest = {
       ...configuration,
+      agentId: indexEntry.agentId,
       sessionId,
       sdkSessionFile: indexEntry.sdkSessionFile,
       cwd,
