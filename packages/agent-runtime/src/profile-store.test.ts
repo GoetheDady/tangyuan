@@ -130,6 +130,26 @@ describe('ProfileStore.writeSoul', () => {
     expect(await readdir(layout.soulHistory('agent-a'))).toEqual([])
   })
 
+  it('纯空白内容被拒绝且不写文件或创建备份', async () => {
+    const initial = await store.readSoul('agent-a')
+    const created = await store.writeSoul('agent-a', '原内容', initial.version)
+
+    const outcome = await store.writeSoul(
+      'agent-a',
+      ' \n\t ',
+      created.result.version,
+    )
+
+    expect(outcome.written).toBe(false)
+    expect(outcome.result).toMatchObject({
+      target: 'soul',
+      status: 'rejected',
+      reason: { code: 'invalid-content' },
+    })
+    expect(await readFile(layout.soul('agent-a'), 'utf8')).toBe('原内容')
+    expect(await readdir(layout.soulHistory('agent-a'))).toEqual([])
+  })
+
   it('调用方版本落后时拒绝覆盖', async () => {
     const initial = await store.readSoul('agent-a')
     const first = await store.writeSoul('agent-a', '第一版', initial.version)

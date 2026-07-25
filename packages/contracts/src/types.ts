@@ -522,6 +522,7 @@ export interface UserProfileContent {
  */
 export interface ProfileUpdateRejection {
   code:
+    | 'invalid-content'
     | 'version-conflict'
     | 'sensitive-content'
     | 'backup-failed'

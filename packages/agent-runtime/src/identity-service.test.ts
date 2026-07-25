@@ -57,6 +57,22 @@ describe('IdentityService', () => {
     expect(snapshotStore.reload).not.toHaveBeenCalled()
   })
 
+  it('updateSoul 写入成功后即使快照刷新失败也返回成功结果', async () => {
+    const updated = {
+      target: 'soul',
+      status: 'updated',
+      version: 'sha256:new',
+    } as const
+    const { service, snapshotStore } = createService({
+      updateSoul: vi.fn(async () => updated),
+    })
+    snapshotStore.reload.mockRejectedValueOnce(new Error('reload failed'))
+
+    await expect(
+      service.updateSoul('a1', '新内容', 'sha256:old'),
+    ).resolves.toEqual(updated)
+  })
+
   it('updateUserProfile 成功后刷新快照', async () => {
     const { service, snapshotStore } = createService({
       updateUserProfile: vi.fn(

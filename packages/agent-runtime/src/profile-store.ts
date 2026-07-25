@@ -42,21 +42,6 @@ export interface AgentHomeStatus {
   userUpdatedAt: string | null
 }
 
-export type ProfileMaintenanceTarget = 'soul' | 'user'
-
-export interface ProfileMaintenanceFileSnapshot {
-  target: ProfileMaintenanceTarget
-  path: string
-  historyPath: string
-  content: string
-  historyFiles: Set<string>
-}
-
-export interface ProfileMaintenanceSnapshot {
-  soul: ProfileMaintenanceFileSnapshot
-  user: ProfileMaintenanceFileSnapshot
-}
-
 /**
  * writeSoul / writeUserProfile 的结果：既含对外的维护结果，
  * 也标记本次是否真的写入了文件（供调用方决定是否广播事件、刷新会话）。
@@ -386,6 +371,15 @@ export class ProfileStore {
     const previousContent = await safeReadFile(input.path)
     const currentVersion = createProfileVersion(previousContent)
 
+    if (input.content.trim().length === 0) {
+      return this.rejectedUpdate(
+        input.target,
+        currentVersion,
+        'invalid-content',
+        input.target === 'soul' ? 'Agent 灵魂不能为空。' : '用户画像不能为空。',
+      )
+    }
+
     if (previousContent === input.content) {
       return {
         written: false,
@@ -602,72 +596,6 @@ export class ProfileStore {
   }
 
   /**
-   * 读取维护回合开始前的 profile 文件内容和历史目录状态。
-   *
-   * @param agentId - Agent 标识；默认为 tangyuan。
-   * @returns soul.md、user.md 及其历史目录的快照。
-   * @throws 当 profile 文件或历史目录无法读取时，Promise 会 reject。
-   */
-  async readMaintenanceSnapshot(
-    agentId: AgentId = TANGYUAN_DEFAULT_AGENT_ID,
-  ): Promise<ProfileMaintenanceSnapshot> {
-    return {
-      soul: await this.readMaintenanceFileSnapshot({
-        target: 'soul',
-        path: this.layout.soul(agentId),
-        historyPath: this.layout.soulHistory(agentId),
-      }),
-      user: await this.readMaintenanceFileSnapshot({
-        target: 'user',
-        path: this.layout.userProfile(),
-        historyPath: this.layout.userHistory(),
-      }),
-    }
-  }
-
-  /**
-   * 读取单个 profile 文件及其历史目录状态。
-   *
-   * @param input - 需要读取的 profile 目标、文件路径和历史目录路径。
-   * @returns 可用于维护结果校验的文件快照。
-   * @throws 当文件读取失败时，Promise 会 reject。
-   */
-  private async readMaintenanceFileSnapshot(input: {
-    target: ProfileMaintenanceTarget
-    path: string
-    historyPath: string
-  }): Promise<ProfileMaintenanceFileSnapshot> {
-    return {
-      target: input.target,
-      path: input.path,
-      historyPath: input.historyPath,
-      content: await readFile(input.path, 'utf8'),
-      historyFiles: await readDirectoryFileSet(input.historyPath),
-    }
-  }
-
-  /**
-   * 判断维护回合是否写入了新的历史备份文件。
-   *
-   * @param previousFile - 维护回合开始前的 profile 文件快照。
-   * @returns 有新增历史文件时返回 true，否则返回 false。
-   * @throws 当历史目录无法读取时，Promise 会 reject。
-   */
-  async hasNewHistoryFile(
-    previousFile: ProfileMaintenanceFileSnapshot,
-  ): Promise<boolean> {
-    const nextHistoryFiles = await readDirectoryFileSet(previousFile.historyPath)
-
-    for (const fileName of nextHistoryFiles) {
-      if (!previousFile.historyFiles.has(fileName)) {
-        return true
-      }
-    }
-
-    return false
-  }
-
-  /**
    * 从 profile 内容中移除敏感凭据。
    *
    * @param content - Agent 写入的 profile 原始内容。
@@ -686,46 +614,6 @@ export class ProfileStore {
         /((?:api\s*key|token|password|secret|密钥|令牌|密码)\s*[:：=]\s*)([^\s，。；;]+)/gi,
         '$1[已隐藏敏感凭据]',
       )
-  }
-
-  /**
-   * 构造后台 profile 维护回合使用的 prompt。
-   *
-   * @param input - 本轮主回合的用户消息、Agent 回复以及当前 profile 内容。
-   * @returns 只用于后台维护的完整 prompt。
-   * @throws 此方法不会主动抛出错误。
-   */
-  buildMaintenancePrompt(input: {
-    userContent: string
-    agentContent: string
-    soulContent: string
-    profileUserContent: string
-  }): string {
-    return [
-      '# 后台 profile 维护回合',
-      '',
-      '这是主回复完成后的后台 profile 维护回合，不要回复用户，不要继续主回复，也不要输出会混入 transcript 的总结。',
-      '只在本轮对话明确改变长期偏好、边界、称呼、工作规则或 Agent 行为规则时更新 profile；内容无实质变化时不要写文件。',
-      '',
-      '更新规则：',
-      '1. 单轮最多更新一次 soul.md，最多更新一次 user.md。',
-      '2. 更新前必须使用 read 读取旧文件。',
-      '3. 更新前必须使用 write 把旧内容备份到 soul.history/ 或 user.history/。',
-      '4. 更新必须使用 edit 或 write 完成。',
-      '5. 不得把 API Key、token、password、密码、密钥或令牌写入 soul.md / user.md。',
-      '',
-      '## 当前 soul.md',
-      input.soulContent.trim(),
-      '',
-      '## 当前 user.md',
-      input.profileUserContent.trim(),
-      '',
-      '## 刚完成的用户消息',
-      input.userContent,
-      '',
-      '## 刚完成的 Agent 主回复',
-      input.agentContent,
-    ].join('\n')
   }
 
   /**

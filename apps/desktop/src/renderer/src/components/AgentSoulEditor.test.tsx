@@ -38,16 +38,25 @@ describe('AgentSoulEditor', () => {
     })
   })
 
-  it('展示受控写入的拒绝原因', async () => {
+  it('版本冲突时展示拒绝原因并重新读取最新内容', async () => {
+    const getSoul = vi
+      .fn()
+      .mockResolvedValueOnce({
+        agentId: 'agent-a',
+        content: '# 旧灵魂',
+        updatedAt: '2026-07-25T00:00:00.000Z',
+        version: 'sha256:old'
+      })
+      .mockResolvedValueOnce({
+        agentId: 'agent-a',
+        content: '# 其他会话的新灵魂',
+        updatedAt: '2026-07-25T00:01:00.000Z',
+        version: 'sha256:current'
+      })
     Object.defineProperty(window, 'api', {
       configurable: true,
       value: {
-        getSoul: vi.fn().mockResolvedValue({
-          agentId: 'agent-a',
-          content: '# 旧灵魂',
-          updatedAt: '2026-07-25T00:00:00.000Z',
-          version: 'sha256:old'
-        }),
+        getSoul,
         updateSoul: vi.fn().mockResolvedValue({
           target: 'soul',
           status: 'rejected',
@@ -70,5 +79,9 @@ describe('AgentSoulEditor', () => {
     expect(
       await screen.findByText('资料已被其他会话更新，请读取最新内容后重试。')
     ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(getSoul).toHaveBeenCalledTimes(2)
+      expect(screen.getByLabelText('Agent 灵魂')).toHaveValue('# 其他会话的新灵魂')
+    })
   })
 })

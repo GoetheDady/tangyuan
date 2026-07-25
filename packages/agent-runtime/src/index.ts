@@ -1,9 +1,5 @@
 /* eslint-disable max-lines -- TODO: 按职责拆分为 session-driver / gateway / transcript 等模块 */
-import {
-  mkdir,
-  readFile,
-  writeFile,
-} from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type {
@@ -20,12 +16,6 @@ import { ConfigStore } from './config-store'
 import { AgentRegistry } from './agent-registry'
 import { SkillStore } from './skill-store'
 import { ProfileStore } from './profile-store'
-import type {
-  AgentHomeStatus,
-  ProfileMaintenanceFileSnapshot,
-  ProfileMaintenanceSnapshot,
-  ProfileMaintenanceTarget,
-} from './profile-store'
 import { SessionIndexStore } from './session-index-store'
 import type {
   PersistedAttemptEntry,
@@ -40,8 +30,6 @@ import {
   normalizeRuntimeConfiguration,
   buildInternalConfigForSave,
   extractAgentRuntimeConfig,
-  pathExists,
-  safeReadFile,
   getMtimeIso,
   createMessagePreview,
 } from './utils'
@@ -1523,7 +1511,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     return this.executeRetry(request, userMessage.content, session, handle)
   }
 
-
   /**
    * 执行一次 Agent prompt 运行的公共核心：流式事件桥接、取消/失败/完成处理、
    * profile 维护编排与 attempt 持久化。sendMessage 与 retryMessage 共用。
@@ -1700,24 +1687,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
         occurredAt: this.now(),
         ...inReplyToPatch,
       })
-      const profileStatusAfterMainReply = await this.emitProfileUpdateEvents(
-        profileStatusBeforeRun,
-        {
-          agentId,
-          sessionId,
-        },
-      )
-
-      if (profileStatusBeforeRun.initialized) {
-        await this.runProfileMaintenanceTurn({
-          agentId,
-          sessionId,
-          handle,
-          userContent: content,
-          agentContent: completedMessage.content,
-          profileStatus: profileStatusAfterMainReply,
-        })
-      } else {
+      if (!profileStatusBeforeRun.initialized) {
         await this.profileStore.performBootstrapCompletionGating()
       }
 
@@ -2212,7 +2182,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
    *
    * @param agentId - 目标 Agent 标识。
    * @param content - 新 soul 内容。
-   * @param requestedByAgentId - 发起更新请求的 Agent 标识。
+   * @param expectedVersion - 调用方最后观察到的内容版本。
    * @returns profile 维护结果。
    * @throws 当文件操作失败时，Promise 会 reject。
    */
@@ -2231,7 +2201,7 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     if (outcome.written) {
       const updatedAt =
         (await getMtimeIso(this.layout.soul(agentId))) ?? this.now()
-      this.emitProfileUpdated('soul', updatedAt, undefined, agentId)
+      this.emitProfileUpdated('soul', updatedAt, agentId)
       await this.refreshAgentProfileContext(agentId).catch((error) => {
         this.emitProfileRefreshError(agentId, error)
       })
@@ -2389,7 +2359,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     await this.configStore.reset()
   }
 
-
   /**
    * 确保指定会话已从索引加载到内存。
    *
@@ -2460,7 +2429,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     return handle
   }
 
-
   /**
    * 基于已有索引生成下一个简单递增会话标识。
    *
@@ -2472,312 +2440,20 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     return crypto.randomUUID()
   }
 
-
-
-
-
-  /**
-   * 对比单次运行前后的 profile 文件状态，并在文件生成或更新后广播事件。
-   *
-   * @param previousStatus - 运行开始前的 Agent Home 文件状态。
-   * @param transcriptTarget - 需要向 transcript 追加系统消息时的会话归属。
-   * @returns 更新后的 Agent Home 文件状态。
-   * @throws 当 Agent Home 状态读取失败时，Promise 会 reject。
-   */
-  private async emitProfileUpdateEvents(
-    previousStatus: AgentHomeStatus,
-    transcriptTarget?: {
-      agentId: AgentId
-      sessionId: string
-    },
-  ): Promise<AgentHomeStatus> {
-    const nextStatus = await this.profileStore.ensureDefaultAgentHome()
-
-    if (
-      nextStatus.soulUpdatedAt &&
-      nextStatus.soulUpdatedAt !== previousStatus.soulUpdatedAt
-    ) {
-      this.emitProfileUpdated(
-        'soul',
-        nextStatus.soulUpdatedAt,
-        transcriptTarget,
-      )
-    }
-
-    if (
-      nextStatus.userUpdatedAt &&
-      nextStatus.userUpdatedAt !== previousStatus.userUpdatedAt
-    ) {
-      this.emitProfileUpdated(
-        'user',
-        nextStatus.userUpdatedAt,
-        transcriptTarget,
-      )
-    }
-
-    return nextStatus
-  }
-
-  /**
-   * 在主回复完成后启动一次后台 profile 维护回合。
-   *
-   * @param input - 当前会话、SDK 运行器、主回合文本和 profile 状态。
-   * @returns 无返回值。
-   * @throws 当维护失败系统消息无法追加时，Promise 会 reject；维护流程自身错误会转换为系统消息。
-   */
-  private async runProfileMaintenanceTurn(input: {
-    agentId: AgentId
-    sessionId: string
-    handle: PiSdkSessionHandle
-    userContent: string
-    agentContent: string
-    profileStatus: AgentHomeStatus
-  }): Promise<void> {
-    if (
-      !input.profileStatus.soulFileExists ||
-      !input.profileStatus.userFileExists
-    ) {
-      return
-    }
-
-    try {
-      const profileSnapshot = await this.profileStore.readMaintenanceSnapshot(
-        input.agentId,
-      )
-      const maintenancePrompt = this.profileStore.buildMaintenancePrompt({
-        userContent: input.userContent,
-        agentContent: input.agentContent,
-        soulContent: profileSnapshot.soul.content,
-        profileUserContent: profileSnapshot.user.content,
-      })
-
-      await input.handle.prompt(maintenancePrompt)
-
-      const readResult = await this.configStore.read()
-      const runtimeConfig = readResult.config
-        ? extractAgentRuntimeConfig(readResult.config, input.agentId)
-        : null
-      await this.applyProfileMaintenanceResults({
-        agentId: input.agentId,
-        sessionId: input.sessionId,
-        previousSnapshot: profileSnapshot,
-        apiKey: runtimeConfig?.apiKey ?? null,
-      })
-    } catch (error) {
-      this.appendAndEmitSystemMessage({
-        agentId: input.agentId,
-        sessionId: input.sessionId,
-        content: `Profile 维护失败：${sanitizeErrorMessage(error)}`,
-      })
-    }
-  }
-
-
-
-
-  /**
-   * 应用维护回合结束后的 profile 文件校验、脱敏和事件广播。
-   *
-   * @param input - 会话归属、维护前快照和可用于精确脱敏的 API Key。
-   * @returns 无返回值。
-   * @throws 当文件读取、恢复或脱敏写入失败时，Promise 会 reject。
-   */
-  private async applyProfileMaintenanceResults(input: {
-    agentId: AgentId
-    sessionId: string
-    previousSnapshot: ProfileMaintenanceSnapshot
-    apiKey: string | null
-  }): Promise<void> {
-    // soul: LLM 写入 agent home 目录下的 soul.md
-    await this.applyProfileMaintenanceFileResult({
-      agentId: input.agentId,
-      sessionId: input.sessionId,
-      previousFile: input.previousSnapshot.soul,
-      apiKey: input.apiKey,
-    })
-
-    // user: LLM 可能写入 agent home 或共享 profile 路径
-    // 先检查 agent home 下的 user.md（旧位置），再同步到共享路径
-    const agentHomeUserPath = join(
-      this.layout.agentHome(input.agentId),
-      'user.md',
-    )
-    const agentHomeUserHistoryPath = join(
-      this.layout.agentHome(input.agentId),
-      'user.history',
-    )
-
-    if (await pathExists(agentHomeUserPath)) {
-      const agentHomeUserContent = await safeReadFile(agentHomeUserPath)
-
-      if (agentHomeUserContent !== input.previousSnapshot.user.content) {
-        // LLM 修改了 agent home 下的 user.md，同步到共享路径
-        const sharedUserPath = this.layout.userProfile()
-
-        // 确保共享路径存在
-        await mkdir(this.layout.sharedProfile(), { recursive: true })
-        await mkdir(this.layout.userHistory(), { recursive: true })
-
-        // 应用相同的校验逻辑到 agent home 的 user.md
-        await this.applyProfileMaintenanceFileResult({
-          agentId: input.agentId,
-          sessionId: input.sessionId,
-          previousFile: {
-            ...input.previousSnapshot.user,
-            path: agentHomeUserPath,
-            historyPath: agentHomeUserHistoryPath,
-          },
-          apiKey: input.apiKey,
-        })
-
-        // 同步到共享路径
-        const updatedContent = await safeReadFile(agentHomeUserPath)
-        if (updatedContent !== input.previousSnapshot.user.content) {
-          await writeFile(sharedUserPath, updatedContent, 'utf8')
-        }
-      }
-    }
-
-    // 同时校验共享路径下的 user.md
-    await this.applyProfileMaintenanceFileResult({
-      agentId: input.agentId,
-      sessionId: input.sessionId,
-      previousFile: input.previousSnapshot.user,
-      apiKey: input.apiKey,
-    })
-  }
-
-  /**
-   * 校验单个 profile 文件是否带备份更新，并在通过后广播更新消息。
-   *
-   * @param input - 会话归属、维护前文件快照和可用于精确脱敏的 API Key。
-   * @returns 无返回值。
-   * @throws 当文件读取、恢复或脱敏写入失败时，Promise 会 reject。
-   */
-  private async applyProfileMaintenanceFileResult(input: {
-    agentId: AgentId
-    sessionId: string
-    previousFile: ProfileMaintenanceFileSnapshot
-    apiKey: string | null
-  }): Promise<void> {
-    const nextContent = await readFile(input.previousFile.path, 'utf8')
-
-    if (nextContent === input.previousFile.content) {
-      return
-    }
-
-    const hasBackup = await this.profileStore.hasNewHistoryFile(input.previousFile)
-
-    if (!hasBackup) {
-      await writeFile(
-        input.previousFile.path,
-        input.previousFile.content,
-        'utf8',
-      )
-      this.appendAndEmitSystemMessage({
-        agentId: input.agentId,
-        sessionId: input.sessionId,
-        content: `更新${this.formatProfileTargetLabel(input.previousFile.target)}失败：缺少更新前备份，已保留旧版本。`,
-      })
-      return
-    }
-
-    const redactedContent = this.profileStore.redactSensitiveContent(
-      nextContent,
-      input.apiKey,
-    )
-
-    if (redactedContent !== nextContent) {
-      await writeFile(input.previousFile.path, redactedContent, 'utf8')
-    }
-
-    this.emitProfileUpdated(
-      input.previousFile.target,
-      (await getMtimeIso(input.previousFile.path)) ?? this.now(),
-      {
-        agentId: input.agentId,
-        sessionId: input.sessionId,
-      },
-    )
-  }
-
-
-
-
-  /**
-   * 广播 profile 更新时间，并可选追加用户可见的系统消息。
-   *
-   * @param target - 被更新的 profile 目标。
-   * @param updatedAt - 文件系统记录的更新时间。
-   * @param transcriptTarget - 需要追加 transcript 系统消息时的会话归属。
-   * @returns 无返回值。
-   * @throws 当系统消息追加失败时，Promise 会 reject。
-   */
+  /** 广播 profile 更新时间，不向消息流追加系统消息。 */
   private emitProfileUpdated(
-    target: ProfileMaintenanceTarget,
+    target: 'soul' | 'user',
     updatedAt: string,
-    transcriptTarget?: {
-      agentId: AgentId
-      sessionId: string
-    },
-    eventAgentId?: AgentId,
+    eventAgentId: AgentId = TANGYUAN_DEFAULT_AGENT_ID,
   ): void {
     this.emit({
       type: 'profile-updated',
-      agentId:
-        transcriptTarget?.agentId ?? eventAgentId ?? TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: eventAgentId,
       target,
       updatedAt,
       occurredAt: this.now(),
     })
-
-    if (transcriptTarget) {
-      this.appendAndEmitSystemMessage({
-        ...transcriptTarget,
-        content: target === 'soul' ? '已更新 Agent 规则' : '已更新用户画像',
-      })
-    }
   }
-
-  /**
-   * 追加并广播一条系统消息。
-   *
-   * @param input - 系统消息的会话归属和内容。
-   * @returns 已追加的系统消息。
-   * @throws 当会话不存在时抛出 AgentRuntimeError。
-   */
-  private appendAndEmitSystemMessage(input: {
-    agentId: AgentId
-    sessionId: string
-    content: string
-  }): InternalMessage {
-    const message = this.appendMessage({
-      agentId: input.agentId,
-      sessionId: input.sessionId,
-      role: 'system',
-      content: input.content,
-    })
-    this.emit({
-      type: 'message-appended',
-      agentId: input.agentId,
-      message,
-      occurredAt: this.now(),
-    })
-
-    return message
-  }
-
-  /**
-   * 把 profile 目标转换为用户可读的中文标签。
-   *
-   * @param target - profile 文件目标。
-   * @returns 用于系统消息的中文标签。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private formatProfileTargetLabel(target: ProfileMaintenanceTarget): string {
-    return target === 'soul' ? 'Agent 规则' : '用户画像'
-  }
-
 
   /**
    * 重算身份上下文并刷新到指定 Agent 的所有活跃会话。
@@ -2893,7 +2569,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
     )
   }
 
-
   /**
    * 确认会话已存在。
    *
@@ -2958,7 +2633,6 @@ export class PiSdkDriver implements AgentSessionDriver, RuntimeResourceDriver {
 
     return `${sessionId}-run-${nextSequence}`
   }
-
 
   /**
    * 更新会话运行状态并广播状态事件。

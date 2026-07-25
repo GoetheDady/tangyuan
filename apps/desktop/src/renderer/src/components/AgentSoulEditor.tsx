@@ -56,6 +56,13 @@ export function AgentSoulEditor({ agentId, editable }: AgentSoulEditorProps): Re
 
       if (result.status === 'rejected') {
         setError(result.reason.message)
+        if (result.reason.code === 'version-conflict') {
+          const latestSoul = await window.api.getSoul({ agentId }).catch(() => null)
+          if (latestSoul) {
+            setSoul(latestSoul)
+            setContent(latestSoul.content)
+          }
+        }
         return
       }
 

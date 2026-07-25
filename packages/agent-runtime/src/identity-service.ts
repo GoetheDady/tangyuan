@@ -59,6 +59,7 @@ export class IdentityService {
    *
    * @param agentId - 目标 Agent 标识。
    * @param content - 新 soul 内容。
+   * @param expectedVersion - 调用方最后观察到的内容版本。
    * @returns profile 维护结果。
    * @throws 当 Driver 不支持或操作失败时，Promise 会 reject。
    */
@@ -78,7 +79,7 @@ export class IdentityService {
     )
 
     if (result.status === 'updated') {
-      await this.snapshotStore.reload()
+      await this.snapshotStore.reload().catch(() => undefined)
     }
 
     return result

@@ -319,6 +319,7 @@ export const profileUpdateResultSchema = z.discriminatedUnion('status', [
     version: z.string().min(1),
     reason: z.strictObject({
       code: z.enum([
+        'invalid-content',
         'version-conflict',
         'sensitive-content',
         'backup-failed',

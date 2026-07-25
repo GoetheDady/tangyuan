@@ -581,6 +581,23 @@ describe('profile schemas', () => {
     })
   })
 
+  it('accepts an invalid-content profile rejection', () => {
+    expect(
+      profileUpdateResultSchema.parse({
+        target: 'soul',
+        status: 'rejected',
+        version: 'sha256:current-version',
+        reason: {
+          code: 'invalid-content',
+          message: 'Agent 灵魂不能为空。',
+        },
+      }),
+    ).toMatchObject({
+      status: 'rejected',
+      reason: { code: 'invalid-content' },
+    })
+  })
+
   it('rejects empty soul content in update request', () => {
     expect(() =>
       updateSoulRequestSchema.parse({
