@@ -118,7 +118,22 @@ export abstract class TangyuanRuntimeOrchestrator {
       if (!isInternalDriverEvent(event)) {
         this.emit(event)
       }
-      // 当 run 结束（完成/取消/失败）时，释放 slot 并启动下一个排队请求
+      // 当 run 因任何原因结束（取消/失败/完成）时，自动清理
+      // 该 session 的待审批请求，防止审批卡片在 UI 中堆积。
+      if (
+        event.type === 'turn-cancelled' ||
+        event.type === 'turn-failed'
+      ) {
+        this.rejectSessionPendingApprovals(event.sessionId)
+      } else if (
+        event.type === 'run-state-changed' &&
+        event.state !== 'running' &&
+        event.state !== 'queued'
+      ) {
+        this.rejectSessionPendingApprovals(event.sessionId)
+      }
+
+      // 当 run 结束时，释放 slot 并启动下一个排队请求
       if (
         event.type === 'turn-cancelled' ||
         event.type === 'turn-failed' ||
