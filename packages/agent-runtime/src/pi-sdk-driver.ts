@@ -564,8 +564,6 @@ export class PiSdkDriver
     } = input
     const inReplyToPatch = input.inReplyTo ? { inReplyTo: input.inReplyTo } : {}
     try {
-      const profileStatusBeforeRun =
-        await this.profileStore.ensureDefaultAgentHome()
       let accumulatedReply = ''
       let turnIndex = 0
       // 惰性宣告：收到第一个真实内容事件时才 emit agent message-appended，
@@ -718,24 +716,9 @@ export class PiSdkDriver
         occurredAt: this.now(),
         ...inReplyToPatch,
       })
-      if (!profileStatusBeforeRun.initialized) {
-        await this.profileStore.performBootstrapCompletionGating()
-      }
-
-      // profile 变化点：本回合可能写入 soul/user 或完成 bootstrap，
-      // 若状态发生变化则刷新系统提示词上下文。
-      const profileStatusAfterRun =
-        await this.profileStore.ensureDefaultAgentHome()
-      if (
-        profileStatusAfterRun.initialized !==
-          profileStatusBeforeRun.initialized ||
-        profileStatusAfterRun.soulUpdatedAt !==
-          profileStatusBeforeRun.soulUpdatedAt ||
-        profileStatusAfterRun.userUpdatedAt !==
-          profileStatusBeforeRun.userUpdatedAt
-      ) {
-        await this.refreshAgentProfileContext(agentId)
-      }
+      // bootstrap 门控：受控工具写入后检查 Agent 灵魂和用户画像
+      // 是否都已就绪；就绪时自动结束初始化。
+      await this.profileStore.performBootstrapCompletionGating()
 
       await this.sessionIndexStore.upsertAttempt(sessionId, {
         attemptId: runId,

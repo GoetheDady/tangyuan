@@ -217,7 +217,7 @@ describe('PiSdkDriver', () => {
       }),
     ).resolves.toEqual(expect.objectContaining({ entries: [] }))
   })
-  it('lets the bootstrap turn create profile files, remove bootstrap.md, and enter history', async () => {
+  it('lets the bootstrap turn create profile files and enter history using controlled tools', async () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
@@ -228,8 +228,8 @@ describe('PiSdkDriver', () => {
           },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
-            await writeFile(
-              join(request.cwd, 'soul.md'),
+            // Agent 使用受控工具完成初始化
+            await request.onUpdateSoul(
               [
                 '# Soul',
                 '身份：汤圆是桌面端 Agent。',
@@ -241,10 +241,8 @@ describe('PiSdkDriver', () => {
                 '记忆与技能原则：只记录长期偏好。',
                 '不确定时的处理方式：先说明假设。',
               ].join('\n'),
-              'utf8',
             )
-            await writeFile(
-              join(request.cwd, 'user.md'),
+            await request.onUpdateUserProfile(
               [
                 '# User',
                 '称呼：用户。',
@@ -255,9 +253,7 @@ describe('PiSdkDriver', () => {
                 '禁止触碰的信息和边界：API Key。',
                 '长期偏好：完整方法注释。',
               ].join('\n'),
-              'utf8',
             )
-            await rm(join(request.cwd, 'bootstrap.md'), { force: true })
 
             return '初始化完成。'
           },
@@ -289,19 +285,21 @@ describe('PiSdkDriver', () => {
     })
 
     const resolvedHomePath = join(rootPath, homePath.slice(2))
+    const sharedProfilePath = join(rootPath, '.tangyuan/profile')
     // bootstrap 回合的身份上下文（建会话时注入）包含 bootstrap 指令。
     const bootstrapContext = gateway.sessionHandles[0]?.systemPromptContexts[0]
     expect(bootstrapContext).toContain('# Bootstrap')
     expect(bootstrapContext).toContain(
-      'soul.md 至少必须覆盖：身份、用户偏好、工作范围、沟通方式、权限边界、敏感信息规则、记忆与技能原则、不确定时的处理方式。',
+      'Agent 灵魂至少必须覆盖：身份、用户偏好、工作范围、沟通方式、权限边界、敏感信息规则、记忆与技能原则、不确定时的处理方式。',
     )
-    expect(bootstrapContext).toContain('完成后删除 bootstrap.md。')
+    expect(bootstrapContext).toContain('update_soul')
     await expect(
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
     ).resolves.toContain('身份：汤圆是桌面端 Agent。')
     await expect(
-      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+      readFile(join(sharedProfilePath, 'user.md'), 'utf8'),
     ).resolves.toContain('称呼：用户。')
+    // bootstrap.md 由 Runtime 自动清理
     await expect(
       readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
     ).rejects.toMatchObject({ code: 'ENOENT' })
@@ -325,7 +323,7 @@ describe('PiSdkDriver', () => {
       ],
     )
   })
-  it('deletes bootstrap.md when the agent writes both profile files but forgets to remove it', async () => {
+  it('auto-deletes bootstrap.md when both controlled tools succeed', async () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
@@ -336,17 +334,9 @@ describe('PiSdkDriver', () => {
           },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
-            // Agent 写入两个 profile 文件，但遗留 bootstrap.md
-            await writeFile(
-              join(request.cwd, 'soul.md'),
-              '# Soul\n只说中文。',
-              'utf8',
-            )
-            await writeFile(
-              join(request.cwd, 'user.md'),
-              '# User\n简洁回答。',
-              'utf8',
-            )
+            // Agent 调用两个受控工具完成初始化
+            await request.onUpdateSoul('# Soul\n只说中文。')
+            await request.onUpdateUserProfile('# User\n简洁回答。')
             return '初始化完成。'
           },
           abort: async () => undefined,
@@ -376,12 +366,13 @@ describe('PiSdkDriver', () => {
     })
 
     const resolvedHomePath = join(rootPath, homePath.slice(2))
+    const sharedProfilePath = join(rootPath, '.tangyuan/profile')
     // soul.md 和 user.md 存在
     await expect(
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
     ).resolves.toContain('# Soul')
     await expect(
-      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+      readFile(join(sharedProfilePath, 'user.md'), 'utf8'),
     ).resolves.toContain('# User')
     // bootstrap.md 被 runtime 自动清理
     await expect(
@@ -397,7 +388,7 @@ describe('PiSdkDriver', () => {
       },
     })
   })
-  it('recreates bootstrap.md when the agent deletes it but only writes soul.md', async () => {
+  it('keeps bootstrap.md when only update_soul succeeds', async () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
@@ -408,13 +399,9 @@ describe('PiSdkDriver', () => {
           },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
-            await writeFile(
-              join(request.cwd, 'soul.md'),
-              '# Soul\n部分初始化。',
-              'utf8',
-            )
-            await rm(join(request.cwd, 'bootstrap.md'), { force: true })
-            return 'soul.md 已创建。'
+            // 只调用 update_soul，不调用 update_user_profile
+            await request.onUpdateSoul('# Soul\n部分初始化。')
+            return 'Agent 灵魂已保存，请继续告诉我你的偏好。'
           },
           abort: async () => undefined,
           dispose: () => undefined,
@@ -449,9 +436,12 @@ describe('PiSdkDriver', () => {
     ).resolves.toContain('# Soul')
     // user.md 不存在
     await expect(
-      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+      readFile(
+        join(rootPath, '.tangyuan/profile/user.md'),
+        'utf8',
+      ),
     ).rejects.toMatchObject({ code: 'ENOENT' })
-    // bootstrap.md 被重建
+    // bootstrap.md 仍存在（初始化阻断保留）
     await expect(
       readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
     ).resolves.toContain('# Bootstrap')
@@ -464,7 +454,7 @@ describe('PiSdkDriver', () => {
       },
     })
   })
-  it('recreates bootstrap.md when the agent deletes it but only writes user.md', async () => {
+  it('keeps bootstrap.md when only update_user_profile succeeds', async () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
@@ -475,13 +465,9 @@ describe('PiSdkDriver', () => {
           },
           prompt: async (prompt: string) => {
             handle.prompts.push(prompt)
-            await writeFile(
-              join(request.cwd, 'user.md'),
-              '# User\n部分初始化。',
-              'utf8',
-            )
-            await rm(join(request.cwd, 'bootstrap.md'), { force: true })
-            return 'user.md 已创建。'
+            // 只调用 update_user_profile，不调用 update_soul
+            await request.onUpdateUserProfile('# User\n部分初始化。')
+            return '用户画像已保存。'
           },
           abort: async () => undefined,
           dispose: () => undefined,
@@ -510,12 +496,18 @@ describe('PiSdkDriver', () => {
     })
 
     const resolvedHomePath = join(rootPath, homePath.slice(2))
+    // user.md 存在于共享路径
     await expect(
-      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+      readFile(
+        join(rootPath, '.tangyuan/profile/user.md'),
+        'utf8',
+      ),
     ).resolves.toContain('# User')
+    // soul.md 不存在
     await expect(
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
     ).rejects.toMatchObject({ code: 'ENOENT' })
+    // bootstrap.md 仍存在（初始化阻断保留）
     await expect(
       readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
     ).resolves.toContain('# Bootstrap')
@@ -568,12 +560,16 @@ describe('PiSdkDriver', () => {
     })
 
     const resolvedHomePath = join(rootPath, homePath.slice(2))
-    // 两个 profile 文件都不存在
+    const sharedProfilePath = join(rootPath, '.tangyuan/profile')
+    // 两个 profile 文件都不存在（Agent Home 和共享路径均无）
     await expect(
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
     ).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(
       readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(
+      readFile(join(sharedProfilePath, 'user.md'), 'utf8'),
     ).rejects.toMatchObject({ code: 'ENOENT' })
     // bootstrap.md 被重建
     await expect(
@@ -587,7 +583,7 @@ describe('PiSdkDriver', () => {
       },
     })
   })
-  it('keeps bootstrap active across turns when the agent writes one file at a time', async () => {
+  it('keeps bootstrap active across turns when the agent calls one tool at a time', async () => {
     let turnCount = 0
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
@@ -601,21 +597,12 @@ describe('PiSdkDriver', () => {
             handle.prompts.push(prompt)
             turnCount++
             if (turnCount === 1) {
-              // 第一回合：只写 soul.md
-              await writeFile(
-                join(request.cwd, 'soul.md'),
-                '# Soul\n第一回合。',
-                'utf8',
-              )
-              return 'soul.md 已创建，请继续告诉我你的偏好。'
+              // 第一回合：只调用 update_soul
+              await request.onUpdateSoul('# Soul\n第一回合。')
+              return 'Agent 灵魂已保存，请继续告诉我你的偏好。'
             }
-            // 第二回合：写 user.md
-            await writeFile(
-              join(request.cwd, 'user.md'),
-              '# User\n第二回合。',
-              'utf8',
-            )
-            await rm(join(request.cwd, 'bootstrap.md'), { force: true })
+            // 第二回合：调用 update_user_profile
+            await request.onUpdateUserProfile('# User\n第二回合。')
             return '初始化完成。'
           },
           abort: async () => undefined,
@@ -645,12 +632,13 @@ describe('PiSdkDriver', () => {
     })
 
     const resolvedHomePath = join(rootPath, homePath.slice(2))
+    const sharedProfilePath = join(rootPath, '.tangyuan/profile')
     // 第一回合后：soul.md 存在，user.md 不存在，bootstrap.md 仍存在
     await expect(
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
     ).resolves.toContain('# Soul')
     await expect(
-      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+      readFile(join(sharedProfilePath, 'user.md'), 'utf8'),
     ).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(
       readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),
@@ -670,12 +658,12 @@ describe('PiSdkDriver', () => {
       content: '我喜欢简洁回答。',
     })
 
-    // 第二回合后：两个 profile 都存在，bootstrap.md 被删除
+    // 第二回合后：两个 profile 都存在，bootstrap.md 被 Runtime 删除
     await expect(
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
     ).resolves.toContain('# Soul')
     await expect(
-      readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+      readFile(join(sharedProfilePath, 'user.md'), 'utf8'),
     ).resolves.toContain('# User')
     await expect(
       readFile(join(resolvedHomePath, 'bootstrap.md'), 'utf8'),

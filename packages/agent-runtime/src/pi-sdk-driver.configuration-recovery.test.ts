@@ -68,6 +68,7 @@ describe('PiSdkDriver', () => {
     })
 
     const resolvedHomePath = join(rootPath, homePath.slice(2))
+    const sharedProfilePath = join(rootPath, '.tangyuan/profile')
     await expect(
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
     ).resolves.toContain('# Soul')
@@ -76,6 +77,9 @@ describe('PiSdkDriver', () => {
     ).resolves.toContain('# Bootstrap')
     await expect(
       readFile(join(resolvedHomePath, 'user.md'), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(
+      readFile(join(sharedProfilePath, 'user.md'), 'utf8'),
     ).rejects.toMatchObject({ code: 'ENOENT' })
   })
   it('enters normal conversation after bootstrap completes without a hidden maintenance turn', async () => {
@@ -92,17 +96,9 @@ describe('PiSdkDriver', () => {
             handle.prompts.push(prompt)
             turnCount++
             if (turnCount === 1) {
-              // Bootstrap 回合：写入两个 profile 文件
-              await writeFile(
-                join(request.cwd, 'soul.md'),
-                '# Soul\n只说中文。',
-                'utf8',
-              )
-              await writeFile(
-                join(request.cwd, 'user.md'),
-                '# User\n简洁回答。',
-                'utf8',
-              )
+              // Bootstrap 回合：使用受控工具完成初始化
+              await request.onUpdateSoul('# Soul\n只说中文。')
+              await request.onUpdateUserProfile('# User\n简洁回答。')
               return '初始化完成。'
             }
             // 正常回合

@@ -524,10 +524,15 @@ export class ProfileStore {
       return [
         `# ${PROFILE_CONTEXT_HEADER}`,
         '',
-        '## soul.md',
+        '下方是你的长期上下文。当用户要求更新身份、职责、偏好或边界时，',
+        '应在正常回复回合内自行调用 update_soul 或 update_user_profile 工具保存；',
+        '更新失败时必须在最终回复中明确告知用户失败原因。',
+        '不要因为更新了 Agent 灵魂或用户画像就重复保存，实在没有什么需要长期记住的就不要调用。',
+        '',
+        '## Agent 灵魂',
         soulContent.trim(),
         '',
-        '## user.md',
+        '## 用户画像',
         profileUserContent.trim(),
       ].join('\n')
     }
@@ -539,17 +544,17 @@ export class ProfileStore {
     return [
       `# ${PROFILE_CONTEXT_HEADER}`,
       '',
-      '当前 profile 尚未初始化。请根据 bootstrap.md 的问题推进首次初始化；信息不足时继续追问，不要要求用户点击完成按钮。',
-      '当你判断固定问题已经回答充分时，必须使用 Pi SDK 可用文件工具完成初始化。',
+      '当前 Agent 灵魂和用户画像尚未初始化。请根据 bootstrap.md 的问题推进首次初始化；信息不足时继续追问，不要要求用户点击完成按钮。',
+      '当你判断固定问题已经回答充分时，必须调用 update_soul 和 update_user_profile 工具完成初始化。',
       '',
       '初始化完成规则：',
-      '1. 使用 write 或 edit 写入 soul.md。',
-      '2. 使用 write 或 edit 写入 user.md。',
-      '3. 完成后删除 bootstrap.md。',
-      '4. 不得把 API Key、密钥、令牌或其它敏感凭据写入 soul.md 或 user.md。',
+      '1. 调用 update_soul 写入 Agent 灵魂内容。',
+      '2. 调用 update_user_profile 写入用户画像内容。',
+      '3. 工具调用失败时必须在最终回复中明确告知用户失败原因。',
+      '4. 不得把 API Key、密钥、令牌或其它敏感凭据写入 Agent 灵魂或用户画像。',
       '',
-      'soul.md 至少必须覆盖：身份、用户偏好、工作范围、沟通方式、权限边界、敏感信息规则、记忆与技能原则、不确定时的处理方式。',
-      'user.md 至少必须覆盖：称呼、语言与语气偏好、常见工作类型、决策偏好、需要先确认的事项、禁止触碰的信息和边界、长期偏好。',
+      'Agent 灵魂至少必须覆盖：身份、用户偏好、工作范围、沟通方式、权限边界、敏感信息规则、记忆与技能原则、不确定时的处理方式。',
+      '用户画像至少必须覆盖：称呼、语言与语气偏好、常见工作类型、决策偏好、需要先确认的事项、禁止触碰的信息和边界、长期偏好。',
       '',
       '## bootstrap.md',
       bootstrapContent.trim(),
@@ -566,7 +571,7 @@ export class ProfileStore {
     const absoluteHomePath = this.layout.agentHome()
     const bootstrapPath = join(absoluteHomePath, 'bootstrap.md')
     const soulPath = join(absoluteHomePath, 'soul.md')
-    const userPath = join(absoluteHomePath, 'user.md')
+    const userPath = this.layout.userProfile()
 
     const [bootstrapExists, soulExists, userExists] = await Promise.all([
       pathExists(bootstrapPath),
@@ -574,13 +579,18 @@ export class ProfileStore {
       pathExists(userPath),
     ])
 
-    // Gate 1: bootstrap 完成 — 确保 bootstrap.md 已被删除
+    // Gate 1: bootstrap 完成 — Agent 灵魂和用户画像都存在且非空
     if (soulExists && userExists) {
-      if (bootstrapExists) {
-        const { rm } = await import('node:fs/promises')
-        await rm(bootstrapPath, { force: true })
+      const [soulHasContent, userHasContent] = await Promise.all([
+        fileHasContent(soulPath),
+        fileHasContent(userPath),
+      ])
+      if (soulHasContent && userHasContent) {
+        if (bootstrapExists) {
+          await rm(bootstrapPath, { force: true })
+        }
+        return
       }
-      return
     }
 
     // Gate 2: 恢复 — bootstrap.md 被误删但 profile 未完成
