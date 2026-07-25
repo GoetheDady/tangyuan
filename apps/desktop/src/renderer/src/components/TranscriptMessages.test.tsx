@@ -694,6 +694,70 @@ describe('TranscriptMessages', () => {
     expect(screen.getByTestId('awaiting-response-indicator')).toBeInTheDocument()
   })
 
+  it('hides awaiting indicator when isAwaitingResponse becomes false (cancel scenario)', () => {
+    defineMockApi()
+    // 模拟运行中的场景：用户消息 + 运行中的 agent-reply
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: '在吗' }),
+      createAgentReplyEntry({
+        index: 1,
+        content: '在的',
+        attempt: createAttempt({ status: 'running', completedAt: null })
+      })
+    ])
+
+    const { rerender } = render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming
+        isAwaitingResponse
+        sessionId="session-1"
+      />
+    )
+
+    // 运行中：attempt 是 running，所以 indicator 不展示
+    expect(screen.queryByTestId('awaiting-response-indicator')).not.toBeInTheDocument()
+
+    // 模拟 cancel：isAwaitingResponse 变为 false
+    rerender(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        isAwaitingResponse={false}
+        sessionId="session-1"
+      />
+    )
+
+    // cancel 后 indicator 应隐藏
+    expect(screen.queryByTestId('awaiting-response-indicator')).not.toBeInTheDocument()
+  })
+
+  it('shows awaiting indicator when isAwaitingResponse is true and attempt is cancelled (mid-cancel window)', () => {
+    defineMockApi()
+    // 模拟 cancel 中间状态：attempt 已变为 cancelled，但 isAwaitingResponse 仍为 true
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, content: '在吗' }),
+      createAgentReplyEntry({
+        index: 1,
+        content: '部分回复',
+        attempt: createAttempt({ status: 'cancelled', completedAt: FIXED_TIME })
+      })
+    ])
+
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        isAwaitingResponse
+        sessionId="session-1"
+      />
+    )
+
+    // attempt 已 cancelled 但 isAwaitingResponse 仍为 true → indicator 应展示
+    // 这是重试等待窗口的设计行为
+    expect(screen.getByTestId('awaiting-response-indicator')).toBeInTheDocument()
+  })
+
   it('provides stable key for retry attempts via attemptId', () => {
     defineMockApi()
     const entry1 = createAgentReplyEntry({

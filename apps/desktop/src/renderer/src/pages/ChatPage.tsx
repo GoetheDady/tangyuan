@@ -357,9 +357,13 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
         sessionId: selectedSession.sessionId
       })
       context.setIsSendingMessage(false)
+      // 刷新 sessions 以同步取消后的状态，避免仅依赖异步推送事件
+      context.setSessions(await window.api.listSessions())
       toast.success('已停止生成')
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : '取消运行失败')
+      // 即使取消失败，也要重置 isSendingMessage，防止 UI 卡住
+      context.setIsSendingMessage(false)
     }
   }
 

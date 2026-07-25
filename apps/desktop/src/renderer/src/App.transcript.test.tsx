@@ -391,6 +391,247 @@ describe('App', () => {
     expect(codeElement).toBeInTheDocument()
     expect(codeElement?.textContent).toContain('代码')
   })
+  it('hides awaiting-response-indicator after cancel stops the active run', async () => {
+    // 模拟：有一个正在运行的 session，用户点击停止后，indicator 应隐藏
+    const user = userEvent.setup()
+    const readyRuntime = createReadyRuntimeSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-t...7890'
+    })
+    const listeners: AgentEventListener[] = []
+    // Deferred：控制 sendMessage 不立即 resolve（模拟长时间运行的请求）
+    const releaseSend = createDeferred<void>()
+    const cancelledSession = {
+      ...createDefaultSessionSummary({
+        sessionId: 'welcome',
+        title: '新会话',
+        updatedAt: '2026-07-08T00:00:05.000Z'
+      }),
+      state: 'cancelled' as const
+    }
+    const mockListSessions = vi.fn().mockResolvedValue([
+      {
+        ...createDefaultSessionSummary({
+          sessionId: 'welcome',
+          title: '新会话',
+          updatedAt: '2026-07-08T00:00:00.000Z'
+        }),
+        state: 'running' as const
+      }
+    ])
+
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
+        refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
+        saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
+        cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
+        listSessions: mockListSessions,
+        createSession: vi.fn(),
+        getTranscript: vi.fn().mockResolvedValue({
+          sessionId: 'welcome',
+          agentId: 'tangyuan',
+          entries: [
+            {
+              kind: 'user-message',
+              index: 0,
+              messageId: 'msg-1',
+              content: '数到 30',
+              createdAt: '2026-07-08T00:00:01.000Z'
+            },
+            {
+              kind: 'agent-reply',
+              index: 1,
+              messageId: 'msg-2',
+              content: '1',
+              createdAt: '2026-07-08T00:00:02.000Z',
+              attempt: {
+                attemptId: 'run-1',
+                runId: 'run-1',
+                status: 'running',
+                startedAt: '2026-07-08T00:00:01.000Z',
+                completedAt: null
+              },
+              turns: []
+            }
+          ],
+          updatedAt: '2026-07-08T00:00:02.000Z'
+        }),
+        sendMessage: vi.fn(async () => {
+          // 模拟运行开始：先发一个 attempt-started 和 entry-appended
+          for (const listener of listeners) {
+            listener({
+              type: 'run-state-changed',
+              agentId: 'tangyuan',
+              sessionId: 'welcome',
+              state: 'running',
+              occurredAt: '2026-07-08T00:00:01.000Z'
+            })
+            listener({
+              type: 'transcript-delta',
+              agentId: 'tangyuan',
+              sessionId: 'welcome',
+              delta: {
+                type: 'entry-appended',
+                entry: {
+                  kind: 'agent-reply',
+                  index: 1,
+                  messageId: 'msg-2',
+                  content: '',
+                  createdAt: '2026-07-08T00:00:02.000Z',
+                  attempt: {
+                    attemptId: 'run-1',
+                    runId: 'run-1',
+                    status: 'running',
+                    startedAt: '2026-07-08T00:00:01.000Z',
+                    completedAt: null
+                  },
+                  turns: []
+                }
+              },
+              occurredAt: '2026-07-08T00:00:02.000Z'
+            })
+          }
+
+          await releaseSend.promise
+
+          return {
+            sessionId: 'welcome',
+            agentId: 'tangyuan',
+            entries: [
+              {
+                kind: 'user-message',
+                index: 0,
+                messageId: 'msg-1',
+                content: '数到 30',
+                createdAt: '2026-07-08T00:00:01.000Z'
+              },
+              {
+                kind: 'agent-reply',
+                index: 1,
+                messageId: 'msg-2',
+                content: '1, 2, 3, ...',
+                createdAt: '2026-07-08T00:00:02.000Z',
+                attempt: {
+                  attemptId: 'run-1',
+                  runId: 'run-1',
+                  status: 'cancelled',
+                  startedAt: '2026-07-08T00:00:01.000Z',
+                  completedAt: '2026-07-08T00:00:05.000Z'
+                },
+                turns: []
+              }
+            ],
+            updatedAt: '2026-07-08T00:00:05.000Z'
+          } satisfies TranscriptSnapshot
+        }),
+        retryMessage: vi.fn().mockResolvedValue([]),
+        cancelRun: vi.fn(async () => {
+          // 模拟 cancel：更新 listSessions 并 emit turn-cancelled 事件
+          mockListSessions.mockResolvedValue([cancelledSession])
+          for (const listener of listeners) {
+            listener({
+              type: 'turn-cancelled',
+              agentId: 'tangyuan',
+              sessionId: 'welcome',
+              runId: 'run-1',
+              occurredAt: '2026-07-08T00:00:05.000Z'
+            })
+            listener({
+              type: 'transcript-delta',
+              agentId: 'tangyuan',
+              sessionId: 'welcome',
+              delta: {
+                type: 'attempt-status-changed',
+                index: 1,
+                attempt: {
+                  attemptId: 'run-1',
+                  runId: 'run-1',
+                  status: 'cancelled',
+                  startedAt: '2026-07-08T00:00:01.000Z',
+                  completedAt: '2026-07-08T00:00:05.000Z'
+                }
+              },
+              occurredAt: '2026-07-08T00:00:05.000Z'
+            })
+          }
+          releaseSend.resolve()
+          return cancelledSession
+        }),
+        subscribeToAgentEvents: vi.fn((listener: AgentEventListener) => {
+          listeners.push(listener)
+          return () => undefined
+        }),
+        openExternalLink: vi.fn(),
+        restoreFromBackup: vi.fn(),
+        resetConfiguration: vi.fn(),
+        listAgents: vi.fn().mockResolvedValue([
+          {
+            agentId: 'tangyuan',
+            displayName: '汤圆',
+            status: 'active' as const,
+            defaultProviderId: null,
+            defaultModelId: null,
+            homePath: '~/.tangyuan/agents/tangyuan',
+            archivedAt: null
+          }
+        ]),
+        updateAgentConfig: vi.fn(),
+        getSessionModelInfo: vi.fn().mockResolvedValue({
+          providerId: 'anthropic',
+          modelId: 'claude-sonnet-4-5',
+          displayName: 'Claude Sonnet 4.5',
+          thinkingLevel: null,
+          supportedThinkingLevels: [],
+          supportsThinking: false
+        }),
+        setSessionModel: vi.fn(),
+        setSessionThinkingLevel: vi.fn(),
+        archiveAgent: vi.fn(),
+        recoverAgent: vi.fn(),
+        reconcileAgentDirectories: vi.fn(),
+        claimAgentDirectory: vi.fn(),
+        rebuildTangyuanHome: vi.fn(),
+        getSoul: vi.fn(),
+        getUserProfile: vi.fn(),
+        updateSoul: vi.fn(),
+        updateUserProfile: vi.fn(),
+        listAgentSkills: vi.fn(),
+        listSharedSkills: vi.fn(),
+        approveBash: vi.fn(),
+        rejectBash: vi.fn(),
+        getPendingApprovals: vi.fn(),
+        answerClarification: vi.fn(),
+        cancelClarification: vi.fn(),
+        getPendingClarifications: vi.fn().mockResolvedValue([]),
+        installSkill: vi.fn(),
+        deleteSkill: vi.fn(),
+        approveSkillOperation: vi.fn(),
+        rejectSkillOperation: vi.fn(),
+        getPendingSkillApprovals: vi.fn(),
+        getSkillInstallRecords: vi.fn()
+      } satisfies DesktopPreloadApi
+    })
+    render(<App />)
+
+    // 初始加载完成：应展示 stop 按钮（因为 session state 是 running）
+    await screen.findByLabelText('消息')
+    expect(screen.getByRole('button', { name: '停止' })).toBeInTheDocument()
+
+    // 点击停止按钮
+    await user.click(screen.getByRole('button', { name: '停止' }))
+
+    // Cancel 完成后：
+    // - 停止按钮应切换为发送按钮
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: '发送' })).toBeInTheDocument()
+    })
+    // - indicator 应该隐藏
+    expect(screen.queryByTestId('awaiting-response-indicator')).not.toBeInTheDocument()
+  })
+
   it('renders user messages as plain text without Markdown parsing', async () => {
     const readyRuntime = createReadyRuntimeSnapshot({
       providerId: 'anthropic',
