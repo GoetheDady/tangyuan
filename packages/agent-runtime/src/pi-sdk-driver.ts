@@ -36,7 +36,7 @@ import type {
   RuntimeResourceDriver,
 } from './index'
 
-import { PiSdkDriverBase } from './pi-sdk-driver-base'
+import { PiSdkDriverResources } from './pi-sdk-driver-resources'
 
 const CONFIGURATION_VERIFICATION_PROMPT = 'Reply with OK.'
 
@@ -44,7 +44,7 @@ const CONFIGURATION_VERIFICATION_PROMPT = 'Reply with OK.'
  * Pi Agent SDK 的 v1 适配器骨架。
  */
 export class PiSdkDriver
-  extends PiSdkDriverBase
+  extends PiSdkDriverResources
   implements AgentSessionDriver, RuntimeResourceDriver
 {
   /**
@@ -77,8 +77,7 @@ export class PiSdkDriver
   async saveConfiguration(
     configuration: RuntimeConfiguration,
   ): Promise<RuntimeSnapshot> {
-    const normalizedConfiguration =
-      normalizeRuntimeConfiguration(configuration)
+    const normalizedConfiguration = normalizeRuntimeConfiguration(configuration)
     const controller = new AbortController()
     this.configurationVerificationController = controller
 
@@ -509,7 +508,8 @@ export class PiSdkDriver
       // 缓存 transcript 快照
       this.transcriptCache.set(request.sessionId, loadedMessages)
       const loadedUserMessage = loadedMessages.entries.find(
-        (e) => e.kind === 'user-message' && e.messageId === request.userMessageId,
+        (e) =>
+          e.kind === 'user-message' && e.messageId === request.userMessageId,
       )
       if (!loadedUserMessage || loadedUserMessage.kind !== 'user-message') {
         throw new AgentRuntimeError({
@@ -548,13 +548,19 @@ export class PiSdkDriver
     agentMessage: InternalMessage
     inReplyTo?: string
   }): Promise<void> {
-    const { agentId, sessionId, runId, content, session, handle, agentMessage } =
-      input
-    const inReplyToPatch = input.inReplyTo
-      ? { inReplyTo: input.inReplyTo }
-      : {}
+    const {
+      agentId,
+      sessionId,
+      runId,
+      content,
+      session,
+      handle,
+      agentMessage,
+    } = input
+    const inReplyToPatch = input.inReplyTo ? { inReplyTo: input.inReplyTo } : {}
     try {
-      const profileStatusBeforeRun = await this.profileStore.ensureDefaultAgentHome()
+      const profileStatusBeforeRun =
+        await this.profileStore.ensureDefaultAgentHome()
       let accumulatedReply = ''
       let turnIndex = 0
       // 惰性宣告：收到第一个真实内容事件时才 emit agent message-appended，
@@ -689,7 +695,9 @@ export class PiSdkDriver
         })
       }
 
-      const completedMessage = this.messageStore.complete(agentMessage.messageId)
+      const completedMessage = this.messageStore.complete(
+        agentMessage.messageId,
+      )
       this.emit({
         type: 'message-completed',
         agentId,
@@ -711,7 +719,8 @@ export class PiSdkDriver
 
       // profile 变化点：本回合可能写入 soul/user 或完成 bootstrap，
       // 若状态发生变化则刷新系统提示词上下文。
-      const profileStatusAfterRun = await this.profileStore.ensureDefaultAgentHome()
+      const profileStatusAfterRun =
+        await this.profileStore.ensureDefaultAgentHome()
       if (
         profileStatusAfterRun.initialized !==
           profileStatusBeforeRun.initialized ||
