@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pi SDK 功能全景 — 汤圆对接清单</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        tangyuan: { ink: '#2d2d2d', rice: '#faf8f5', red: '#c44b3c', border: '#e8e4df' }
+      }
+    }
+  }
+}
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:400,500,600&family=Noto+Sans+SC:wght@400;500;600&display=swap');
+  body { font-family: 'Inter', 'Noto Sans SC', system-ui, sans-serif; }
+  .module-card { transition: box-shadow 0.15s ease; }
+  .module-card:hover { box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+  .progress-bar { transition: width 0.3s ease; }
+</style>
+</head>
+<body class="bg-tangyuan-rice text-tangyuan-ink min-h-screen">
+
+<header class="sticky top-0 z-10 bg-tangyuan-rice/90 backdrop-blur border-b border-tangyuan-border">
+  <div class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-lg font-semibold tracking-tight">Pi SDK 功能全景</h1>
+      <p class="text-sm text-gray-500">汤圆对接清单 · <a href="https://github.com/GoetheDady/tangyuan/issues/88" class="underline hover:text-tangyuan-red">Issue #88</a></p>
+    </div>
+    <div class="flex items-center gap-4 text-sm">
+      <div class="flex items-center gap-1.5">
+        <div class="w-3 h-3 rounded-sm bg-green-500"></div>
+        <span id="doneCount">-</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <div class="w-3 h-3 rounded-sm border border-gray-300"></div>
+        <span id="todoCount">-</span>
+      </div>
+      <div class="text-gray-400">共 <span id="totalCount">-</span> 项</div>
+    </div>
+  </div>
+  <div class="h-0.5 bg-gray-200">
+    <div id="overallProgress" class="progress-bar h-full bg-tangyuan-red" style="width: 0%"></div>
+  </div>
+</header>
+
+<main class="max-w-4xl mx-auto px-6 py-8 space-y-8">
+
+<section class="bg-white rounded-xl border border-tangyuan-border p-6">
+  <h2 class="font-semibold mb-3">背景</h2>
+  <p class="text-gray-600 leading-relaxed">
+    本清单列出 <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">@earendil-works/pi-coding-agent</code> SDK 的全部功能模块，按大类拆分，每个子功能附白话解释。目的是逐块评估、对接、测试，确保汤圆不遗漏 SDK 提供的标准能力。
+  </p>
+  <div class="mt-4 flex flex-wrap gap-3 text-sm">
+    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-200">
+      <span class="w-2 h-2 rounded-full bg-green-500"></span> 默认对接
+    </span>
+    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+      <span class="w-2 h-2 rounded-full bg-amber-500"></span> 自定义逻辑
+    </span>
+    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+      <span class="w-2 h-2 rounded-full bg-blue-500"></span> 业务功能
+    </span>
+  </div>
+</section>
+
+<div id="modules"></div>
+
+<section class="bg-white rounded-xl border border-tangyuan-border p-6">
+  <h2 class="font-semibold mb-3">对接顺序建议</h2>
+  <ol class="list-decimal list-inside space-y-2 text-gray-600">
+    <li><strong>先把已打勾的补完整</strong> — 已打勾但可能只对接了部分参数/事件的，完善到完整覆盖</li>
+    <li><strong>再补「高价值未对接」</strong> — 如 compaction（13）、会话树分叉（11.7-11.10）、steer/followUp（2.4-2.5）</li>
+    <li><strong>最后补「锦上添花」</strong> — 如 OAuth（18.6）、cycleModel（4.8）、运行模式（14）等</li>
+  </ol>
+</section>
+
+</main>
+
+<footer class="max-w-4xl mx-auto px-6 py-8 text-center text-xs text-gray-400">
+  Tangyuan · Pi SDK Integration Checklist
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// 数据用 JSON 嵌入，避免中文引号与 JS 字符串定界符冲突
+// ═══════════════════════════════════════════════════════
+const MODULES_JSON = `
+[
+  {
+    "id": 1,
+    "title": "会话创建与管理",
+    "summary": "怎么「开一个对话」、怎么「继续上次的对话」、怎么「在多个对话之间切换」。Pi SDK 把每个对话存在 .jsonl 文件里，还支持树形分支（类似 git branch）。",
+    "items": [
+      {
+        "id": "1.1",
+        "name": "createAgentSession() — 创建会话",
+        "desc": "这是最核心的入口，调用它就能拿到一个「会话对象」，后续发消息、收事件、切换模型都通过它。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "1.2",
+        "name": "SessionManager.create() — 新建并持久化会话",
+        "desc": "不仅创建会话，还把它存到磁盘文件，关了应用再打开还能继续聊。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "1.3",
+        "name": "SessionManager.open() — 打开已有会话",
+        "desc": "指定一个 .jsonl 文件路径，恢复之前的对话继续聊。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "1.4",
+        "name": "SessionManager.continueRecent() — 继续最近会话",
+        "desc": "自动找到最近一次对话，直接打开。适合「启动应用后自动恢复上次对话」的场景。",
+        "done": false
+      },
+      {
+        "id": "1.5",
+        "name": "SessionManager.inMemory() — 不落盘的临时会话",
+        "desc": "对话只在内存里，关了就没了。适合测试或一次性问答。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "1.6",
+        "name": "SessionManager.list() / listAll() — 列出会话",
+        "desc": "列出某个目录下所有存过的对话，用于「会话列表」界面。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "1.7",
+        "name": "AgentSessionRuntime — 会话运行时（高级）",
+        "desc": "当需要「新建对话」「切换到另一个对话」「从某个节点分叉出去」这种替换当前会话的操作时，用这个更高级的 API 来管理。",
+        "done": false
+      },
+      {
+        "id": "1.8",
+        "name": "runtime.newSession() — 替换为新会话",
+        "desc": "关掉当前对话，开一个新的。",
+        "done": false
+      },
+      {
+        "id": "1.9",
+        "name": "runtime.switchSession() — 切换到其他会话",
+        "desc": "从当前对话 A 切到对话 B。",
+        "done": false
+      },
+      {
+        "id": "1.10",
+        "name": "runtime.fork() — 分叉会话",
+        "desc": "在对话历史的某个节点「另起炉灶」，从那个点分出一条新路。适合「我想回到第 3 条消息换个方式问」。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "title": "消息发送与交互控制",
+    "summary": "怎么给 Agent 发消息、怎么在它还在想的时候插话、怎么取消。",
+    "items": [
+      {
+        "id": "2.1",
+        "name": "session.prompt(text) — 发送消息",
+        "desc": "给 Agent 发一条消息，它开始思考并回复。这是最常用的操作。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "2.2",
+        "name": "PromptOptions.images — 带图片的消息",
+        "desc": "发送消息时可以附带图片（base64 编码），让 Agent 看图回答问题。",
+        "done": false
+      },
+      {
+        "id": "2.3",
+        "name": "PromptOptions.expandPromptTemplates — 模板展开",
+        "desc": "如果发的内容是一个文件路径（.md 文件），自动把那个文件的内容展开再发送。",
+        "done": false
+      },
+      {
+        "id": "2.4",
+        "name": "session.steer(text) — 运行中插话",
+        "desc": "Agent 正在思考/执行工具时，你可以中途插入新指令，它收到后会调整方向。",
+        "done": false
+      },
+      {
+        "id": "2.5",
+        "name": "session.followUp(text) — 排队后续消息",
+        "desc": "Agent 还在忙，你先把下一条消息排上队，等它忙完自动继续。",
+        "done": false
+      },
+      {
+        "id": "2.6",
+        "name": "session.abort() — 取消",
+        "desc": "Agent 正在运行，不想等了，直接终止。",
+        "done": true,
+        "tag": "默认对接"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "title": "事件流系统",
+    "summary": "Agent 在思考、写字、调工具的每一步都会「广播」事件，你可以订阅这些事件来更新 UI（比如逐字显示、显示工具调用状态）。",
+    "items": [
+      {
+        "id": "3.1",
+        "name": "session.subscribe(listener) — 订阅事件",
+        "desc": "注册一个回调函数，Agent 有任何动静都会通知你。返回一个取消订阅的函数。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "3.2",
+        "name": "message_update → text_delta — 逐字输出",
+        "desc": "Agent 回复时一个字一个字地往外蹦，适合做打字机效果。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "3.3",
+        "name": "message_update → thinking_delta — 思考内容流",
+        "desc": "如果开了 Thinking 模式，模型的「内心思考」也会逐字输出。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "3.4",
+        "name": "tool_execution_start — 工具开始执行",
+        "desc": "Agent 决定调用某个工具（比如读文件、跑命令），这个事件告诉你它开始干了。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "3.5",
+        "name": "tool_execution_update — 工具执行中",
+        "desc": "工具正在执行，可能有中间输出流出来。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "3.6",
+        "name": "tool_execution_end — 工具执行完毕",
+        "desc": "工具调用完成，告诉你成功了还是报错了。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "3.7",
+        "name": "message_start / message_end — 消息起止",
+        "desc": "一条完整的 Agent 回复开始和结束的标记。",
+        "done": false
+      },
+      {
+        "id": "3.8",
+        "name": "agent_start / agent_end — Agent 运行起止",
+        "desc": "Agent 开始处理一条用户消息和完全处理完毕的标记。",
+        "done": false
+      },
+      {
+        "id": "3.9",
+        "name": "turn_start / turn_end — 回合起止",
+        "desc": "一个回合 = 模型生成一段话 + 执行一批工具。这对理解 Agent 的「工作节奏」很有用。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "3.10",
+        "name": "queue_update — 消息队列变化",
+        "desc": "当你用 steer/followUp 排队消息时，这个事件告诉你队列状态变了。",
+        "done": false
+      },
+      {
+        "id": "3.11",
+        "name": "compaction_start / compaction_end — 上下文压缩起止",
+        "desc": "对话太长时 SDK 会自动压缩上下文，这两个事件告诉你压缩开始和结束。",
+        "done": false
+      },
+      {
+        "id": "3.12",
+        "name": "auto_retry_* 系列事件 — 自动重试",
+        "desc": "Agent 调用失败时 SDK 会自动重试，这些事件让你知道重试进度。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "title": "模型管理",
+    "summary": "怎么选择用哪个模型（比如 Claude Opus vs Haiku）、怎么切换、怎么查看有哪些可用。",
+    "items": [
+      {
+        "id": "4.1",
+        "name": "ModelRuntime.create() — 模型运行时初始化",
+        "desc": "整个模型系统的「管家」，管理有哪些 Provider、哪些模型、认证信息。",
+        "done": false
+      },
+      {
+        "id": "4.2",
+        "name": "getModel(provider, id) — 查找模型",
+        "desc": "按 Provider 名+模型名找到对应的模型对象（不检查 API Key 是否有效）。",
+        "done": false
+      },
+      {
+        "id": "4.3",
+        "name": "modelRuntime.getModel(provider, id) — 查找模型（含自定义）",
+        "desc": "同上，但还能找到用户在 models.json 里自定义的模型。",
+        "done": false
+      },
+      {
+        "id": "4.4",
+        "name": "modelRuntime.getAvailable() — 获取可用模型列表",
+        "desc": "只返回那些 API Key 已配好、真正能用的模型。适合做模型选择下拉框。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "4.5",
+        "name": "modelRuntime.getProviders() — 获取 Provider 列表",
+        "desc": "列出所有支持的模型服务商（Anthropic、OpenAI 等）及其认证方式。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "4.6",
+        "name": "modelRuntime.checkAuth(providerId) — 检查认证状态",
+        "desc": "检查某个 Provider 的 API Key 是否已配置、是否有效。",
+        "done": false
+      },
+      {
+        "id": "4.7",
+        "name": "session.setModel(model) — 切换模型",
+        "desc": "在当前对话中把模型从 A 换成 B，后面的回复都用新模型。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "4.8",
+        "name": "session.cycleModel() — 轮换模型",
+        "desc": "在预设的「模型池」里循环切换下一个。适合做快捷键切换。",
+        "done": false
+      },
+      {
+        "id": "4.9",
+        "name": "scopedModels — 模型范围/池",
+        "desc": "预先配置一组可用的模型+Thinking 组合，cycleModel 就在这个池子里轮。",
+        "done": false
+      },
+      {
+        "id": "4.10",
+        "name": "resolveCliModel() — CLI 模型字符串解析",
+        "desc": "把命令行里的 anthropic/claude-opus-4-5:high 这种字符串解析成模型对象。",
+        "done": false
+      },
+      {
+        "id": "4.11",
+        "name": "resolveModelScopeWithDiagnostics() — 模型范围解析",
+        "desc": "把一组模型字符串解析成可用的「模型池」，顺带返回哪些字符串解析失败了。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "title": "Thinking 思考模式",
+    "summary": "Claude 等模型的「思考」功能 —— 让模型在给出最终答案前先在内部推理一遍。可以控制思考量的多少。",
+    "items": [
+      {
+        "id": "5.1",
+        "name": "session.setThinkingLevel(level) — 设置思考级别",
+        "desc": "off=不思考，minimal=尽量少想，low/medium/high/xhigh/max=越想越多。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "5.2",
+        "name": "session.cycleThinkingLevel() — 轮换思考级别",
+        "desc": "在可选级别之间循环切换，类似 cycleModel 的逻辑。",
+        "done": false
+      },
+      {
+        "id": "5.3",
+        "name": "session.thinkingLevel — 读取当前级别",
+        "desc": "查看当前会话的思考级别是什么。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "5.4",
+        "name": "session.supportsThinking() — 是否支持思考",
+        "desc": "有些模型不支持 Thinking（比如 Haiku），这个 API 帮你判断。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "5.5",
+        "name": "session.getAvailableThinkingLevels() — 可用级别列表",
+        "desc": "返回当前模型支持哪些思考级别。不是所有模型都支持 xhigh 或 max。",
+        "done": true,
+        "tag": "默认对接"
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "title": "工具系统",
+    "summary": "Agent 能用的「手」—— 读写文件、执行命令、搜索代码等。你可以配置让 Agent 用哪些工具，也可以写自己的工具。",
+    "items": [
+      {
+        "id": "6.1",
+        "name": "内置工具 — read",
+        "desc": "读文件内容。Agent 用它来看代码或文档。⚠ 有审批时原生版被排除，替换成带文件路径校验的 read_file。",
+        "done": true,
+        "tag": "自定义逻辑"
+      },
+      {
+        "id": "6.2",
+        "name": "内置工具 — bash",
+        "desc": "在终端里执行命令。Agent 用它跑构建、测试、装依赖。⚠ 有审批时原生版被排除，替换成带审批流程的 run_command。",
+        "done": true,
+        "tag": "自定义逻辑"
+      },
+      {
+        "id": "6.3",
+        "name": "内置工具 — edit",
+        "desc": "精确修改文件（搜索替换）。Agent 用它改代码。⚠ 有审批时原生版被排除，替换成带审批的 edit_file。",
+        "done": true,
+        "tag": "自定义逻辑"
+      },
+      {
+        "id": "6.4",
+        "name": "内置工具 — write",
+        "desc": "创建或覆盖文件。Agent 用它写新文件。⚠ 有审批时原生版被排除，替换成带审批的 write_file。",
+        "done": true,
+        "tag": "自定义逻辑"
+      },
+      {
+        "id": "6.5",
+        "name": "内置工具 — grep",
+        "desc": "文本搜索。Agent 用它搜索代码内容。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "6.6",
+        "name": "内置工具 — find",
+        "desc": "按文件名搜索。Agent 用它找文件。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "6.7",
+        "name": "内置工具 — ls",
+        "desc": "列出目录内容。Agent 用它看项目结构。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "6.8",
+        "name": "defineTool() — 自定义工具",
+        "desc": "自己写一个新的工具给 Agent 用，定义名字、描述、参数和实际执行逻辑。SDK 标准方法，汤圆用来注册业务工具。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "6.9",
+        "name": "tools 选项 — 工具白名单",
+        "desc": "指定 Agent 只能用哪些工具。比如只给 [read, grep]，它就变只读模式。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "6.10",
+        "name": "excludeTools — 排除特定工具",
+        "desc": "从可用列表中移除某个工具。适合「除了 X 之外都能用」的场景。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "6.11",
+        "name": "noTools — 完全禁用工具",
+        "desc": "Agent 变成纯聊天模式，不能操作任何文件或命令。",
+        "done": false
+      },
+      {
+        "id": "6.12",
+        "name": "createCodingTools() — 编码工具工厂",
+        "desc": "一次性创建全套编码工具（read/bash/edit/write）。",
+        "done": false
+      },
+      {
+        "id": "6.13",
+        "name": "createReadOnlyTools() — 只读工具工厂",
+        "desc": "一次性创建只读工具（read/grep/find/ls）。",
+        "done": false
+      },
+      {
+        "id": "6.14",
+        "name": "单独工具工厂函数",
+        "desc": "createReadTool、createBashTool、createEditTool 等，可以单独创建某个工具并自定义其行为。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "title": "扩展系统",
+    "summary": "给 Pi SDK 装「插件」。扩展可以注册新工具、监听事件、加命令，相当于给 Agent 拓展能力。",
+    "items": [
+      {
+        "id": "7.1",
+        "name": "Extension 加载机制",
+        "desc": "SDK 从 ~/.pi/agent/extensions/、项目 .pi/extensions/ 和 settings.json 自动发现扩展并加载。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "7.2",
+        "name": "extensionFactories — 行内扩展",
+        "desc": "不用文件，直接在代码里写一个函数作为扩展。适合轻量定制。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "7.3",
+        "name": "扩展 API — pi.registerTool()",
+        "desc": "扩展可以通过这个函数注册新工具给 Agent 用。",
+        "done": false
+      },
+      {
+        "id": "7.4",
+        "name": "扩展 API — pi.on(event, handler)",
+        "desc": "扩展可以监听 Agent 的各种事件，比如在 Agent 开始前或结束后做额外操作。",
+        "done": false
+      },
+      {
+        "id": "7.5",
+        "name": "Event Bus — createEventBus()",
+        "desc": "提供一个跨扩展/跨组件的事件总线，扩展之间可以通过它互相通信。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "title": "Skills 技能系统",
+    "summary": "技能是一份 Markdown 说明书，告诉 Agent「遇到某类任务时应该怎么做」。比如「写 commit message 的规范」就是一个 Skill。",
+    "items": [
+      {
+        "id": "8.1",
+        "name": "Skill 发现与加载",
+        "desc": "SDK 自动从多个目录找到所有 SKILL.md 文件并注入到系统提示词里。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "8.2",
+        "name": "Agent 专属 Skill vs 共享 Skill",
+        "desc": "共享 Skill 所有 Agent 都能用；Agent 专属 Skill 只给某一个 Agent 用，且同名时专属版覆盖共享版。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "8.3",
+        "name": "skillsOverride — 覆盖 Skill 列表",
+        "desc": "在代码里替换或追加 Skill，不依赖文件系统的自动发现。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "title": "系统提示词与上下文",
+    "summary": "系统提示词是「给 Agent 的长期说明书」，定义它是什么角色、有什么规则。上下文文件（比如 AGENTS.md）也会被自动读进来。",
+    "items": [
+      {
+        "id": "9.1",
+        "name": "systemPromptOverride — 完全替换系统提示词",
+        "desc": "不要 Pi 默认的系统提示词了，用你自己写的。",
+        "done": false
+      },
+      {
+        "id": "9.2",
+        "name": "appendSystemPromptOverride — 追加系统提示词",
+        "desc": "在 Pi 默认系统提示词后面追加你自己的内容，而不是替换。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "9.3",
+        "name": "上下文文件（AGENTS.md）自动加载",
+        "desc": "SDK 从当前目录往上找 AGENTS.md，还有 ~/.pi/agent/AGENTS.md，自动拼入系统提示词。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "9.4",
+        "name": "agentsFilesOverride — 覆盖/追加上下文文件",
+        "desc": "在代码里添加虚拟的 AGENTS.md 内容，让 Agent 遵循你的项目规范。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 10,
+    "title": "斜杠命令（Prompt Templates）",
+    "summary": "像 Slack 的 / 命令一样，输入 /deploy 就自动展开成一段预设好的提示词。",
+    "items": [
+      {
+        "id": "10.1",
+        "name": "Prompt Template 加载",
+        "desc": "SDK 从 prompts 目录加载 .md 文件作为命令模板。",
+        "done": false
+      },
+      {
+        "id": "10.2",
+        "name": "promptsOverride — 覆盖命令列表",
+        "desc": "在代码里添加自定义命令。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 11,
+    "title": "会话树与导航",
+    "summary": "对话历史不是一条直线，而是可以分叉的树。你可以回到某条消息、从那里分叉、给节点打标签。",
+    "items": [
+      {
+        "id": "11.1",
+        "name": "session.navigateTree(targetId) — 树内导航",
+        "desc": "让 Agent 的上下文跳回到对话历史的某个节点。",
+        "done": false
+      },
+      {
+        "id": "11.2",
+        "name": "SessionManager.getTree() — 获取树结构",
+        "desc": "拿到当前会话的完整树形结构（每个节点谁是谁的父节点）。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "11.3",
+        "name": "SessionManager.getPath() — 获取当前路径",
+        "desc": "从根节点到当前叶子节点的路径。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "11.4",
+        "name": "SessionManager.getLeafEntry() — 获取当前叶子",
+        "desc": "对话树的「末端」节点。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "11.5",
+        "name": "SessionManager.getEntry(id) — 按 ID 获取节点",
+        "desc": "找到树中某个特定节点的内容。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "11.6",
+        "name": "SessionManager.getChildren(id) — 获取子节点",
+        "desc": "看某个节点有哪些分叉出去的子节点。",
+        "done": false
+      },
+      {
+        "id": "11.7",
+        "name": "SessionManager.branch(entryId) — 分叉",
+        "desc": "把当前会话的「末端」移到更早的一个节点上。",
+        "done": false
+      },
+      {
+        "id": "11.8",
+        "name": "SessionManager.branchWithSummary(id, summary) — 分叉并总结",
+        "desc": "同上，但附带一段总结说明为什么分叉。",
+        "done": false
+      },
+      {
+        "id": "11.9",
+        "name": "SessionManager.createBranchedSession(leafId) — 导出分叉为新会话",
+        "desc": "把树中某条路径单独导出为一个新的会话文件。",
+        "done": false
+      },
+      {
+        "id": "11.10",
+        "name": "SessionManager.getLabel(id) / appendLabelChange(id, label) — 节点标签",
+        "desc": "给会话树中的节点打标签（比如 checkpoint），方便回溯。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 12,
+    "title": "设置管理",
+    "summary": "全局和项目级配置。比如「要不要自动压缩上下文」「最多重试几次」。",
+    "items": [
+      {
+        "id": "12.1",
+        "name": "SettingsManager.create(cwd?, agentDir?) — 从文件加载设置",
+        "desc": "从 ~/.pi/agent/settings.json（全局）和 .pi/settings.json（项目）加载设置，项目覆盖全局。",
+        "done": false
+      },
+      {
+        "id": "12.2",
+        "name": "SettingsManager.inMemory(settings?) — 纯内存设置",
+        "desc": "不读写文件，适合测试。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "12.3",
+        "name": "applyOverrides(overrides) — 运行时覆盖",
+        "desc": "在代码里临时覆盖某些设置项。",
+        "done": false
+      },
+      {
+        "id": "12.4",
+        "name": "settingsManager.flush() — 刷盘",
+        "desc": "把内存中的设置改动写入磁盘（默认是异步写入，这个函数等待写完）。",
+        "done": false
+      },
+      {
+        "id": "12.5",
+        "name": "设置项 — Compaction 相关",
+        "desc": "控制自动压缩行为的开关和参数。",
+        "done": false
+      },
+      {
+        "id": "12.6",
+        "name": "设置项 — Retry 相关",
+        "desc": "控制自动重试的开关和最大重试次数。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 13,
+    "title": "上下文压缩",
+    "summary": "聊天记录太长超出模型上下文窗口时，SDK 自动把前面的对话「压缩」成摘要，给后面的对话腾地方。",
+    "items": [
+      {
+        "id": "13.1",
+        "name": "session.compact(customInstructions?) — 手动压缩",
+        "desc": "不等自动触发，主动要求压缩当前对话上下文。",
+        "done": false
+      },
+      {
+        "id": "13.2",
+        "name": "session.abortCompaction() — 取消压缩",
+        "desc": "压缩正在进行中，不想等了，取消它。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 14,
+    "title": "运行模式",
+    "summary": "Pi SDK 提供了三种「开箱即用」的运行模式，适合不同的使用场景。",
+    "items": [
+      {
+        "id": "14.1",
+        "name": "InteractiveMode — 交互式 TUI 模式",
+        "desc": "Pi 自带的终端交互界面。对汤圆来说不需要（我们有桌面 UI），但可以作为参考实现。",
+        "done": false,
+        "skip": true
+      },
+      {
+        "id": "14.2",
+        "name": "runPrintMode — 单次执行模式",
+        "desc": "发一条消息 → 等回复 → 打印结果 → 退出。适合脚本化和自动化。",
+        "done": false
+      },
+      {
+        "id": "14.3",
+        "name": "runRpcMode — JSON-RPC 服务模式",
+        "desc": "Pi 作为 JSON-RPC 服务运行，外部程序通过标准输入/输出的 JSON 消息来控制它。适合跨语言集成。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 15,
+    "title": "重试与错误恢复",
+    "summary": "Agent 调用工具失败时，SDK 可以自动重试。还有专门的「摘要重试」来处理压缩失败的情况。",
+    "items": [
+      {
+        "id": "15.1",
+        "name": "自动重试机制",
+        "desc": "工具调用失败时 SDK 根据设置自动重试（可选开关和最大次数）。",
+        "done": false
+      },
+      {
+        "id": "15.2",
+        "name": "auto_retry_start / auto_retry_end 事件",
+        "desc": "告诉你重试开始和结束。",
+        "done": false
+      },
+      {
+        "id": "15.3",
+        "name": "摘要重试",
+        "desc": "上下文压缩失败后有专门的恢复流程，通过一系列事件通知进度。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 16,
+    "title": "Agent 状态访问",
+    "summary": "直接读取 Agent 内部状态信息 —— 当前有哪些消息、用什么模型、系统提示词是什么。",
+    "items": [
+      {
+        "id": "16.1",
+        "name": "session.agent.state.messages — 消息列表",
+        "desc": "当前对话的全部消息（用户+Agent+系统）。",
+        "done": false
+      },
+      {
+        "id": "16.2",
+        "name": "session.agent.state.model — 当前模型",
+        "desc": "读当前使用的是哪个模型。",
+        "done": false
+      },
+      {
+        "id": "16.3",
+        "name": "session.agent.state.thinkingLevel — 当前思考级别",
+        "desc": "读当前的 Thinking 设置。",
+        "done": false
+      },
+      {
+        "id": "16.4",
+        "name": "session.agent.state.systemPrompt — 系统提示词",
+        "desc": "读当前生效的系统提示词全文。",
+        "done": false
+      },
+      {
+        "id": "16.5",
+        "name": "session.agent.state.tools — 工具列表",
+        "desc": "读当前可用的工具列表。",
+        "done": false
+      },
+      {
+        "id": "16.6",
+        "name": "session.agent.state.streamingMessage — 流式消息",
+        "desc": "Agent 正在回复时的半成品消息。",
+        "done": false
+      },
+      {
+        "id": "16.7",
+        "name": "session.agent.state.errorMessage — 错误信息",
+        "desc": "最近一次 Agent 错误的信息。",
+        "done": false
+      },
+      {
+        "id": "16.8",
+        "name": "session.agent.waitForIdle() — 等待空闲",
+        "desc": "暂停当前代码执行，直到 Agent 处理完毕。",
+        "done": false
+      }
+    ]
+  },
+  {
+    "id": 17,
+    "title": "资源加载器（DefaultResourceLoader）",
+    "summary": "这是 SDK 的「文件发现引擎」。它从多个目录中找到扩展、技能、命令模板、主题和上下文文件。",
+    "items": [
+      {
+        "id": "17.1",
+        "name": "资源发现目录 — cwd（项目级）",
+        "desc": "当前工作目录下的 .pi/extensions/、.pi/skills/、.pi/prompts/ 等。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "17.2",
+        "name": "资源发现目录 — agentDir（全局）",
+        "desc": "~/.pi/agent/ 下的 extensions/、skills/、prompts/ 等。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "17.3",
+        "name": "loader.getExtensions() — 获取扩展列表",
+        "desc": "拿到所有已加载的扩展。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "17.4",
+        "name": "loader.getSkills() — 获取技能列表",
+        "desc": "拿到所有已加载的 Skill。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "17.5",
+        "name": "loader.getPrompts() — 获取命令模板列表",
+        "desc": "拿到所有斜杠命令模板。",
+        "done": false
+      },
+      {
+        "id": "17.6",
+        "name": "loader.getThemes() — 获取主题列表",
+        "desc": "拿到所有可用的 TUI 主题（汤圆有自己的主题体系，可能用不到）。",
+        "done": false,
+        "skip": true
+      },
+      {
+        "id": "17.7",
+        "name": "loader.getAgentsFiles() — 获取上下文文件",
+        "desc": "拿到所有 AGENTS.md 的内容。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "17.8",
+        "name": "loader.reload() — 重新加载",
+        "desc": "重新扫描目录，刷新所有资源。适合「用户改了 Skill 文件后立即生效」。",
+        "done": true,
+        "tag": "默认对接"
+      }
+    ]
+  },
+  {
+    "id": 18,
+    "title": "认证与凭据",
+    "summary": "怎么管理 API Key —— 配置、存储、读取。支持多种方式：文件存储、运行时覆盖、环境变量。",
+    "items": [
+      {
+        "id": "18.1",
+        "name": "AuthStorage — 认证存储",
+        "desc": "管理 API Key 的存储和读取。可以存在文件里也可以只在内存中。目前汤圆用 inMemory 模式。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "18.2",
+        "name": "modelRuntime.setRuntimeApiKey() — 运行时 API Key 覆盖",
+        "desc": "在代码里临时设置一个 API Key（不写盘），优先级高于文件存储的 Key。",
+        "done": true,
+        "tag": "默认对接"
+      },
+      {
+        "id": "18.3",
+        "name": "auth.json — 持久化凭据文件",
+        "desc": "SDK 默认把 API Key 存在 ~/.pi/agent/auth.json。",
+        "done": false
+      },
+      {
+        "id": "18.4",
+        "name": "环境变量回退",
+        "desc": "如果文件和运行时都没配 Key，SDK 会尝试从 ANTHROPIC_API_KEY、OPENAI_API_KEY 等环境变量读取。",
+        "done": false
+      },
+      {
+        "id": "18.5",
+        "name": "InMemoryCredentialStore — 纯内存凭据",
+        "desc": "完全不写盘，适合测试或短期运行。",
+        "done": false
+      },
+      {
+        "id": "18.6",
+        "name": "OAuth 支持",
+        "desc": "对于需要 OAuth 登录的 Provider，SDK 支持浏览器 OAuth 流程。",
+        "done": false
+      },
+      {
+        "id": "18.7",
+        "name": "modelRuntime.checkAuth(providerId) — 检查认证状态",
+        "desc": "检查某个 Provider 的认证是否已配置且有效。",
+        "done": false
+      }
+    ]
+  }
+]
+`;
+const modules = JSON.parse(MODULES_JSON);
+
+// ═══════════════════════════════════════════════════════
+// 渲染
+// ═══════════════════════════════════════════════════════
+const container = document.getElementById('modules');
+let totalDone = 0, totalItems = 0;
+
+const tagColors = {
+  '默认对接': 'bg-green-50 text-green-700 border-green-200',
+  '自定义逻辑': 'bg-amber-50 text-amber-700 border-amber-200',
+  '业务功能': 'bg-blue-50 text-blue-700 border-blue-200'
+};
+
+modules.forEach(mod => {
+  const doneCount = mod.items.filter(i => i.done).length;
+  const total = mod.items.length;
+  const pct = Math.round((doneCount / total) * 100);
+  totalDone += doneCount;
+  totalItems += total;
+
+  const card = document.createElement('section');
+  card.className = 'module-card bg-white rounded-xl border border-tangyuan-border overflow-hidden';
+
+  let itemsHtml = '';
+  mod.items.forEach(item => {
+    const tc = tagColors[item.tag] || '';
+    const skipBadge = item.skip
+      ? '<span class="ml-2 px-1.5 py-0.5 text-xs rounded bg-gray-100 text-gray-400 border border-gray-200">可跳过</span>'
+      : '';
+    const checkIcon = item.done
+      ? '<svg class="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+      : '<svg class="w-5 h-5 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/></svg>';
+    itemsHtml += `
+      <div class="flex items-start gap-3 py-2 px-3 rounded-lg ${item.done ? 'bg-gray-50/50' : ''} hover:bg-gray-50 transition-colors">
+        ${checkIcon}
+        <div class="flex-1 min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs text-gray-400 font-mono">${item.id}</span>
+            <span class="font-medium text-sm ${item.done ? 'text-gray-600' : 'text-gray-800'}">${item.name}</span>
+            ${item.tag ? `<span class="px-1.5 py-0.5 text-xs rounded border ${tc}">${item.tag}</span>` : ''}
+            ${skipBadge}
+          </div>
+          <p class="text-xs text-gray-500 mt-1 leading-relaxed">${item.desc}</p>
+        </div>
+      </div>`;
+  });
+
+  card.innerHTML = `
+    <div class="p-6">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <h3 class="font-semibold text-lg">${mod.id}. ${mod.title}</h3>
+          <p class="text-sm text-gray-500 mt-1 max-w-2xl">${mod.summary}</p>
+        </div>
+        <div class="text-right flex-shrink-0 ml-4">
+          <span class="text-2xl font-semibold ${pct === 100 ? 'text-green-600' : pct > 0 ? 'text-amber-600' : 'text-gray-400'}">${doneCount}</span>
+          <span class="text-gray-400">/${total}</span>
+        </div>
+      </div>
+      <div class="h-1 bg-gray-100 rounded-full mb-4">
+        <div class="progress-bar h-full rounded-full ${pct === 100 ? 'bg-green-500' : pct > 0 ? 'bg-amber-400' : 'bg-gray-200'}" style="width:${pct}%"></div>
+      </div>
+      <div class="space-y-0.5">${itemsHtml}</div>
+    </div>`;
+  container.appendChild(card);
+});
+
+document.getElementById('doneCount').textContent = totalDone + ' 已对接';
+document.getElementById('todoCount').textContent = (totalItems - totalDone) + ' 待对接';
+document.getElementById('totalCount').textContent = totalItems;
+document.getElementById('overallProgress').style.width = Math.round((totalDone / totalItems) * 100) + '%';
+</script>
+</body>
+</html>

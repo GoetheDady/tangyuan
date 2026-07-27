@@ -90,6 +90,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
       modelRegistry,
       model,
       sessionManager: SessionManager.inMemory(),
+      settingsManager: SettingsManager.inMemory(),
       noTools: 'all',
     })
 
@@ -200,6 +201,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
       AuthStorage,
       ModelRegistry,
       SessionManager,
+      SettingsManager,
       createAgentSession,
       createReadToolDefinition,
       DefaultResourceLoader,
@@ -398,6 +400,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
       modelRegistry,
       model,
       sessionManager,
+      settingsManager: SettingsManager.inMemory(),
       resourceLoader,
       ...(customTools.length > 0
         ? { customTools: toSdkCustomTools(customTools) }

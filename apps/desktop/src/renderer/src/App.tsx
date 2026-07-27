@@ -517,15 +517,16 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   }
 
   const sessions = await api.listSessions()
+  // 1.4 continueRecent：有历史会话则自动打开最近一次，没有则新建。
   const nextSessions =
-    runtime.activeAgent.profile.bootstrapRequired && !sessions.length
-      ? [
+    sessions.length > 0
+      ? sessions
+      : [
           await api.createSession({
             agentId: runtime.activeAgent.agentId,
-            title: 'Bootstrap 初始化'
+            title: runtime.activeAgent.profile.bootstrapRequired ? 'Bootstrap 初始化' : '新会话'
           })
         ]
-      : sessions
   const [firstSession] = nextSessions
   const transcript = firstSession
     ? await api.getTranscript({

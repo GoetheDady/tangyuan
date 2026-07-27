@@ -25,6 +25,9 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
     create: vi.fn(() => ({ getSessionFile: () => '/tmp/session.json' })),
     open: vi.fn(() => ({ getSessionFile: () => '/tmp/session.json' })),
   },
+  SettingsManager: {
+    inMemory: () => ({}),
+  },
   DefaultResourceLoader: class {
     async reload(): Promise<void> {}
   },
@@ -39,6 +42,38 @@ import type {
 import { RealPiSdkGateway } from './gateway'
 
 describe('RealPiSdkGateway profile tools', () => {
+  it('创建会话时传入 SettingsManager.inMemory() 以隔离外部 Pi 配置', async () => {
+    createAgentSession.mockResolvedValueOnce({
+      session: {
+        subscribe: () => () => undefined,
+        prompt: vi.fn(async () => undefined),
+        getLastAssistantText: () => null,
+        abort: vi.fn(async () => undefined),
+        dispose: vi.fn(),
+      },
+    })
+    const request: PiSdkCreateSessionRequest = {
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test',
+      agentId: 'tangyuan',
+      sessionId: 'session-settings',
+      sdkSessionFile: '/tmp/session.json',
+      cwd: '/tmp',
+      agentSkillsPath: '/tmp/agent/skills',
+      sharedSkillsPath: '/tmp/shared/skills',
+      onUpdateSoul: vi.fn(),
+      onUpdateUserProfile: vi.fn(),
+    }
+
+    await new RealPiSdkGateway().createSession(request)
+
+    const options = createAgentSession.mock.calls[0]?.[0] as {
+      settingsManager: unknown
+    }
+    expect(options.settingsManager).toBeDefined()
+  })
+
   it('在新建会话中注册共享用户画像工具并绑定受控回调', async () => {
     createAgentSession.mockResolvedValueOnce({
       session: {
@@ -70,7 +105,7 @@ describe('RealPiSdkGateway profile tools', () => {
 
     await new RealPiSdkGateway().createSession(request)
 
-    const options = createAgentSession.mock.calls[0]?.[0] as {
+    const options = createAgentSession.mock.calls.at(-1)?.[0] as {
       customTools: Array<{
         name: string
         parameters: unknown

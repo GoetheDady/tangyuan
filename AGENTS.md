@@ -110,6 +110,10 @@
 - 测试框架：Vitest
 - Monorepo 工具：pnpm workspaces
 
+### 外部 SDK 文档
+
+- **Pi SDK**：`/Users/gdsw/gdsw/pi/packages/coding-agent/docs/sdk.md` — `createAgentSession`、`AgentSession`、事件系统、工具、设置、会话管理等 SDK 接口说明
+
 ## Agent skills
 
 ### Issue tracker

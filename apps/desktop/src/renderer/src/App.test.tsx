@@ -166,9 +166,15 @@ describe('App', () => {
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
         cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
         listSessions: vi.fn().mockResolvedValue([]),
-        createSession: vi.fn(),
+        createSession: vi.fn().mockResolvedValue(
+          createDefaultSessionSummary({
+            sessionId: 'auto-session',
+            title: '新会话',
+            updatedAt: '2026-07-08T00:00:00.000Z'
+          })
+        ),
         getTranscript: vi.fn().mockResolvedValue({
-          sessionId: '',
+          sessionId: 'auto-session',
           agentId: 'tangyuan',
           entries: [],
           updatedAt: '2026-01-01T00:00:00.000Z'
@@ -232,6 +238,10 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: '汤圆' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '配置接口密钥' })).not.toBeInTheDocument()
     expect(screen.queryByText('sk-t...7890')).not.toBeInTheDocument()
+    expect(window.api.createSession).toHaveBeenCalledWith({
+      agentId: 'tangyuan',
+      title: '新会话'
+    })
   })
   it('opens a bootstrap session on startup when runtime is ready but profile is uninitialized', async () => {
     const readyRuntime = createReadyRuntimeSnapshot({
