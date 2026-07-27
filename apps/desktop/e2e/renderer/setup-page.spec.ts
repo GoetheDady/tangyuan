@@ -87,7 +87,7 @@ test.describe('初始化配置页面', () => {
     ).toBeVisible()
   })
 
-  test('runtime 就绪时自动跳转到 /#/chat', async ({ page }) => {
+  test('runtime 就绪时直接访问 /#/console/providers 停留在配置页并提供返回聊天入口', async ({ page }) => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = [
       {
@@ -103,6 +103,13 @@ test.describe('初始化配置页面', () => {
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
 
+    // ready 且无 redirect 参数（用户主动进入）时停留在配置页，不自动跳走（#76）
+    await expect(page).toHaveURL(/\/console\/providers/)
+
+    // 提供手动返回聊天的入口
+    const enterChatButton = page.getByRole('button', { name: '进入聊天' })
+    await expect(enterChatButton).toBeVisible()
+    await enterChatButton.click()
     await page.waitForSelector('#composer')
     await expect(page).toHaveURL(/\/chat/)
   })

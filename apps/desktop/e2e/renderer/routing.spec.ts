@@ -7,6 +7,37 @@ import {
 } from '../fixtures/preload-mock'
 
 test.describe('路由导航', () => {
+  test('从聊天页点击设置按钮可进入配置页', async ({ page }) => {
+    const runtime = createReadyRuntimeSnapshot()
+    const sessions = createTestSessions(8)
+    const initScript = createPreloadApiInitScript(runtime, sessions)
+
+    await page.setViewportSize({ width: 900, height: 670 })
+    await page.addInitScript({ content: initScript })
+    await page.goto('/#/chat/tangyuan')
+
+    await page.getByRole('button', { name: '设置' }).click()
+
+    // 用户主动进入设置页时不应被弹回聊天页
+    await expect(page).toHaveURL(/#\/console\/providers$/)
+    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
+  })
+
+  test('携带 redirect 参数且 ready 时自动跳回聊天页', async ({ page }) => {
+    const runtime = createReadyRuntimeSnapshot()
+    const sessions = createTestSessions(1)
+    const initScript = createPreloadApiInitScript(runtime, sessions)
+
+    await page.setViewportSize({ width: 900, height: 670 })
+    await page.addInitScript({ content: initScript })
+    await page.goto('/#/console/providers?redirect=%2Fchat%2Ftangyuan%2Fsession-1')
+
+    // 有 redirect 参数且 runtime ready 时自动跳转到聊天页
+    await page.waitForSelector('#composer')
+    await expect(page).toHaveURL(/#\/chat\/tangyuan\/session-1$/)
+    await expect(page.getByRole('heading', { name: '汤圆' })).toBeVisible()
+  })
+
   test('配置阻断保留原始目标并在配置完成后返回', async ({ page }) => {
     const runtime = createMissingConfigSnapshot()
     const initScript = createPreloadApiInitScript(runtime)
@@ -16,7 +47,7 @@ test.describe('路由导航', () => {
     await page.goto('/#/chat/tangyuan/session-1')
 
     // 应被重定向到控制台 Providers 页，且 URL 包含 redirect 参数
-    await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
     await expect(page).toHaveURL(/\/console\/providers/)
     await expect(page).toHaveURL(/redirect=/) // 包含 redirect 参数
   })
@@ -28,9 +59,10 @@ test.describe('路由导航', () => {
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
 
-    await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
-    await expect(page.locator('#model-anthropic')).toBeVisible()
-    await expect(page.locator('#api-key-anthropic')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
+    await expect(page.getByTestId('setup-provider-select')).toBeVisible()
+    await expect(page.getByTestId('setup-api-key-input')).toBeVisible()
+    await expect(page.getByTestId('setup-model-select')).toBeVisible()
   })
 
   test('直接访问 /#/console/agents 渲染 Agent 列表页', async ({ page }) => {
@@ -95,23 +127,6 @@ test.describe('路由导航', () => {
     await expect(activeBadge).toHaveCSS('box-shadow', 'none')
   })
 
-  test('设置页面的 Provider 配置状态使用语义 Badge', async ({ page }) => {
-    const runtime = createMissingConfigSnapshot({
-      configuredProviders: {
-        anthropic: { configured: true, maskedValue: 'sk-a...test' }
-      }
-    })
-    const initScript = createPreloadApiInitScript(runtime)
-
-    await page.addInitScript({ content: initScript })
-    await page.goto('/#/console/providers')
-
-    const configuredBadge = page.locator('[data-slot="badge"]', { hasText: '已配置' })
-    await expect(configuredBadge).toHaveAttribute('data-variant', 'success')
-    await expect(configuredBadge.locator('svg')).toHaveCSS('width', '12px')
-    await expect(configuredBadge).toHaveCSS('box-shadow', 'none')
-  })
-
   test('直接访问 /#/console/agents/:agentId 渲染 Agent 详情页', async ({ page }) => {
     const runtime = createMissingConfigSnapshot()
     const initScript = createPreloadApiInitScript(runtime)
@@ -143,15 +158,15 @@ test.describe('路由导航', () => {
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
-    await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
 
     // 刷新页面
     await page.reload()
-    await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
 
     // 刷新后仍在 console providers 页
     await expect(page).toHaveURL(/\/console\/providers/)
-    await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
   })
 
   test('刷新后保持聊天页', async ({ page }) => {
@@ -183,7 +198,7 @@ test.describe('路由导航', () => {
 
     // 再访问 providers 页
     await page.goto('/#/console/providers')
-    await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
 
     // 后退
     await page.goBack()
@@ -191,7 +206,7 @@ test.describe('路由导航', () => {
 
     // 前进
     await page.goForward()
-    await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
   })
 
   test('设置页面目录对账继续通过全局 Sonner 队列反馈', async ({ page }) => {

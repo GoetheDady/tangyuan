@@ -92,15 +92,16 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
   const canSubmit = Boolean(selectedProviderId) && apiKey.trim().length > 0 && Boolean(selectedModelId)
 
-  // 配置已就绪时自动跳转
+  // 配置已就绪时自动跳转（仅 ChatGuard 强制跳转场景，有 redirect 参数时才执行）
   const initialRedirectAttempted = useRef(false)
   useEffect(() => {
     if (initialRedirectAttempted.current) return
-    if (!isLoading && !isVerifying && runtime?.status === 'ready') {
+    const wasRedirectedFromGuard = searchParams.has('redirect')
+    if (!isLoading && !isVerifying && runtime?.status === 'ready' && wasRedirectedFromGuard) {
       initialRedirectAttempted.current = true
       navigate(redirectTarget, { replace: true })
     }
-  }, [isLoading, isVerifying, runtime?.status, navigate, redirectTarget])
+  }, [isLoading, isVerifying, runtime?.status, navigate, redirectTarget, searchParams])
 
   /**
    * 刷新 Provider 和模型资源。
