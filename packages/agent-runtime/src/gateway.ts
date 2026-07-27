@@ -1,6 +1,6 @@
-import { dirname, resolve as pathResolve } from 'node:path'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import type { TranscriptSnapshot } from '@tangyuan/contracts'
+import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
 import {
   type PiSdkCreateSessionRequest,
   type PiSdkGateway,
@@ -15,13 +15,17 @@ import {
 } from './pi-sdk-driver-contracts'
 import {
   buildTranscriptSnapshotFromSdkEntries,
-  describeBashRisk,
   normalizePiSdkSessionEvent,
 } from './utils'
 import {
   createUpdateSoulTool,
   createUpdateUserProfileTool,
 } from './profile-tools'
+import {
+  createProtectedTools,
+  NATIVE_DANGEROUS_TOOL_NAMES,
+  toSdkCustomTools,
+} from './protected-tools'
 
 export class RealPiSdkGateway implements PiSdkGateway {
   /**
@@ -197,6 +201,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
       ModelRegistry,
       SessionManager,
       createAgentSession,
+      createReadToolDefinition,
       DefaultResourceLoader,
     } = await import('@earendil-works/pi-coding-agent')
     const authStorage = AuthStorage.inMemory()
@@ -240,7 +245,10 @@ export class RealPiSdkGateway implements PiSdkGateway {
     })
     await resourceLoader.reload()
 
-    const customTools: Array<Record<string, unknown>> = []
+    // customTools 收容两种来源：TangyuanToolDefinition（带简化的 execute 签名）
+    // 与 ToolDefinition（来自 createProtectedTools 的 read_file 包装）。
+    // toSdkCustomTools 是唯一的类型适配边界，参见 protected-tools.ts。
+    const customTools: unknown[] = []
 
     customTools.push(createUpdateSoulTool(request.onUpdateSoul))
     customTools.push(createUpdateUserProfileTool(request.onUpdateUserProfile))
@@ -289,217 +297,23 @@ export class RealPiSdkGateway implements PiSdkGateway {
         cwd: request.cwd,
       }
 
-      // 自定义 bash 工具（带审批）
-      customTools.push({
-        name: 'bash',
-        label: '运行命令（需审批）',
-        description:
-          '在当前工作目录中执行 bash 命令。每次执行前需要用户审批。命令将以当前 macOS 用户权限运行。',
-        promptSnippet: 'bash(command: string) → 执行 bash 命令',
-        promptGuidelines: [
-          '执行前会请求用户审批，仅本次有效',
-          '命令将以当前 macOS 用户权限执行',
-          '如果用户拒绝，命令不会执行',
-        ],
-        parameters: {
-          type: 'object',
-          properties: {
-            command: { type: 'string', minLength: 1 },
+      // 受保护的危险工具：read_file / run_command / write_file / edit_file
+      // 通过 createProtectedTools 集中构造，使用与原生不同的工具名，
+      // 避免与 excludeTools 排除的原生名冲突。
+      customTools.push(
+        ...createProtectedTools(
+          {
+            gateway: approvalGateway,
+            agentId: request.agentId,
+            sessionId: request.sessionId,
+            cwd: request.cwd,
           },
-          required: ['command'],
-          additionalProperties: false,
-        },
-        async execute(_toolCallId: string, params: { command: string }) {
-          const riskDescription = describeBashRisk(params.command)
-          const result = await approvalGateway.requestBashApproval({
-            agentId: approvalRunContext.agentId || 'tangyuan',
-            sessionId: approvalRunContext.sessionId,
-            runId: '',
-            command: params.command,
-            cwd: approvalRunContext.cwd,
-            riskDescription,
-          })
-
-          if (!result.approved) {
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: '用户拒绝了此命令的执行。',
-                },
-              ],
-            }
-          }
-
-          // 批准后执行命令
-          try {
-            const { exec } = await import('node:child_process')
-            const { promisify } = await import('node:util')
-            const execAsync = promisify(exec)
-            const { stdout, stderr } = await execAsync(params.command, {
-              cwd: approvalRunContext.cwd,
-              timeout: 120_000,
-            })
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: stdout + (stderr ? `\nstderr:\n${stderr}` : ''),
-                },
-              ],
-            }
-          } catch (error) {
-            const message =
-              error instanceof Error ? error.message : '命令执行失败'
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `命令执行失败：${message}`,
-                },
-              ],
-            }
-          }
-        },
-      })
-
-      // 自定义写入工具（带路径保护）
-      customTools.push({
-        name: 'write',
-        label: '写入文件',
-        description:
-          '创建或覆盖文件。父目录不存在时会自动创建。不能写入 Agent 灵魂、共享用户画像或 Skill 等受保护文件，这些内容请使用 update_soul 或 update_user_profile 工具。',
-        promptSnippet: 'write(path: string, content: string) → 写入文件',
-        promptGuidelines: [
-          '不能写入 Agent 灵魂（soul.md）或用户画像（user.md），请使用 update_soul 或 update_user_profile',
-          '不能写入 soul.history/ 或 user.history/ 中的历史备份文件',
-        ],
-        parameters: {
-          type: 'object',
-          properties: {
-            path: { type: 'string', minLength: 1 },
-            content: { type: 'string' },
-          },
-          required: ['path', 'content'],
-          additionalProperties: false,
-        },
-        async execute(
-          _toolCallId: string,
-          params: { path: string; content: string },
-        ) {
-          const resolvedPath = pathResolve(approvalRunContext.cwd, params.path)
-          const guard = approvalGateway.validateFilePath({
-            agentId: approvalRunContext.agentId,
-            path: resolvedPath,
-            operation: 'write',
-          })
-
-          if (!guard.allowed) {
-            return {
-              content: [{ type: 'text', text: guard.reason! }],
-            }
-          }
-
-          await mkdir(dirname(resolvedPath), { recursive: true })
-          await writeFile(resolvedPath, params.content, 'utf8')
-          return {
-            content: [{ type: 'text', text: `已写入 ${resolvedPath}` }],
-          }
-        },
-      })
-
-      // 自定义编辑工具（带路径保护）
-      customTools.push({
-        name: 'edit',
-        label: '编辑文件',
-        description:
-          '对现有文件做精确文本替换。每次编辑匹配原始文件中唯一的 oldText，替换为 newText。不能编辑 Agent 灵魂、共享用户画像或 Skill 等受保护文件，这些内容请使用 update_soul 或 update_user_profile 工具。',
-        promptSnippet:
-          'edit(path: string, edits: {oldText, newText}[]) → 编辑文件',
-        promptGuidelines: [
-          '不能编辑 Agent 灵魂（soul.md）或用户画像（user.md），请使用 update_soul 或 update_user_profile',
-          '不能编辑 soul.history/ 或 user.history/ 中的历史备份文件',
-          'oldText 必须在文件中唯一存在，且不同的 edits 不得重叠',
-        ],
-        parameters: {
-          type: 'object',
-          properties: {
-            path: { type: 'string', minLength: 1 },
-            edits: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  oldText: { type: 'string', minLength: 1 },
-                  newText: { type: 'string' },
-                },
-                required: ['oldText', 'newText'],
-                additionalProperties: false,
-              },
-              minItems: 1,
-            },
-          },
-          required: ['path', 'edits'],
-          additionalProperties: false,
-        },
-        async execute(
-          _toolCallId: string,
-          params: {
-            path: string
-            edits: Array<{ oldText: string; newText: string }>
-          },
-        ) {
-          const resolvedPath = pathResolve(approvalRunContext.cwd, params.path)
-          const guard = approvalGateway.validateFilePath({
-            agentId: approvalRunContext.agentId,
-            path: resolvedPath,
-            operation: 'edit',
-          })
-
-          if (!guard.allowed) {
-            return {
-              content: [{ type: 'text', text: guard.reason! }],
-            }
-          }
-
-          const original = await readFile(resolvedPath, 'utf8')
-          let result = original
-
-          for (const edit of params.edits) {
-            const occurrences =
-              result.split(edit.oldText).length - 1
-
-            if (occurrences === 0) {
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: `编辑失败：在文件中找不到要替换的文本。`,
-                  },
-                ],
-              }
-            }
-
-            if (occurrences > 1) {
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: `编辑失败：要替换的文本在文件中出现了 ${occurrences} 次，oldText 必须在文件中唯一。`,
-                  },
-                ],
-              }
-            }
-
-            result = result.replace(edit.oldText, edit.newText)
-          }
-
-          await writeFile(resolvedPath, result, 'utf8')
-          return {
-            content: [{ type: 'text', text: `已编辑 ${resolvedPath}` }],
-          }
-        },
-      })
+          // 原生 read 工具定义工厂，供 read_file 复用（保留图片/offset/limit 能力）。
+          // createReadToolDefinition 的返回类型比泛型的 ToolDefinition 更具体
+          //（renderCall 参数在 strict 模式下不兼容），这一窄化仅限于此回调。
+          (cwd: string) => createReadToolDefinition(cwd) as ToolDefinition,
+        ),
+      )
 
       // 自定义单问题澄清工具
       customTools.push({
@@ -570,10 +384,12 @@ export class RealPiSdkGateway implements PiSdkGateway {
       })
     }
 
-    // 使用 excludeTools 排除内置工具（当存在审批网关时由自定义工具接管）
+    // 显式排除 Pi SDK 原生危险工具，由汤圆受保护版本接管。
+    // 受保护版本使用不同的工具名（run_command / write_file / edit_file / read_file），
+    // 因此排除原生名不会牵连它们——安全边界不依赖 SDK 的工具注册顺序。
     const excludedToolNames: string[] = []
     if (approvalGateway) {
-      excludedToolNames.push('bash', 'write', 'edit')
+      excludedToolNames.push(...NATIVE_DANGEROUS_TOOL_NAMES)
     }
 
     const { session } = await createAgentSession({
@@ -583,11 +399,11 @@ export class RealPiSdkGateway implements PiSdkGateway {
       model,
       sessionManager,
       resourceLoader,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- custom tools use simplified execute signatures
-      customTools: customTools.length > 0 ? (customTools as any) : undefined,
+      ...(customTools.length > 0
+        ? { customTools: toSdkCustomTools(customTools) }
+        : {}),
       ...(excludedToolNames.length > 0
-        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mapping to Pi SDK's excludeTools option
-          { excludedToolNames: excludedToolNames as any }
+        ? { excludeTools: excludedToolNames }
         : {}),
     })
 

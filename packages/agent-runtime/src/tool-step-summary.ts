@@ -12,7 +12,17 @@ const BUILTIN_TOOL_LABELS: Record<
     running: '正在读取文件',
     failed: '读取文件失败',
   },
+  read_file: {
+    completed: '读取文件',
+    running: '正在读取文件',
+    failed: '读取文件失败',
+  },
   write: {
+    completed: '写入文件',
+    running: '正在写入文件',
+    failed: '写入文件失败',
+  },
+  write_file: {
     completed: '写入文件',
     running: '正在写入文件',
     failed: '写入文件失败',
@@ -22,7 +32,17 @@ const BUILTIN_TOOL_LABELS: Record<
     running: '正在编辑文件',
     failed: '编辑文件失败',
   },
+  edit_file: {
+    completed: '编辑文件',
+    running: '正在编辑文件',
+    failed: '编辑文件失败',
+  },
   bash: {
+    completed: '执行命令',
+    running: '正在执行命令',
+    failed: '执行命令失败',
+  },
+  run_command: {
     completed: '执行命令',
     running: '正在执行命令',
     failed: '执行命令失败',

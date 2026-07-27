@@ -4,6 +4,15 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 const createAgentSession = vi.fn()
+const createReadToolDefinition = vi.fn((_cwd: string) => ({
+  name: 'read',
+  label: 'read',
+  description: 'Read file',
+  parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+  async execute() {
+    return { content: [{ type: 'text', text: 'content' }], details: undefined }
+  },
+}))
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
   AuthStorage: {
@@ -20,6 +29,7 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
     async reload(): Promise<void> {}
   },
   createAgentSession,
+  createReadToolDefinition,
 }))
 
 import type {
@@ -189,14 +199,15 @@ describe('RealPiSdkGateway write/edit path protection', () => {
 
     const options = createAgentSession.mock.calls.at(-1)?.[0] as {
       customTools: Array<{ name: string }>
-      excludedToolNames?: string[]
+      excludeTools?: string[]
     }
     const toolNames = options.customTools.map((tool) => tool.name)
 
-    expect(toolNames).toContain('write')
-    expect(toolNames).toContain('edit')
-    expect(options.excludedToolNames).toContain('write')
-    expect(options.excludedToolNames).toContain('edit')
+    expect(toolNames).toContain('read_file')
+    expect(toolNames).toContain('run_command')
+    expect(toolNames).toContain('write_file')
+    expect(toolNames).toContain('edit_file')
+    expect(options.excludeTools).toEqual(['read', 'bash', 'write', 'edit'])
   })
 
   it('打开历史会话中也注册带路径保护的 write 和 edit 工具', async () => {
@@ -214,14 +225,15 @@ describe('RealPiSdkGateway write/edit path protection', () => {
 
     const options = createAgentSession.mock.calls.at(-1)?.[0] as {
       customTools: Array<{ name: string }>
-      excludedToolNames?: string[]
+      excludeTools?: string[]
     }
     const toolNames = options.customTools.map((tool) => tool.name)
 
-    expect(toolNames).toContain('write')
-    expect(toolNames).toContain('edit')
-    expect(options.excludedToolNames).toContain('write')
-    expect(options.excludedToolNames).toContain('edit')
+    expect(toolNames).toContain('read_file')
+    expect(toolNames).toContain('run_command')
+    expect(toolNames).toContain('write_file')
+    expect(toolNames).toContain('edit_file')
+    expect(options.excludeTools).toEqual(['read', 'bash', 'write', 'edit'])
   })
 
   it('write 工具拒绝受保护的 soul.md 路径', async () => {
@@ -251,7 +263,7 @@ describe('RealPiSdkGateway write/edit path protection', () => {
         ) => Promise<{ content: Array<{ type: string; text: string }> }>
       }>
     }
-    const writeTool = options.customTools.find((tool) => tool.name === 'write')
+    const writeTool = options.customTools.find((tool) => tool.name === 'write_file')
     expect(writeTool).toBeDefined()
 
     const result = await writeTool!.execute('call-1', {
@@ -289,7 +301,7 @@ describe('RealPiSdkGateway write/edit path protection', () => {
         ) => Promise<{ content: Array<{ type: string; text: string }> }>
       }>
     }
-    const editTool = options.customTools.find((tool) => tool.name === 'edit')
+    const editTool = options.customTools.find((tool) => tool.name === 'edit_file')
     expect(editTool).toBeDefined()
 
     const result = await editTool!.execute('call-1', {
@@ -327,7 +339,7 @@ describe('RealPiSdkGateway write/edit path protection', () => {
         ) => Promise<{ content: Array<{ type: string; text: string }> }>
       }>
     }
-    const writeTool = options.customTools.find((tool) => tool.name === 'write')
+    const writeTool = options.customTools.find((tool) => tool.name === 'write_file')
     expect(writeTool).toBeDefined()
 
     mockToolApprovalGateway.validateFilePath.mockReturnValueOnce({
@@ -380,7 +392,7 @@ describe('RealPiSdkGateway write/edit path protection', () => {
         ) => Promise<{ content: Array<{ type: string; text: string }> }>
       }>
     }
-    const editTool = options.customTools.find((tool) => tool.name === 'edit')
+    const editTool = options.customTools.find((tool) => tool.name === 'edit_file')
     expect(editTool).toBeDefined()
 
     mockToolApprovalGateway.validateFilePath.mockReturnValueOnce({
@@ -433,7 +445,7 @@ describe('RealPiSdkGateway write/edit path protection', () => {
         ) => Promise<{ content: Array<{ type: string; text: string }> }>
       }>
     }
-    const editTool = options.customTools.find((tool) => tool.name === 'edit')
+    const editTool = options.customTools.find((tool) => tool.name === 'edit_file')
     expect(editTool).toBeDefined()
 
     mockToolApprovalGateway.validateFilePath.mockReturnValueOnce({
@@ -446,6 +458,135 @@ describe('RealPiSdkGateway write/edit path protection', () => {
     })
 
     expect(result.content[0]?.text).toContain('出现了 2 次')
+
+    // 清理
+    await import('node:fs/promises').then(({ rm }) =>
+      rm(tmpDir, { recursive: true, force: true }),
+    )
+  })
+})
+
+describe('RealPiSdkGateway 审批与路径拒绝不产生副作用', () => {
+  const mockToolApprovalGateway = {
+    requestBashApproval: vi.fn(),
+    validateFilePath: vi.fn(
+      (_params: { agentId: string; path: string; operation: string }): {
+        allowed: boolean
+        reason?: string
+      } => {
+        return { allowed: true }
+      },
+    ),
+    requestClarification: vi.fn(),
+  }
+
+  function createSessionRequest(
+    overrides: Partial<PiSdkCreateSessionRequest> = {},
+  ): PiSdkCreateSessionRequest {
+    return {
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test',
+      agentId: 'tangyuan',
+      sessionId: 'session-side-effect',
+      sdkSessionFile: '/tmp/session.json',
+      cwd: '/tmp',
+      agentSkillsPath: '/tmp/agent/skills',
+      sharedSkillsPath: '/tmp/shared/skills',
+      onUpdateSoul: vi.fn(),
+      onUpdateUserProfile: vi.fn(),
+      toolApprovalGateway: mockToolApprovalGateway,
+      ...overrides,
+    }
+  }
+
+  it('run_command 工具拒绝审批时不执行命令（无副作用）', async () => {
+    mockToolApprovalGateway.requestBashApproval.mockResolvedValueOnce({
+      approved: false,
+    })
+
+    createAgentSession.mockResolvedValueOnce({
+      session: {
+        subscribe: () => () => undefined,
+        prompt: vi.fn(async () => undefined),
+        getLastAssistantText: () => null,
+        abort: vi.fn(async () => undefined),
+        dispose: vi.fn(),
+      },
+    })
+
+    await new RealPiSdkGateway().createSession(createSessionRequest())
+
+    const options = createAgentSession.mock.calls.at(-1)?.[0] as {
+      customTools: Array<{
+        name: string
+        execute: (
+          toolCallId: string,
+          params: Record<string, unknown>,
+        ) => Promise<{ content: Array<{ type: string; text: string }> }>
+      }>
+    }
+    const runCommandTool = options.customTools.find(
+      (tool) => tool.name === 'run_command',
+    )
+    expect(runCommandTool).toBeDefined()
+
+    const result = await runCommandTool!.execute('call-1', {
+      command: 'rm -rf /',
+    })
+
+    expect(result.content[0]?.text).toContain('拒绝')
+    // 确认 requestBashApproval 确实被调用了（审批流程走了）
+    expect(mockToolApprovalGateway.requestBashApproval).toHaveBeenCalled()
+  })
+
+  it('write_file 工具路径校验拒绝时不创建文件（无副作用）', async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), 'tangyuan-test-'))
+    const testFile = join(tmpDir, 'rejected.txt')
+
+    mockToolApprovalGateway.validateFilePath.mockReturnValueOnce({
+      allowed: false,
+      reason: '测试拒绝原因',
+    })
+
+    createAgentSession.mockResolvedValueOnce({
+      session: {
+        subscribe: () => () => undefined,
+        prompt: vi.fn(async () => undefined),
+        getLastAssistantText: () => null,
+        abort: vi.fn(async () => undefined),
+        dispose: vi.fn(),
+      },
+    })
+
+    await new RealPiSdkGateway().createSession(
+      createSessionRequest({ cwd: tmpDir }),
+    )
+
+    const options = createAgentSession.mock.calls.at(-1)?.[0] as {
+      customTools: Array<{
+        name: string
+        execute: (
+          toolCallId: string,
+          params: Record<string, unknown>,
+        ) => Promise<{ content: Array<{ type: string; text: string }> }>
+      }>
+    }
+    const writeTool = options.customTools.find(
+      (tool) => tool.name === 'write_file',
+    )
+    expect(writeTool).toBeDefined()
+
+    const result = await writeTool!.execute('call-1', {
+      path: testFile,
+      content: 'should not be written',
+    })
+
+    expect(result.content[0]?.text).toBe('测试拒绝原因')
+
+    // 确认文件确实没有被创建
+    const { access } = await import('node:fs/promises')
+    await expect(access(testFile)).rejects.toThrow()
 
     // 清理
     await import('node:fs/promises').then(({ rm }) =>

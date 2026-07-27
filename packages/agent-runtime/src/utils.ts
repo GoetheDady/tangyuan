@@ -146,9 +146,13 @@ export function createToolActivityLabel(
 
   const labels: Record<string, string> = {
     read: '正在读取文件',
+    read_file: '正在读取文件',
     write: '正在写入文件',
+    write_file: '正在写入文件',
     edit: '正在编辑文件',
+    edit_file: '正在编辑文件',
     bash: '正在运行命令',
+    run_command: '正在运行命令',
     search: '正在搜索',
     ask_clarification: '等待用户回答',
   }
