@@ -5,6 +5,17 @@
 - **语言**：始终使用中文回复，包括解释、计划、commit message、PR 描述以及写入文档的内容。代码、标识符、API 名称保持英文。
 - **查代码优先用 codegraph**：仓库已建有 `.codegraph/` 索引。理解或定位代码时，先用 `codegraph explore <query>` 或 `codegraph query <search>`，需要调用关系时用 `codegraph callers/callees/impact`，再回退到 `rg` 等文本搜索。
 
+## Pi 启动流程
+
+每次进入 Pi 会话后，先完成以下初始化再开始处理用户请求：
+
+1. **连接 MCP 服务器**：调用 `mcp({ connect: "codegraph" })`、`mcp({ connect: "context7" })` 等，确保 MCP 工具可用。
+2. **确认 codegraph 索引**：检查 `.codegraph/` 索引是否有效。如不可用，用 `codegraph` 工具重建索引。
+3. **阅读 AGENTS.md**：确认项目行为准则和约束。
+4. **阅读近期会话上下文**（可选）：通过会话历史了解当前工作进度。
+
+完成上述初始化后，再开始处理用户请求。
+
 ## 行为准则
 
 用于减少常见 LLM 编码错误的行为准则。与上面的项目专属说明结合使用。
