@@ -73,7 +73,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
    * @throws 当 SDK 调用失败、模型不存在或取消信号触发时，Promise 会 reject。
    */
   async verifyConfiguration(request: PiSdkVerificationRequest): Promise<void> {
-    const { AuthStorage, ModelRegistry, SessionManager, createAgentSession } =
+    const { AuthStorage, ModelRegistry, SessionManager, SettingsManager, createAgentSession } =
       await import('@earendil-works/pi-coding-agent')
     const authStorage = AuthStorage.inMemory()
     authStorage.setRuntimeApiKey(request.providerId, request.apiKey)
