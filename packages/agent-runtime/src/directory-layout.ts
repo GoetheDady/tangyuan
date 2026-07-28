@@ -156,6 +156,15 @@ export class DirectoryLayout {
   }
 
   /**
+   * 解析最后激活会话记录文件绝对路径。
+   *
+   * @returns userDataPath 下 sessions/last-active-session.json 绝对路径。
+   */
+  lastActiveSession(): string {
+    return join(this.userDataPath, 'sessions', 'last-active-session.json')
+  }
+
+  /**
    * 解析 Pi SDK 会话目录绝对路径。
    *
    * @returns userDataPath 下 sessions/pi-sdk 绝对路径。

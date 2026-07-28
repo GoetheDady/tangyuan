@@ -73,6 +73,8 @@ test.describe('Electron 窗口', () => {
     expect(apiKeys).toContain('saveRuntimeConfiguration')
     expect(apiKeys).toContain('cancelRuntimeConfigurationVerification')
     expect(apiKeys).toContain('listSessions')
+    expect(apiKeys).toContain('getLastActiveSession')
+    expect(apiKeys).toContain('setLastActiveSession')
     expect(apiKeys).toContain('createSession')
     expect(apiKeys).toContain('getTranscript')
     expect(apiKeys).toContain('sendMessage')
@@ -105,6 +107,10 @@ test.describe('Electron 窗口', () => {
   })
 
   test('页面渲染了配置页或聊天页之一', async () => {
+    await mainWindow.waitForFunction(() => {
+      const text = document.body.innerText
+      return text.includes('连接模型服务') || text.includes('大语言模型对话')
+    })
     const bodyText = await mainWindow.evaluate(() => {
       return document.body.innerText
     })
@@ -151,6 +157,19 @@ test.describe('Electron 窗口', () => {
     })
 
     expect(sessions).toBeInstanceOf(Array)
+  })
+
+  test('最后激活会话 IPC 在无可用会话时返回 null', async () => {
+    const result = await mainWindow.evaluate(async () => {
+      const initial = await window.api.getLastActiveSession()
+      const updated = await window.api.setLastActiveSession({
+        agentId: 'tangyuan',
+        sessionId: 'missing-session'
+      })
+      return { initial, updated }
+    })
+
+    expect(result).toEqual({ initial: null, updated: null })
   })
 
   test('调用 openExternalLink 被拒绝当协议不是 http/https', async () => {

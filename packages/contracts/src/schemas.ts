@@ -605,6 +605,30 @@ export const createSessionRequestSchema = z.strictObject({
 })
 
 /**
+ * 校验读取指定 Agent 会话列表时使用的过滤条件。
+ */
+export const listSessionsRequestSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+})
+
+/**
+ * 校验最后激活会话记录。
+ */
+export const lastActiveSessionSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+  updatedAt: timestampSchema,
+})
+
+/**
+ * 校验切换最后激活会话的请求。
+ */
+export const setLastActiveSessionRequestSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+})
+
+/**
  * 校验读取会话消息请求。
  */
 export const getSessionMessagesRequestSchema = z.strictObject({

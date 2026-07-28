@@ -1,7 +1,11 @@
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import {
   createTangyuanRuntimeForTesting,
   type TangyuanRuntime,
 } from './TangyuanRuntime'
+import { DirectoryLayout } from './directory-layout'
+import { LastActiveSessionStore } from './last-active-session-store'
 import { PiSdkDriver } from './pi-sdk-driver'
 import type {
   PiSdkDriverOptions,
@@ -81,10 +85,20 @@ export function createTangyuanRuntime(
       },
     },
   })
+  const fsRoot = options?.fsRoot ?? homedir()
+  const now = options?.now ?? (() => new Date().toISOString())
+  const layout = new DirectoryLayout({
+    agentHomePath:
+      options?.agentHomePath ?? '~/.tangyuan/agents/tangyuan',
+    fsRoot,
+    userDataPath: options?.userDataPath ?? join(fsRoot, '.tangyuan'),
+  })
+  const lastActiveSessionStore = new LastActiveSessionStore({ layout, now })
 
   const runtime = createTangyuanRuntimeForTesting({
     runtimeDriver: driver,
     sessionDriver: driver,
+    lastActiveSessionStore,
   })
 
   gatewayInstance = runtime.createToolApprovalGateway()

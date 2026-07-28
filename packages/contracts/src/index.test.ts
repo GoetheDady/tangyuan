@@ -7,6 +7,7 @@ import {
   applyTranscriptDelta,
   createAgentProfileStatus,
   createSessionRequestSchema,
+  listSessionsRequestSchema,
   forkSessionRequestSchema,
   createDefaultSessionSummary,
   createRuntimeSnapshot,
@@ -27,6 +28,13 @@ import {
 } from './index'
 
 describe('contracts schemas', () => {
+  it('validates the Agent filter used to list sessions', () => {
+    expect(listSessionsRequestSchema.parse({ agentId: 'agent-2' })).toEqual({
+      agentId: 'agent-2',
+    })
+    expect(() => listSessionsRequestSchema.parse({ agentId: '' })).toThrow()
+  })
+
   it('accepts serializable Agent events and rejects malformed event payloads', () => {
     expect(
       agentEventSchema.parse({
@@ -348,6 +356,8 @@ describe('DESKTOP_IPC_CHANNELS', () => {
       sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
       sessionsRetryMessage: 'tangyuan:sessions:retry-message',
       sessionsFork: 'tangyuan:sessions:fork',
+      sessionsGetLastActive: 'tangyuan:sessions:get-last-active',
+      sessionsSetLastActive: 'tangyuan:sessions:set-last-active',
       agentsArchive: 'tangyuan:agents:archive',
       agentsClaimDirectory: 'tangyuan:agents:claim-directory',
       agentsList: 'tangyuan:agents:list',

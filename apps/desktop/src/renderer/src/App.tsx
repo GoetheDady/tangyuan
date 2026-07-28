@@ -195,7 +195,7 @@ function DesktopRoutes(): React.JSX.Element {
         setAgents(workbench.agents)
         setSessions(workbench.sessions)
         setSelectedSessionId(
-          (currentSessionId) => currentSessionId ?? workbench.sessions[0]?.sessionId ?? null
+          (currentSessionId) => currentSessionId ?? workbench.activeSession?.sessionId ?? null
         )
         setTranscript((currentTranscript) => {
           const activeSessionId = selectedSessionIdRef.current
@@ -356,7 +356,18 @@ function DesktopRoutes(): React.JSX.Element {
 
   return (
     <Routes>
-      <Route path="/" element={<StartupRedirect runtime={runtime} isLoading={isLoading} />} />
+      <Route
+        path="/"
+        element={
+          <StartupRedirect
+            runtime={runtime}
+            activeSession={
+              sessions.find((session) => session.sessionId === selectedSessionId) ?? null
+            }
+            isLoading={isLoading}
+          />
+        }
+      />
       <Route path="/chat/:agentId?/:sessionId?" element={<ChatGuard context={context} />} />
       <Route path="/console" element={<Navigate to="/console/providers" replace />} />
       <Route path="/console/providers" element={<ConsoleProviderPage />} />
@@ -376,6 +387,7 @@ function DesktopRoutes(): React.JSX.Element {
  */
 function StartupRedirect(props: {
   runtime: RuntimeSnapshot | null
+  activeSession: AgentSessionSummary | null
   isLoading: boolean
 }): React.JSX.Element {
   if (props.isLoading) {
@@ -384,7 +396,11 @@ function StartupRedirect(props: {
 
   return (
     <Navigate
-      to={props.runtime?.status === 'ready' ? '/chat/tangyuan' : '/console/providers'}
+      to={
+        props.runtime?.status === 'ready' && props.activeSession
+          ? `/chat/${props.activeSession.agentId}/${props.activeSession.sessionId}`
+          : '/console/providers'
+      }
       replace
     />
   )
@@ -497,6 +513,7 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   runtime: RuntimeSnapshot
   agents: AgentSummary[]
   sessions: AgentSessionSummary[]
+  activeSession: AgentSessionSummary | null
   transcript: TranscriptSnapshot | null
 }> {
   const runtime = await api.getRuntimeSnapshot()
@@ -513,29 +530,65 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   ]
 
   if (runtime.status !== 'ready') {
-    return { runtime, agents, sessions: [], transcript: null }
+    return { runtime, agents, sessions: [], activeSession: null, transcript: null }
   }
 
-  const sessions = await api.listSessions()
-  // 1.4 continueRecent：有历史会话则自动打开最近一次，没有则新建。
-  const nextSessions =
-    sessions.length > 0
-      ? sessions
-      : [
-          await api.createSession({
-            agentId: runtime.activeAgent.agentId,
-            title: runtime.activeAgent.profile.bootstrapRequired ? 'Bootstrap 初始化' : '新会话'
-          })
-        ]
-  const [firstSession] = nextSessions
-  const transcript = firstSession
-    ? await api.getTranscript({
-        agentId: firstSession.agentId,
-        sessionId: firstSession.sessionId
-      })
-    : null
+  const lastActiveSession = await api.getLastActiveSession()
+  const activeAgentId = lastActiveSession?.agentId ?? runtime.activeAgent.agentId
+  let nextSessions = await api.listSessions({ agentId: activeAgentId })
+  let activeSession: AgentSessionSummary | null = null
+  let transcript: TranscriptSnapshot | null = null
 
-  return { runtime, agents, sessions: nextSessions, transcript }
+  if (lastActiveSession) {
+    activeSession =
+      nextSessions.find((session) => session.sessionId === lastActiveSession.sessionId) ??
+      nextSessions[0] ??
+      null
+    transcript = activeSession
+      ? await api.getTranscript({
+          agentId: activeSession.agentId,
+          sessionId: activeSession.sessionId
+        })
+      : null
+  } else {
+    // 兼容尚无最后激活记录的旧数据，并跳过索引中的损坏会话。
+    for (const session of nextSessions) {
+      try {
+        transcript = await api.getTranscript({
+          agentId: session.agentId,
+          sessionId: session.sessionId
+        })
+        activeSession = session
+        break
+      } catch {
+        // 继续尝试下一个最近会话。
+      }
+    }
+  }
+
+  if (!activeSession) {
+    activeSession = await api.createSession({
+      agentId: activeAgentId,
+      title: runtime.activeAgent.profile.bootstrapRequired ? 'Bootstrap 初始化' : '新会话'
+    })
+    nextSessions = [
+      activeSession,
+      ...nextSessions.filter((session) => session.sessionId !== activeSession?.sessionId)
+    ]
+    transcript = await api.getTranscript({
+      agentId: activeSession.agentId,
+      sessionId: activeSession.sessionId
+    })
+  }
+
+  if (!lastActiveSession) {
+    await api.setLastActiveSession({
+      agentId: activeSession.agentId,
+      sessionId: activeSession.sessionId
+    })
+  }
+
+  return { runtime, agents, sessions: nextSessions, activeSession, transcript }
 }
 
 export default App

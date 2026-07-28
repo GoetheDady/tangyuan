@@ -18,6 +18,7 @@ import {
   type GetSessionModelInfoRequest,
   type GetSoulRequest,
   type ListAgentSkillsRequest,
+  type ListSessionsRequest,
   type OpenExternalLinkRequest,
   type RecoverAgentRequest,
   type RejectBashRequest,
@@ -27,6 +28,7 @@ import {
   type SendMessageRequest,
   type SetSessionModelRequest,
   type SetSessionThinkingLevelRequest,
+  type SetLastActiveSessionRequest,
   type SkillOperationParams,
   type UpdateAgentConfigRequest,
   type UpdateSoulRequest,
@@ -76,8 +78,14 @@ export function createTangyuanPreloadApi(
     ) => {
       return invoke(DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification, request)
     },
-    listSessions: async () => {
-      return invoke(DESKTOP_IPC_CHANNELS.sessionsList)
+    listSessions: async (request?: ListSessionsRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsList, request)
+    },
+    getLastActiveSession: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsGetLastActive)
+    },
+    setLastActiveSession: async (request: SetLastActiveSessionRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsSetLastActive, request)
     },
     createSession: async (request: CreateSessionRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsCreate, request)

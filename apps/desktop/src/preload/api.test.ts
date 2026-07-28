@@ -43,6 +43,7 @@ describe('createTangyuanPreloadApi', () => {
       'createSession',
       'deleteSkill',
       'forkSession',
+      'getLastActiveSession',
       'getPendingApprovals',
       'getPendingClarifications',
       'getPendingSkillApprovals',
@@ -69,6 +70,7 @@ describe('createTangyuanPreloadApi', () => {
       'retryMessage',
       'saveRuntimeConfiguration',
       'sendMessage',
+      'setLastActiveSession',
       'setSessionModel',
       'setSessionThinkingLevel',
       'subscribeToAgentEvents',
@@ -85,7 +87,9 @@ describe('createTangyuanPreloadApi', () => {
       apiKey: 'sk-test-secret-7890'
     })
     await api.cancelRuntimeConfigurationVerification({ verificationId: 'verify-1' })
-    await api.listSessions()
+    await api.listSessions({ agentId: 'agent-2' })
+    await api.getLastActiveSession()
+    await api.setLastActiveSession({ agentId: 'tangyuan', sessionId: 'session-1' })
     await api.createSession({ agentId: 'tangyuan', title: '新会话' })
     await api.getTranscript({ agentId: 'tangyuan', sessionId: 'session-1' })
     await api.sendMessage({
@@ -153,7 +157,12 @@ describe('createTangyuanPreloadApi', () => {
         }
       ],
       [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification, { verificationId: 'verify-1' }],
-      [DESKTOP_IPC_CHANNELS.sessionsList],
+      [DESKTOP_IPC_CHANNELS.sessionsList, { agentId: 'agent-2' }],
+      [DESKTOP_IPC_CHANNELS.sessionsGetLastActive],
+      [
+        DESKTOP_IPC_CHANNELS.sessionsSetLastActive,
+        { agentId: 'tangyuan', sessionId: 'session-1' }
+      ],
       [
         DESKTOP_IPC_CHANNELS.sessionsCreate,
         {

@@ -42,6 +42,8 @@ describe('App', () => {
             updatedAt: '2026-07-08T00:00:00.000Z'
           })
         ]),
+        getLastActiveSession: vi.fn().mockResolvedValue(null),
+        setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: 'welcome',
@@ -208,6 +210,8 @@ describe('App', () => {
             updatedAt: '2026-07-08T00:00:00.000Z'
           })
         ]),
+        getLastActiveSession: vi.fn().mockResolvedValue(null),
+        setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: 'welcome',
@@ -313,6 +317,8 @@ describe('App', () => {
             updatedAt: '2026-07-08T00:00:00.000Z'
           })
         ]),
+        getLastActiveSession: vi.fn().mockResolvedValue(null),
+        setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: 'welcome',
@@ -432,6 +438,8 @@ describe('App', () => {
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
         cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
         listSessions: mockListSessions,
+        getLastActiveSession: vi.fn().mockResolvedValue(null),
+        setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: 'welcome',
@@ -656,6 +664,8 @@ describe('App', () => {
             updatedAt: '2026-07-08T00:00:00.000Z'
           })
         ]),
+        getLastActiveSession: vi.fn().mockResolvedValue(null),
+        setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: 'welcome',

@@ -119,5 +119,9 @@ describe('App independent session fork', () => {
     expect(screen.getByRole('heading', { name: '父会话（分叉）' })).toBeInTheDocument()
     expect(window.location.hash).toBe('#/chat/tangyuan/child-session')
     expect(screen.getAllByText('父会话（分叉）')).toHaveLength(2)
+    expect(window.api.setLastActiveSession).toHaveBeenCalledWith({
+      agentId: 'tangyuan',
+      sessionId: 'child-session'
+    })
   })
 })

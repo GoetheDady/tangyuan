@@ -55,10 +55,13 @@ function isInternalDriverEvent(event: AgentEvent | DriverEvent): boolean {
 }
 
 import type { TangyuanRuntimeDependencies } from './tangyuan-runtime-dependencies'
+import type { LastActiveSessionStore } from './last-active-session-store'
 
 export abstract class TangyuanRuntimeOrchestrator {
   protected static readonly MAX_CONCURRENT_RUNS = 4
   protected readonly sessionDriver: AgentSessionDriver
+  protected readonly lastActiveSessionStore:
+    Pick<LastActiveSessionStore, 'read' | 'write' | 'clear'>
   protected readonly listeners = new Set<AgentEventListener>()
   protected readonly activeRunIds = new Map<string, string>()
   protected readonly transcriptEmitter: TranscriptEmitter
@@ -85,6 +88,14 @@ export abstract class TangyuanRuntimeOrchestrator {
    */
   constructor(dependencies: TangyuanRuntimeDependencies) {
     this.sessionDriver = dependencies.sessionDriver
+    this.lastActiveSessionStore = dependencies.lastActiveSessionStore ?? {
+      read: async () => null,
+      write: async (record) => ({
+        ...record,
+        updatedAt: new Date().toISOString(),
+      }),
+      clear: async () => undefined,
+    }
     this.transcriptEmitter = new TranscriptEmitter(this.emit.bind(this))
     this.snapshotStore = new RuntimeSnapshotStore({
       runtimeDriver: dependencies.runtimeDriver,

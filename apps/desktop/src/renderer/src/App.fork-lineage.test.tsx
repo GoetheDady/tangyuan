@@ -141,6 +141,10 @@ describe('App 递归会话谱系与分叉来源提示', () => {
     await waitFor(() => {
       expect(screen.getByTestId('fork-source-message')).toHaveTextContent('父会话的来源消息')
     })
+    expect(window.api.setLastActiveSession).toHaveBeenCalledWith({
+      agentId: 'tangyuan',
+      sessionId: 'parent-session'
+    })
   })
 
   it('从孙会话可逐级跳回上一层的来源消息', async () => {

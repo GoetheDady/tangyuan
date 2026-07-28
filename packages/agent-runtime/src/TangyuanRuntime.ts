@@ -10,6 +10,7 @@ import {
   type ForkSessionRequest,
   type GetSessionMessagesRequest,
   type GetSessionModelInfoRequest,
+  type LastActiveSession,
   type ProfileUpdateResult,
   type RetryRunRequest,
   type RuntimeConfiguration,
@@ -18,6 +19,7 @@ import {
   type SessionModelInfo,
   type SetSessionModelRequest,
   type SetSessionThinkingLevelRequest,
+  type SetLastActiveSessionRequest,
   type SkillSummary,
   type SoulContent,
   type TranscriptSnapshot,
@@ -120,6 +122,133 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
       })),
     )
     return this.sessionCache.list()
+  }
+
+  /**
+   * 解析应用启动时应恢复的最后激活会话。
+   *
+   * @returns 记录指向的 Agent 和会话均可用时返回该记录，否则返回 null。
+   * @throws 当 Agent 或会话列表读取失败时，Promise 会 reject。
+   */
+  async getLastActiveSession(): Promise<LastActiveSession | null> {
+    const record = await this.lastActiveSessionStore.read()
+
+    if (record) {
+      const agents = await this.listAgents()
+      const agent = agents.find(
+        (candidate) => candidate.agentId === record.agentId,
+      )
+
+      if (agent?.status === 'active') {
+        const sessions = await this.listSessions(record.agentId)
+        const recordedSession = sessions.find(
+          (session) => session.sessionId === record.sessionId,
+        )
+
+        if (
+          recordedSession &&
+          (await this.canRestoreSessionLineage(recordedSession, sessions))
+        ) {
+          return record
+        }
+      }
+    }
+
+    const fallbackSessions = await this.listSessions(
+      TANGYUAN_DEFAULT_AGENT_ID,
+    )
+    let fallbackSession: AgentSessionSummary | undefined
+
+    for (const session of fallbackSessions) {
+      if (await this.canRestoreSessionLineage(session, fallbackSessions)) {
+        fallbackSession = session
+        break
+      }
+    }
+
+    if (!fallbackSession) {
+      await this.lastActiveSessionStore.clear()
+      return null
+    }
+
+    return this.lastActiveSessionStore.write({
+      agentId: fallbackSession.agentId,
+      sessionId: fallbackSession.sessionId,
+    })
+  }
+
+  /**
+   * 验证会话及其完整父链的 Pi session 内容仍可读取。
+   *
+   * @param session - 需要验证的会话摘要。
+   * @param sessions - 同一 Agent 的全部可见会话。
+   * @returns 谱系完整且每个 transcript 可读时返回 true。
+   */
+  private async canRestoreSessionLineage(
+    session: AgentSessionSummary,
+    sessions: AgentSessionSummary[],
+  ): Promise<boolean> {
+    const sessionsById = new Map(
+      sessions.map((candidate) => [candidate.sessionId, candidate]),
+    )
+    const visitedSessionIds = new Set<string>()
+    let candidate: AgentSessionSummary | undefined = session
+
+    while (candidate) {
+      if (
+        candidate.agentId !== session.agentId ||
+        visitedSessionIds.has(candidate.sessionId)
+      ) {
+        return false
+      }
+      visitedSessionIds.add(candidate.sessionId)
+
+      try {
+        await this.sessionDriver.getTranscript({
+          agentId: candidate.agentId,
+          sessionId: candidate.sessionId,
+        })
+      } catch {
+        return false
+      }
+
+      const parentSessionId = candidate.forkedFrom?.sessionId
+      if (!parentSessionId) {
+        return true
+      }
+      candidate = sessionsById.get(parentSessionId)
+    }
+
+    return false
+  }
+
+  /**
+   * 校验并持久化用户最后打开的会话。
+   *
+   * @param request - 要记录的 Agent 和会话标识。
+   * @returns 目标可用时返回写入后的记录，否则返回 null。
+   * @throws 当 Agent、会话列表或记录文件读写失败时，Promise 会 reject。
+   */
+  async setLastActiveSession(
+    request: SetLastActiveSessionRequest,
+  ): Promise<LastActiveSession | null> {
+    const agents = await this.listAgents()
+    const agent = agents.find(
+      (candidate) => candidate.agentId === request.agentId,
+    )
+
+    if (!agent || agent.status !== 'active') {
+      return null
+    }
+
+    const sessions = await this.listSessions(request.agentId)
+    const isAvailable = sessions.some(
+      (session) =>
+        session.agentId === request.agentId &&
+        session.sessionId === request.sessionId,
+    )
+
+    return isAvailable ? this.lastActiveSessionStore.write(request) : null
   }
 
   /**
@@ -567,6 +696,8 @@ export type TangyuanRuntime = Pick<
   | 'restoreFromBackup'
   | 'resetConfiguration'
   | 'listSessions'
+  | 'getLastActiveSession'
+  | 'setLastActiveSession'
   | 'createSession'
   | 'getTranscript'
   | 'sendMessage'

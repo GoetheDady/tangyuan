@@ -29,12 +29,19 @@ describe('registerDesktopAppIpc', () => {
     }
     const snapshot = createMissingConfigurationSnapshot()
     const session = createSessionSummary()
+    const lastActiveSession = {
+      agentId: 'tangyuan',
+      sessionId: 'session-1',
+      updatedAt: '2026-07-28T14:00:00.000Z'
+    }
     const runtime: TangyuanRuntime = {
       getRuntimeSnapshot: vi.fn().mockResolvedValue(snapshot),
       refreshRuntime: vi.fn().mockResolvedValue(snapshot),
       saveRuntimeConfiguration: vi.fn().mockResolvedValue(snapshot),
       cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(snapshot),
       listSessions: vi.fn().mockResolvedValue([session]),
+      getLastActiveSession: vi.fn().mockResolvedValue(lastActiveSession),
+      setLastActiveSession: vi.fn().mockResolvedValue(lastActiveSession),
       createSession: vi.fn().mockResolvedValue(session),
       getTranscript: vi.fn().mockResolvedValue({
         sessionId: 'session-1',
@@ -161,7 +168,7 @@ describe('registerDesktopAppIpc', () => {
 
     registerDesktopAppIpc(ipcMain, runtime, broadcastAgentEvent, openExternalLink)
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(42)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(44)
     expect(broadcastAgentEvent).toHaveBeenCalledWith(createAttemptStartedEvent())
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
@@ -182,14 +189,24 @@ describe('registerDesktopAppIpc', () => {
       })
     ).resolves.toEqual(snapshot)
     await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsList)(null, undefined)
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsList)(null, { agentId: 'agent-2' })
     ).resolves.toEqual([session])
+    expect(runtime.listSessions).toHaveBeenCalledWith('agent-2')
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsCreate)(null, {
         agentId: 'tangyuan',
         title: '新会话'
       })
     ).resolves.toEqual(session)
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsGetLastActive)(null, undefined)
+    ).resolves.toEqual(lastActiveSession)
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsSetLastActive)(null, {
+        agentId: 'tangyuan',
+        sessionId: 'session-1'
+      })
+    ).resolves.toEqual(lastActiveSession)
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsGetTranscript)(null, {
         agentId: 'tangyuan',
@@ -342,6 +359,8 @@ describe('registerDesktopAppIpc', () => {
       saveRuntimeConfiguration: vi.fn().mockResolvedValue(snapshot),
       cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(snapshot),
       listSessions: vi.fn().mockResolvedValue([]),
+      getLastActiveSession: vi.fn().mockResolvedValue(null),
+      setLastActiveSession: vi.fn().mockResolvedValue(null),
       createSession: vi.fn(),
       getTranscript: vi.fn().mockResolvedValue({
         sessionId: 'session-1',

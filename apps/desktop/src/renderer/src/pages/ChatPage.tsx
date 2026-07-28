@@ -228,6 +228,17 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     return context.sessions.find((session) => session.sessionId === parentSessionId) ?? null
   }, [context.sessions, selectedSession?.forkedFrom?.sessionId])
 
+  async function persistLastActiveSession(session: AgentSessionSummary): Promise<void> {
+    try {
+      await window.api.setLastActiveSession({
+        agentId: session.agentId,
+        sessionId: session.sessionId
+      })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '无法记录最后打开的会话')
+    }
+  }
+
   /**
    * 创建默认 Agent 的新会话并放到列表顶部。
    *
@@ -247,6 +258,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
       context.setSelectedSessionId(session.sessionId)
       context.setTranscript(null)
       navigate(`/chat/${activeAgentId}/${session.sessionId}`, { replace: true })
+      await persistLastActiveSession(session)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '创建会话失败')
     }
@@ -268,6 +280,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
         sessionId: session.sessionId
       })
       context.setTranscript(nextTranscript)
+      await persistLastActiveSession(session)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '读取会话消息失败')
     }
@@ -311,7 +324,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
         content
       })
       context.setTranscript(nextTranscript)
-      context.setSessions(await window.api.listSessions())
+      context.setSessions(await window.api.listSessions({ agentId: selectedSession.agentId }))
       navigate(`/chat/${activeAgentId}/${selectedSession.sessionId}`, { replace: true })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '发送消息失败')
@@ -342,7 +355,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
         userMessageId
       })
       context.setTranscript(nextTranscript)
-      context.setSessions(await window.api.listSessions())
+      context.setSessions(await window.api.listSessions({ agentId: selectedSession.agentId }))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '重试消息失败')
     } finally {
@@ -375,7 +388,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
         entryId: userMessageId
       })
       const [sessions, childTranscript] = await Promise.all([
-        window.api.listSessions(),
+        window.api.listSessions({ agentId: childSession.agentId }),
         window.api.getTranscript({
           agentId: childSession.agentId,
           sessionId: childSession.sessionId
@@ -386,6 +399,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
       context.setTranscript(childTranscript)
       context.setComposerText(sourceMessageContent)
       navigate(`/chat/${activeAgentId}/${childSession.sessionId}`, { replace: true })
+      await persistLastActiveSession(childSession)
       toast.success('已创建分叉会话')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '分叉会话失败')
@@ -410,7 +424,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
       })
       context.setIsSendingMessage(false)
       // 刷新 sessions 以同步取消后的状态，避免仅依赖异步推送事件
-      context.setSessions(await window.api.listSessions())
+      context.setSessions(await window.api.listSessions({ agentId: selectedSession.agentId }))
       toast.success('已停止生成')
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : '取消运行失败')
@@ -484,8 +498,8 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     context.setTranscript(null)
 
     try {
-      const sessions = await window.api.listSessions()
-      context.setSessions(sessions.filter((session) => session.agentId === nextAgentId))
+      const sessions = await window.api.listSessions({ agentId: nextAgentId })
+      context.setSessions(sessions)
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : '加载 Agent 会话失败')
     }

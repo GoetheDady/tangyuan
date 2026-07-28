@@ -13,6 +13,7 @@ import {
   getSessionModelInfoRequestSchema,
   getSoulRequestSchema,
   listAgentSkillsRequestSchema,
+  listSessionsRequestSchema,
   nonEmptyIdentifierSchema,
   openExternalLinkRequestSchema,
   profileUpdateResultSchema,
@@ -38,6 +39,8 @@ import {
   skillInstallRecordSchema,
   skillSummarySchema,
   forkSessionRequestSchema,
+  lastActiveSessionSchema,
+  setLastActiveSessionRequestSchema,
 } from './schemas'
 import type {
   AgentEventListener,
@@ -56,17 +59,20 @@ import type {
   GetSessionModelInfoRequest,
   GetSoulRequest,
   ListAgentSkillsRequest,
+  ListSessionsRequest,
   OpenExternalLinkRequest,
   ProfileUpdateResult,
   QuestionClarificationRequest,
   RecoverAgentRequest,
   RejectBashRequest,
   ForkSessionRequest,
+  LastActiveSession,
   RetryRunRequest,
   RuntimeConfiguration,
   RuntimeSnapshot,
   SendMessageRequest,
   SessionModelInfo,
+  SetLastActiveSessionRequest,
   SetSessionModelRequest,
   SetSessionThinkingLevelRequest,
   SkillApprovalRequest,
@@ -127,6 +133,8 @@ export const DESKTOP_IPC_CHANNELS = {
   sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
   sessionsRetryMessage: 'tangyuan:sessions:retry-message',
   sessionsFork: 'tangyuan:sessions:fork',
+  sessionsGetLastActive: 'tangyuan:sessions:get-last-active',
+  sessionsSetLastActive: 'tangyuan:sessions:set-last-active',
 } as const
 
 /**
@@ -150,7 +158,7 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification]: CancelConfigurationVerificationRequest
   [DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup]: undefined
   [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: undefined
-  [DESKTOP_IPC_CHANNELS.sessionsList]: undefined
+  [DESKTOP_IPC_CHANNELS.sessionsList]: ListSessionsRequest | undefined
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: CreateSessionRequest
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: SendMessageRequest
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: CancelRunRequest
@@ -186,6 +194,8 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: GetSessionMessagesRequest
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: RetryRunRequest
   [DESKTOP_IPC_CHANNELS.sessionsFork]: ForkSessionRequest
+  [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: undefined
+  [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: SetLastActiveSessionRequest
 }
 
 /**
@@ -199,7 +209,7 @@ export const desktopIpcRequestSchemas = {
     cancelConfigurationVerificationRequestSchema,
   [DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: z.undefined(),
-  [DESKTOP_IPC_CHANNELS.sessionsList]: z.undefined(),
+  [DESKTOP_IPC_CHANNELS.sessionsList]: listSessionsRequestSchema.optional(),
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: createSessionRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: sendMessageRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: cancelRunRequestSchema,
@@ -238,6 +248,8 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: getSessionMessagesRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: retryRunRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsFork]: forkSessionRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: z.undefined(),
+  [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: setLastActiveSessionRequestSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -306,6 +318,8 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: TranscriptSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: TranscriptSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsFork]: AgentSessionSummary
+  [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: LastActiveSession | null
+  [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: LastActiveSession | null
 }
 
 /**
@@ -439,6 +453,8 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: transcriptSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: transcriptSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsFork]: agentSessionSummarySchema,
+  [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: lastActiveSessionSchema.nullable(),
+  [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: lastActiveSessionSchema.nullable(),
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -474,8 +490,8 @@ export type DesktopIpcResponse<Channel extends DesktopIpcChannel> =
  * 描述调用某个 IPC channel 时是否需要传 payload 参数。
  */
 export type DesktopIpcPayloadArgs<Channel extends DesktopIpcChannel> =
-  DesktopIpcRequest<Channel> extends undefined
-    ? []
+  undefined extends DesktopIpcRequest<Channel>
+    ? [payload?: Exclude<DesktopIpcRequest<Channel>, undefined>]
     : [payload: DesktopIpcRequest<Channel>]
 
 /**
@@ -521,12 +537,13 @@ export interface DesktopPreloadApi {
   ): Promise<RuntimeSnapshot>
 
   /**
-   * 读取当前 Agent 的会话列表。
+   * 读取指定 Agent 的会话列表；省略参数时读取默认 Agent。
    *
+   * @param request - 可选的 Agent 过滤条件。
    * @returns 会话摘要列表。
    * @throws 当会话索引读取失败时，Promise 会 reject。
    */
-  listSessions(): Promise<AgentSessionSummary[]>
+  listSessions(request?: ListSessionsRequest): Promise<AgentSessionSummary[]>
 
   /**
    * 创建一个新的 Agent 会话。
@@ -861,6 +878,23 @@ export interface DesktopPreloadApi {
    * @throws 当澄清不存在或已过期时，Promise 会 reject。
    */
   cancelClarification(request: CancelClarificationRequest): Promise<void>
+
+  /**
+   * 读取最后激活会话记录，用于启动恢复。
+   *
+   * @returns 最后激活会话记录；无记录时返回 null。
+   * @throws 当读取失败时，Promise 会 reject。
+   */
+  getLastActiveSession(): Promise<LastActiveSession | null>
+
+  /**
+   * 更新最后激活会话记录。Main 会校验会话可用性后持久化。
+   *
+   * @param request - 要记录的 Agent 和会话标识。
+   * @returns 更新后的最后激活会话记录；会话不可用时返回 null。
+   * @throws 当 Agent 不存在或读取失败时，Promise 会 reject。
+   */
+  setLastActiveSession(request: SetLastActiveSessionRequest): Promise<LastActiveSession | null>
 
   /**
    * 读取所有待回答的澄清问题。

@@ -70,6 +70,9 @@ describe('DirectoryLayout · userDataPath 派生路径', () => {
     expect(layout.sessionIndex()).toBe(
       '/home/tester/.tangyuan/sessions/index.json',
     )
+    expect(layout.lastActiveSession()).toBe(
+      '/home/tester/.tangyuan/sessions/last-active-session.json',
+    )
     expect(layout.sdkSessionDir()).toBe(
       '/home/tester/.tangyuan/sessions/pi-sdk',
     )

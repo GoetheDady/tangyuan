@@ -3,6 +3,7 @@ import {
   createDefaultSessionSummary,
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
+  type LastActiveSession,
   type RuntimeSnapshot
 } from '@tangyuan/contracts'
 
@@ -148,9 +149,10 @@ export function createLongTestMessage(): LegacyTestMessage {
 export function createPreloadApiInitScript(
   runtime: RuntimeSnapshot,
   sessions: AgentSessionSummary[] = [],
-  messages: LegacyTestMessage[] = []
+  messages: LegacyTestMessage[] = [],
+  lastActiveSession: LastActiveSession | null = null
 ): string {
-  const serialized = JSON.stringify({ runtime, sessions, messages })
+  const serialized = JSON.stringify({ runtime, sessions, messages, lastActiveSession })
 
   return `
     (() => {
@@ -163,10 +165,17 @@ export function createPreloadApiInitScript(
         refreshRuntime: async () => data.runtime,
         saveRuntimeConfiguration: async () => data.runtime,
         cancelRuntimeConfigurationVerification: async () => data.runtime,
-        listSessions: async () => data.sessions,
-        createSession: async () => {
+        listSessions: async (request) => request
+          ? data.sessions.filter((session) => session.agentId === request.agentId)
+          : data.sessions,
+        getLastActiveSession: async () => data.lastActiveSession,
+        setLastActiveSession: async (request) => {
+          data.lastActiveSession = { ...request, updatedAt: new Date().toISOString() };
+          return data.lastActiveSession;
+        },
+        createSession: async (request) => {
           const session = {
-            agentId: '${TANGYUAN_DEFAULT_AGENT_ID}',
+            agentId: request.agentId,
             sessionId: 'session-' + Date.now(),
             title: '新会话',
             state: 'idle',

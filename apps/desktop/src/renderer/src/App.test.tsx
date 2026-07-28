@@ -39,6 +39,163 @@ describe('App', () => {
     expect(screen.queryByRole('button', { name: '新会话' })).not.toBeInTheDocument()
     expect(window.api.listSessions).not.toHaveBeenCalled()
   })
+  it('启动时恢复最后打开的自定义 Agent 分叉会话', async () => {
+    const readyRuntime = createReadyRuntimeSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-t...7890',
+      profileInitialized: true
+    })
+    readyRuntime.agents.push({
+      agentId: 'agent-2',
+      displayName: '研究助手',
+      status: 'active',
+      defaultProviderId: 'anthropic',
+      defaultModelId: 'claude-sonnet-4-5',
+      homePath: '~/.tangyuan/agents/agent-2',
+      archivedAt: null,
+      directoryStatus: 'healthy'
+    })
+    const forkSession = {
+      agentId: 'agent-2',
+      sessionId: 'fork-session',
+      title: '分叉会话',
+      state: 'idle' as const,
+      updatedAt: '2026-07-28T09:00:00.000Z',
+      forkedFrom: { sessionId: 'parent-session', entryId: 'message-1' }
+    }
+    window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(readyRuntime)
+    window.api.getLastActiveSession = vi.fn().mockResolvedValue({
+      agentId: 'agent-2',
+      sessionId: 'fork-session',
+      updatedAt: '2026-07-28T10:00:00.000Z'
+    })
+    window.api.listSessions = vi.fn().mockResolvedValue([forkSession])
+    window.api.getTranscript = vi.fn().mockResolvedValue({
+      agentId: 'agent-2',
+      sessionId: 'fork-session',
+      entries: [],
+      updatedAt: '2026-07-28T10:00:00.000Z'
+    })
+
+    render(<App />)
+
+    expect(await screen.findAllByText('分叉会话')).toHaveLength(2)
+    await waitFor(() => {
+      expect(window.location.hash).toBe('#/chat/agent-2/fork-session')
+    })
+    expect(window.api.listSessions).toHaveBeenCalledWith({ agentId: 'agent-2' })
+    expect(window.api.getTranscript).toHaveBeenCalledWith({
+      agentId: 'agent-2',
+      sessionId: 'fork-session'
+    })
+  })
+  it('默认 Agent 只有损坏会话时创建并打开新会话', async () => {
+    const readyRuntime = createReadyRuntimeSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-t...7890',
+      profileInitialized: true
+    })
+    const damagedSession = createDefaultSessionSummary({
+      sessionId: 'damaged-session',
+      title: '损坏会话',
+      updatedAt: '2026-07-28T09:00:00.000Z'
+    })
+    const newSession = createDefaultSessionSummary({
+      sessionId: 'new-session',
+      title: '新会话',
+      updatedAt: '2026-07-28T10:00:00.000Z'
+    })
+    window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(readyRuntime)
+    window.api.getLastActiveSession = vi.fn().mockResolvedValue(null)
+    window.api.listSessions = vi.fn().mockResolvedValue([damagedSession])
+    window.api.createSession = vi.fn().mockResolvedValue(newSession)
+    window.api.getTranscript = vi.fn(async ({ agentId, sessionId }) => {
+      if (sessionId === damagedSession.sessionId) {
+        throw new Error('Pi session JSONL 损坏')
+      }
+
+      return {
+        agentId,
+        sessionId,
+        entries: [],
+        updatedAt: '2026-07-28T10:00:00.000Z'
+      }
+    })
+
+    render(<App />)
+
+    expect(await screen.findAllByText('新会话')).toHaveLength(2)
+    await waitFor(() => {
+      expect(window.location.hash).toBe('#/chat/tangyuan/new-session')
+    })
+    expect(window.api.createSession).toHaveBeenCalledWith({
+      agentId: 'tangyuan',
+      title: '新会话'
+    })
+    expect(window.api.getTranscript).toHaveBeenCalledWith({
+      agentId: 'tangyuan',
+      sessionId: 'damaged-session'
+    })
+  })
+  it('切换 Agent 并选择会话时更新最后激活记录', async () => {
+    const user = userEvent.setup()
+    const readyRuntime = createReadyRuntimeSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-t...7890',
+      profileInitialized: true
+    })
+    readyRuntime.agents.push({
+      agentId: 'agent-2',
+      displayName: '研究助手',
+      status: 'active',
+      defaultProviderId: 'anthropic',
+      defaultModelId: 'claude-sonnet-4-5',
+      homePath: '~/.tangyuan/agents/agent-2',
+      archivedAt: null,
+      directoryStatus: 'healthy'
+    })
+    const defaultSession = createDefaultSessionSummary({
+      sessionId: 'default-session',
+      title: '默认会话',
+      updatedAt: '2026-07-28T09:00:00.000Z'
+    })
+    const agentSession = {
+      ...createDefaultSessionSummary({
+        sessionId: 'agent-session',
+        title: '研究会话',
+        updatedAt: '2026-07-28T10:00:00.000Z'
+      }),
+      agentId: 'agent-2'
+    }
+    window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(readyRuntime)
+    window.api.getLastActiveSession = vi.fn().mockResolvedValue(null)
+    window.api.listSessions = vi
+      .fn()
+      .mockResolvedValueOnce([defaultSession])
+      .mockResolvedValue([agentSession])
+    window.api.getTranscript = vi.fn().mockImplementation(async (request) => ({
+      agentId: request.agentId,
+      sessionId: request.sessionId,
+      entries: [],
+      updatedAt: '2026-07-28T10:00:00.000Z'
+    }))
+
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: '切换到 Agent 研究助手' }))
+    await user.click(await screen.findByRole('treeitem', { name: /研究会话/ }))
+
+    await waitFor(() => {
+      expect(window.api.setLastActiveSession).toHaveBeenCalledWith({
+        agentId: 'agent-2',
+        sessionId: 'agent-session'
+      })
+    })
+    expect(window.api.listSessions).toHaveBeenCalledWith({ agentId: 'agent-2' })
+  })
   it('renders model options with unique keys across providers', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(
@@ -166,6 +323,8 @@ describe('App', () => {
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
         cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
         listSessions: vi.fn().mockResolvedValue([]),
+        getLastActiveSession: vi.fn().mockResolvedValue(null),
+        setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn().mockResolvedValue(
           createDefaultSessionSummary({
             sessionId: 'auto-session',
@@ -258,6 +417,8 @@ describe('App', () => {
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
         cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(readyRuntime),
         listSessions: vi.fn().mockResolvedValue([]),
+        getLastActiveSession: vi.fn().mockResolvedValue(null),
+        setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn().mockResolvedValue(
           createDefaultSessionSummary({
             sessionId: 'bootstrap-session',
@@ -355,6 +516,8 @@ describe('App', () => {
             updatedAt: '2026-07-08T00:00:00.000Z'
           })
         ]),
+        getLastActiveSession: vi.fn().mockResolvedValue(null),
+        setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: '',

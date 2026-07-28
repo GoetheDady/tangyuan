@@ -96,8 +96,11 @@ export function registerDesktopAppIpc(
     }
   )
   ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsList, async (_event, payload) => {
-    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsList, payload)
-    return parseDesktopIpcResponse(DESKTOP_IPC_CHANNELS.sessionsList, await runtime.listSessions())
+    const request = parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsList, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsList,
+      await runtime.listSessions(request?.agentId)
+    )
   })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsCreate, async (_event, payload) => {
     return parseDesktopIpcResponse(
@@ -143,6 +146,21 @@ export function registerDesktopAppIpc(
     return parseDesktopIpcResponse(
       DESKTOP_IPC_CHANNELS.sessionsFork,
       await runtime.forkSession(parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsFork, payload))
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsGetLastActive, async (_event, payload) => {
+    parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsGetLastActive, payload)
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsGetLastActive,
+      await runtime.getLastActiveSession()
+    )
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsSetLastActive, async (_event, payload) => {
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsSetLastActive,
+      await runtime.setLastActiveSession(
+        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsSetLastActive, payload)
+      )
     )
   })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.agentsList, async (_event, payload) => {
