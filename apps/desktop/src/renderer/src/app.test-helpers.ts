@@ -27,7 +27,11 @@ export function installDefaultAppApi(): void {
         updatedAt: '2026-07-08T00:00:00.000Z'
       })
     ]),
-    getLastActiveSession: vi.fn().mockResolvedValue(null),
+    getLastActiveSession: vi.fn().mockResolvedValue({
+      agentId: 'tangyuan',
+      sessionId: 'welcome',
+      updatedAt: '2026-07-08T00:00:00.000Z'
+    }),
     setLastActiveSession: vi.fn().mockResolvedValue(null),
     createSession: vi.fn().mockResolvedValue(
       createDefaultSessionSummary({

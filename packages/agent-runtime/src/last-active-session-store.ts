@@ -71,7 +71,7 @@ export class LastActiveSessionStore {
    * 清除最后激活会话记录文件。
    *
    * @returns 无返回值。
-   * @throws 此方法不会主动抛出错误。
+   * @throws 删除记录文件失败时，Promise 会 reject。
    */
   async clear(): Promise<void> {
     await rm(this.layout.lastActiveSession(), { force: true })

@@ -550,20 +550,6 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
           sessionId: activeSession.sessionId
         })
       : null
-  } else {
-    // 兼容尚无最后激活记录的旧数据，并跳过索引中的损坏会话。
-    for (const session of nextSessions) {
-      try {
-        transcript = await api.getTranscript({
-          agentId: session.agentId,
-          sessionId: session.sessionId
-        })
-        activeSession = session
-        break
-      } catch {
-        // 继续尝试下一个最近会话。
-      }
-    }
   }
 
   if (!activeSession) {

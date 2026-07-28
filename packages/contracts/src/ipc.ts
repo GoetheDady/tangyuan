@@ -42,6 +42,7 @@ import {
   lastActiveSessionSchema,
   setLastActiveSessionRequestSchema,
 } from './schemas'
+import type { LastActiveSession, SetLastActiveSessionRequest } from './last-active-session'
 import type {
   AgentEventListener,
   AgentSessionSummary,
@@ -66,13 +67,11 @@ import type {
   RecoverAgentRequest,
   RejectBashRequest,
   ForkSessionRequest,
-  LastActiveSession,
   RetryRunRequest,
   RuntimeConfiguration,
   RuntimeSnapshot,
   SendMessageRequest,
   SessionModelInfo,
-  SetLastActiveSessionRequest,
   SetSessionModelRequest,
   SetSessionThinkingLevelRequest,
   SkillApprovalRequest,

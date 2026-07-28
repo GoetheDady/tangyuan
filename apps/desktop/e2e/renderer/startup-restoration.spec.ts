@@ -27,6 +27,13 @@ test('启动时恢复最后激活的自定义 Agent 分叉会话', async ({ page
     },
     {
       agentId: 'agent-2',
+      sessionId: 'parent-session',
+      title: '研究主线',
+      state: 'idle',
+      updatedAt: '2026-07-28T08:00:00.000Z'
+    },
+    {
+      agentId: 'agent-2',
       sessionId: 'fork-session',
       title: '研究分叉',
       state: 'idle',
@@ -50,4 +57,8 @@ test('启动时恢复最后激活的自定义 Agent 分叉会话', async ({ page
     'aria-current',
     'page'
   )
+  await expect(page.getByRole('treeitem', { name: /研究主线/ })).toHaveAttribute('aria-level', '1')
+  await expect(page.getByRole('treeitem', { name: /研究分叉/ })).toHaveAttribute('aria-level', '2')
+  await expect(page.getByText('分叉自「研究主线」')).toBeVisible()
+  await expect(page.getByRole('combobox', { name: '模型' })).toHaveText('Claude Sonnet 4.5')
 })

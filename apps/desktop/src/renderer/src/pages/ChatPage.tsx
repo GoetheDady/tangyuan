@@ -9,7 +9,7 @@ import type {
   TranscriptSnapshot
 } from '@tangyuan/contracts'
 import { MessageSquarePlus, Settings } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 
@@ -123,6 +123,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
   const [sessionModelInfo, setSessionModelInfo] = useState<SessionModelInfo | null>(null)
   const [isLoadingModelInfo, setIsLoadingModelInfo] = useState(false)
   const [isSwitchingModel, setIsSwitchingModel] = useState(false)
+  const openSessionRequestIdRef = useRef(0)
   /** 跳转后需要在父会话中定位的分叉来源消息标识。 */
   const [forkSourceMessageId, setForkSourceMessageId] = useState<string | null>(null)
 
@@ -228,6 +229,13 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     return context.sessions.find((session) => session.sessionId === parentSessionId) ?? null
   }, [context.sessions, selectedSession?.forkedFrom?.sessionId])
 
+  /**
+   * 持久化用户最后成功打开的会话。
+   *
+   * @param session - 已成功打开的会话摘要。
+   * @returns 无返回值。
+   * @throws Preload API 错误会被捕获并通过 toast 反馈。
+   */
   async function persistLastActiveSession(session: AgentSessionSummary): Promise<void> {
     try {
       await window.api.setLastActiveSession({
@@ -272,6 +280,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
    * @throws Preload API 错误会被捕获并通过 toast 反馈。
    */
   const openSession = async (session: AgentSessionSummary): Promise<void> => {
+    const requestId = ++openSessionRequestIdRef.current
     context.setSelectedSessionId(session.sessionId)
 
     try {
@@ -279,9 +288,13 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
         agentId: session.agentId,
         sessionId: session.sessionId
       })
+      if (requestId !== openSessionRequestIdRef.current) return
+
       context.setTranscript(nextTranscript)
       await persistLastActiveSession(session)
     } catch (error) {
+      if (requestId !== openSessionRequestIdRef.current) return
+
       toast.error(error instanceof Error ? error.message : '读取会话消息失败')
     }
   }

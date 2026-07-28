@@ -64,13 +64,20 @@ describe('App', () => {
       updatedAt: '2026-07-28T09:00:00.000Z',
       forkedFrom: { sessionId: 'parent-session', entryId: 'message-1' }
     }
+    const parentSession = {
+      agentId: 'agent-2',
+      sessionId: 'parent-session',
+      title: '父会话',
+      state: 'idle' as const,
+      updatedAt: '2026-07-28T08:00:00.000Z'
+    }
     window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(readyRuntime)
     window.api.getLastActiveSession = vi.fn().mockResolvedValue({
       agentId: 'agent-2',
       sessionId: 'fork-session',
       updatedAt: '2026-07-28T10:00:00.000Z'
     })
-    window.api.listSessions = vi.fn().mockResolvedValue([forkSession])
+    window.api.listSessions = vi.fn().mockResolvedValue([forkSession, parentSession])
     window.api.getTranscript = vi.fn().mockResolvedValue({
       agentId: 'agent-2',
       sessionId: 'fork-session',
@@ -89,19 +96,23 @@ describe('App', () => {
       agentId: 'agent-2',
       sessionId: 'fork-session'
     })
+    expect(screen.getByText('分叉自「父会话」')).toBeInTheDocument()
   })
-  it('默认 Agent 只有损坏会话时创建并打开新会话', async () => {
+  it('Runtime 判定无可恢复会话后不重新打开谱系不可用摘要', async () => {
     const readyRuntime = createReadyRuntimeSnapshot({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       maskedValue: 'sk-t...7890',
       profileInitialized: true
     })
-    const damagedSession = createDefaultSessionSummary({
-      sessionId: 'damaged-session',
-      title: '损坏会话',
-      updatedAt: '2026-07-28T09:00:00.000Z'
-    })
+    const unavailableSession = {
+      ...createDefaultSessionSummary({
+        sessionId: 'unavailable-session',
+        title: '谱系不可用会话',
+        updatedAt: '2026-07-28T09:00:00.000Z'
+      }),
+      forkedFrom: { sessionId: 'missing-parent', entryId: 'message-1' }
+    }
     const newSession = createDefaultSessionSummary({
       sessionId: 'new-session',
       title: '新会话',
@@ -109,20 +120,14 @@ describe('App', () => {
     })
     window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(readyRuntime)
     window.api.getLastActiveSession = vi.fn().mockResolvedValue(null)
-    window.api.listSessions = vi.fn().mockResolvedValue([damagedSession])
+    window.api.listSessions = vi.fn().mockResolvedValue([unavailableSession])
     window.api.createSession = vi.fn().mockResolvedValue(newSession)
-    window.api.getTranscript = vi.fn(async ({ agentId, sessionId }) => {
-      if (sessionId === damagedSession.sessionId) {
-        throw new Error('Pi session JSONL 损坏')
-      }
-
-      return {
-        agentId,
-        sessionId,
-        entries: [],
-        updatedAt: '2026-07-28T10:00:00.000Z'
-      }
-    })
+    window.api.getTranscript = vi.fn(async ({ agentId, sessionId }) => ({
+      agentId,
+      sessionId,
+      entries: [],
+      updatedAt: '2026-07-28T10:00:00.000Z'
+    }))
 
     render(<App />)
 
@@ -134,9 +139,9 @@ describe('App', () => {
       agentId: 'tangyuan',
       title: '新会话'
     })
-    expect(window.api.getTranscript).toHaveBeenCalledWith({
+    expect(window.api.getTranscript).not.toHaveBeenCalledWith({
       agentId: 'tangyuan',
-      sessionId: 'damaged-session'
+      sessionId: 'unavailable-session'
     })
   })
   it('切换 Agent 并选择会话时更新最后激活记录', async () => {
@@ -516,7 +521,11 @@ describe('App', () => {
             updatedAt: '2026-07-08T00:00:00.000Z'
           })
         ]),
-        getLastActiveSession: vi.fn().mockResolvedValue(null),
+        getLastActiveSession: vi.fn().mockResolvedValue({
+          agentId: 'tangyuan',
+          sessionId: 'welcome',
+          updatedAt: '2026-07-08T00:00:00.000Z'
+        }),
         setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({

@@ -1,10 +1,15 @@
 import '@testing-library/jest-dom/vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createDefaultSessionSummary, type AgentSessionSummary } from '@tangyuan/contracts'
+import {
+  createDefaultSessionSummary,
+  type AgentSessionSummary,
+  type TranscriptSnapshot
+} from '@tangyuan/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import {
+  createDeferred,
   createReadyRuntimeSnapshot,
   installDefaultAppApi,
   resetAppTestEnvironment
@@ -48,6 +53,11 @@ function installLineageApi(): void {
   })
   vi.mocked(window.api.getRuntimeSnapshot).mockResolvedValue(readyRuntime)
   vi.mocked(window.api.refreshRuntime).mockResolvedValue(readyRuntime)
+  vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
+    agentId: 'tangyuan',
+    sessionId: 'parent-session',
+    updatedAt: '2026-07-28T00:02:00.000Z'
+  })
   vi.mocked(window.api.listSessions).mockResolvedValue([PARENT, CHILD, GRANDCHILD])
   vi.mocked(window.api.getTranscript).mockImplementation(async (request) => {
     const entriesBySession: Record<string, unknown[]> = {
@@ -179,5 +189,73 @@ describe('App 递归会话谱系与分叉来源提示', () => {
     expect(screen.queryByRole('button', { name: '查看来源消息' })).not.toBeInTheDocument()
     // 父会话缺失的分叉仍要在侧边栏可见，作为根节点展示。
     expect(screen.getByRole('treeitem', { name: /孤立分叉/ })).toHaveAttribute('aria-level', '1')
+  })
+
+  it('快速切换父会话与分叉时只保留最后一次选择', async () => {
+    const user = userEvent.setup()
+    window.location.hash = '#/chat/tangyuan/parent-session'
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: '父会话' })).toBeInTheDocument()
+    const parentTranscript = createDeferred<TranscriptSnapshot>()
+    vi.mocked(window.api.getTranscript).mockImplementation(async (request) => {
+      if (request.sessionId === PARENT.sessionId) {
+        return parentTranscript.promise
+      }
+
+      return {
+        agentId: request.agentId,
+        sessionId: request.sessionId,
+        entries: [
+          {
+            kind: 'user-message',
+            index: 0,
+            messageId: 'latest-child-message',
+            content: '最后选择的子会话内容',
+            createdAt: '2026-07-28T00:03:00.000Z'
+          }
+        ],
+        updatedAt: '2026-07-28T00:03:00.000Z'
+      }
+    })
+    vi.mocked(window.api.setLastActiveSession).mockClear()
+
+    await user.click(screen.getByRole('treeitem', { name: /父会话/ }))
+    await user.click(screen.getByRole('treeitem', { name: /子会话/ }))
+
+    await waitFor(() => {
+      expect(window.api.setLastActiveSession).toHaveBeenLastCalledWith({
+        agentId: 'tangyuan',
+        sessionId: 'child-session'
+      })
+    })
+    expect(await screen.findByText('最后选择的子会话内容')).toBeInTheDocument()
+
+    await act(async () => {
+      parentTranscript.resolve({
+        agentId: 'tangyuan',
+        sessionId: 'parent-session',
+        entries: [
+          {
+            kind: 'user-message',
+            index: 0,
+            messageId: 'stale-parent-message',
+            content: '过期返回的父会话内容',
+            createdAt: '2026-07-28T00:04:00.000Z'
+          }
+        ],
+        updatedAt: '2026-07-28T00:04:00.000Z'
+      })
+      await parentTranscript.promise
+    })
+
+    expect(screen.getByText('最后选择的子会话内容')).toBeInTheDocument()
+    expect(screen.queryByText('过期返回的父会话内容')).not.toBeInTheDocument()
+    expect(window.api.setLastActiveSession).toHaveBeenLastCalledWith({
+      agentId: 'tangyuan',
+      sessionId: 'child-session'
+    })
+    expect(window.location.hash).toBe('#/chat/tangyuan/child-session')
   })
 })
