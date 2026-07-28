@@ -67,7 +67,7 @@ test.describe('Electron 窗口', () => {
       return Object.keys(window.api).sort()
     })
 
-    // 验证所有 11 个 Preload API 方法都存在
+    // 验证 Preload API 方法都存在
     expect(apiKeys).toContain('getRuntimeSnapshot')
     expect(apiKeys).toContain('refreshRuntime')
     expect(apiKeys).toContain('saveRuntimeConfiguration')
@@ -79,6 +79,29 @@ test.describe('Electron 窗口', () => {
     expect(apiKeys).toContain('cancelRun')
     expect(apiKeys).toContain('subscribeToAgentEvents')
     expect(apiKeys).toContain('openExternalLink')
+    expect(apiKeys).toContain('forkSession')
+  })
+
+  test('调用 forkSession 在会话不存在时被 Runtime 拒绝', async () => {
+    const result = await mainWindow.evaluate(async () => {
+      try {
+        await window.api.forkSession({
+          agentId: 'tangyuan',
+          sessionId: 'missing-session',
+          entryId: 'missing-entry'
+        })
+        return { rejected: false, message: '' }
+      } catch (error) {
+        return {
+          rejected: true,
+          message: error instanceof Error ? error.message : String(error)
+        }
+      }
+    })
+
+    // IPC 贯通到 Runtime：请求通过 schema 校验后，由 Runtime 报告会话不存在。
+    expect(result.rejected).toBe(true)
+    expect(result.message).toContain('missing-session')
   })
 
   test('页面渲染了配置页或聊天页之一', async () => {
