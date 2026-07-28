@@ -124,6 +124,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
   const [isLoadingModelInfo, setIsLoadingModelInfo] = useState(false)
   const [isSwitchingModel, setIsSwitchingModel] = useState(false)
   const openSessionRequestIdRef = useRef(0)
+  const persistLastActiveSessionQueueRef = useRef<Promise<void>>(Promise.resolve())
   /** 跳转后需要在父会话中定位的分叉来源消息标识。 */
   const [forkSourceMessageId, setForkSourceMessageId] = useState<string | null>(null)
 
@@ -236,15 +237,19 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
    * @returns 无返回值。
    * @throws Preload API 错误会被捕获并通过 toast 反馈。
    */
-  async function persistLastActiveSession(session: AgentSessionSummary): Promise<void> {
-    try {
-      await window.api.setLastActiveSession({
-        agentId: session.agentId,
-        sessionId: session.sessionId
+  function persistLastActiveSession(session: AgentSessionSummary): Promise<void> {
+    persistLastActiveSessionQueueRef.current = persistLastActiveSessionQueueRef.current
+      .then(async () => {
+        await window.api.setLastActiveSession({
+          agentId: session.agentId,
+          sessionId: session.sessionId
+        })
       })
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '无法记录最后打开的会话')
-    }
+      .catch((error) => {
+        toast.error(error instanceof Error ? error.message : '无法记录最后打开的会话')
+      })
+
+    return persistLastActiveSessionQueueRef.current
   }
 
   /**
@@ -505,6 +510,13 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     navigate(`/chat/${activeAgentId}/${parentSession.sessionId}`, { replace: true })
   }
 
+  /**
+   * 切换到指定 Agent 并加载其会话列表。
+   *
+   * @param nextAgentId - 要切换到的 Agent 标识。
+   * @returns 无返回值。
+   * @throws Preload API 错误会被捕获并通过 toast 反馈。
+   */
   async function handleAgentChange(nextAgentId: string): Promise<void> {
     navigate(`/chat/${nextAgentId}`, { replace: true })
     context.setSelectedSessionId(null)

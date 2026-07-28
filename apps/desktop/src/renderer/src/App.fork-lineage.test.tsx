@@ -258,4 +258,42 @@ describe('App 递归会话谱系与分叉来源提示', () => {
     })
     expect(window.location.hash).toBe('#/chat/tangyuan/child-session')
   })
+
+  it('较早会话的持久化延迟时最后激活记录仍以最后选择为准', async () => {
+    const user = userEvent.setup()
+    const releaseParentWrite = createDeferred<void>()
+    let persistedSessionId: string | null = null
+    window.location.hash = '#/chat/tangyuan/parent-session'
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: '父会话' })).toBeInTheDocument()
+    vi.mocked(window.api.setLastActiveSession).mockImplementation(async (request) => {
+      if (request.sessionId === PARENT.sessionId) {
+        await releaseParentWrite.promise
+      }
+      persistedSessionId = request.sessionId
+      return {
+        ...request,
+        updatedAt: '2026-07-28T00:05:00.000Z'
+      }
+    })
+
+    await user.click(screen.getByRole('treeitem', { name: /父会话/ }))
+    await waitFor(() => {
+      expect(window.api.setLastActiveSession).toHaveBeenCalledWith({
+        agentId: 'tangyuan',
+        sessionId: 'parent-session'
+      })
+    })
+    await user.click(screen.getByRole('treeitem', { name: /子会话/ }))
+    expect(await screen.findByRole('heading', { name: '子会话' })).toBeInTheDocument()
+
+    releaseParentWrite.resolve()
+
+    await waitFor(() => {
+      expect(window.api.setLastActiveSession).toHaveBeenCalledTimes(2)
+      expect(persistedSessionId).toBe('child-session')
+    })
+  })
 })

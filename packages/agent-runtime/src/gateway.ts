@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { TranscriptSnapshot } from '@tangyuan/contracts'
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
@@ -193,6 +193,28 @@ export class RealPiSdkGateway implements PiSdkGateway {
   async readMessages(
     request: PiSdkReadMessagesRequest,
   ): Promise<TranscriptSnapshot> {
+    let header: unknown
+
+    try {
+      const firstLine = (await readFile(request.sdkSessionFile, 'utf8'))
+        .split('\n')
+        .find((line) => line.trim().length > 0)
+      header = firstLine ? JSON.parse(firstLine) : null
+    } catch {
+      throw new Error(`会话文件不可读：${request.sdkSessionFile}`)
+    }
+
+    if (
+      !header ||
+      typeof header !== 'object' ||
+      !('type' in header) ||
+      header.type !== 'session' ||
+      !('id' in header) ||
+      header.id !== request.sessionId
+    ) {
+      throw new Error(`会话文件不可读：${request.sdkSessionFile}`)
+    }
+
     const { SessionManager } = await import('@earendil-works/pi-coding-agent')
     const sessionManager = SessionManager.open(
       request.sdkSessionFile,

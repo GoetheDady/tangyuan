@@ -100,8 +100,9 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
   }
 
   /**
-   * 读取默认 Agent 的会话摘要列表并写入 Runtime 缓存。
+   * 读取指定 Agent 的会话摘要列表并写入 Runtime 缓存。
    *
+   * @param agentId - 要读取会话的 Agent 标识，默认为默认 Agent。
    * @returns 会话摘要列表。
    * @throws 当 AgentSessionDriver 读取失败时，Promise 会 reject。
    */
@@ -127,8 +128,8 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
   /**
    * 解析应用启动时应恢复的最后激活会话。
    *
-   * @returns 记录指向的 Agent 和会话均可用时返回该记录，否则返回 null。
-   * @throws 当 Agent 或会话列表读取失败时，Promise 会 reject。
+   * @returns 最后激活会话可用时返回原记录；否则返回并记录默认 Agent 的首个可恢复会话；无可恢复会话时返回 null。
+   * @throws 当记录、Agent、会话或父链读取失败，或回退记录写入、清理失败时，Promise 会 reject。
    */
   async getLastActiveSession(): Promise<LastActiveSession | null> {
     const record = await this.lastActiveSessionStore.read()
