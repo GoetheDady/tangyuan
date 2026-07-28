@@ -40,4 +40,28 @@ describe('RealPiSdkGateway.readMessages', () => {
       }),
     ).rejects.toThrow('会话文件不可读')
   })
+
+  it('合法 header 后存在损坏条目时拒绝返回截断 transcript', async () => {
+    const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-read-messages-'))
+    const sessionFile = join(rootPath, 'corrupted-entry-session.jsonl')
+    tempDirs.push(rootPath)
+    await writeFile(
+      sessionFile,
+      `${JSON.stringify({
+        type: 'session',
+        version: 3,
+        id: 'corrupted-entry-session',
+        timestamp: '2026-07-28T00:00:00.000Z',
+        cwd: rootPath,
+      })}\n{ not valid json\n`,
+      'utf8',
+    )
+
+    await expect(
+      new RealPiSdkGateway().readMessages({
+        sessionId: 'corrupted-entry-session',
+        sdkSessionFile: sessionFile,
+      }),
+    ).rejects.toThrow('会话文件不可读')
+  })
 })

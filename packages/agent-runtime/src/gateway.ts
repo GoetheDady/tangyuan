@@ -188,7 +188,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
    *
    * @param request - 会话标识和 SDK session 文件。
    * @returns 转换后的汤圆标准消息列表。
-   * @throws 当 SDK session 文件无法打开或读取时，Promise 会 reject。
+   * @throws 当 SDK session 文件无法打开、读取或完整解析时，Promise 会 reject。
    */
   async readMessages(
     request: PiSdkReadMessagesRequest,
@@ -196,10 +196,13 @@ export class RealPiSdkGateway implements PiSdkGateway {
     let header: unknown
 
     try {
-      const firstLine = (await readFile(request.sdkSessionFile, 'utf8'))
+      const lines = (await readFile(request.sdkSessionFile, 'utf8'))
         .split('\n')
-        .find((line) => line.trim().length > 0)
-      header = firstLine ? JSON.parse(firstLine) : null
+        .filter((line) => line.trim().length > 0)
+      header = lines[0] ? JSON.parse(lines[0]) : null
+      for (const line of lines.slice(1)) {
+        JSON.parse(line)
+      }
     } catch {
       throw new Error(`会话文件不可读：${request.sdkSessionFile}`)
     }
