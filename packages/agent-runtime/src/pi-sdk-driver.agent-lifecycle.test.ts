@@ -157,6 +157,7 @@ describe('PiSdkDriver', () => {
         sessionId: string
         sdkSessionFile: string
         title: string
+        cwd: string
         createdAt: string
         updatedAt: string
       }>
@@ -167,6 +168,7 @@ describe('PiSdkDriver', () => {
           sessionId: request.sessionId,
           sdkSessionFile: request.sdkSessionFile,
           title: '',
+          cwd: request.cwd,
           createdAt: '2026-07-08T00:00:00.000Z',
           updatedAt: '2026-07-08T00:00:00.000Z',
         }
@@ -189,7 +191,8 @@ describe('PiSdkDriver', () => {
       listSessions: async (request) => {
         gateway.listSessionRequests.push(request)
 
-        return sessionsByCwd.get(request.cwd) ?? []
+        // 全局扫描：返回所有工作目录下的 Pi 会话，由索引按 cwd 归属 Agent。
+        return [...sessionsByCwd.values()].flat()
       },
     })
     const { driver, rootPath, userDataPath } = await createDriver({ gateway })
@@ -282,6 +285,7 @@ describe('PiSdkDriver', () => {
         sessionId: string
         sdkSessionFile: string
         title: string
+        cwd: string
         createdAt: string
         updatedAt: string
       }>
@@ -292,6 +296,7 @@ describe('PiSdkDriver', () => {
           sessionId: request.sessionId,
           sdkSessionFile: request.sdkSessionFile,
           title: '',
+          cwd: request.cwd,
           createdAt: '2026-07-08T00:00:00.000Z',
           updatedAt: '2026-07-08T00:00:00.000Z',
         }
@@ -308,7 +313,8 @@ describe('PiSdkDriver', () => {
       listSessions: async (request) => {
         gateway.listSessionRequests.push(request)
 
-        return sessionsByCwd.get(request.cwd) ?? []
+        // 全局扫描：返回所有工作目录下的 Pi 会话，由索引按 cwd 归属 Agent。
+        return [...sessionsByCwd.values()].flat()
       },
     })
     const { driver, rootPath, userDataPath } = await createDriver({ gateway })
@@ -374,6 +380,7 @@ describe('PiSdkDriver', () => {
         sessionId: string
         sdkSessionFile: string
         title: string
+        cwd: string
         createdAt: string
         updatedAt: string
       }>
@@ -384,6 +391,7 @@ describe('PiSdkDriver', () => {
           sessionId: request.sessionId,
           sdkSessionFile: request.sdkSessionFile,
           title: '',
+          cwd: request.cwd,
           createdAt: '2026-07-08T00:00:00.000Z',
           updatedAt: '2026-07-08T00:00:00.000Z',
         }
@@ -400,7 +408,8 @@ describe('PiSdkDriver', () => {
       listSessions: async (request) => {
         gateway.listSessionRequests.push(request)
 
-        return sessionsByCwd.get(request.cwd) ?? []
+        // 全局扫描：返回所有工作目录下的 Pi 会话，由索引按 cwd 归属 Agent。
+        return [...sessionsByCwd.values()].flat()
       },
     })
     const { driver, rootPath, userDataPath } = await createDriver({ gateway })

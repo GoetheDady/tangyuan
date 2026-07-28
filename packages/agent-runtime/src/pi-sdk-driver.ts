@@ -306,7 +306,7 @@ export class PiSdkDriver
    * 从指定会话的某个用户消息创建独立分叉会话。
    *
    * 分叉会话拥有新的 Pi session ID 与 JSONL，并继承父会话当前的
-   * Provider 与 Model；创建后不自动发起模型运行。
+   * Provider、Model 与 Thinking Level；创建后不自动发起模型运行。
    *
    * @param request - Agent 标识、会话标识和分叉起始节点。
    * @returns 新分叉会话的会话摘要。
@@ -317,25 +317,31 @@ export class PiSdkDriver
     this.assertKnownSession(request.sessionId, request.agentId)
 
     const parentEntry = this.sessionIndexStore.getEntry(request.sessionId)
+    // 分叉继承父会话的「有效」会话运行配置：父会话已打开时以运行中的
+    // Provider/Model/Thinking Level 为准，否则用索引中持久化的取值。
+    const parentConfig = await this.readEffectiveSessionConfig(
+      request.sessionId,
+      parentEntry,
+    )
     const agentConfiguration = await this.configStore.readRequired(
       request.agentId,
     )
     const apiKey =
-      parentEntry.provider === agentConfiguration.providerId
+      parentConfig.providerId === agentConfiguration.providerId
         ? agentConfiguration.apiKey
-        : await this.configStore.readProviderApiKey(parentEntry.provider)
+        : await this.configStore.readProviderApiKey(parentConfig.providerId)
 
     if (!apiKey) {
       throw new AgentRuntimeError({
         code: 'configuration-missing',
-        message: `模型服务「${parentEntry.provider}」尚未配置 API Key（接口密钥），无法创建分叉会话。`,
+        message: `模型服务「${parentConfig.providerId}」尚未配置 API Key（接口密钥），无法创建分叉会话。`,
         recoverable: true,
       })
     }
 
     const configuration: RuntimeConfiguration = {
-      providerId: parentEntry.provider,
-      modelId: parentEntry.model,
+      providerId: parentConfig.providerId,
+      modelId: parentConfig.modelId,
       apiKey,
     }
     const forkedSession = await this.gateway.createBranchedSession({
@@ -356,6 +362,9 @@ export class PiSdkDriver
       updatedAt: now,
       provider: configuration.providerId,
       model: configuration.modelId,
+      ...(parentConfig.thinkingLevel !== undefined
+        ? { thinkingLevel: parentConfig.thinkingLevel }
+        : {}),
       agentId: request.agentId,
       lastMessagePreview: '',
       status: 'idle',

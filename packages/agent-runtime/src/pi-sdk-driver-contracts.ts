@@ -144,7 +144,7 @@ export interface PiSdkOpenSessionRequest extends RuntimeConfiguration {
  * 描述从 Pi SDK 原生持久化中列出会话时需要的参数。
  */
 export interface PiSdkListSessionsRequest {
-  cwd: string
+  /** 全局 Pi session 目录；扫描其中所有会话，不按工作目录过滤。 */
   sessionDir: string
 }
 
@@ -179,9 +179,17 @@ export interface PiSdkStoredSession {
   sessionId: string
   sdkSessionFile: string
   title?: string
+  /** session header 中记录的工作目录；旧会话可能为空串。 */
+  cwd: string
   createdAt: string
   updatedAt: string
   forkedFrom?: ForkSource
+  /** Pi session 中记录的会话级 Provider；未记录时省略。 */
+  provider?: string
+  /** Pi session 中记录的会话级 Model；未记录时省略。 */
+  model?: string
+  /** Pi session 中记录的会话级 Thinking Level；未记录时省略。 */
+  thinkingLevel?: string
 }
 
 /**
@@ -373,10 +381,10 @@ export interface PiSdkGateway {
   openSession(request: PiSdkOpenSessionRequest): Promise<PiSdkSessionHandle>
 
   /**
-   * 从 Pi SDK 原生持久化中读取会话列表。
+   * 从 Pi SDK 原生持久化中读取全局会话列表。
    *
-   * @param request - Pi SDK session 所属工作目录和 session 目录。
-   * @returns SDK 侧能恢复出的会话摘要列表。
+   * @param request - 全局 Pi session 目录。
+   * @returns SDK 侧能恢复出的会话摘要列表（含 session header 工作目录）。
    * @throws 当 SDK session 目录无法读取时，Promise 会 reject。
    */
   listSessions(request: PiSdkListSessionsRequest): Promise<PiSdkStoredSession[]>

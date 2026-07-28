@@ -29,37 +29,69 @@ function createRealFileGateway(): PiSdkGateway {
   const createHandle = (
     sessionManager: SessionManager,
     sdkSessionFile: string,
-  ): PiSdkSessionHandle => ({
-    sdkSessionFile,
-    prompt: async (prompt: string) => {
-      sessionManager.appendMessage({
-        role: 'user',
-        content: prompt,
-        timestamp: ++timestamp,
-      })
-      sessionManager.appendMessage({
-        role: 'assistant',
-        content: [{ type: 'text', text: `收到：${prompt}` }],
-        api: 'anthropic-messages',
-        provider: 'anthropic',
-        model: 'test',
-        usage: {
-          input: 1,
-          output: 1,
-          cacheRead: 0,
-          cacheWrite: 0,
-          totalTokens: 2,
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-        },
-        stopReason: 'stop',
-        timestamp: ++timestamp,
-      })
+    initialProviderId: string,
+    initialModelId: string,
+  ): PiSdkSessionHandle => {
+    // 会话运行配置的真相写回真实 Pi JSONL，重建时才能从中恢复。
+    let providerId = initialProviderId
+    let modelId = initialModelId
+    let thinkingLevel = 'off'
 
-      return `收到：${prompt}`
-    },
-    abort: async () => undefined,
-    dispose: () => undefined,
-  })
+    return {
+      sdkSessionFile,
+      prompt: async (prompt: string) => {
+        sessionManager.appendMessage({
+          role: 'user',
+          content: prompt,
+          timestamp: ++timestamp,
+        })
+        sessionManager.appendMessage({
+          role: 'assistant',
+          content: [{ type: 'text', text: `收到：${prompt}` }],
+          api: 'anthropic-messages',
+          provider: 'anthropic',
+          model: 'test',
+          usage: {
+            input: 1,
+            output: 1,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 2,
+            cost: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              total: 0,
+            },
+          },
+          stopReason: 'stop',
+          timestamp: ++timestamp,
+        })
+
+        return `收到：${prompt}`
+      },
+      abort: async () => undefined,
+      dispose: () => undefined,
+      setModel: async (nextProviderId: string, nextModelId: string) => {
+        providerId = nextProviderId
+        modelId = nextModelId
+        sessionManager.appendModelChange(nextProviderId, nextModelId)
+      },
+      setThinkingLevel: async (level: string) => {
+        thinkingLevel = level
+        sessionManager.appendThinkingLevelChange(level)
+      },
+      getModelInfo: async () => ({
+        providerId,
+        modelId,
+        displayName: modelId,
+        thinkingLevel,
+        supportedThinkingLevels: ['off', 'low', 'medium', 'high'],
+        supportsThinking: true,
+      }),
+    }
+  }
 
   return {
     listProvidersAndModels: async () => ({
@@ -83,6 +115,8 @@ function createRealFileGateway(): PiSdkGateway {
       return createHandle(
         sessionManager,
         sessionManager.getSessionFile() ?? request.sdkSessionFile,
+        request.providerId,
+        request.modelId,
       )
     },
     openSession: async (request) => {
@@ -92,7 +126,12 @@ function createRealFileGateway(): PiSdkGateway {
         request.cwd,
       )
 
-      return createHandle(sessionManager, request.sdkSessionFile)
+      return createHandle(
+        sessionManager,
+        request.sdkSessionFile,
+        request.providerId,
+        request.modelId,
+      )
     },
     listSessions: async (request) => realGateway.listSessions(request),
     readMessages: async (request) => realGateway.readMessages(request),
@@ -303,9 +342,8 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
     })
 
     expect(
-      rebuiltSessions.find(
-        (session) => session.sessionId === parent.sessionId,
-      )?.forkedFrom,
+      rebuiltSessions.find((session) => session.sessionId === parent.sessionId)
+        ?.forkedFrom,
     ).toBeUndefined()
     expect(
       rebuiltSessions.map((session) => ({
@@ -390,5 +428,178 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
     await expect(
       driver.listSessions({ agentId: 'tangyuan' }),
     ).resolves.toHaveLength(before)
+  })
+})
+
+describe('PiSdkDriver 会话运行配置', () => {
+  it('分叉继承父会话有效配置，之后两边各自独立', async () => {
+    const gateway = createRealFileGateway()
+    const { driver } = await createDriver({ gateway })
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const parent = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '父会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: parent.sessionId,
+      content: '第一个问题',
+    })
+
+    // 父会话先换模型和 Thinking Level，分叉应继承这些「有效」取值而非创建时值。
+    await driver.setSessionModel({
+      agentId: 'tangyuan',
+      sessionId: parent.sessionId,
+      providerId: 'anthropic',
+      modelId: 'claude-opus-4-6',
+    })
+    await driver.setSessionThinkingLevel({
+      agentId: 'tangyuan',
+      sessionId: parent.sessionId,
+      level: 'high',
+    })
+
+    const sourceId = await findUserMessageId(
+      driver,
+      parent.sessionId,
+      '第一个问题',
+    )
+    const fork = await driver.forkSession({
+      agentId: 'tangyuan',
+      sessionId: parent.sessionId,
+      entryId: sourceId,
+    })
+
+    await expect(
+      driver.getSessionModelInfo({
+        agentId: 'tangyuan',
+        sessionId: fork.sessionId,
+      }),
+    ).resolves.toMatchObject({
+      providerId: 'anthropic',
+      modelId: 'claude-opus-4-6',
+      thinkingLevel: 'high',
+    })
+
+    // 分叉侧换配置不影响父会话。
+    await driver.setSessionThinkingLevel({
+      agentId: 'tangyuan',
+      sessionId: fork.sessionId,
+      level: 'low',
+    })
+
+    await expect(
+      driver.getSessionModelInfo({
+        agentId: 'tangyuan',
+        sessionId: parent.sessionId,
+      }),
+    ).resolves.toMatchObject({ thinkingLevel: 'high' })
+    await expect(
+      driver.getSessionModelInfo({
+        agentId: 'tangyuan',
+        sessionId: fork.sessionId,
+      }),
+    ).resolves.toMatchObject({ thinkingLevel: 'low' })
+  })
+
+  it('重启后打开历史会话恢复会话运行配置，而不是 Agent 默认配置', async () => {
+    const gateway = createRealFileGateway()
+    const { driver, rootPath, userDataPath } = await createDriver({ gateway })
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '换过模型的会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '第一个问题',
+    })
+    await driver.setSessionModel({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      providerId: 'anthropic',
+      modelId: 'claude-opus-4-6',
+    })
+    await driver.setSessionThinkingLevel({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      level: 'medium',
+    })
+
+    const restartedDriver = createDriverAtPath({
+      gateway,
+      rootPath,
+      userDataPath,
+    })
+    await restartedDriver.listSessions({ agentId: 'tangyuan' })
+
+    await expect(
+      restartedDriver.getSessionModelInfo({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toMatchObject({
+      providerId: 'anthropic',
+      modelId: 'claude-opus-4-6',
+      thinkingLevel: 'medium',
+    })
+  })
+
+  it('索引丢失后从全局 Pi session 扫描恢复会话运行配置', async () => {
+    const gateway = createRealFileGateway()
+    const { driver, rootPath, userDataPath } = await createDriver({ gateway })
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '换过模型的会话',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      content: '第一个问题',
+    })
+    await driver.setSessionModel({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      providerId: 'anthropic',
+      modelId: 'claude-opus-4-6',
+    })
+    await driver.setSessionThinkingLevel({
+      agentId: 'tangyuan',
+      sessionId: session.sessionId,
+      level: 'medium',
+    })
+
+    await unlink(join(userDataPath, 'sessions/index.json'))
+    const rebuiltDriver = createDriverAtPath({
+      gateway,
+      rootPath,
+      userDataPath,
+    })
+    await rebuiltDriver.listSessions({ agentId: 'tangyuan' })
+
+    await expect(
+      rebuiltDriver.getSessionModelInfo({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toMatchObject({
+      providerId: 'anthropic',
+      modelId: 'claude-opus-4-6',
+      thinkingLevel: 'medium',
+    })
   })
 })

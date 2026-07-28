@@ -25,6 +25,7 @@ import {
 import type {
   DriverEvent,
   InternalMessage,
+  PersistedSessionIndexEntry,
   PiSdkDriverOptions,
   PiSdkGateway,
   PiSdkSessionHandle,
@@ -148,11 +149,107 @@ export abstract class PiSdkDriverState {
     }
 
     const indexEntry = this.sessionIndexStore.getEntry(sessionId)
-    const configuration = await this.configStore.readRequired(
+    const configuration = await this.resolveSessionConfiguration(indexEntry)
+
+    return this.openSessionHandle(sessionId, configuration)
+  }
+
+  /**
+   * 读取某会话当前有效的 Provider、Model 与 Thinking Level。
+   *
+   * 会话已打开时以运行中的 handle 为真相（用户可能刚切过模型），
+   * 否则回退到索引中持久化的会话运行配置。
+   *
+   * @param sessionId - 会话标识。
+   * @param indexEntry - 该会话的索引条目。
+   * @returns 有效的 Provider、Model 和可选 Thinking Level。
+   * @throws 此方法不会主动抛出错误。
+   */
+  protected async readEffectiveSessionConfig(
+    sessionId: string,
+    indexEntry: PersistedSessionIndexEntry,
+  ): Promise<{
+    providerId: string
+    modelId: string
+    thinkingLevel?: string
+  }> {
+    const fallback = {
+      providerId: indexEntry.provider,
+      modelId: indexEntry.model,
+      ...(indexEntry.thinkingLevel !== undefined
+        ? { thinkingLevel: indexEntry.thinkingLevel }
+        : {}),
+    }
+    const handle = this.sessionHandles.get(sessionId)
+
+    if (!handle?.getModelInfo) {
+      return fallback
+    }
+
+    try {
+      const info = await handle.getModelInfo()
+
+      return {
+        providerId: info.providerId || fallback.providerId,
+        modelId: info.modelId || fallback.modelId,
+        ...(info.thinkingLevel
+          ? { thinkingLevel: info.thinkingLevel }
+          : fallback.thinkingLevel !== undefined
+            ? { thinkingLevel: fallback.thinkingLevel }
+            : {}),
+      }
+    } catch {
+      // 运行中会话读不出模型信息时仍可按索引继承。
+      return fallback
+    }
+  }
+
+  /**
+   * 解析某个会话应当生效的会话运行配置。
+   *
+   * 会话运行配置属于会话本身：索引里记录的 Provider/Model 优先于 Agent 默认配置，
+   * 只在会话尚未记录时回退到 Agent 默认值。跨 Provider 时补取对应 API Key。
+   *
+   * @param indexEntry - 会话索引条目。
+   * @returns 该会话生效的运行配置。
+   * @throws 当 Agent 配置缺失或会话 Provider 未配置 API Key 时，Promise 会 reject。
+   */
+  protected async resolveSessionConfiguration(
+    indexEntry: PersistedSessionIndexEntry,
+  ): Promise<RuntimeConfiguration> {
+    const agentConfiguration = await this.configStore.readRequired(
       indexEntry.agentId,
     )
 
-    return this.openSessionHandle(sessionId, configuration)
+    if (!indexEntry.provider || !indexEntry.model) {
+      return agentConfiguration
+    }
+
+    if (indexEntry.provider === agentConfiguration.providerId) {
+      return {
+        providerId: indexEntry.provider,
+        modelId: indexEntry.model,
+        apiKey: agentConfiguration.apiKey,
+      }
+    }
+
+    const apiKey = await this.configStore.readProviderApiKey(
+      indexEntry.provider,
+    )
+
+    if (!apiKey) {
+      throw new AgentRuntimeError({
+        code: 'configuration-missing',
+        message: `模型服务「${indexEntry.provider}」尚未配置 API Key（接口密钥），无法打开该会话。`,
+        recoverable: true,
+      })
+    }
+
+    return {
+      providerId: indexEntry.provider,
+      modelId: indexEntry.model,
+      apiKey,
+    }
   }
 
   /**
@@ -198,6 +295,11 @@ export abstract class PiSdkDriverState {
         : openRequest,
     )
     this.sessionHandles.set(sessionId, handle)
+    // 会话运行配置属于会话：Thinking Level 由汤圆索引恢复，
+    // 不依赖 Pi session 文件是否记住上次取值。
+    if (indexEntry.thinkingLevel && handle.setThinkingLevel) {
+      await handle.setThinkingLevel(indexEntry.thinkingLevel)
+    }
     // 身份上下文走系统提示词：重启后打开历史会话时注入并 reload 使其生效。
     if (handle.setSystemPromptContext) {
       handle.setSystemPromptContext(

@@ -28,13 +28,22 @@ function createFakeGateway(
     sessionId: string
     sdkSessionFile: string
     title?: string
+    cwd?: string
     createdAt: string
     updatedAt: string
     forkedFrom?: { sessionId: string; entryId: string }
+    provider?: string
+    model?: string
+    thinkingLevel?: string
   }> = [],
 ): PiSdkGateway {
   return {
-    listSessions: async () => sessions,
+    // 全局扫描返回的会话默认归属默认汤圆的 Agent Home。
+    listSessions: async () =>
+      sessions.map((session) => ({
+        ...session,
+        cwd: session.cwd ?? layout.agentHome(),
+      })),
   } as unknown as PiSdkGateway
 }
 
@@ -172,6 +181,19 @@ describe('SessionIndexStore.upsertAttempt', () => {
   })
 })
 
+describe('SessionIndexStore 会话运行配置', () => {
+  it('Thinking Level 写盘后可被新 store 读回', async () => {
+    const store = await makeStore()
+    store.addSession(makeEntry())
+    await store.updateEntry('s1', { thinkingLevel: 'high' })
+
+    const store2 = await makeStore()
+    await store2.load()
+
+    expect(store2.getEntry('s1').thinkingLevel).toBe('high')
+  })
+})
+
 describe('SessionIndexStore.load 重建', () => {
   it('索引缺失时从 SDK 会话重建', async () => {
     const config: InternalRuntimeConfig = {
@@ -267,6 +289,188 @@ describe('SessionIndexStore.load 重建', () => {
     const store = await makeStore(createFakeGateway([]))
     const entries = await store.load()
     expect(entries).toEqual([])
+  })
+
+  it('重建优先恢复 Pi session 里的会话运行配置，不回退到 Agent 默认值', async () => {
+    await configStore.write({
+      schemaVersion: 2,
+      providers: {
+        openai: { apiKey: 'sk-x', updatedAt: 'now' },
+        anthropic: { apiKey: 'sk-y', updatedAt: 'now' },
+      },
+      agents: {
+        tangyuan: {
+          displayName: '汤圆',
+          defaultProviderId: 'openai',
+          defaultModelId: 'gpt-4',
+          status: 'active',
+          archivedAt: null,
+        },
+      },
+    })
+    // Pi session 自己记住了该会话已切到另一个模型和 Thinking Level。
+    const store = await makeStore(
+      createFakeGateway([
+        {
+          sessionId: 's1',
+          sdkSessionFile: '/tmp/s1.jsonl',
+          title: '已改过模型的会话',
+          createdAt: 'now',
+          updatedAt: 'now',
+          provider: 'anthropic',
+          model: 'claude-sonnet-4-5',
+          thinkingLevel: 'high',
+        },
+      ]),
+    )
+
+    await store.load()
+
+    expect(store.getEntry('s1')).toMatchObject({
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5',
+      thinkingLevel: 'high',
+    })
+  })
+
+  it('全局扫描失败时给出空索引而不抛错', async () => {
+    await configStore.write({
+      schemaVersion: 2,
+      providers: { openai: { apiKey: 'sk-x', updatedAt: 'now' } },
+      agents: {
+        tangyuan: {
+          displayName: '汤圆',
+          defaultProviderId: 'openai',
+          defaultModelId: 'gpt-4',
+          status: 'active',
+          archivedAt: null,
+        },
+      },
+    })
+    const failingGateway = {
+      listSessions: async () => {
+        throw new Error('session 目录不可读')
+      },
+    } as unknown as PiSdkGateway
+    const store = await makeStore(failingGateway)
+
+    await expect(store.load()).resolves.toEqual([])
+    expect(store.listSummaries('tangyuan')).toEqual([])
+  })
+
+  it('按 session header 工作目录归属 Agent，无法归属的会话不入索引', async () => {
+    await configStore.write({
+      schemaVersion: 2,
+      providers: { openai: { apiKey: 'sk-x', updatedAt: 'now' } },
+      agents: {
+        tangyuan: {
+          displayName: '汤圆',
+          defaultProviderId: 'openai',
+          defaultModelId: 'gpt-4',
+          status: 'active',
+          archivedAt: null,
+        },
+        helper: {
+          displayName: '助手',
+          defaultProviderId: 'openai',
+          defaultModelId: 'gpt-4',
+          status: 'active',
+          archivedAt: null,
+        },
+      },
+    })
+    const store = await makeStore(
+      createFakeGateway([
+        {
+          sessionId: 'tangyuan-session',
+          sdkSessionFile: '/tmp/a.jsonl',
+          title: '汤圆会话',
+          cwd: layout.agentHome(),
+          createdAt: 'now',
+          updatedAt: 'now',
+        },
+        {
+          sessionId: 'helper-session',
+          sdkSessionFile: '/tmp/b.jsonl',
+          title: '助手会话',
+          cwd: layout.workspace('helper'),
+          createdAt: 'now',
+          updatedAt: 'now',
+        },
+        {
+          sessionId: 'foreign-session',
+          sdkSessionFile: '/tmp/c.jsonl',
+          title: '其他工具写入的会话',
+          cwd: join(dir, 'somewhere-else'),
+          createdAt: 'now',
+          updatedAt: 'now',
+        },
+      ]),
+    )
+
+    await store.load()
+
+    expect(
+      store.listSummaries('tangyuan').map((item) => item.sessionId),
+    ).toEqual(['tangyuan-session'])
+    expect(store.listSummaries('helper').map((item) => item.sessionId)).toEqual(
+      ['helper-session'],
+    )
+    expect(store.getEntryOrNull('foreign-session')).toBeUndefined()
+  })
+
+  it('已归档 Agent 的会话在重建后保留，且不混入活跃 Agent 列表', async () => {
+    await configStore.write({
+      schemaVersion: 2,
+      providers: { openai: { apiKey: 'sk-x', updatedAt: 'now' } },
+      agents: {
+        tangyuan: {
+          displayName: '汤圆',
+          defaultProviderId: 'openai',
+          defaultModelId: 'gpt-4',
+          status: 'active',
+          archivedAt: null,
+        },
+        retired: {
+          displayName: '已归档助手',
+          defaultProviderId: 'openai',
+          defaultModelId: 'gpt-4',
+          status: 'archived',
+          archivedAt: 'now',
+        },
+      },
+    })
+    const store = await makeStore(
+      createFakeGateway([
+        {
+          sessionId: 'retired-root',
+          sdkSessionFile: '/tmp/retired-root.jsonl',
+          title: '归档会话',
+          cwd: layout.workspace('retired'),
+          createdAt: 'now',
+          updatedAt: 'now',
+        },
+        {
+          sessionId: 'retired-fork',
+          sdkSessionFile: '/tmp/retired-fork.jsonl',
+          title: '归档分叉',
+          cwd: layout.workspace('retired'),
+          createdAt: 'now',
+          updatedAt: 'now',
+          forkedFrom: { sessionId: 'retired-root', entryId: 'source-user' },
+        },
+      ]),
+    )
+
+    await store.load()
+
+    expect(store.listSummaries('tangyuan')).toEqual([])
+    expect(
+      store.listSummaries('retired').map((item) => item.sessionId),
+    ).toEqual(expect.arrayContaining(['retired-root', 'retired-fork']))
+    expect(store.getSummary('retired-fork')).toMatchObject({
+      forkedFrom: { sessionId: 'retired-root', entryId: 'source-user' },
+    })
   })
 })
 

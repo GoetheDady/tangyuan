@@ -94,7 +94,7 @@ describe('RealPiSdkGateway independent fork', () => {
       }),
     ])
     await expect(
-      new RealPiSdkGateway().listSessions({ cwd, sessionDir }),
+      new RealPiSdkGateway().listSessions({ sessionDir }),
     ).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -283,7 +283,7 @@ describe('RealPiSdkGateway independent fork', () => {
       }),
     ])
     await expect(
-      new RealPiSdkGateway().listSessions({ cwd, sessionDir }),
+      new RealPiSdkGateway().listSessions({ sessionDir }),
     ).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -372,7 +372,7 @@ describe('RealPiSdkGateway independent fork', () => {
         ),
     ).toEqual(['保留的历史消息', '保留的历史回答', '第二个方案'])
     await expect(
-      new RealPiSdkGateway().listSessions({ cwd, sessionDir }),
+      new RealPiSdkGateway().listSessions({ sessionDir }),
     ).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({

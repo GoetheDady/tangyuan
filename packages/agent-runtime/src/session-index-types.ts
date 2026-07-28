@@ -32,6 +32,8 @@ export interface PersistedSessionIndexEntry {
   updatedAt: string
   provider: string
   model: string
+  /** 会话运行配置中的 Thinking Level；未设置过时省略。 */
+  thinkingLevel?: string
   agentId: AgentId
   lastMessagePreview: string
   status: AgentRunState

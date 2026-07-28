@@ -418,18 +418,22 @@ describe('PiSdkDriver', () => {
     ])
   })
   it('rebuilds a basic local index from Pi SDK sessions when the index is missing', async () => {
+    // 重建按 session header 的工作目录归属 Agent，cwd 在拿到 rootPath 后才能确定。
+    let tangyuanCwd = ''
     const gateway = createPiSdkGateway({
       listSessions: async () => [
         {
           sessionId: 'session-from-sdk',
           sdkSessionFile: '/tmp/pi-sessions/session-from-sdk.json',
           title: 'SDK 恢复会话',
+          cwd: tangyuanCwd,
           createdAt: '2026-07-07T00:00:00.000Z',
           updatedAt: '2026-07-07T00:01:00.000Z',
         },
       ],
     })
-    const { driver, userDataPath } = await createDriver({ gateway })
+    const { driver, rootPath, userDataPath } = await createDriver({ gateway })
+    tangyuanCwd = join(rootPath, '.tangyuan/agents/tangyuan')
 
     await driver.saveConfiguration({
       providerId: 'anthropic',

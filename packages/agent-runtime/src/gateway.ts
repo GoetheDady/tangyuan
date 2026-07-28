@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import type { ForkSource, TranscriptSnapshot } from '@tangyuan/contracts'
+import type { TranscriptSnapshot } from '@tangyuan/contracts'
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
 import {
   type PiSdkBranchedSession,
@@ -152,20 +152,20 @@ export class RealPiSdkGateway implements PiSdkGateway {
   }
 
   /**
-   * 从 Pi SDK 原生 session 目录列出可恢复的会话。
+   * 扫描全局 Pi SDK session 目录，列出全部可恢复的会话。
    *
-   * @param request - Agent Home 工作目录和 SDK session 目录。
-   * @returns SDK session 摘要列表。
+   * @param request - 全局 Pi session 目录。
+   * @returns SDK session 摘要列表（含 session header 工作目录）。
    * @throws 当 SDK session 目录读取失败时，Promise 会 reject。
    */
   async listSessions(
     request: PiSdkListSessionsRequest,
   ): Promise<PiSdkStoredSession[]> {
     const { SessionManager } = await import('@earendil-works/pi-coding-agent')
-    const sessions = await SessionManager.list(request.cwd, request.sessionDir)
+    const sessions = await SessionManager.listAll(request.sessionDir)
 
     return sessions.map((session) => {
-      const forkedFrom = this.readForkSource(
+      const projection = this.readSessionProjection(
         SessionManager,
         session.path,
         request.sessionDir,
@@ -175,9 +175,10 @@ export class RealPiSdkGateway implements PiSdkGateway {
         sessionId: session.id,
         sdkSessionFile: session.path,
         title: (session.name ?? session.firstMessage) || session.id,
+        cwd: session.cwd,
         createdAt: session.created.toISOString(),
         updatedAt: session.modified.toISOString(),
-        ...(forkedFrom ? { forkedFrom } : {}),
+        ...projection,
       }
     })
   }
@@ -354,17 +355,25 @@ export class RealPiSdkGateway implements PiSdkGateway {
   }
 
   /**
-   * 从 Pi session 的汤圆 custom entry 中读取分叉来源。
+   * 从 Pi session 文件投影分叉来源与会话运行配置。
    *
+   * 分叉来源来自汤圆写入的 custom entry；Provider/Model/Thinking Level
+   * 来自 Pi 自己的 model_change / thinking_level_change 记录，
+   * 因此本地索引丢失后仍能恢复该会话的有效配置。
+   *
+   * @param SessionManager - Pi SDK 的 SessionManager。
    * @param sessionFile - Pi JSONL 文件路径。
    * @param sessionDir - Pi session 目录。
-   * @returns 合法来源记录；无记录或无法读取时返回 undefined。
+   * @returns 可展开到 PiSdkStoredSession 上的可选字段；无法读取时返回空对象。
    */
-  private readForkSource(
+  private readSessionProjection(
     SessionManager: typeof import('@earendil-works/pi-coding-agent').SessionManager,
     sessionFile: string,
     sessionDir: string,
-  ): ForkSource | undefined {
+  ): Pick<
+    PiSdkStoredSession,
+    'forkedFrom' | 'provider' | 'model' | 'thinkingLevel'
+  > {
     try {
       const session = SessionManager.open(sessionFile, sessionDir)
       const entry = [...session.getEntries()]
@@ -376,14 +385,42 @@ export class RealPiSdkGateway implements PiSdkGateway {
         )
       const data = entry?.type === 'custom' ? entry.data : undefined
 
-      if (isForkSource(data)) {
-        return data
+      return {
+        ...(isForkSource(data) ? { forkedFrom: data } : {}),
+        // 上下文重建失败不应连带丢掉已读到的分叉来源。
+        ...this.readSessionRunConfig(session),
       }
     } catch {
       // 单个 session 文件损坏不阻断其他会话索引重建。
+      return {}
     }
+  }
 
-    return undefined
+  /**
+   * 从已打开的 Pi session 读取会话级 Provider、Model 与 Thinking Level。
+   *
+   * @param session - 已打开的 Pi session。
+   * @returns 已记录的会话运行配置字段；无法重建上下文时返回空对象。
+   */
+  private readSessionRunConfig(
+    session: import('@earendil-works/pi-coding-agent').SessionManager,
+  ): Pick<PiSdkStoredSession, 'provider' | 'model' | 'thinkingLevel'> {
+    try {
+      const context = session.buildSessionContext()
+
+      return {
+        ...(context.model?.provider
+          ? { provider: context.model.provider }
+          : {}),
+        ...(context.model?.modelId ? { model: context.model.modelId } : {}),
+        ...(context.thinkingLevel
+          ? { thinkingLevel: context.thinkingLevel }
+          : {}),
+      }
+    } catch {
+      // 会话历史无法重建时回退到旧索引或 Agent 默认配置。
+      return {}
+    }
   }
 
   /**

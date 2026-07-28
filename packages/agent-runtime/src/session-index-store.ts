@@ -1,5 +1,5 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentRunState,
@@ -9,7 +9,11 @@ import type { DirectoryLayout } from './directory-layout'
 import type { ConfigStore } from './config-store'
 import type { PiSdkGateway } from './pi-sdk-driver-contracts'
 import { AgentRuntimeError } from './errors'
-import { extractAgentRuntimeConfig, isForkSource, isNotFoundError } from './utils'
+import {
+  extractAgentRuntimeConfig,
+  isForkSource,
+  isNotFoundError,
+} from './utils'
 import type {
   PersistedAttemptEntry,
   PersistedSessionIndex,
@@ -78,10 +82,14 @@ export class SessionIndexStore {
   }
 
   /**
-   * 在本地索引缺失或损坏时，扫描所有 Agent 的 Pi SDK 原生 session 重建全局索引。
+   * 在本地索引缺失或损坏时，扫描全局 Pi SDK session 目录重建索引。
+   *
+   * 按 session header 的工作目录恢复 Agent 归属；已归档 Agent 的会话同样保留
+   *（listSummaries 按 agentId 过滤，不会混入当前活跃 Agent 的日常列表）。
+   * 无法归属到任何已知 Agent 的 Pi 会话不进入索引。
    *
    * @returns 从 SDK 恢复出的索引条目。
-   * @throws 当运行时配置或 SDK session 列表读取失败时，Promise 会 reject。
+   * @throws 当运行时配置读取失败时，Promise 会 reject。
    */
   private async rebuildFromSdk(): Promise<PersistedSessionIndexEntry[]> {
     const readResult = await this.configStore.read()
@@ -94,50 +102,70 @@ export class SessionIndexStore {
 
     // 读取旧索引以保留扩展数据
     const oldEntries = await this.tryReadOldIndex()
-    const allEntries: PersistedSessionIndexEntry[] = []
-    const agents = Object.entries(readResult.config.agents).filter(
-      ([, agentConfig]) => agentConfig.status === 'active',
-    )
+    const config = readResult.config
+    // 工作目录 → Agent 归属；含已归档 Agent，否则其会话谱系会在重建后丢失。
+    const agentIdByCwd = new Map<string, string>()
 
-    for (const [agentId] of agents) {
-      const runtimeConfig = extractAgentRuntimeConfig(
-        readResult.config,
-        agentId,
-      )
+    for (const agentId of Object.keys(config.agents)) {
       const cwd =
         agentId === TANGYUAN_DEFAULT_AGENT_ID
           ? this.layout.agentHome()
           : this.layout.workspace(agentId)
+      agentIdByCwd.set(resolve(cwd), agentId)
+    }
 
-      try {
-        const sdkSessions = await this.gateway.listSessions({
-          cwd,
-          sessionDir: this.layout.sdkSessionDir(),
-        })
+    let sdkSessions: Awaited<ReturnType<PiSdkGateway['listSessions']>>
 
-        for (const session of sdkSessions) {
-          const oldEntry = oldEntries.get(session.sessionId)
-          // 索引已有来源优先；否则从 Pi session 的来源记录投影。
-          const forkedFrom = oldEntry?.forkedFrom ?? session.forkedFrom
+    try {
+      sdkSessions = await this.gateway.listSessions({
+        sessionDir: this.layout.sdkSessionDir(),
+      })
+    } catch {
+      // 全局扫描失败时给出空索引，下次 load 仍会重试重建。
+      this.replaceAll([])
+      await this.write()
+      return []
+    }
 
-          allEntries.push({
-            sessionId: session.sessionId,
-            sdkSessionFile: session.sdkSessionFile,
-            title: session.title?.trim() || session.sessionId,
-            createdAt: session.createdAt,
-            updatedAt: session.updatedAt,
-            provider: runtimeConfig?.providerId ?? '',
-            model: runtimeConfig?.modelId ?? '',
-            agentId,
-            // 保留旧扩展数据，不存在则使用默认值
-            lastMessagePreview: oldEntry?.lastMessagePreview ?? '',
-            status: oldEntry?.status ?? 'idle',
-            ...(forkedFrom !== undefined ? { forkedFrom } : {}),
-          })
-        }
-      } catch {
-        // 单个 Agent 的 session 列表读取失败时跳过该 Agent
-      }
+    const allEntries: PersistedSessionIndexEntry[] = []
+
+    for (const session of sdkSessions) {
+      const oldEntry = oldEntries.get(session.sessionId)
+      const agentId = session.cwd
+        ? agentIdByCwd.get(resolve(session.cwd))
+        : oldEntry?.agentId
+
+      // 无法归属到已知 Agent 的会话（如其他工具写入的 Pi 会话）不入索引。
+      if (!agentId) continue
+
+      const runtimeConfig = extractAgentRuntimeConfig(config, agentId)
+      // 会话运行配置属于会话：Pi session 自己记录的取值最可信，
+      // 其次是旧索引，最后才回退到 Agent 默认配置。
+      const provider =
+        session.provider ||
+        oldEntry?.provider ||
+        (runtimeConfig?.providerId ?? '')
+      const model =
+        session.model || oldEntry?.model || (runtimeConfig?.modelId ?? '')
+      const thinkingLevel = session.thinkingLevel ?? oldEntry?.thinkingLevel
+      // 索引已有来源优先；否则从 Pi session 的来源记录投影。
+      const forkedFrom = oldEntry?.forkedFrom ?? session.forkedFrom
+
+      allEntries.push({
+        sessionId: session.sessionId,
+        sdkSessionFile: session.sdkSessionFile,
+        title: session.title?.trim() || session.sessionId,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+        provider,
+        model,
+        ...(thinkingLevel !== undefined ? { thinkingLevel } : {}),
+        agentId,
+        // 保留旧扩展数据，不存在则使用默认值
+        lastMessagePreview: oldEntry?.lastMessagePreview ?? '',
+        status: oldEntry?.status ?? 'idle',
+        ...(forkedFrom !== undefined ? { forkedFrom } : {}),
+      })
     }
 
     this.replaceAll(allEntries)
@@ -441,6 +469,8 @@ export class SessionIndexStore {
     const forkedFrom = isForkSource(entry.forkedFrom)
       ? entry.forkedFrom
       : undefined
+    const thinkingLevel =
+      typeof entry.thinkingLevel === 'string' ? entry.thinkingLevel : undefined
 
     return [
       {
@@ -451,6 +481,7 @@ export class SessionIndexStore {
         updatedAt: entry.updatedAt,
         provider: entry.provider,
         model: entry.model,
+        ...(thinkingLevel !== undefined ? { thinkingLevel } : {}),
         agentId: entry.agentId,
         lastMessagePreview: entry.lastMessagePreview,
         status: entry.status,

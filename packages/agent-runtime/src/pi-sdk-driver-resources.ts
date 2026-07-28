@@ -447,7 +447,7 @@ export class PiSdkDriverResources extends PiSdkDriverState {
       indexEntry.agentId,
     )
     const targetApiKey =
-      request.providerId !== configuration.providerId
+      request.providerId !== (indexEntry.provider || configuration.providerId)
         ? await this.configStore.readProviderApiKey(request.providerId)
         : undefined
 
@@ -499,7 +499,14 @@ export class PiSdkDriverResources extends PiSdkDriverState {
       })
     }
 
-    return handle.getModelInfo()
+    const info = await handle.getModelInfo()
+    // Thinking Level 属于会话运行配置：持久化后重新打开会话才能恢复，
+    // 而不是静默回退到 Agent 默认配置。
+    await this.sessionIndexStore.updateEntry(request.sessionId, {
+      thinkingLevel: request.level,
+    })
+
+    return info
   }
 
   /**
