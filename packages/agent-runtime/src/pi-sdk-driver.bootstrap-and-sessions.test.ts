@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   type AgentEvent,
+  type InternalMessage,
   type TranscriptSnapshot,
   PiSdkDriver,
   type PiSdkPromptOptions,
@@ -686,5 +687,184 @@ describe('PiSdkDriver', () => {
 
     releaseFirstRun.resolve()
     await expect(firstRun).resolves.toBeUndefined()
+  })
+  it('creates an independent Pi session containing history before the forked user message', async () => {
+    const gateway = createPiSdkGateway()
+    const createBranchedSession = async (request: {
+      sdkSessionFile: string
+      entryId: string
+    }) => {
+      expect(request.entryId).toBe('source-user')
+      return {
+        sessionId: 'child-session-id',
+        sdkSessionFile: '/tmp/child-session.jsonl',
+        providerId: 'anthropic',
+        modelId: 'claude-opus-4-6',
+      }
+    }
+    ;(
+      gateway as unknown as {
+        createBranchedSession: typeof createBranchedSession
+      }
+    ).createBranchedSession = createBranchedSession
+
+    const readMessages = gateway.readMessages.bind(gateway)
+    let childMessages: InternalMessage[] = []
+    const childHandle = createPromptingHandle(
+      'child-session-id',
+      (messages) => {
+        childMessages = messages
+      },
+    )
+    gateway.openSession = async (request) => {
+      gateway.openSessionRequests.push(request)
+      gateway.sessionHandles.push(childHandle)
+      return childHandle
+    }
+    gateway.readMessages = async (request) => {
+      if (request.sessionId === 'child-session-id') {
+        return snapshotFromMessages('child-session-id', 'tangyuan', [
+          {
+            messageId: 'before-user',
+            agentId: 'tangyuan',
+            sessionId: 'child-session-id',
+            role: 'user',
+            content: '之前的问题',
+            createdAt: '2026-07-08T00:00:00.000Z',
+          },
+          {
+            messageId: 'before-agent',
+            agentId: 'tangyuan',
+            sessionId: 'child-session-id',
+            role: 'agent',
+            content: '之前的回答',
+            createdAt: '2026-07-08T00:00:00.000Z',
+          },
+          ...childMessages,
+        ])
+      }
+
+      return readMessages(request)
+    }
+
+    const { driver, userDataPath } = await createDriver({ gateway })
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const parent = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '父会话',
+    })
+    const parentHandle = gateway.sessionHandles[0]!
+    parentHandle.setModel = async () => undefined
+    parentHandle.getModelInfo = async () => ({
+      providerId: 'anthropic',
+      modelId: 'claude-opus-4-6',
+      displayName: 'Claude Opus 4.6',
+      thinkingLevel: null,
+      supportedThinkingLevels: [],
+      supportsThinking: false,
+    })
+    await driver.setSessionModel({
+      agentId: 'tangyuan',
+      sessionId: parent.sessionId,
+      providerId: 'anthropic',
+      modelId: 'claude-opus-4-6',
+    })
+    expect(await readJson(join(userDataPath, 'sessions/index.json'))).toEqual(
+      expect.objectContaining({
+        sessions: expect.arrayContaining([
+          expect.objectContaining({
+            sessionId: parent.sessionId,
+            model: 'claude-opus-4-6',
+          }),
+        ]),
+      }),
+    )
+
+    const child = await driver.forkSession({
+      agentId: 'tangyuan',
+      sessionId: parent.sessionId,
+      entryId: 'source-user',
+    })
+
+    expect(child).toMatchObject({
+      sessionId: 'child-session-id',
+      title: '父会话（分叉）',
+      state: 'idle',
+      forkedFrom: {
+        sessionId: parent.sessionId,
+        entryId: 'source-user',
+      },
+    })
+    expect(gateway.openSessionRequests).toEqual([
+      expect.objectContaining({
+        sessionId: 'child-session-id',
+        sdkSessionFile: '/tmp/child-session.jsonl',
+        providerId: 'anthropic',
+        modelId: 'claude-opus-4-6',
+      }),
+    ])
+    await expect(
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: 'child-session-id',
+      }),
+    ).resolves.toMatchObject({
+      entries: [
+        expect.objectContaining({ content: '之前的问题' }),
+        expect.objectContaining({ content: '之前的回答' }),
+      ],
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: parent.sessionId,
+      content: '父会话继续',
+    })
+    await driver.sendMessage({
+      agentId: 'tangyuan',
+      sessionId: child.sessionId,
+      content: '子会话继续',
+    })
+    expect(gateway.sessionHandles[0]?.prompts).toEqual(['父会话继续'])
+    expect(childHandle.prompts).toEqual(['子会话继续'])
+    await expect(
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: parent.sessionId,
+      }),
+    ).resolves.toMatchObject({
+      entries: expect.arrayContaining([
+        expect.objectContaining({ content: '父会话继续' }),
+      ]),
+    })
+    await expect(
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: child.sessionId,
+      }),
+    ).resolves.toMatchObject({
+      entries: expect.arrayContaining([
+        expect.objectContaining({ content: '之前的问题' }),
+        expect.objectContaining({ content: '子会话继续' }),
+      ]),
+    })
+
+    await expect(
+      readJson(join(userDataPath, 'sessions/index.json')),
+    ).resolves.toEqual({
+      sessions: expect.arrayContaining([
+        expect.objectContaining({
+          sessionId: 'child-session-id',
+          sdkSessionFile: '/tmp/child-session.jsonl',
+          forkedFrom: {
+            sessionId: parent.sessionId,
+            entryId: 'source-user',
+          },
+        }),
+      ]),
+    })
   })
 })

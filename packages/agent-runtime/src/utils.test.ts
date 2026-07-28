@@ -15,6 +15,7 @@ import {
   readDirectoryFileSet,
   fileHasContent,
   getMtimeIso,
+  isForkSource,
 } from './utils'
 import { AgentRuntimeError } from './errors'
 
@@ -309,6 +310,17 @@ describe('buildTranscriptSnapshotFromSdkEntries', () => {
         }),
       ],
     })
+  })
+})
+
+describe('isForkSource', () => {
+  it('仅在 sessionId 和 entryId 都是字符串时认为是分叉来源记录', () => {
+    expect(isForkSource({ sessionId: 'parent', entryId: 'entry-1' })).toBe(true)
+    expect(isForkSource({ sessionId: 'parent' })).toBe(false)
+    expect(isForkSource({ sessionId: 'parent', entryId: 1 })).toBe(false)
+    expect(isForkSource(null)).toBe(false)
+    expect(isForkSource(undefined)).toBe(false)
+    expect(isForkSource('parent')).toBe(false)
   })
 })
 

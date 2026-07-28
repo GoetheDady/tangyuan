@@ -181,6 +181,7 @@ describe('App', () => {
         }),
         sendMessage: vi.fn().mockResolvedValue([]),
         retryMessage: vi.fn().mockResolvedValue([]),
+        forkSession: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
         openExternalLink: vi.fn(),
@@ -272,6 +273,7 @@ describe('App', () => {
         }),
         sendMessage: vi.fn().mockResolvedValue([]),
         retryMessage: vi.fn().mockResolvedValue([]),
+        forkSession: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
         openExternalLink: vi.fn(),
@@ -385,6 +387,7 @@ describe('App', () => {
           updatedAt: '2026-07-08T00:00:01.000Z'
         }),
         retryMessage: vi.fn().mockResolvedValue([]),
+        forkSession: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
         openExternalLink: vi.fn(),

@@ -7,6 +7,7 @@ import {
   applyTranscriptDelta,
   createAgentProfileStatus,
   createSessionRequestSchema,
+  forkSessionRequestSchema,
   createDefaultSessionSummary,
   createRuntimeSnapshot,
   migrateConfigV1ToV2,
@@ -71,6 +72,28 @@ describe('contracts schemas', () => {
       sessionId: 'session-1',
       state: 'queued',
       occurredAt: '2026-07-17T00:00:00.000Z',
+    })
+  })
+
+  it('requires a non-empty fork source entry at the IPC contract boundary', () => {
+    expect(() =>
+      forkSessionRequestSchema.parse({
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        entryId: '',
+      }),
+    ).toThrow()
+
+    expect(
+      forkSessionRequestSchema.parse({
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        entryId: 'entry-1',
+      }),
+    ).toEqual({
+      agentId: 'tangyuan',
+      sessionId: 'session-1',
+      entryId: 'entry-1',
     })
   })
 
@@ -324,6 +347,7 @@ describe('DESKTOP_IPC_CHANNELS', () => {
         'tangyuan:sessions:get-pending-clarifications',
       sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
       sessionsRetryMessage: 'tangyuan:sessions:retry-message',
+      sessionsFork: 'tangyuan:sessions:fork',
       agentsArchive: 'tangyuan:agents:archive',
       agentsClaimDirectory: 'tangyuan:agents:claim-directory',
       agentsList: 'tangyuan:agents:list',

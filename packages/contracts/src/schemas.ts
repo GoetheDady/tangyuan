@@ -166,6 +166,21 @@ export const agentSessionSummarySchema = z.strictObject({
     'failed',
   ]),
   updatedAt: timestampSchema,
+  forkedFrom: z
+    .strictObject({
+      sessionId: nonEmptyIdentifierSchema,
+      entryId: nonEmptyIdentifierSchema,
+    })
+    .optional(),
+})
+
+/**
+ * 校验从历史用户消息创建分叉会话的请求。
+ */
+export const forkSessionRequestSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+  entryId: nonEmptyIdentifierSchema,
 })
 
 /**

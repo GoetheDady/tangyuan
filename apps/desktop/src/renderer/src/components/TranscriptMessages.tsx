@@ -172,6 +172,8 @@ export interface TranscriptMessagesProps {
   sessionId: string | null
   /** 重试回调；传入失败条目的 inReplyTo 用户消息标识。 */
   onRetry?: (userMessageId: string) => void
+  /** 分叉回调；传入用户消息标识。 */
+  onFork?: (userMessageId: string) => void
 }
 
 /**
@@ -197,7 +199,8 @@ export function TranscriptMessages({
   isStreaming,
   isAwaitingResponse = false,
   sessionId,
-  onRetry
+  onRetry,
+  onFork
 }: TranscriptMessagesProps): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
@@ -421,7 +424,10 @@ export function TranscriptMessages({
                 <div className="py-2.5">
                   <article className="flex justify-end">
                     <div className="flex max-w-[360px] min-w-0 flex-col gap-1.5 rounded-[16px_16px_4px_16px] bg-secondary px-4 py-3 text-body text-secondary-foreground">
-                      <UserMessage content={item.content} />
+                      <UserMessage
+                        content={item.content}
+                        onFork={onFork ? () => onFork(item.messageId) : undefined}
+                      />
                       <time
                         dateTime={item.createdAt}
                         className="self-end font-mono text-[10px] leading-none text-muted-foreground"

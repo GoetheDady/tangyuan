@@ -142,26 +142,30 @@ const MODULES_JSON = `
       {
         "id": "1.7",
         "name": "AgentSessionRuntime — 会话运行时（高级）",
-        "desc": "当需要「新建对话」「切换到另一个对话」「从某个节点分叉出去」这种替换当前会话的操作时，用这个更高级的 API 来管理。",
-        "done": false
+        "desc": "为「进程内复用会话」设计的高级 API。汤圆每个会话独立 openSession，无此场景。P2 暂缓。",
+        "done": false,
+        "skip": true
       },
       {
         "id": "1.8",
         "name": "runtime.newSession() — 替换为新会话",
-        "desc": "关掉当前对话，开一个新的。",
-        "done": false
+        "desc": "关掉当前对话，开一个新的。当前 createSession 已满足。P2 暂缓。",
+        "done": false,
+        "skip": true
       },
       {
         "id": "1.9",
         "name": "runtime.switchSession() — 切换到其他会话",
-        "desc": "从当前对话 A 切到对话 B。",
-        "done": false
+        "desc": "从当前对话 A 切到对话 B。当前独立 openSession 已满足。P2 暂缓。",
+        "done": false,
+        "skip": true
       },
       {
         "id": "1.10",
-        "name": "runtime.fork() — 分叉会话",
-        "desc": "在对话历史的某个节点「另起炉灶」，从那个点分出一条新路。适合「我想回到第 3 条消息换个方式问」。",
-        "done": false
+        "name": "SessionManager.createBranchedSession() → 独立分叉会话",
+        "desc": "从来源用户消息之前的 leaf 导出新的 Pi JSONL 与 session ID，来源消息预填到 Composer；汤圆索引记录父子谱系，侧边栏嵌套展示。",
+        "done": true,
+        "tag": "已对接"
       }
     ]
   },
@@ -692,8 +696,9 @@ const MODULES_JSON = `
       {
         "id": "11.9",
         "name": "SessionManager.createBranchedSession(leafId) — 导出分叉为新会话",
-        "desc": "把树中某条路径单独导出为一个新的会话文件。",
-        "done": false
+        "desc": "把树中某条路径单独导出为一个新的会话文件。已由 1.10 独立分叉会话对接。",
+        "done": true,
+        "tag": "已对接"
       },
       {
         "id": "11.10",

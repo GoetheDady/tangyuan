@@ -30,6 +30,7 @@ function createFakeGateway(
     title?: string
     createdAt: string
     updatedAt: string
+    forkedFrom?: { sessionId: string; entryId: string }
   }> = [],
 ): PiSdkGateway {
   return {
@@ -59,7 +60,9 @@ let dir: string
 let layout: DirectoryLayout
 let configStore: ConfigStore
 
-async function makeStore(gateway = createFakeGateway()): Promise<SessionIndexStore> {
+async function makeStore(
+  gateway = createFakeGateway(),
+): Promise<SessionIndexStore> {
   return new SessionIndexStore({ layout, configStore, gateway })
 }
 
@@ -201,6 +204,47 @@ describe('SessionIndexStore.load 重建', () => {
     expect(entries).toHaveLength(1)
     expect(entries[0]?.sessionId).toBe('sdk-1')
     expect(store.getSummary('sdk-1')?.title).toBe('SDK 会话')
+  })
+
+  it('索引缺失时从 Pi session 元数据恢复分叉来源', async () => {
+    await configStore.write({
+      schemaVersion: 2,
+      providers: { openai: { apiKey: 'sk-x', updatedAt: 'now' } },
+      agents: {
+        tangyuan: {
+          displayName: '汤圆',
+          defaultProviderId: 'openai',
+          defaultModelId: 'gpt-4',
+          status: 'active',
+          archivedAt: null,
+        },
+      },
+    })
+    const store = await makeStore(
+      createFakeGateway([
+        {
+          sessionId: 'parent',
+          sdkSessionFile: '/tmp/parent.jsonl',
+          title: '父会话',
+          createdAt: 'now',
+          updatedAt: 'now',
+        },
+        {
+          sessionId: 'child',
+          sdkSessionFile: '/tmp/child.jsonl',
+          title: '子会话',
+          createdAt: 'now',
+          updatedAt: 'now',
+          forkedFrom: { sessionId: 'parent', entryId: 'source-user' },
+        },
+      ]),
+    )
+
+    await store.load()
+
+    expect(store.getSummary('child')).toMatchObject({
+      forkedFrom: { sessionId: 'parent', entryId: 'source-user' },
+    })
   })
 
   it('损坏的索引 JSON 触发重建', async () => {

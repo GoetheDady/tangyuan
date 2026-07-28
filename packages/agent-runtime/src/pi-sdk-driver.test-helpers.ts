@@ -261,6 +261,13 @@ export function createPiSdkGateway(
         messagesBySession.get(request.sessionId) ?? [],
       )
     },
+    createBranchedSession: async (request) => {
+      if (options.createBranchedSession) {
+        return options.createBranchedSession(request)
+      }
+
+      throw new Error('测试网关未配置 createBranchedSession。')
+    },
     ...options,
   }
 }

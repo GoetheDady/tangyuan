@@ -122,6 +122,7 @@ describe('App', () => {
           } satisfies TranscriptSnapshot
         }),
         retryMessage: vi.fn().mockResolvedValue([]),
+        forkSession: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn((listener: AgentEventListener) => {
           listeners.push(listener)
@@ -233,6 +234,7 @@ describe('App', () => {
         }),
         sendMessage: vi.fn(),
         retryMessage: vi.fn().mockResolvedValue([]),
+        forkSession: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
         openExternalLink: vi.fn(),
@@ -330,6 +332,7 @@ describe('App', () => {
         }),
         sendMessage: vi.fn(),
         retryMessage: vi.fn().mockResolvedValue([]),
+        forkSession: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
         openExternalLink: vi.fn(),
@@ -528,6 +531,7 @@ describe('App', () => {
           } satisfies TranscriptSnapshot
         }),
         retryMessage: vi.fn().mockResolvedValue([]),
+        forkSession: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(async () => {
           // 模拟 cancel：更新 listSessions 并 emit turn-cancelled 事件
           mockListSessions.mockResolvedValue([cancelledSession])
@@ -669,6 +673,7 @@ describe('App', () => {
         }),
         sendMessage: vi.fn(),
         retryMessage: vi.fn().mockResolvedValue([]),
+        forkSession: vi.fn().mockResolvedValue([]),
         cancelRun: vi.fn(),
         subscribeToAgentEvents: vi.fn(() => () => undefined),
         openExternalLink: vi.fn(),

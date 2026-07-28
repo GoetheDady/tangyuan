@@ -1,6 +1,7 @@
 import type {
   AgentId,
   AgentRunState,
+  ForkSource,
   AgentRuntimeErrorPayload,
 } from '@tangyuan/contracts'
 
@@ -36,6 +37,8 @@ export interface PersistedSessionIndexEntry {
   status: AgentRunState
   /** 执行尝试记录列表，用于会话重建时还原 attempt 状态。 */
   attempts?: PersistedAttemptEntry[]
+  /** 分叉来源信息；为根会话（非分叉）时省略。 */
+  forkedFrom?: ForkSource
 }
 
 /**

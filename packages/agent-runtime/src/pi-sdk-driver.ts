@@ -21,6 +21,7 @@ import {
   type CancelConfigurationVerificationRequest,
   type CancelRunRequest,
   type CreateSessionRequest,
+  type ForkSessionRequest,
   type GetSessionMessagesRequest,
   type ListSessionsRequest,
   type RuntimeConfiguration,
@@ -302,6 +303,89 @@ export class PiSdkDriver
   }
 
   /**
+   * 从指定会话的某个用户消息创建独立分叉会话。
+   *
+   * 分叉会话拥有新的 Pi session ID 与 JSONL，并继承父会话当前的
+   * Provider 与 Model；创建后不自动发起模型运行。
+   *
+   * @param request - Agent 标识、会话标识和分叉起始节点。
+   * @returns 新分叉会话的会话摘要。
+   * @throws 当会话不存在、父会话 Provider 缺少 API Key 或分叉失败时，Promise 会 reject。
+   */
+  async forkSession(request: ForkSessionRequest): Promise<AgentSessionSummary> {
+    await this.sessionIndexStore.load()
+    this.assertKnownSession(request.sessionId, request.agentId)
+
+    const parentEntry = this.sessionIndexStore.getEntry(request.sessionId)
+    const agentConfiguration = await this.configStore.readRequired(
+      request.agentId,
+    )
+    const apiKey =
+      parentEntry.provider === agentConfiguration.providerId
+        ? agentConfiguration.apiKey
+        : await this.configStore.readProviderApiKey(parentEntry.provider)
+
+    if (!apiKey) {
+      throw new AgentRuntimeError({
+        code: 'configuration-missing',
+        message: `模型服务「${parentEntry.provider}」尚未配置 API Key（接口密钥），无法创建分叉会话。`,
+        recoverable: true,
+      })
+    }
+
+    const configuration: RuntimeConfiguration = {
+      providerId: parentEntry.provider,
+      modelId: parentEntry.model,
+      apiKey,
+    }
+    const forkedSession = await this.gateway.createBranchedSession({
+      sdkSessionFile: parentEntry.sdkSessionFile,
+      entryId: request.entryId,
+    })
+    const now = this.now()
+    const title = `${parentEntry.title}（分叉）`
+    const forkedFrom = {
+      sessionId: request.sessionId,
+      entryId: request.entryId,
+    }
+    const childEntry: PersistedSessionIndexEntry = {
+      sessionId: forkedSession.sessionId,
+      sdkSessionFile: forkedSession.sdkSessionFile,
+      title,
+      createdAt: now,
+      updatedAt: now,
+      provider: configuration.providerId,
+      model: configuration.modelId,
+      agentId: request.agentId,
+      lastMessagePreview: '',
+      status: 'idle',
+      forkedFrom,
+    }
+
+    this.sessionIndexStore.addSession(childEntry)
+    this.messageStore.initSession(forkedSession.sessionId)
+    await this.openSessionHandle(forkedSession.sessionId, configuration)
+    await this.sessionIndexStore.write()
+
+    const session: AgentSessionSummary = {
+      agentId: request.agentId,
+      sessionId: forkedSession.sessionId,
+      title,
+      state: 'idle',
+      updatedAt: now,
+      forkedFrom,
+    }
+    this.emit({
+      type: 'session-created',
+      agentId: request.agentId,
+      session,
+      occurredAt: now,
+    })
+
+    return session
+  }
+
+  /**
    * 将持久化 attempt 记录填充到 transcript 快照中。
    */
   private enrichTranscriptWithAttempts(
@@ -419,6 +503,7 @@ export class PiSdkDriver
       startedAt: this.now(),
       completedAt: null,
     })
+    this.transcriptCache.delete(request.sessionId)
 
     await this.executePromptRun({
       agentId: request.agentId,

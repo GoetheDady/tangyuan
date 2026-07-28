@@ -42,6 +42,7 @@ describe('createTangyuanPreloadApi', () => {
       'claimAgentDirectory',
       'createSession',
       'deleteSkill',
+      'forkSession',
       'getPendingApprovals',
       'getPendingClarifications',
       'getPendingSkillApprovals',

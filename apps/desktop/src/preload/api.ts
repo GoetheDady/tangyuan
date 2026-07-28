@@ -13,6 +13,7 @@ import {
   type DesktopIpcPayloadArgs,
   type DesktopIpcResponse,
   type DesktopPreloadApi,
+  type ForkSessionRequest,
   type GetSessionMessagesRequest,
   type GetSessionModelInfoRequest,
   type GetSoulRequest,
@@ -92,6 +93,9 @@ export function createTangyuanPreloadApi(
     },
     retryMessage: async (request: RetryRunRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsRetryMessage, request)
+    },
+    forkSession: async (request: ForkSessionRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsFork, request)
     },
     subscribeToAgentEvents: (listener: AgentEventListener) => {
       return subscribe(DESKTOP_AGENT_EVENT_CHANNEL, listener)

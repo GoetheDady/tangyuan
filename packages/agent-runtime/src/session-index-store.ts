@@ -9,7 +9,7 @@ import type { DirectoryLayout } from './directory-layout'
 import type { ConfigStore } from './config-store'
 import type { PiSdkGateway } from './pi-sdk-driver-contracts'
 import { AgentRuntimeError } from './errors'
-import { extractAgentRuntimeConfig, isNotFoundError } from './utils'
+import { extractAgentRuntimeConfig, isForkSource, isNotFoundError } from './utils'
 import type {
   PersistedAttemptEntry,
   PersistedSessionIndex,
@@ -117,6 +117,8 @@ export class SessionIndexStore {
 
         for (const session of sdkSessions) {
           const oldEntry = oldEntries.get(session.sessionId)
+          // 索引已有来源优先；否则从 Pi session 的来源记录投影。
+          const forkedFrom = oldEntry?.forkedFrom ?? session.forkedFrom
 
           allEntries.push({
             sessionId: session.sessionId,
@@ -130,6 +132,7 @@ export class SessionIndexStore {
             // 保留旧扩展数据，不存在则使用默认值
             lastMessagePreview: oldEntry?.lastMessagePreview ?? '',
             status: oldEntry?.status ?? 'idle',
+            ...(forkedFrom !== undefined ? { forkedFrom } : {}),
           })
         }
       } catch {
@@ -197,6 +200,9 @@ export class SessionIndexStore {
       title: entry.title,
       state: entry.status,
       updatedAt: entry.updatedAt,
+      ...(entry.forkedFrom !== undefined
+        ? { forkedFrom: entry.forkedFrom }
+        : {}),
     }
   }
 
@@ -432,6 +438,9 @@ export class SessionIndexStore {
     }
 
     const attempts = Array.isArray(entry.attempts) ? entry.attempts : undefined
+    const forkedFrom = isForkSource(entry.forkedFrom)
+      ? entry.forkedFrom
+      : undefined
 
     return [
       {
@@ -446,6 +455,7 @@ export class SessionIndexStore {
         lastMessagePreview: entry.lastMessagePreview,
         status: entry.status,
         ...(attempts !== undefined ? { attempts } : {}),
+        ...(forkedFrom !== undefined ? { forkedFrom } : {}),
       },
     ]
   }

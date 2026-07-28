@@ -341,6 +341,48 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
   }
 
   /**
+   * 在当前会话的某个用户消息节点分叉出新分支。
+   *
+   * @param userMessageId - 分叉起始节点（用户消息标识）。
+   * @returns 无返回值。
+   * @throws Preload API 错误会被捕获并通过 toast 反馈。
+   */
+  const forkSession = async (userMessageId: string): Promise<void> => {
+    if (!selectedSession) {
+      toast.error('请先选择一个会话。')
+      return
+    }
+
+    const sourceEntry = selectedTranscript?.entries.find(
+      (entry) => entry.kind === 'user-message' && entry.messageId === userMessageId
+    )
+    const sourceMessageContent = sourceEntry?.kind === 'user-message' ? sourceEntry.content : ''
+
+    try {
+      const childSession = await window.api.forkSession({
+        agentId: selectedSession.agentId,
+        sessionId: selectedSession.sessionId,
+        entryId: userMessageId
+      })
+      const [sessions, childTranscript] = await Promise.all([
+        window.api.listSessions(),
+        window.api.getTranscript({
+          agentId: childSession.agentId,
+          sessionId: childSession.sessionId
+        })
+      ])
+      context.setSessions(sessions)
+      context.setSelectedSessionId(childSession.sessionId)
+      context.setTranscript(childTranscript)
+      context.setComposerText(sourceMessageContent)
+      navigate(`/chat/${activeAgentId}/${childSession.sessionId}`, { replace: true })
+      toast.success('已创建分叉会话')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '分叉会话失败')
+    }
+  }
+
+  /**
    * 取消当前会话正在运行的模型响应。
    *
    * @returns 无返回值。
@@ -369,22 +411,43 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
 
   const sessionGroups = useMemo(() => {
     const today = new Date().toDateString()
+    const rootSessions = context.sessions.filter((s) => !s.forkedFrom)
+
     const groups = [
       {
         label: '今天',
-        sessions: context.sessions.filter(
+        sessions: rootSessions.filter(
           (session) => new Date(session.updatedAt).toDateString() === today
         )
       },
       {
         label: '更早',
-        sessions: context.sessions.filter(
+        sessions: rootSessions.filter(
           (session) => new Date(session.updatedAt).toDateString() !== today
         )
       }
     ]
 
     return groups.filter((group) => group.sessions.length > 0)
+  }, [context.sessions])
+
+  const childSessionsByParentId = useMemo(() => {
+    const children = new Map<string, AgentSessionSummary[]>()
+
+    for (const session of context.sessions) {
+      const parentSessionId = session.forkedFrom?.sessionId
+      if (!parentSessionId) continue
+
+      const siblings = children.get(parentSessionId) ?? []
+      siblings.push(session)
+      children.set(parentSessionId, siblings)
+    }
+
+    for (const siblings of children.values()) {
+      siblings.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    }
+
+    return children
   }, [context.sessions])
 
   async function handleAgentChange(nextAgentId: string): Promise<void> {
@@ -487,43 +550,75 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                             approval.status === 'pending'
                         )
                         const isRunning = session.state === 'running' || session.state === 'queued'
+                        const childSessions = childSessionsByParentId.get(session.sessionId) ?? []
 
                         return (
-                          <button
-                            key={session.sessionId}
-                            type="button"
-                            className={`flex h-10 w-full cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-left text-caption transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
-                              isSelected
-                                ? 'bg-secondary text-foreground'
-                                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                            }`}
-                            onClick={() => {
-                              void openSession(session)
-                              navigate(`/chat/${activeAgentId}/${session.sessionId}`, {
-                                replace: true
-                              })
-                            }}
-                          >
-                            <span
-                              className={`min-w-0 flex-1 truncate text-body ${isSelected ? 'font-semibold' : 'font-medium'}`}
+                          <div key={session.sessionId}>
+                            <button
+                              type="button"
+                              className={`flex h-10 w-full cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-left text-caption transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
+                                isSelected
+                                  ? 'bg-secondary text-foreground'
+                                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                              }`}
+                              onClick={() => {
+                                void openSession(session)
+                                navigate(`/chat/${activeAgentId}/${session.sessionId}`, {
+                                  replace: true
+                                })
+                              }}
                             >
-                              {session.title}
-                            </span>
-                            {(isRunning || hasPendingApproval) && (
-                              <>
-                                <span
-                                  aria-hidden="true"
-                                  title={hasPendingApproval ? '待审批' : '运行中'}
-                                  className={`size-1.5 shrink-0 rounded-full ${
-                                    hasPendingApproval ? 'bg-warning' : 'bg-info'
-                                  }`}
-                                />
-                                <span className="sr-only">
-                                  {hasPendingApproval ? '待审批' : '运行中'}
-                                </span>
-                              </>
+                              <span
+                                className={`min-w-0 flex-1 truncate text-body ${isSelected ? 'font-semibold' : 'font-medium'}`}
+                              >
+                                {session.title}
+                              </span>
+                              {(isRunning || hasPendingApproval) && (
+                                <>
+                                  <span
+                                    aria-hidden="true"
+                                    title={hasPendingApproval ? '待审批' : '运行中'}
+                                    className={`size-1.5 shrink-0 rounded-full ${
+                                      hasPendingApproval ? 'bg-warning' : 'bg-info'
+                                    }`}
+                                  />
+                                  <span className="sr-only">
+                                    {hasPendingApproval ? '待审批' : '运行中'}
+                                  </span>
+                                </>
+                              )}
+                            </button>
+                            {childSessions.length > 0 && (
+                              <div className="ml-4 border-l border-border pl-2">
+                                {childSessions.map((childSession) => {
+                                  const isChildSelected =
+                                    childSession.sessionId === selectedSession?.sessionId
+                                  return (
+                                    <button
+                                      key={childSession.sessionId}
+                                      type="button"
+                                      className={`flex h-8 w-full cursor-pointer items-center gap-1 rounded-md px-2 text-left text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
+                                        isChildSelected
+                                          ? 'bg-secondary/60 text-foreground'
+                                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                      }`}
+                                      onClick={() => {
+                                        void openSession(childSession)
+                                        navigate(
+                                          `/chat/${activeAgentId}/${childSession.sessionId}`,
+                                          { replace: true }
+                                        )
+                                      }}
+                                    >
+                                      <span className="min-w-0 flex-1 truncate">
+                                        {childSession.title}
+                                      </span>
+                                    </button>
+                                  )
+                                })}
+                              </div>
                             )}
-                          </button>
+                          </div>
                         )
                       })}
                     </div>
@@ -544,7 +639,9 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
             data-testid="chat-header"
             className="flex h-12 shrink-0 items-center border-b border-border px-[18px]"
           >
-            <h2 className="truncate text-section-heading font-semibold">{selectedSession?.title ?? '新对话'}</h2>
+            <h2 className="truncate text-section-heading font-semibold">
+              {selectedSession?.title ?? '新对话'}
+            </h2>
           </header>
 
           <div className="min-h-0 flex-1 px-4">
@@ -556,6 +653,9 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
               sessionId={selectedSession?.sessionId ?? null}
               onRetry={(userMessageId) => {
                 void retryMessage(userMessageId)
+              }}
+              onFork={(userMessageId) => {
+                void forkSession(userMessageId)
               }}
             />
           </div>

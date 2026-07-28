@@ -1,7 +1,10 @@
+import { writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import type { TranscriptSnapshot } from '@tangyuan/contracts'
+import type { ForkSource, TranscriptSnapshot } from '@tangyuan/contracts'
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
 import {
+  type PiSdkBranchedSession,
+  type PiSdkCreateBranchedSessionRequest,
   type PiSdkCreateSessionRequest,
   type PiSdkGateway,
   type PiSdkListSessionsRequest,
@@ -15,8 +18,12 @@ import {
 } from './pi-sdk-driver-contracts'
 import {
   buildTranscriptSnapshotFromSdkEntries,
+  isForkSource,
   normalizePiSdkSessionEvent,
 } from './utils'
+
+/** 汤圆写入分叉会话 Pi JSONL 的来源记录 custom entry 类型。 */
+const TANGYUAN_FORK_SOURCE_ENTRY_TYPE = 'tangyuan:fork-source'
 import {
   createUpdateSoulTool,
   createUpdateUserProfileTool,
@@ -73,8 +80,13 @@ export class RealPiSdkGateway implements PiSdkGateway {
    * @throws 当 SDK 调用失败、模型不存在或取消信号触发时，Promise 会 reject。
    */
   async verifyConfiguration(request: PiSdkVerificationRequest): Promise<void> {
-    const { AuthStorage, ModelRegistry, SessionManager, SettingsManager, createAgentSession } =
-      await import('@earendil-works/pi-coding-agent')
+    const {
+      AuthStorage,
+      ModelRegistry,
+      SessionManager,
+      SettingsManager,
+      createAgentSession,
+    } = await import('@earendil-works/pi-coding-agent')
     const authStorage = AuthStorage.inMemory()
     authStorage.setRuntimeApiKey(request.providerId, request.apiKey)
 
@@ -152,13 +164,22 @@ export class RealPiSdkGateway implements PiSdkGateway {
     const { SessionManager } = await import('@earendil-works/pi-coding-agent')
     const sessions = await SessionManager.list(request.cwd, request.sessionDir)
 
-    return sessions.map((session) => ({
-      sessionId: session.id,
-      sdkSessionFile: session.path,
-      title: (session.name ?? session.firstMessage) || session.id,
-      createdAt: session.created.toISOString(),
-      updatedAt: session.modified.toISOString(),
-    }))
+    return sessions.map((session) => {
+      const forkedFrom = this.readForkSource(
+        SessionManager,
+        session.path,
+        request.sessionDir,
+      )
+
+      return {
+        sessionId: session.id,
+        sdkSessionFile: session.path,
+        title: (session.name ?? session.firstMessage) || session.id,
+        createdAt: session.created.toISOString(),
+        updatedAt: session.modified.toISOString(),
+        ...(forkedFrom ? { forkedFrom } : {}),
+      }
+    })
   }
 
   /**
@@ -183,6 +204,129 @@ export class RealPiSdkGateway implements PiSdkGateway {
       request.sessionId,
       'tangyuan',
     )
+  }
+
+  /**
+   * 从 Pi SDK 原生 session 文件提取独立分叉会话。
+   *
+   * 分叉源是用户消息时，新会话只复制该消息之前的路径；源消息文本留给
+   * Renderer 作为可编辑草稿，因此不会进入新会话的 Pi 历史。
+   *
+   * @param request - 来源 session 文件和分叉源用户消息标识。
+   * @returns 新 JSONL 文件及其 Pi session ID。
+   * @throws 当来源会话无可读历史、来源消息不是用户消息或分叉失败时，Promise 会 reject。
+   */
+  async createBranchedSession(
+    request: PiSdkCreateBranchedSessionRequest,
+  ): Promise<PiSdkBranchedSession> {
+    const { SessionManager } = await import('@earendil-works/pi-coding-agent')
+    const sourceSession = SessionManager.open(
+      request.sdkSessionFile,
+      dirname(request.sdkSessionFile),
+    )
+    const sourceEntry = sourceSession.getEntry(request.entryId)
+
+    // Pi 会话在首条 assistant 回复前不落盘，此时父文件读不到任何 entry。
+    if (sourceSession.getEntries().length === 0) {
+      throw new Error('来源会话尚无可读取的历史记录，无法分叉。')
+    }
+
+    if (
+      !sourceEntry ||
+      sourceEntry.type !== 'message' ||
+      sourceEntry.message.role !== 'user'
+    ) {
+      throw new Error('分叉源必须是历史用户消息。')
+    }
+
+    const parentSessionId = sourceSession.getSessionId()
+    const forkedSessionFile = sourceEntry.parentId
+      ? sourceSession.createBranchedSession(sourceEntry.parentId)
+      : await this.createEmptyForkedSessionFile(
+          SessionManager,
+          sourceSession.getCwd(),
+          sourceSession.getSessionDir(),
+          request.sdkSessionFile,
+        )
+
+    if (!forkedSessionFile) {
+      throw new Error('无法创建分叉会话文件。')
+    }
+
+    const forkedSession = SessionManager.open(
+      forkedSessionFile,
+      dirname(forkedSessionFile),
+    )
+    forkedSession.appendCustomEntry(TANGYUAN_FORK_SOURCE_ENTRY_TYPE, {
+      sessionId: parentSessionId,
+      entryId: request.entryId,
+    })
+
+    return {
+      sessionId: forkedSession.getSessionId(),
+      sdkSessionFile: forkedSessionFile,
+    }
+  }
+
+  /**
+   * 创建仅包含 session header 的持久化 Pi 会话文件。
+   *
+   * @param SessionManager - Pi SDK 会话管理器构造对象。
+   * @param cwd - 新会话所属工作目录。
+   * @param sessionDir - Pi JSONL 目录。
+   * @param parentSession - 父会话 JSONL 文件路径。
+   * @returns 新会话 JSONL 文件路径。
+   * @throws 当 Pi SDK 未生成文件路径时抛出错误。
+   */
+  private async createEmptyForkedSessionFile(
+    SessionManager: typeof import('@earendil-works/pi-coding-agent').SessionManager,
+    cwd: string,
+    sessionDir: string,
+    parentSession: string,
+  ): Promise<string> {
+    const session = SessionManager.create(cwd, sessionDir)
+    const sessionFile = session.newSession({ parentSession })
+    const header = session.getHeader()
+
+    if (!sessionFile || !header) {
+      throw new Error('无法创建空分叉会话文件。')
+    }
+
+    await writeFile(sessionFile, `${JSON.stringify(header)}\n`, 'utf8')
+    return sessionFile
+  }
+
+  /**
+   * 从 Pi session 的汤圆 custom entry 中读取分叉来源。
+   *
+   * @param sessionFile - Pi JSONL 文件路径。
+   * @param sessionDir - Pi session 目录。
+   * @returns 合法来源记录；无记录或无法读取时返回 undefined。
+   */
+  private readForkSource(
+    SessionManager: typeof import('@earendil-works/pi-coding-agent').SessionManager,
+    sessionFile: string,
+    sessionDir: string,
+  ): ForkSource | undefined {
+    try {
+      const session = SessionManager.open(sessionFile, sessionDir)
+      const entry = [...session.getEntries()]
+        .reverse()
+        .find(
+          (candidate) =>
+            candidate.type === 'custom' &&
+            candidate.customType === TANGYUAN_FORK_SOURCE_ENTRY_TYPE,
+        )
+      const data = entry?.type === 'custom' ? entry.data : undefined
+
+      if (isForkSource(data)) {
+        return data
+      }
+    } catch {
+      // 单个 session 文件损坏不阻断其他会话索引重建。
+    }
+
+    return undefined
   }
 
   /**

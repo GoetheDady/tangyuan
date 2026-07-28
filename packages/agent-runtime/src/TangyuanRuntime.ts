@@ -7,6 +7,7 @@ import {
   type CancelConfigurationVerificationRequest,
   type CancelRunRequest,
   type CreateSessionRequest,
+  type ForkSessionRequest,
   type GetSessionMessagesRequest,
   type GetSessionModelInfoRequest,
   type ProfileUpdateResult,
@@ -470,6 +471,21 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
   }
 
   /**
+   * 从指定会话的某个用户消息创建独立分叉会话。
+   *
+   * @param request - Agent 标识、会话标识和分叉起始节点。
+   * @returns 新分支的会话摘要。
+   * @throws 当 Driver 不支持或分叉失败时，Promise 会 reject。
+   */
+  async forkSession(request: ForkSessionRequest): Promise<AgentSessionSummary> {
+    if (!this.sessionDriver.forkSession) {
+      throw new Error('当前运行时不支持分叉会话。')
+    }
+
+    return this.sessionDriver.forkSession(request)
+  }
+
+  /**
    * 取消指定会话正在运行的 Agent 响应，并返回更新后的摘要。
    *
    * @param request - 会话所属 Agent 和会话标识。
@@ -555,6 +571,7 @@ export type TangyuanRuntime = Pick<
   | 'getTranscript'
   | 'sendMessage'
   | 'retryMessage'
+  | 'forkSession'
   | 'cancelRun'
   | 'subscribe'
   | 'cancelAllActiveRuns'

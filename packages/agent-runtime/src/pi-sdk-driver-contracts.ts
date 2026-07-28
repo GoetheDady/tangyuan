@@ -16,6 +16,7 @@ import type {
   ConfigEncryptionAdapter,
   CreateSessionRequest,
   GetSessionMessagesRequest,
+  ForkSource,
   GetSessionModelInfoRequest,
   ListSessionsRequest,
   ModelDescriptor,
@@ -156,6 +157,22 @@ export interface PiSdkReadMessagesRequest {
 }
 
 /**
+ * 描述从 Pi SDK 原生 session 提取独立分叉会话时需要的参数。
+ */
+export interface PiSdkCreateBranchedSessionRequest {
+  sdkSessionFile: string
+  entryId: string
+}
+
+/**
+ * 描述 Pi SDK 创建出的独立分叉会话文件和会话标识。
+ */
+export interface PiSdkBranchedSession {
+  sessionId: string
+  sdkSessionFile: string
+}
+
+/**
  * 描述 Pi SDK 原生 session 列表里的单个会话。
  */
 export interface PiSdkStoredSession {
@@ -164,6 +181,7 @@ export interface PiSdkStoredSession {
   title?: string
   createdAt: string
   updatedAt: string
+  forkedFrom?: ForkSource
 }
 
 /**
@@ -374,6 +392,17 @@ export interface PiSdkGateway {
    * @throws 当 SDK session 文件无法读取或解析时，Promise 会 reject。
    */
   readMessages(request: PiSdkReadMessagesRequest): Promise<TranscriptSnapshot>
+
+  /**
+   * 从 Pi SDK 原生 session 文件提取独立分叉会话。
+   *
+   * @param request - 来源 session 文件和分叉源用户消息标识。
+   * @returns 新 JSONL 文件及其 Pi session ID。
+   * @throws 当来源消息不是用户消息、session 文件不存在或分叉失败时，Promise 会 reject。
+   */
+  createBranchedSession(
+    request: PiSdkCreateBranchedSessionRequest,
+  ): Promise<PiSdkBranchedSession>
 }
 
 /**
@@ -453,6 +482,17 @@ export interface AgentSessionDriver {
   retryMessage?(
     request: import('@tangyuan/contracts').RetryRunRequest,
   ): Promise<void>
+
+  /**
+   * 在指定会话的某个用户消息节点分叉出新的分支。
+   *
+   * @param request - Agent 标识、会话标识和分叉起始节点。
+   * @returns 新分支的会话摘要。
+   * @throws 当会话不存在或分叉操作失败时，Promise 会 reject。
+   */
+  forkSession?(
+    request: import('@tangyuan/contracts').ForkSessionRequest,
+  ): Promise<import('@tangyuan/contracts').AgentSessionSummary>
 
   /**
    * 读取指定会话的持久化执行尝试记录，用于会话重建。

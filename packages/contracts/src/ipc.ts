@@ -37,6 +37,7 @@ import {
   skillApprovalRequestSchema,
   skillInstallRecordSchema,
   skillSummarySchema,
+  forkSessionRequestSchema,
 } from './schemas'
 import type {
   AgentEventListener,
@@ -60,6 +61,7 @@ import type {
   QuestionClarificationRequest,
   RecoverAgentRequest,
   RejectBashRequest,
+  ForkSessionRequest,
   RetryRunRequest,
   RuntimeConfiguration,
   RuntimeSnapshot,
@@ -124,6 +126,7 @@ export const DESKTOP_IPC_CHANNELS = {
     'tangyuan:sessions:get-pending-clarifications',
   sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
   sessionsRetryMessage: 'tangyuan:sessions:retry-message',
+  sessionsFork: 'tangyuan:sessions:fork',
 } as const
 
 /**
@@ -182,6 +185,7 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: GetSessionMessagesRequest
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: RetryRunRequest
+  [DESKTOP_IPC_CHANNELS.sessionsFork]: ForkSessionRequest
 }
 
 /**
@@ -233,6 +237,7 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: getSessionMessagesRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: retryRunRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsFork]: forkSessionRequestSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -300,6 +305,7 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications]: QuestionClarificationRequest[]
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: TranscriptSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: TranscriptSnapshot
+  [DESKTOP_IPC_CHANNELS.sessionsFork]: AgentSessionSummary
 }
 
 /**
@@ -432,6 +438,7 @@ export const desktopIpcResponseSchemas = {
   ),
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: transcriptSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: transcriptSnapshotSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsFork]: agentSessionSummarySchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -565,6 +572,15 @@ export interface DesktopPreloadApi {
    * @throws 当配置缺失、会话不存在或 Agent 运行失败时，Promise 会 reject。
    */
   retryMessage(request: RetryRunRequest): Promise<TranscriptSnapshot>
+
+  /**
+   * 在指定会话的某个用户消息节点分叉出新的分支。
+   *
+   * @param request - Agent 标识、会话标识和分叉起始节点。
+   * @returns 新分支的会话摘要。
+   * @throws 当会话不存在或分叉操作失败时，Promise 会 reject。
+   */
+  forkSession(request: ForkSessionRequest): Promise<AgentSessionSummary>
 
   /**
    * 订阅 Main 进程转发的 Agent 标准事件。

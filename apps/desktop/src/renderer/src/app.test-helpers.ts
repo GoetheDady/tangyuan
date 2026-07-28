@@ -59,6 +59,13 @@ export function installDefaultAppApi(): void {
       }
     ]),
     retryMessage: vi.fn().mockResolvedValue([]),
+    forkSession: vi.fn().mockResolvedValue(
+      createDefaultSessionSummary({
+        sessionId: 'welcome',
+        title: '新会话',
+        updatedAt: '2026-07-08T00:00:00.000Z',
+      }),
+    ),
     cancelRun: vi.fn().mockResolvedValue(
       createDefaultSessionSummary({
         sessionId: 'welcome',

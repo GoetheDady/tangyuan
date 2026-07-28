@@ -19,6 +19,7 @@ import {
   type AgentSessionSummary,
   type ConfigEncryptionAdapter,
   type ProfileUpdateResult,
+  type RuntimeConfiguration,
   type TranscriptSnapshot,
 } from '@tangyuan/contracts'
 import type {
@@ -150,6 +151,23 @@ export abstract class PiSdkDriverState {
     const configuration = await this.configStore.readRequired(
       indexEntry.agentId,
     )
+
+    return this.openSessionHandle(sessionId, configuration)
+  }
+
+  /**
+   * 以指定运行配置打开会话的 Pi SDK session handle 并登记到运行状态。
+   *
+   * @param sessionId - 已存在于会话索引中的会话标识。
+   * @param configuration - 打开该会话使用的 Provider、Model 与 API Key。
+   * @returns 可运行 prompt 的 Pi SDK session handle。
+   * @throws 当会话索引缺失或 SDK 打开失败时，Promise 会 reject。
+   */
+  protected async openSessionHandle(
+    sessionId: string,
+    configuration: RuntimeConfiguration,
+  ): Promise<PiSdkSessionHandle> {
+    const indexEntry = this.sessionIndexStore.getEntry(sessionId)
     const cwd =
       indexEntry.agentId === TANGYUAN_DEFAULT_AGENT_ID
         ? this.layout.agentHome()

@@ -222,6 +222,14 @@ export type TranscriptDelta =
     }
 
 /**
+ * 描述独立分叉会话的来源。
+ */
+export interface ForkSource {
+  sessionId: string
+  entryId: string
+}
+
+/**
  * 会话列表中展示的单个 Agent 会话摘要。
  */
 export interface AgentSessionSummary {
@@ -230,6 +238,20 @@ export interface AgentSessionSummary {
   title: string
   state: AgentRunState
   updatedAt: string
+  /** 分叉来源信息；为根会话（非分叉）时省略。 */
+  forkedFrom?: ForkSource
+}
+
+/**
+ * 描述分叉会话请求。
+ */
+export interface ForkSessionRequest {
+  /** 所属 Agent 标识。 */
+  agentId: AgentId
+  /** 要分叉的会话标识。 */
+  sessionId: string
+  /** 分叉起始节点标识（用户消息的 messageId）。 */
+  entryId: string
 }
 
 /**

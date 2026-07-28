@@ -3,6 +3,7 @@ import { access, readFile, readdir, stat } from 'node:fs/promises'
 import { constants as fsConstants } from 'node:fs'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
+  type ForkSource,
   type InternalRuntimeConfig,
   type RuntimeConfiguration,
 } from '@tangyuan/contracts'
@@ -270,6 +271,21 @@ export function normalizePiSdkSessionEvent(event: unknown): PiSdkStreamEvent[] {
  */
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+/**
+ * 判断未知值是否是完整的分叉来源记录。
+ *
+ * @param value - 需要判断的未知值。
+ * @returns 同时具备 sessionId 和 entryId 字符串字段时返回 true。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function isForkSource(value: unknown): value is ForkSource {
+  return (
+    isRecord(value) &&
+    typeof value.sessionId === 'string' &&
+    typeof value.entryId === 'string'
+  )
 }
 
 /**
