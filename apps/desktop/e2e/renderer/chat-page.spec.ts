@@ -55,10 +55,10 @@ test.describe('聊天页', () => {
   })
 
   test('会话列表展示 mock sessions', async ({ page }) => {
-    // 验证 3 个测试会话都在侧边栏列表中（使用 role="button" 定位侧边栏会话项）
-    await expect(page.getByRole('button', { name: /测试会话 1/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: /测试会话 2/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: /测试会话 3/ })).toBeVisible()
+    // 验证 3 个测试会话都在侧边栏谱系树中（使用 role="treeitem" 定位侧边栏会话项）
+    await expect(page.getByRole('treeitem', { name: /测试会话 1/ })).toBeVisible()
+    await expect(page.getByRole('treeitem', { name: /测试会话 2/ })).toBeVisible()
+    await expect(page.getByRole('treeitem', { name: /测试会话 3/ })).toBeVisible()
   })
 
   test('会话列表只显示影响操作的状态', async ({ page }) => {

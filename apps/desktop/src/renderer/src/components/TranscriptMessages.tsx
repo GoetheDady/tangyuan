@@ -170,6 +170,8 @@ export interface TranscriptMessagesProps {
   isAwaitingResponse?: boolean
   /** 当前选中会话的标识；为 null 时不展示消息。 */
   sessionId: string | null
+  /** 需要高亮定位的分叉来源消息标识；跳回父会话时使用。 */
+  forkSourceMessageId?: string | null
   /** 重试回调；传入失败条目的 inReplyTo 用户消息标识。 */
   onRetry?: (userMessageId: string) => void
   /** 分叉回调；传入用户消息标识。 */
@@ -199,6 +201,7 @@ export function TranscriptMessages({
   isStreaming,
   isAwaitingResponse = false,
   sessionId,
+  forkSourceMessageId = null,
   onRetry,
   onFork
 }: TranscriptMessagesProps): React.JSX.Element {
@@ -228,6 +231,19 @@ export function TranscriptMessages({
       return getItemStableKey(item)
     }
   })
+
+  // 跳回父会话查看分叉来源时，把来源消息滚入视口
+  useEffect(() => {
+    if (!forkSourceMessageId) return
+
+    const targetIndex = renderItems.findIndex(
+      (item) => item.type === 'user-message' && item.messageId === forkSourceMessageId
+    )
+    if (targetIndex < 0) return
+
+    virtualizer.scrollToIndex(targetIndex, { align: 'center' })
+    isAtBottomRef.current = false
+  }, [forkSourceMessageId, renderItems, virtualizer])
 
   // 用于展开/收起时保持阅读位置的锚点信息
   const anchorRef = useRef<{ index: number; offsetFromTop: number } | null>(null)
@@ -423,7 +439,14 @@ export function TranscriptMessages({
               ) : item.type === 'user-message' ? (
                 <div className="py-2.5">
                   <article className="flex justify-end">
-                    <div className="flex max-w-[360px] min-w-0 flex-col gap-1.5 rounded-[16px_16px_4px_16px] bg-secondary px-4 py-3 text-body text-secondary-foreground">
+                    <div
+                      data-testid={
+                        item.messageId === forkSourceMessageId ? 'fork-source-message' : undefined
+                      }
+                      className={`flex max-w-[360px] min-w-0 flex-col gap-1.5 rounded-[16px_16px_4px_16px] bg-secondary px-4 py-3 text-body text-secondary-foreground ${
+                        item.messageId === forkSourceMessageId ? 'ring-2 ring-ring/60' : ''
+                      }`}
+                    >
                       <UserMessage
                         content={item.content}
                         onFork={onFork ? () => onFork(item.messageId) : undefined}

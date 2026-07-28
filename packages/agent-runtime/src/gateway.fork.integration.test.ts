@@ -212,6 +212,287 @@ describe('RealPiSdkGateway independent fork', () => {
         ),
     ).toEqual(['保留的历史消息', '保留的历史回答', '子会话的新消息'])
   })
+  it('persists the fork source record when the retained path has no assistant reply', async () => {
+    const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-pi-fork-draft-'))
+    tempDirs.push(rootPath)
+    const cwd = join(rootPath, 'agent-home')
+    const sessionDir = join(rootPath, 'sessions')
+    const parent = SessionManager.create(cwd, sessionDir)
+    const firstMessageId = parent.appendMessage({
+      role: 'user',
+      content: '第一条用户消息',
+      timestamp: 1,
+    })
+    parent.appendMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text: '父会话回答' }],
+      api: 'anthropic-messages',
+      provider: 'anthropic',
+      model: 'test',
+      usage: {
+        input: 1,
+        output: 1,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 2,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: 'stop',
+      timestamp: 2,
+    })
+    // 首条分叉得到空历史子会话；随后在子会话里只追加一条用户消息（无 assistant），
+    // 再从这条消息递归分叉时保留路径里同样没有 assistant 回复。
+    const child = await new RealPiSdkGateway().createBranchedSession({
+      sdkSessionFile: parent.getSessionFile()!,
+      entryId: firstMessageId,
+    })
+    const childSession = SessionManager.open(child.sdkSessionFile, sessionDir)
+    const childMessageId = childSession.appendMessage({
+      role: 'user',
+      content: '子会话里的用户消息',
+      timestamp: 3,
+    })
+
+    const grandchild = await new RealPiSdkGateway().createBranchedSession({
+      sdkSessionFile: child.sdkSessionFile,
+      entryId: childMessageId,
+    })
+
+    await expect(stat(grandchild.sdkSessionFile)).resolves.toBeDefined()
+    const grandchildSession = SessionManager.open(
+      grandchild.sdkSessionFile,
+      sessionDir,
+    )
+    expect(grandchildSession.getSessionId()).toBe(grandchild.sessionId)
+    expect(grandchildSession.getCwd()).toBe(cwd)
+    expect(grandchildSession.getHeader()?.parentSession).toBe(
+      child.sdkSessionFile,
+    )
+    // 递归分叉的来源记录必须落盘，且只保留指向直接父会话的最新一条。
+    expect(
+      grandchildSession
+        .getEntries()
+        .filter(
+          (entry) =>
+            entry.type === 'custom' &&
+            entry.customType === 'tangyuan:fork-source',
+        ),
+    ).toEqual([
+      expect.objectContaining({
+        data: { sessionId: child.sessionId, entryId: childMessageId },
+      }),
+    ])
+    await expect(
+      new RealPiSdkGateway().listSessions({ cwd, sessionDir }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sessionId: grandchild.sessionId,
+          forkedFrom: { sessionId: child.sessionId, entryId: childMessageId },
+        }),
+      ]),
+    )
+  })
+  it('keeps sibling forks from the same source independent', async () => {
+    const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-pi-fork-siblings-'))
+    tempDirs.push(rootPath)
+    const cwd = join(rootPath, 'agent-home')
+    const sessionDir = join(rootPath, 'sessions')
+    const parent = SessionManager.create(cwd, sessionDir)
+    parent.appendMessage({
+      role: 'user',
+      content: '保留的历史消息',
+      timestamp: 1,
+    })
+    parent.appendMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text: '保留的历史回答' }],
+      api: 'anthropic-messages',
+      provider: 'anthropic',
+      model: 'test',
+      usage: {
+        input: 1,
+        output: 1,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 2,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: 'stop',
+      timestamp: 2,
+    })
+    const sourceMessageId = parent.appendMessage({
+      role: 'user',
+      content: '同一条分叉源消息',
+      timestamp: 3,
+    })
+    const parentSessionFile = parent.getSessionFile()!
+
+    const first = await new RealPiSdkGateway().createBranchedSession({
+      sdkSessionFile: parentSessionFile,
+      entryId: sourceMessageId,
+    })
+    const second = await new RealPiSdkGateway().createBranchedSession({
+      sdkSessionFile: parentSessionFile,
+      entryId: sourceMessageId,
+    })
+
+    expect(second.sessionId).not.toBe(first.sessionId)
+    expect(second.sdkSessionFile).not.toBe(first.sdkSessionFile)
+
+    const firstSession = SessionManager.open(first.sdkSessionFile, sessionDir)
+    const secondSession = SessionManager.open(second.sdkSessionFile, sessionDir)
+    firstSession.appendMessage({
+      role: 'user',
+      content: '第一个方案',
+      timestamp: 4,
+    })
+    secondSession.appendMessage({
+      role: 'user',
+      content: '第二个方案',
+      timestamp: 5,
+    })
+
+    expect(
+      SessionManager.open(first.sdkSessionFile, sessionDir)
+        .buildSessionContext()
+        .messages.map((message) =>
+          stringifyPiSdkMessageContent(
+            (message as { content?: unknown }).content,
+          ),
+        ),
+    ).toEqual(['保留的历史消息', '保留的历史回答', '第一个方案'])
+    expect(
+      SessionManager.open(second.sdkSessionFile, sessionDir)
+        .buildSessionContext()
+        .messages.map((message) =>
+          stringifyPiSdkMessageContent(
+            (message as { content?: unknown }).content,
+          ),
+        ),
+    ).toEqual(['保留的历史消息', '保留的历史回答', '第二个方案'])
+    await expect(
+      new RealPiSdkGateway().listSessions({ cwd, sessionDir }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sessionId: first.sessionId,
+          forkedFrom: {
+            sessionId: parent.getSessionId(),
+            entryId: sourceMessageId,
+          },
+        }),
+        expect.objectContaining({
+          sessionId: second.sessionId,
+          forkedFrom: {
+            sessionId: parent.getSessionId(),
+            entryId: sourceMessageId,
+          },
+        }),
+      ]),
+    )
+  })
+  it('keeps exactly one fork source record and excludes it from the model context on recursive forks', async () => {
+    const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-pi-fork-nested-'))
+    tempDirs.push(rootPath)
+    const cwd = join(rootPath, 'agent-home')
+    const sessionDir = join(rootPath, 'sessions')
+    /**
+     * 向会话追加一问一答。
+     *
+     * @param session - Pi SDK 会话管理器。
+     * @param label - 消息文本前缀。
+     * @param timestamp - 用户消息时间戳。
+     * @returns 用户消息标识。
+     */
+    const appendExchange = (
+      session: SessionManager,
+      label: string,
+      timestamp: number,
+    ): string => {
+      const messageId = session.appendMessage({
+        role: 'user',
+        content: label,
+        timestamp,
+      })
+      session.appendMessage({
+        role: 'assistant',
+        content: [{ type: 'text', text: `回答：${label}` }],
+        api: 'anthropic-messages',
+        provider: 'anthropic',
+        model: 'test',
+        usage: {
+          input: 1,
+          output: 1,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 2,
+          cost: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            total: 0,
+          },
+        },
+        stopReason: 'stop',
+        timestamp: timestamp + 1,
+      })
+
+      return messageId
+    }
+
+    const parent = SessionManager.create(cwd, sessionDir)
+    appendExchange(parent, '父会话历史', 1)
+    const parentSourceId = appendExchange(parent, '父会话来源消息', 3)
+    const child = await new RealPiSdkGateway().createBranchedSession({
+      sdkSessionFile: parent.getSessionFile()!,
+      entryId: parentSourceId,
+    })
+    // 子会话追加一问一答，使递归分叉的保留路径含 assistant 回复（Pi SDK 会自行落盘）。
+    const childSession = SessionManager.open(child.sdkSessionFile, sessionDir)
+    appendExchange(childSession, '子会话历史', 5)
+    const childSourceId = appendExchange(childSession, '子会话来源消息', 7)
+
+    const grandchild = await new RealPiSdkGateway().createBranchedSession({
+      sdkSessionFile: child.sdkSessionFile,
+      entryId: childSourceId,
+    })
+
+    const grandchildSession = SessionManager.open(
+      grandchild.sdkSessionFile,
+      sessionDir,
+    )
+    // 从父路径继承来的旧来源记录不得残留，否则同一文件里会出现多条矛盾的来源。
+    expect(
+      grandchildSession
+        .getEntries()
+        .filter(
+          (entry) =>
+            entry.type === 'custom' &&
+            entry.customType === 'tangyuan:fork-source',
+        ),
+    ).toEqual([
+      expect.objectContaining({
+        data: { sessionId: child.sessionId, entryId: childSourceId },
+      }),
+    ])
+    // 来源记录不参与模型上下文；上下文只包含保留的对话历史。
+    expect(
+      grandchildSession
+        .buildSessionContext()
+        .messages.map((message) =>
+          stringifyPiSdkMessageContent(
+            (message as { content?: unknown }).content,
+          ),
+        ),
+    ).toEqual([
+      '父会话历史',
+      '回答：父会话历史',
+      '子会话历史',
+      '回答：子会话历史',
+    ])
+  })
   it('reports an unavailable parent session when the source file has no persisted history', async () => {
     const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-pi-fork-empty-'))
     tempDirs.push(rootPath)

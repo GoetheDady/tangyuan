@@ -349,7 +349,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
     await page.goto('/#/chat/tangyuan')
 
     await expect(page.getByText('第一会话内容')).toBeVisible()
-    await page.getByRole('button', { name: /测试会话 2/ }).click()
+    await page.getByRole('treeitem', { name: /测试会话 2/ }).click()
     await expect
       .poll(() => page.evaluate(() => window.__getTranscriptCalls__))
       .toContainEqual({ agentId: 'tangyuan', sessionId: 'session-2' })

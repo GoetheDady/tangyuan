@@ -14,7 +14,9 @@ import { Navigate, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 
 import { BashApprovalCard } from '@/components/BashApprovalCard'
+import { ForkSourceNotice } from '@/components/ForkSourceNotice'
 import { QuestionClarificationCard } from '@/components/QuestionClarificationCard'
+import { SessionLineageTree } from '@/components/SessionLineageTree'
 import { Button } from '@/components/ui/button'
 import { Composer } from '@/components/Composer'
 import { TranscriptMessages } from '@/components/TranscriptMessages'
@@ -121,6 +123,8 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
   const [sessionModelInfo, setSessionModelInfo] = useState<SessionModelInfo | null>(null)
   const [isLoadingModelInfo, setIsLoadingModelInfo] = useState(false)
   const [isSwitchingModel, setIsSwitchingModel] = useState(false)
+  /** 跳转后需要在父会话中定位的分叉来源消息标识。 */
+  const [forkSourceMessageId, setForkSourceMessageId] = useState<string | null>(null)
 
   // 当选中 session 变化时加载模型信息
   useEffect(() => {
@@ -217,6 +221,12 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     selectedSession?.state === 'queued'
   const selectedTranscript =
     context.transcript?.sessionId === selectedSession?.sessionId ? context.transcript : null
+  const parentSession = useMemo(() => {
+    const parentSessionId = selectedSession?.forkedFrom?.sessionId
+    if (!parentSessionId) return null
+
+    return context.sessions.find((session) => session.sessionId === parentSessionId) ?? null
+  }, [context.sessions, selectedSession?.forkedFrom?.sessionId])
 
   /**
    * 创建默认 Agent 的新会话并放到列表顶部。
@@ -411,7 +421,11 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
 
   const sessionGroups = useMemo(() => {
     const today = new Date().toDateString()
-    const rootSessions = context.sessions.filter((s) => !s.forkedFrom)
+    const knownSessionIds = new Set(context.sessions.map((session) => session.sessionId))
+    // 父会话已不在列表里的分叉也作为根展示，避免整条谱系不可见。
+    const rootSessions = context.sessions.filter(
+      (session) => !session.forkedFrom || !knownSessionIds.has(session.forkedFrom.sessionId)
+    )
 
     const groups = [
       {
@@ -431,24 +445,38 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     return groups.filter((group) => group.sessions.length > 0)
   }, [context.sessions])
 
-  const childSessionsByParentId = useMemo(() => {
-    const children = new Map<string, AgentSessionSummary[]>()
+  const pendingApprovalSessionIds = useMemo(
+    () =>
+      context.pendingApprovals
+        .filter((approval) => approval.status === 'pending')
+        .map((approval) => approval.sessionId),
+    [context.pendingApprovals]
+  )
 
-    for (const session of context.sessions) {
-      const parentSessionId = session.forkedFrom?.sessionId
-      if (!parentSessionId) continue
+  /**
+   * 选中侧边栏的会话并同步路由。
+   *
+   * @param session - 被选中的会话摘要。
+   * @returns 无返回值。
+   */
+  function handleSelectSession(session: AgentSessionSummary): void {
+    setForkSourceMessageId(null)
+    void openSession(session)
+    navigate(`/chat/${activeAgentId}/${session.sessionId}`, { replace: true })
+  }
 
-      const siblings = children.get(parentSessionId) ?? []
-      siblings.push(session)
-      children.set(parentSessionId, siblings)
-    }
+  /**
+   * 跳回当前分叉会话的父会话，并定位到分叉来源消息。
+   *
+   * @returns 无返回值。
+   */
+  async function viewForkSource(): Promise<void> {
+    if (!parentSession || !selectedSession?.forkedFrom) return
 
-    for (const siblings of children.values()) {
-      siblings.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-    }
-
-    return children
-  }, [context.sessions])
+    setForkSourceMessageId(selectedSession.forkedFrom.entryId)
+    await openSession(parentSession)
+    navigate(`/chat/${activeAgentId}/${parentSession.sessionId}`, { replace: true })
+  }
 
   async function handleAgentChange(nextAgentId: string): Promise<void> {
     navigate(`/chat/${nextAgentId}`, { replace: true })
@@ -536,91 +564,19 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
 
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
               {sessionGroups.length > 0 ? (
-                <div className="flex flex-col gap-0.5">
+                <div role="tree" aria-label="会话谱系" className="flex flex-col gap-0.5">
                   {sessionGroups.map((group) => (
                     <div key={group.label} role="group" aria-label={group.label}>
                       <p className="flex h-5 items-center px-2.5 font-mono text-[8px] font-semibold text-muted-foreground">
                         {group.label}
                       </p>
-                      {group.sessions.map((session) => {
-                        const isSelected = session.sessionId === selectedSession?.sessionId
-                        const hasPendingApproval = context.pendingApprovals.some(
-                          (approval) =>
-                            approval.sessionId === session.sessionId &&
-                            approval.status === 'pending'
-                        )
-                        const isRunning = session.state === 'running' || session.state === 'queued'
-                        const childSessions = childSessionsByParentId.get(session.sessionId) ?? []
-
-                        return (
-                          <div key={session.sessionId}>
-                            <button
-                              type="button"
-                              className={`flex h-10 w-full cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-left text-caption transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
-                                isSelected
-                                  ? 'bg-secondary text-foreground'
-                                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                              }`}
-                              onClick={() => {
-                                void openSession(session)
-                                navigate(`/chat/${activeAgentId}/${session.sessionId}`, {
-                                  replace: true
-                                })
-                              }}
-                            >
-                              <span
-                                className={`min-w-0 flex-1 truncate text-body ${isSelected ? 'font-semibold' : 'font-medium'}`}
-                              >
-                                {session.title}
-                              </span>
-                              {(isRunning || hasPendingApproval) && (
-                                <>
-                                  <span
-                                    aria-hidden="true"
-                                    title={hasPendingApproval ? '待审批' : '运行中'}
-                                    className={`size-1.5 shrink-0 rounded-full ${
-                                      hasPendingApproval ? 'bg-warning' : 'bg-info'
-                                    }`}
-                                  />
-                                  <span className="sr-only">
-                                    {hasPendingApproval ? '待审批' : '运行中'}
-                                  </span>
-                                </>
-                              )}
-                            </button>
-                            {childSessions.length > 0 && (
-                              <div className="ml-4 border-l border-border pl-2">
-                                {childSessions.map((childSession) => {
-                                  const isChildSelected =
-                                    childSession.sessionId === selectedSession?.sessionId
-                                  return (
-                                    <button
-                                      key={childSession.sessionId}
-                                      type="button"
-                                      className={`flex h-8 w-full cursor-pointer items-center gap-1 rounded-md px-2 text-left text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
-                                        isChildSelected
-                                          ? 'bg-secondary/60 text-foreground'
-                                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                                      }`}
-                                      onClick={() => {
-                                        void openSession(childSession)
-                                        navigate(
-                                          `/chat/${activeAgentId}/${childSession.sessionId}`,
-                                          { replace: true }
-                                        )
-                                      }}
-                                    >
-                                      <span className="min-w-0 flex-1 truncate">
-                                        {childSession.title}
-                                      </span>
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
+                      <SessionLineageTree
+                        sessions={context.sessions}
+                        rootSessions={group.sessions}
+                        selectedSessionId={selectedSession?.sessionId ?? null}
+                        pendingApprovalSessionIds={pendingApprovalSessionIds}
+                        onSelect={handleSelectSession}
+                      />
                     </div>
                   ))}
                 </div>
@@ -644,13 +600,23 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
             </h2>
           </header>
 
-          <div className="min-h-0 flex-1 px-4">
+          <div className="flex min-h-0 flex-1 flex-col px-4">
+            {selectedSession?.forkedFrom && (
+              <ForkSourceNotice
+                parentSessionTitle={parentSession?.title ?? null}
+                isParentAvailable={parentSession !== null}
+                onViewSource={() => {
+                  void viewForkSource()
+                }}
+              />
+            )}
             <TranscriptMessages
               key={selectedSession?.sessionId ?? 'no-session'}
               transcript={selectedTranscript}
               isStreaming={isSelectedSessionRunning}
               isAwaitingResponse={isAwaitingResponse}
               sessionId={selectedSession?.sessionId ?? null}
+              forkSourceMessageId={forkSourceMessageId}
               onRetry={(userMessageId) => {
                 void retryMessage(userMessageId)
               }}

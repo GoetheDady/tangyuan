@@ -240,14 +240,27 @@ export class RealPiSdkGateway implements PiSdkGateway {
     }
 
     const parentSessionId = sourceSession.getSessionId()
-    const forkedSessionFile = sourceEntry.parentId
-      ? sourceSession.createBranchedSession(sourceEntry.parentId)
-      : await this.createEmptyForkedSessionFile(
-          SessionManager,
-          sourceSession.getCwd(),
-          sourceSession.getSessionDir(),
-          request.sdkSessionFile,
-        )
+    let forkedSessionFile: string | undefined
+
+    if (sourceEntry.parentId) {
+      forkedSessionFile = sourceSession.createBranchedSession(
+        sourceEntry.parentId,
+      )
+
+      if (forkedSessionFile) {
+        // Pi SDK 只在保留路径含 assistant 回复时才立刻落盘分叉文件，且会原样带上从
+        // 父路径继承来的旧来源记录。统一重写一次：既补齐缺失的文件（否则重新 open 会
+        // 退化成另建会话，丢掉 sessionId、cwd 与继承历史），也确保只保留自己的直接来源。
+        await this.writeForkedSessionFile(sourceSession, forkedSessionFile)
+      }
+    } else {
+      forkedSessionFile = await this.createEmptyForkedSessionFile(
+        SessionManager,
+        sourceSession.getCwd(),
+        sourceSession.getSessionDir(),
+        request.sdkSessionFile,
+      )
+    }
 
     if (!forkedSessionFile) {
       throw new Error('无法创建分叉会话文件。')
@@ -266,6 +279,50 @@ export class RealPiSdkGateway implements PiSdkGateway {
       sessionId: forkedSession.getSessionId(),
       sdkSessionFile: forkedSessionFile,
     }
+  }
+
+  /**
+   * 把分叉后的会话状态写成分叉 Pi JSONL。
+   *
+   * Pi SDK 的 createBranchedSession 会把内存里的会话切换成分叉后的新会话，但只在
+   * 保留路径里已有 assistant 回复时才写文件。这里用切换后的内存状态统一写一次，
+   * 并剔除从父路径继承来的旧来源记录，让每个分叉文件只保留自己的直接来源。
+   *
+   * @param branchedSession - 已切换为分叉会话的 Pi SDK 会话管理器。
+   * @param forkedSessionFile - 分叉会话 JSONL 文件路径。
+   * @returns 无返回值。
+   * @throws 当缺少 session header 或写文件失败时抛出错误。
+   */
+  private async writeForkedSessionFile(
+    branchedSession: import('@earendil-works/pi-coding-agent').SessionManager,
+    forkedSessionFile: string,
+  ): Promise<void> {
+    const header = branchedSession.getHeader()
+
+    if (!header) {
+      throw new Error('分叉会话缺少 session header，无法落盘。')
+    }
+
+    // 剔除继承来的来源记录后重连 parentId，避免删除条目导致后续条目断链。
+    const entries: unknown[] = []
+    let parentId: string | null = null
+
+    for (const entry of branchedSession.getEntries()) {
+      if (
+        entry.type === 'custom' &&
+        entry.customType === TANGYUAN_FORK_SOURCE_ENTRY_TYPE
+      ) {
+        continue
+      }
+
+      entries.push({ ...entry, parentId })
+      parentId = entry.id
+    }
+
+    const lines = [header, ...entries]
+      .map((entry) => `${JSON.stringify(entry)}\n`)
+      .join('')
+    await writeFile(forkedSessionFile, lines, 'utf8')
   }
 
   /**
