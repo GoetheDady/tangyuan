@@ -245,7 +245,7 @@ function DesktopRoutes(): React.JSX.Element {
         toast.error(
           error instanceof Error ? error.message : '无法读取桌面端运行时状态',
         )
-        navigate('/console/providers', { replace: true })
+        navigate('/setup', { replace: true })
       })
       .finally(() => {
         if (isMounted) {
@@ -418,15 +418,28 @@ function DesktopRoutes(): React.JSX.Element {
         path="/chat/:agentId?/:sessionId?"
         element={<ChatGuard context={context} />}
       />
+      <Route path="/setup" element={<ConsoleProviderPage />} />
+      <Route
+        path="/settings"
+        element={<Navigate to="/settings/providers" replace />}
+      />
+      <Route path="/settings/providers" element={<ConsoleProviderPage />} />
+      <Route path="/settings/agents" element={<ConsoleAgentListPage />} />
+      <Route
+        path="/settings/agents/:agentId"
+        element={<ConsoleAgentDetailPage />}
+      />
       <Route
         path="/console"
-        element={<Navigate to="/console/providers" replace />}
+        element={<Navigate to="/settings/providers" replace />}
       />
-      <Route path="/console/providers" element={<ConsoleProviderPage />} />
-      <Route path="/console/agents" element={<ConsoleAgentListPage />} />
       <Route
-        path="/console/agents/:agentId"
-        element={<ConsoleAgentDetailPage />}
+        path="/console/providers"
+        element={<Navigate to="/settings/providers" replace />}
+      />
+      <Route
+        path="/console/agents"
+        element={<Navigate to="/settings/agents" replace />}
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -449,16 +462,20 @@ function StartupRedirect(props: {
     return <LoadingScreen />
   }
 
-  return (
-    <Navigate
-      to={
-        props.runtime?.status === 'ready' && props.activeSession
-          ? `/chat/${props.activeSession.agentId}/${props.activeSession.sessionId}`
-          : '/console/providers'
-      }
-      replace
-    />
-  )
+  if (props.runtime?.status === 'ready') {
+    return (
+      <Navigate
+        to={
+          props.activeSession
+            ? `/chat/${props.activeSession.agentId}/${props.activeSession.sessionId}`
+            : '/chat/tangyuan'
+        }
+        replace
+      />
+    )
+  }
+
+  return <Navigate to="/setup" replace />
 }
 
 type StateSetter<T> = (value: T | ((currentValue: T) => T)) => void

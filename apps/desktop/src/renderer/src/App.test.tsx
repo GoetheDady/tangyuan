@@ -19,7 +19,7 @@ describe('App', () => {
   afterEach(resetAppTestEnvironment)
   beforeEach(installDefaultAppApi)
   it('在 Agent 详情设置页展示 Agent 灵魂编辑入口', async () => {
-    window.location.hash = '#/console/agents/tangyuan'
+    window.location.hash = '#/settings/agents/tangyuan'
 
     render(<App />)
 

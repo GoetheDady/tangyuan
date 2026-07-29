@@ -10,7 +10,7 @@ import type {
 } from '@tangyuan/contracts'
 import { MessageSquarePlus, Settings } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router'
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 
 import { BashApprovalCard } from '@/components/BashApprovalCard'
@@ -102,7 +102,7 @@ export function ChatGuard(props: {
     const redirectTarget = agentId ? `/chat/${agentId}` : '/chat/tangyuan'
     return (
       <Navigate
-        to={`/console/providers?redirect=${encodeURIComponent(redirectTarget)}`}
+        to={`/setup?redirect=${encodeURIComponent(redirectTarget)}`}
         replace
       />
     )
@@ -127,6 +127,7 @@ function ChatPage(props: {
     sessionId: string
   }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const activeAgentId =
     agentId ?? context.runtime?.activeAgent.agentId ?? 'tangyuan'
 
@@ -688,7 +689,7 @@ function ChatPage(props: {
               title="设置"
               className="window-no-drag text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:ring-ring/50 grid size-9 shrink-0 place-items-center rounded-[10px] transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
               onClick={() => {
-                navigate('/console/providers')
+                navigate(`/settings/providers?redirect=${encodeURIComponent(location.pathname)}`)
               }}
             >
               <Settings size={16} aria-hidden="true" />

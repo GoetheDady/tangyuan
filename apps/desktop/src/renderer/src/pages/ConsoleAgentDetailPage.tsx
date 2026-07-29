@@ -256,7 +256,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
       <div className="mx-auto max-w-5xl">
         <header className="mb-8">
           <div className="window-no-drag relative z-50 mb-4">
-            <Link to="/console/agents">
+            <Link to="/settings/agents">
               <Button variant="ghost" size="sm">
                 <ArrowLeft aria-hidden="true" />
                 返回 Agent 列表

@@ -206,7 +206,7 @@ export function ConsoleAgentListPage(): React.JSX.Element {
               请先在控制台中配置模型服务，然后在汤圆对话中创建新的 Agent。
             </p>
             <div className="mt-6">
-              <Link to="/console/providers">
+              <Link to="/settings/providers">
                 <Button variant="outline" size="sm">
                   <Settings aria-hidden="true" />
                   前往 Provider 控制台
@@ -322,7 +322,7 @@ export function ConsoleAgentListPage(): React.JSX.Element {
                         恢复
                       </Button>
                     ) : null}
-                    <Link to={`/console/agents/${agent.agentId}`}>
+                    <Link to={`/settings/agents/${agent.agentId}`}>
                       <Button variant="ghost" size="icon" className="size-8">
                         <ExternalLink size={15} aria-hidden="true" />
                       </Button>
