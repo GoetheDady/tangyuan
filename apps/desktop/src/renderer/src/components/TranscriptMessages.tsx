@@ -1,6 +1,6 @@
 import type { AgentReplyEntry, TranscriptEntry, TranscriptSnapshot } from '@tangyuan/contracts'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Sparkles } from 'lucide-react'
+import { GitBranchPlus, Sparkles } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { AssistantMessage, TIMELINE_TOGGLE_ANIMATION_MS } from './AssistantMessage'
 import { AwaitingResponseIndicator } from './AwaitingResponseIndicator'
@@ -438,26 +438,39 @@ export function TranscriptMessages({
                 <AwaitingResponseIndicator />
               ) : item.type === 'user-message' ? (
                 <div className="py-2.5">
-                  <article className="flex justify-end">
+                  <article className="flex flex-col items-end">
                     <div
                       data-testid={
                         item.messageId === forkSourceMessageId ? 'fork-source-message' : undefined
                       }
-                      className={`flex max-w-[360px] min-w-0 flex-col gap-1.5 rounded-[16px_16px_4px_16px] bg-secondary px-4 py-3 text-body text-secondary-foreground ${
+                      className={`peer flex max-w-[360px] min-w-0 flex-col gap-1.5 rounded-[16px_16px_4px_16px] bg-secondary px-4 py-3 text-body text-secondary-foreground ${
                         item.messageId === forkSourceMessageId ? 'ring-2 ring-ring/60' : ''
                       }`}
                     >
-                      <UserMessage
-                        content={item.content}
-                        onFork={onFork ? () => onFork(item.messageId) : undefined}
-                      />
+                      <UserMessage content={item.content} />
+                    </div>
+                    <footer className="mt-1 flex h-6 items-center gap-1 opacity-0 transition-opacity peer-hover:opacity-100 hover:opacity-100 focus-within:opacity-100">
                       <time
                         dateTime={item.createdAt}
-                        className="self-end font-mono text-[10px] leading-none text-muted-foreground"
+                        className="font-mono text-[10px] leading-none text-muted-foreground"
                       >
                         {formatMessageTime(item.createdAt)}
                       </time>
-                    </div>
+                      {onFork ? (
+                        <button
+                          type="button"
+                          aria-label="从此处分叉"
+                          title="从此处分叉"
+                          className="window-no-drag flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            onFork(item.messageId)
+                          }}
+                        >
+                          <GitBranchPlus size={14} aria-hidden="true" />
+                        </button>
+                      ) : null}
+                    </footer>
                   </article>
                 </div>
               ) : item.type === 'assistant-message' ? (

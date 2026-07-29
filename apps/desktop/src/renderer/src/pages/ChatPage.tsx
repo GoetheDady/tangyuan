@@ -537,12 +537,12 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
       <div className="grid h-full min-h-0 grid-cols-[292px_minmax(0,1fr)]">
         <aside
           data-testid="chat-sidebar"
-          className="grid min-h-0 grid-cols-[76px_216px] border-r border-border bg-sidebar"
+          className="grid min-h-0 grid-cols-[76px_216px] border-r border-split bg-sidebar"
         >
           <nav
             aria-label="Agent 切换"
             data-testid="chat-agent-rail"
-            className="window-no-drag relative z-50 flex min-h-0 flex-col items-center gap-2.5 border-r border-sidebar-border bg-background px-2.5 py-2"
+            className="window-no-drag relative z-50 flex min-h-0 flex-col items-center gap-2.5 border-r border-split bg-sidebar px-2.5 py-2"
           >
             <div aria-hidden="true" className="h-9 shrink-0" />
 
@@ -560,7 +560,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                     className={`window-no-drag grid size-9 shrink-0 place-items-center rounded-[10px] border text-label font-semibold transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
                       isActive
                         ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border bg-secondary text-foreground hover:bg-accent'
+                        : 'border-border bg-card text-foreground hover:bg-background'
                     }`}
                     onClick={() => {
                       void handleAgentChange(agent.agentId)
@@ -587,7 +587,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
 
           <section
             data-testid="chat-session-pane"
-            className="flex min-h-0 min-w-0 flex-col bg-sidebar"
+            className="flex min-h-0 min-w-0 flex-col bg-background/50"
           >
             <div className="window-no-drag relative z-50 p-[8px_10px_10px]">
               <Button
@@ -629,7 +629,10 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
           </section>
         </aside>
 
-        <section data-testid="chat-main" className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+        <section
+          data-testid="chat-main"
+          className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-background"
+        >
           <header
             data-testid="chat-header"
             className="flex h-12 shrink-0 items-center border-b border-border px-[18px]"

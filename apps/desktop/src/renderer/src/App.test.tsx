@@ -201,6 +201,40 @@ describe('App', () => {
     })
     expect(window.api.listSessions).toHaveBeenCalledWith({ agentId: 'agent-2' })
   })
+  it('聊天主界面的三栏背景从左到右逐级变浅', async () => {
+    const readyRuntime = createReadyRuntimeSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-t...7890',
+      profileInitialized: true
+    })
+    readyRuntime.agents.push({
+      agentId: 'agent-2',
+      displayName: '研究助手',
+      status: 'active',
+      defaultProviderId: 'anthropic',
+      defaultModelId: 'claude-sonnet-4-5',
+      homePath: '~/.tangyuan/agents/agent-2',
+      archivedAt: null,
+      directoryStatus: 'healthy'
+    })
+    window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(readyRuntime)
+
+    render(<App />)
+
+    expect(await screen.findByTestId('chat-agent-rail')).toHaveClass(
+      'border-split',
+      'bg-sidebar'
+    )
+    expect(screen.getByTestId('chat-session-pane')).toHaveClass('bg-background/50')
+    expect(screen.getByTestId('chat-sidebar')).toHaveClass('border-split')
+    expect(screen.getByTestId('chat-main')).toHaveClass('bg-background')
+    expect(screen.getByRole('button', { name: '切换到 Agent 研究助手' })).toHaveClass(
+      'border-border',
+      'bg-card',
+      'hover:bg-background'
+    )
+  })
   it('renders model options with unique keys across providers', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(

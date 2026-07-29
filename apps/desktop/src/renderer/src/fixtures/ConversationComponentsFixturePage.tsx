@@ -428,6 +428,7 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
                 isStreaming
                 sessionId="fixture-session"
                 onRetry={() => setRetryCount((value) => value + 1)}
+                onFork={() => undefined}
               />
             </div>
             <div className="border-t bg-background px-6 py-4">

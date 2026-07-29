@@ -32,6 +32,45 @@ test.describe('对话业务组件验收夹具', () => {
     await expect(page.getByTestId('clarification-sequence')).toBeVisible()
   })
 
+  test('用户消息 hover 时才在气泡下方同一行显示时间和单个分叉图标', async ({ page }) => {
+    const integrated = page.getByTestId('integrated-chat')
+    const article = integrated
+      .locator('article')
+      .filter({ hasText: '请对完整对话体验做一次跨组件验收。' })
+    const message = article.getByText('请对完整对话体验做一次跨组件验收。', { exact: true })
+    const footer = article.locator('footer')
+    const time = footer.locator('time')
+    const forkButton = article.getByRole('button', { name: '从此处分叉' })
+
+    await expect(article).toHaveCount(1)
+    await expect(forkButton).toHaveCount(1)
+    const articleBox = await article.boundingBox()
+    const bubbleBox = await message.locator('..').boundingBox()
+    expect(articleBox).not.toBeNull()
+    expect(bubbleBox).not.toBeNull()
+
+    await page.mouse.move(articleBox!.x + 1, bubbleBox!.y + bubbleBox!.height / 2)
+    await expect(footer).toHaveCSS('opacity', '0')
+    await message.locator('..').hover()
+    await expect(footer).toHaveCSS('opacity', '1')
+    await expect(forkButton).toHaveText('')
+    await expect(forkButton.locator('svg')).toHaveCount(1)
+
+    const footerBox = await footer.boundingBox()
+    const timeBox = await time.boundingBox()
+    const buttonBox = await forkButton.boundingBox()
+    expect(footerBox).not.toBeNull()
+    expect(timeBox).not.toBeNull()
+    expect(buttonBox).not.toBeNull()
+    expect(footerBox!.y).toBeGreaterThanOrEqual(bubbleBox!.y + bubbleBox!.height)
+    expect(
+      Math.abs(timeBox!.y + timeBox!.height / 2 - (buttonBox!.y + buttonBox!.height / 2))
+    ).toBeLessThanOrEqual(2)
+
+    await forkButton.hover()
+    await expect(footer).toHaveCSS('opacity', '1')
+  })
+
   test('附件入口保持禁用占位且不出现文件选择器或附件预览', async ({ page }) => {
     const attachmentButtons = page.getByRole('button', { name: '附件功能暂未开放' })
     expect(await attachmentButtons.count()).toBeGreaterThanOrEqual(3)
