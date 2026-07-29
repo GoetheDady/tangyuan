@@ -102,7 +102,7 @@ describe('App independent session fork', () => {
     const sourceMessage = await screen.findByText('换一种方式回答')
     await user.hover(sourceMessage)
     await user.click(
-      within(sourceMessage.parentElement!).getByRole('button', {
+      within(sourceMessage.closest('article')!).getByRole('button', {
         name: '从此处分叉'
       })
     )

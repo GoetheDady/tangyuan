@@ -196,8 +196,46 @@ describe('TranscriptMessages', () => {
     render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
 
     const articles = document.querySelectorAll('article')
-    expect(articles[0]).toHaveClass('justify-end')
+    expect(articles[0]).toHaveClass('items-end')
     expect(articles[1]).toHaveClass('justify-start')
+  })
+
+  it('在用户消息下方同一行渲染 hover 时显示的时间和单个分叉图标', () => {
+    defineMockApi()
+    const onFork = vi.fn()
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ messageId: 'fork-source', content: '从这里分叉' })
+    ])
+
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+        onFork={onFork}
+      />
+    )
+
+    const message = screen.getByText('从这里分叉')
+    const article = message.closest('article')
+    const time = article!.querySelector('time')
+    const footer = article!.querySelector('footer')
+    const forkButtons = screen.getAllByRole('button', { name: '从此处分叉' })
+    expect(article).not.toBeNull()
+    expect(time).not.toBeNull()
+    expect(footer).not.toBeNull()
+    expect(forkButtons).toHaveLength(1)
+    expect(article!.children[1]).toBe(footer)
+    expect(footer).toContainElement(time)
+    expect(footer).toContainElement(forkButtons[0])
+    expect(article!.children[0]).not.toContainElement(time)
+    expect(article!.children[0]).toHaveClass('peer')
+    expect(footer).toHaveClass('opacity-0', 'peer-hover:opacity-100', 'hover:opacity-100')
+    expect(forkButtons[0]).toHaveTextContent('')
+    expect(forkButtons[0].querySelectorAll('svg')).toHaveLength(1)
+
+    fireEvent.click(forkButtons[0])
+    expect(onFork).toHaveBeenCalledWith('fork-source')
   })
 
   it('renders many structured entries without crashing', () => {
