@@ -14,7 +14,6 @@ import { toast } from 'sonner'
 
 import { UserProfileEditor } from '@/components/UserProfileEditor'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import {
   AlertDialog,
@@ -162,26 +161,8 @@ export function ConsoleAgentListPage(): React.JSX.Element {
   }
 
   return (
-    <main className="bg-background text-foreground min-h-full px-6 py-8">
+    <div>
       <div className="mx-auto max-w-5xl">
-        <header className="mb-8">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary text-primary-foreground grid size-10 place-items-center rounded-md">
-              <Bot size={20} aria-hidden="true" />
-            </div>
-            <div>
-              <h1 className="text-2xl leading-tight font-semibold">
-                Agent 管理
-              </h1>
-              <p className="text-body text-muted-foreground">
-                查看和管理所有 Agent 的状态与默认模型
-              </p>
-            </div>
-          </div>
-        </header>
-
-        <Separator className="mb-8" />
-
         <div className="mb-8">
           <UserProfileEditor editable />
         </div>
@@ -448,6 +429,6 @@ export function ConsoleAgentListPage(): React.JSX.Element {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </main>
+    </div>
   )
 }

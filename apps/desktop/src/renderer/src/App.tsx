@@ -26,6 +26,8 @@ import { ChatGuard, LoadingScreen } from '@/pages/ChatPage'
 import { ConsoleProviderPage } from '@/pages/ConsoleProviderPage'
 import { ConsoleAgentListPage } from '@/pages/ConsoleAgentListPage'
 import { ConsoleAgentDetailPage } from '@/pages/ConsoleAgentDetailPage'
+import { SettingsLayout } from '@/pages/SettingsLayout'
+import { SettingsProviderPage } from '@/pages/SettingsProviderPage'
 
 const componentFixturesEnabled =
   import.meta.env.DEV || import.meta.env.MODE === 'test'
@@ -419,16 +421,12 @@ function DesktopRoutes(): React.JSX.Element {
         element={<ChatGuard context={context} />}
       />
       <Route path="/setup" element={<ConsoleProviderPage />} />
-      <Route
-        path="/settings"
-        element={<Navigate to="/settings/providers" replace />}
-      />
-      <Route path="/settings/providers" element={<ConsoleProviderPage />} />
-      <Route path="/settings/agents" element={<ConsoleAgentListPage />} />
-      <Route
-        path="/settings/agents/:agentId"
-        element={<ConsoleAgentDetailPage />}
-      />
+      <Route path="/settings" element={<SettingsLayout />}>
+        <Route index element={<Navigate to="providers" replace />} />
+        <Route path="providers" element={<SettingsProviderPage />} />
+        <Route path="agents" element={<ConsoleAgentListPage />} />
+        <Route path="agents/:agentId" element={<ConsoleAgentDetailPage />} />
+      </Route>
       <Route
         path="/console"
         element={<Navigate to="/settings/providers" replace />}

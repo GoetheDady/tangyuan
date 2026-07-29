@@ -241,18 +241,18 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
 
   if (isLoading) {
     return (
-      <main className="bg-background text-foreground min-h-full px-6 py-8">
+      <div className="min-h-full">
         <div className="mx-auto max-w-5xl">
           <p className="text-body text-muted-foreground">
             正在加载 Agent 详情...
           </p>
         </div>
-      </main>
+      </div>
     )
   }
 
   return (
-    <main className="bg-background text-foreground min-h-full px-6 py-8">
+    <div className="min-h-full">
       <div className="mx-auto max-w-5xl">
         <header className="mb-8">
           <div className="window-no-drag relative z-50 mb-4">
@@ -678,6 +678,6 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </main>
+    </div>
   )
 }
