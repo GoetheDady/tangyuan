@@ -1,8 +1,15 @@
-import type { AgentReplyEntry, TranscriptEntry, TranscriptSnapshot } from '@tangyuan/contracts'
+import type {
+  AgentReplyEntry,
+  TranscriptEntry,
+  TranscriptSnapshot,
+} from '@tangyuan/contracts'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { GitBranchPlus, Sparkles } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
-import { AssistantMessage, TIMELINE_TOGGLE_ANIMATION_MS } from './AssistantMessage'
+import {
+  AssistantMessage,
+  TIMELINE_TOGGLE_ANIMATION_MS,
+} from './AssistantMessage'
 import { AwaitingResponseIndicator } from './AwaitingResponseIndicator'
 import { CompactionIndicator } from './CompactionIndicator'
 import { UserMessage } from './UserMessage'
@@ -18,7 +25,12 @@ type RenderItem =
       createdAt: string
       renderIndex: number
     }
-  | { type: 'assistant-message'; entry: AgentReplyEntry; isLastAgent: boolean; renderIndex: number }
+  | {
+      type: 'assistant-message'
+      entry: AgentReplyEntry
+      isLastAgent: boolean
+      renderIndex: number
+    }
   | { type: 'compaction'; timestamp: string; renderIndex: number }
   | { type: 'awaiting'; renderIndex: number }
 
@@ -35,7 +47,7 @@ const ESTIMATED_SIZES: Record<RenderItem['type'], number> = {
   compaction: 48,
   'user-message': 112,
   'assistant-message': 160,
-  awaiting: 44
+  awaiting: 44,
 }
 
 /**
@@ -94,7 +106,7 @@ function isDialogKind(kind: TranscriptEntry['kind']): boolean {
 function buildRenderItemsFromTranscript(
   entries: readonly TranscriptEntry[],
   isStreaming: boolean,
-  isAwaitingResponse: boolean
+  isAwaitingResponse: boolean,
 ): RenderItem[] {
   const dialogCount = entries.filter((e) => isDialogKind(e.kind)).length
   const items: RenderItem[] = []
@@ -106,7 +118,7 @@ function buildRenderItemsFromTranscript(
       items.push({
         type: 'compaction',
         timestamp: entry.timestamp,
-        renderIndex: renderIndex++
+        renderIndex: renderIndex++,
       })
     } else if (entry.kind === 'user-message') {
       items.push({
@@ -114,7 +126,7 @@ function buildRenderItemsFromTranscript(
         messageId: entry.messageId,
         content: entry.content,
         createdAt: entry.createdAt,
-        renderIndex: renderIndex++
+        renderIndex: renderIndex++,
       })
       dialogIndex++
     } else if (entry.kind === 'agent-reply') {
@@ -123,7 +135,7 @@ function buildRenderItemsFromTranscript(
         type: 'assistant-message',
         entry,
         isLastAgent,
-        renderIndex: renderIndex++
+        renderIndex: renderIndex++,
       })
       dialogIndex++
     }
@@ -136,9 +148,12 @@ function buildRenderItemsFromTranscript(
   // 是 agent-reply 且其 attempt 仍在运行。重试等待窗口内，最后一条是旧的
   // 已终结（failed / completed / cancelled）agent-reply，故仍展示占位。
   if (isAwaitingResponse) {
-    const lastDialog = [...items].reverse().find((item) => item.type !== 'compaction')
+    const lastDialog = [...items]
+      .reverse()
+      .find((item) => item.type !== 'compaction')
     const hasVisibleReply =
-      lastDialog?.type === 'assistant-message' && lastDialog.entry.attempt?.status === 'running'
+      lastDialog?.type === 'assistant-message' &&
+      lastDialog.entry.attempt?.status === 'running'
     if (!hasVisibleReply) {
       items.push({ type: 'awaiting', renderIndex: renderIndex++ })
     }
@@ -154,7 +169,7 @@ function formatMessageTime(value: string): string {
   return new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false
+    hour12: false,
   }).format(new Date(value))
 }
 
@@ -203,7 +218,7 @@ export function TranscriptMessages({
   sessionId,
   forkSourceMessageId = null,
   onRetry,
-  onFork
+  onFork,
 }: TranscriptMessagesProps): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
@@ -212,9 +227,13 @@ export function TranscriptMessages({
   const renderItems = useMemo(
     () =>
       transcript && transcript.entries.length > 0
-        ? buildRenderItemsFromTranscript(transcript.entries, isStreaming, isAwaitingResponse)
+        ? buildRenderItemsFromTranscript(
+            transcript.entries,
+            isStreaming,
+            isAwaitingResponse,
+          )
         : [],
-    [transcript, isStreaming, isAwaitingResponse]
+    [transcript, isStreaming, isAwaitingResponse],
   )
 
   const virtualizer = useVirtualizer({
@@ -229,7 +248,7 @@ export function TranscriptMessages({
       const item = renderItems[index]
       if (!item) return `item-${index}`
       return getItemStableKey(item)
-    }
+    },
   })
 
   // 跳回父会话查看分叉来源时，把来源消息滚入视口
@@ -237,7 +256,8 @@ export function TranscriptMessages({
     if (!forkSourceMessageId) return
 
     const targetIndex = renderItems.findIndex(
-      (item) => item.type === 'user-message' && item.messageId === forkSourceMessageId
+      (item) =>
+        item.type === 'user-message' && item.messageId === forkSourceMessageId,
     )
     if (targetIndex < 0) return
 
@@ -246,7 +266,9 @@ export function TranscriptMessages({
   }, [forkSourceMessageId, renderItems, virtualizer])
 
   // 用于展开/收起时保持阅读位置的锚点信息
-  const anchorRef = useRef<{ index: number; offsetFromTop: number } | null>(null)
+  const anchorRef = useRef<{ index: number; offsetFromTop: number } | null>(
+    null,
+  )
   // 动画结束后清空锚点的定时器；动画期间保留锚点以持续校正。
   const anchorClearTimerRef = useRef<number | null>(null)
   useEffect(() => {
@@ -265,7 +287,8 @@ export function TranscriptMessages({
     function handleScroll(): void {
       const { scrollTop, scrollHeight, clientHeight } = scrollEl!
       // 距底部阈值以内视为"在底部"
-      isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < AT_BOTTOM_THRESHOLD
+      isAtBottomRef.current =
+        scrollHeight - scrollTop - clientHeight < AT_BOTTOM_THRESHOLD
     }
 
     scrollEl.addEventListener('scroll', handleScroll, { passive: true })
@@ -321,7 +344,8 @@ export function TranscriptMessages({
   }, [renderItems.length, virtualizer])
 
   // 流式模式下最后一条消息内容增长时，若用户在底部则保持跟随
-  const lastItem = renderItems.length > 0 ? renderItems[renderItems.length - 1] : null
+  const lastItem =
+    renderItems.length > 0 ? renderItems[renderItems.length - 1] : null
   const lastMessageContent =
     lastItem?.type === 'user-message'
       ? lastItem.content.length
@@ -342,9 +366,12 @@ export function TranscriptMessages({
     const anchor = anchorRef.current
     if (anchor && scrollRef.current) {
       // 找到锚点条目当前在虚拟列表中的位置
-      const anchorVirtualIndex = virtualizer.getVirtualItems().find((v) => v.index === anchor.index)
+      const anchorVirtualIndex = virtualizer
+        .getVirtualItems()
+        .find((v) => v.index === anchor.index)
       if (anchorVirtualIndex) {
-        const currentOffset = anchorVirtualIndex.start - scrollRef.current.scrollTop
+        const currentOffset =
+          anchorVirtualIndex.start - scrollRef.current.scrollTop
         const delta = currentOffset - anchor.offsetFromTop
         scrollRef.current.scrollTop += delta
       }
@@ -369,7 +396,7 @@ export function TranscriptMessages({
       if (targetItem) {
         anchorRef.current = {
           index: renderIndex,
-          offsetFromTop: targetItem.start - scrollEl.scrollTop
+          offsetFromTop: targetItem.start - scrollEl.scrollTop,
         }
         // 展开/收起动画期间持续校正锚点；动画结束后（预留 60ms 缓冲）清空，
         // 避免后续无关的高度变化被误校正。
@@ -382,17 +409,19 @@ export function TranscriptMessages({
         }, TIMELINE_TOGGLE_ANIMATION_MS + 60)
       }
     },
-    [virtualizer]
+    [virtualizer],
   )
 
   if (!sessionId) {
     return (
       <div className="grid min-h-full place-items-center text-center">
         <div>
-          <div className="mx-auto mb-4 grid size-11 place-items-center rounded-md border bg-card">
+          <div className="bg-card mx-auto mb-4 grid size-11 place-items-center rounded-md border">
             <Sparkles size={20} aria-hidden="true" />
           </div>
-          <p className="text-body text-muted-foreground">选择一个会话后开始。</p>
+          <p className="text-body text-muted-foreground">
+            选择一个会话后开始。
+          </p>
         </div>
       </div>
     )
@@ -402,10 +431,12 @@ export function TranscriptMessages({
     return (
       <div className="grid min-h-full place-items-center text-center">
         <div>
-          <div className="mx-auto mb-4 grid size-11 place-items-center rounded-md border bg-card">
+          <div className="bg-card mx-auto mb-4 grid size-11 place-items-center rounded-md border">
             <Sparkles size={20} aria-hidden="true" />
           </div>
-          <p className="text-body text-muted-foreground">发送第一条消息开始会话。</p>
+          <p className="text-body text-muted-foreground">
+            发送第一条消息开始会话。
+          </p>
         </div>
       </div>
     )
@@ -417,7 +448,10 @@ export function TranscriptMessages({
       className="mx-auto h-full w-full max-w-[720px] overflow-x-hidden overflow-y-auto"
       data-testid="message-scroll-area"
     >
-      <div className="relative w-full" style={{ height: `${virtualizer.getTotalSize()}px` }}>
+      <div
+        className="relative w-full"
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
+      >
         {virtualizer.getVirtualItems().map((virtualItem) => {
           const item = renderItems[virtualItem.index]
           if (!item) return null
@@ -427,9 +461,9 @@ export function TranscriptMessages({
               key={virtualItem.key}
               data-index={virtualItem.index}
               ref={virtualizer.measureElement}
-              className="absolute left-0 top-0 w-full"
+              className="absolute top-0 left-0 w-full"
               style={{
-                transform: `translateY(${virtualItem.start}px)`
+                transform: `translateY(${virtualItem.start}px)`,
               }}
             >
               {item.type === 'compaction' ? (
@@ -441,18 +475,22 @@ export function TranscriptMessages({
                   <article className="flex flex-col items-end">
                     <div
                       data-testid={
-                        item.messageId === forkSourceMessageId ? 'fork-source-message' : undefined
+                        item.messageId === forkSourceMessageId
+                          ? 'fork-source-message'
+                          : undefined
                       }
-                      className={`peer flex max-w-[360px] min-w-0 flex-col gap-1.5 rounded-[16px_16px_4px_16px] bg-secondary px-4 py-3 text-body text-secondary-foreground ${
-                        item.messageId === forkSourceMessageId ? 'ring-2 ring-ring/60' : ''
+                      className={`peer bg-secondary text-body text-secondary-foreground flex max-w-[360px] min-w-0 flex-col gap-1.5 rounded-[16px_16px_4px_16px] px-4 py-3 ${
+                        item.messageId === forkSourceMessageId
+                          ? 'ring-ring/60 ring-2'
+                          : ''
                       }`}
                     >
                       <UserMessage content={item.content} />
                     </div>
-                    <footer className="mt-1 flex h-6 items-center gap-1 opacity-0 transition-opacity peer-hover:opacity-100 hover:opacity-100 focus-within:opacity-100">
+                    <footer className="mt-1 flex h-6 items-center gap-1 opacity-0 transition-opacity peer-hover:opacity-100 focus-within:opacity-100 hover:opacity-100">
                       <time
                         dateTime={item.createdAt}
-                        className="font-mono text-[10px] leading-none text-muted-foreground"
+                        className="text-muted-foreground font-mono text-[10px] leading-none"
                       >
                         {formatMessageTime(item.createdAt)}
                       </time>
@@ -461,7 +499,7 @@ export function TranscriptMessages({
                           type="button"
                           aria-label="从此处分叉"
                           title="从此处分叉"
-                          className="window-no-drag flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                          className="window-no-drag text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/50 flex size-6 items-center justify-center rounded-md transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
                           onClick={(event) => {
                             event.stopPropagation()
                             onFork(item.messageId)
@@ -487,7 +525,10 @@ export function TranscriptMessages({
                               const entryIndex = item.entry.index
                               for (let i = entryIndex - 1; i >= 0; i--) {
                                 const prevEntry = transcript.entries[i]
-                                if (prevEntry && prevEntry.kind === 'user-message') {
+                                if (
+                                  prevEntry &&
+                                  prevEntry.kind === 'user-message'
+                                ) {
                                   userMessageId = prevEntry.messageId
                                   break
                                 }

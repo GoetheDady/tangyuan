@@ -8,14 +8,21 @@ import { extendTailwindMerge } from 'tailwind-merge'
  * token 误判为文字颜色类，从而在合并时删掉同元素上真正的颜色类。将它们注册到
  * font-size 组后，冲突判定恢复正确。
  */
-const semanticFontSizes = ['page-title', 'section-heading', 'body', 'label', 'caption', 'mono']
+const semanticFontSizes = [
+  'page-title',
+  'section-heading',
+  'body',
+  'label',
+  'caption',
+  'mono',
+]
 
 const twMerge = extendTailwindMerge({
   extend: {
     classGroups: {
-      'font-size': semanticFontSizes.map((size) => `text-${size}`)
-    }
-  }
+      'font-size': semanticFontSizes.map((size) => `text-${size}`),
+    },
+  },
 })
 
 /**

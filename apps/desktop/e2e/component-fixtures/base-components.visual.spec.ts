@@ -1,6 +1,9 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 
-import { focusInteractiveCard, pressInteractiveCard } from './card-fixture-helpers'
+import {
+  focusInteractiveCard,
+  pressInteractiveCard,
+} from './card-fixture-helpers'
 
 const fixturePath = '/#/__fixtures__/base-components'
 
@@ -13,46 +16,68 @@ const visualSections = [
   { id: 'dropdown-menus', snapshot: 'dropdown-menus.png' },
   { id: 'feedback', snapshot: 'feedback.png' },
   { id: 'alert-dialogs', snapshot: 'alert-dialogs.png' },
-  { id: 'cards', snapshot: 'cards.png' }
+  { id: 'cards', snapshot: 'cards.png' },
 ] as const
 
 const screenshotOptions = {
   animations: 'disabled',
   caret: 'hide',
-  scale: 'css'
+  scale: 'css',
 } as const
 
 test.describe('基础组件视觉回归', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(fixturePath)
-    await expect(page.locator('[data-fixture-marker="base-components-fixture-v1"]')).toBeVisible()
+    await expect(
+      page.locator('[data-fixture-marker="base-components-fixture-v1"]'),
+    ).toBeVisible()
   })
 
   for (const section of visualSections) {
     test(`${section.id} 分区保持视觉基准`, async ({ page }) => {
-      await expect(page.locator(`[data-fixture-section="${section.id}"]`)).toHaveScreenshot(
-        section.snapshot,
-        screenshotOptions
-      )
+      await expect(
+        page.locator(`[data-fixture-section="${section.id}"]`),
+      ).toHaveScreenshot(section.snapshot, screenshotOptions)
     })
   }
 
   const tooltipVisualScenarios = [
-    { trigger: '悬停查看上方说明', side: 'top', snapshot: 'tooltip-top-open.png' },
-    { trigger: '悬停查看右侧说明', side: 'right', snapshot: 'tooltip-right-open.png' },
-    { trigger: '悬停查看下方说明', side: 'bottom', snapshot: 'tooltip-bottom-open.png' },
-    { trigger: '悬停查看左侧说明', side: 'left', snapshot: 'tooltip-left-open.png' }
+    {
+      trigger: '悬停查看上方说明',
+      side: 'top',
+      snapshot: 'tooltip-top-open.png',
+    },
+    {
+      trigger: '悬停查看右侧说明',
+      side: 'right',
+      snapshot: 'tooltip-right-open.png',
+    },
+    {
+      trigger: '悬停查看下方说明',
+      side: 'bottom',
+      snapshot: 'tooltip-bottom-open.png',
+    },
+    {
+      trigger: '悬停查看左侧说明',
+      side: 'left',
+      snapshot: 'tooltip-left-open.png',
+    },
   ] as const
 
   for (const scenario of tooltipVisualScenarios) {
     test(`Tooltip ${scenario.side} 保持打开状态视觉基准`, async ({ page }) => {
       const trigger = page.getByRole('button', { name: scenario.trigger })
-      await trigger.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+      await trigger.evaluate((element) =>
+        element.scrollIntoView({ block: 'center' }),
+      )
       await trigger.hover()
       const content = page.locator('[data-slot="tooltip-content"]')
       await expect(content).toBeVisible()
       await expect(content).toHaveAttribute('data-side', scenario.side)
-      await expect(content).toHaveScreenshot(scenario.snapshot, screenshotOptions)
+      await expect(content).toHaveScreenshot(
+        scenario.snapshot,
+        screenshotOptions,
+      )
     })
   }
 
@@ -60,29 +85,33 @@ test.describe('基础组件视觉回归', () => {
     {
       trigger: '打开 default 对话框',
       title: '确认验收动作',
-      snapshot: 'alert-dialog-default-open.png'
+      snapshot: 'alert-dialog-default-open.png',
     },
     {
       trigger: '打开 sm 对话框',
       title: '切换默认模型？',
-      snapshot: 'alert-dialog-sm-open.png'
+      snapshot: 'alert-dialog-sm-open.png',
     },
     {
       trigger: '打开危险确认',
       title: '确认归档这个 Agent？',
-      snapshot: 'alert-dialog-destructive-open.png'
+      snapshot: 'alert-dialog-destructive-open.png',
     },
     {
       trigger: '打开长内容对话框',
       title: '确认将“研究资料整理与长期知识维护 Agent”归档？',
-      snapshot: 'alert-dialog-long-content-open.png'
-    }
+      snapshot: 'alert-dialog-long-content-open.png',
+    },
   ] as const
 
   for (const scenario of alertDialogScenarios) {
-    test(`AlertDialog ${scenario.title} 保持打开状态视觉基准`, async ({ page }) => {
+    test(`AlertDialog ${scenario.title} 保持打开状态视觉基准`, async ({
+      page,
+    }) => {
       await page.getByRole('button', { name: scenario.trigger }).click()
-      await expect(page.getByRole('alertdialog', { name: scenario.title })).toBeVisible()
+      await expect(
+        page.getByRole('alertdialog', { name: scenario.title }),
+      ).toBeVisible()
       await expect(page).toHaveScreenshot(scenario.snapshot, screenshotOptions)
     })
   }
@@ -91,23 +120,31 @@ test.describe('基础组件视觉回归', () => {
     await page.getByRole('button', { name: '菜单：普通操作' }).click()
     const content = page.getByTestId('dropdown-menu-actions-content')
     await expect(content).toBeVisible()
-    await expect(content).toHaveScreenshot('dropdown-menu-actions-open.png', screenshotOptions)
+    await expect(content).toHaveScreenshot(
+      'dropdown-menu-actions-open.png',
+      screenshotOptions,
+    )
   })
 
-  test('DropdownMenu Checkbox 与 Radio 已选状态保持视觉基准', async ({ page }) => {
+  test('DropdownMenu Checkbox 与 Radio 已选状态保持视觉基准', async ({
+    page,
+  }) => {
     await page.getByRole('button', { name: '菜单：Checkbox' }).click()
     const checkboxContent = page.getByTestId('dropdown-menu-checkbox-content')
     await expect(checkboxContent).toBeVisible()
     await expect(checkboxContent).toHaveScreenshot(
       'dropdown-menu-checkbox-open.png',
-      screenshotOptions
+      screenshotOptions,
     )
 
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: '菜单：Radio' }).click()
     const radioContent = page.getByTestId('dropdown-menu-radio-content')
     await expect(radioContent).toBeVisible()
-    await expect(radioContent).toHaveScreenshot('dropdown-menu-radio-open.png', screenshotOptions)
+    await expect(radioContent).toHaveScreenshot(
+      'dropdown-menu-radio-open.png',
+      screenshotOptions,
+    )
   })
 
   test('DropdownMenu 嵌套菜单保持打开状态视觉基准', async ({ page }) => {
@@ -117,49 +154,75 @@ test.describe('基础组件视觉回归', () => {
     const trigger = page.getByRole('button', { name: '菜单：受控子菜单' })
     await trigger.focus()
     await page.keyboard.press('Enter')
-    await expect(page.getByTestId('dropdown-menu-controlled-root-content')).toBeVisible()
+    await expect(
+      page.getByTestId('dropdown-menu-controlled-root-content'),
+    ).toBeVisible()
     await page.keyboard.press('ArrowDown')
-    await expect(page.getByRole('menuitem', { name: '共享到' })).toHaveAttribute(
-      'data-highlighted',
-      ''
-    )
+    await expect(
+      page.getByRole('menuitem', { name: '共享到' }),
+    ).toHaveAttribute('data-highlighted', '')
     await page.keyboard.press('ArrowRight')
-    await expect(page.getByTestId('dropdown-menu-controlled-sub-content')).toBeVisible()
+    await expect(
+      page.getByTestId('dropdown-menu-controlled-sub-content'),
+    ).toBeVisible()
 
-    await expect(page).toHaveScreenshot('dropdown-menu-submenu-open.png', screenshotOptions)
+    await expect(page).toHaveScreenshot(
+      'dropdown-menu-submenu-open.png',
+      screenshotOptions,
+    )
   })
 
   test('Alert 语义与内容组合保持分区视觉基准', async ({ page }) => {
     await expect(page.locator('[data-fixture-alerts]')).toHaveScreenshot(
       'alerts.png',
-      screenshotOptions
+      screenshotOptions,
     )
   })
 
   const toastVisualScenarios = [
     { trigger: '显示 info Toast', type: 'info', snapshot: 'toast-info.png' },
-    { trigger: '显示 success Toast', type: 'success', snapshot: 'toast-success.png' },
-    { trigger: '显示 warning Toast', type: 'warning', snapshot: 'toast-warning.png' },
+    {
+      trigger: '显示 success Toast',
+      type: 'success',
+      snapshot: 'toast-success.png',
+    },
+    {
+      trigger: '显示 warning Toast',
+      type: 'warning',
+      snapshot: 'toast-warning.png',
+    },
     { trigger: '显示 error Toast', type: 'error', snapshot: 'toast-error.png' },
-    { trigger: '显示 loading Toast', type: 'loading', snapshot: 'toast-loading.png' },
+    {
+      trigger: '显示 loading Toast',
+      type: 'loading',
+      snapshot: 'toast-loading.png',
+    },
     {
       trigger: '显示标题与说明 Toast',
       type: 'error',
-      snapshot: 'toast-title-description.png'
+      snapshot: 'toast-title-description.png',
     },
-    { trigger: '显示操作 Toast', type: 'success', snapshot: 'toast-action.png' },
+    {
+      trigger: '显示操作 Toast',
+      type: 'success',
+      snapshot: 'toast-action.png',
+    },
     { trigger: '显示取消 Toast', type: 'info', snapshot: 'toast-cancel.png' },
     {
       trigger: '显示完整内容 Toast',
       type: 'success',
-      snapshot: 'toast-full-content.png'
-    }
+      snapshot: 'toast-full-content.png',
+    },
   ] as const
 
   for (const scenario of toastVisualScenarios) {
-    test(`Toast ${scenario.type} · ${scenario.trigger} 保持视觉基准`, async ({ page }) => {
+    test(`Toast ${scenario.type} · ${scenario.trigger} 保持视觉基准`, async ({
+      page,
+    }) => {
       await page.getByRole('button', { name: scenario.trigger }).click()
-      const item = page.locator(`[data-sonner-toast][data-type="${scenario.type}"]`).first()
+      const item = page
+        .locator(`[data-sonner-toast][data-type="${scenario.type}"]`)
+        .first()
       await expect(item).toBeVisible()
       await expect(item).toHaveScreenshot(scenario.snapshot, screenshotOptions)
     })
@@ -168,21 +231,30 @@ test.describe('基础组件视觉回归', () => {
   test('Toast bottom-right 三条堆叠保持位置与视觉基准', async ({ page }) => {
     await page.getByRole('button', { name: '显示连续 Toast' }).click()
     const toaster = page.locator('[data-sonner-toaster]')
-    const visibleItems = toaster.locator('[data-sonner-toast][data-visible="true"]')
+    const visibleItems = toaster.locator(
+      '[data-sonner-toast][data-visible="true"]',
+    )
     await expect(visibleItems).toHaveCount(3)
     await toaster.dispatchEvent('mouseover')
     await expect(visibleItems.first()).toHaveAttribute('data-expanded', 'true')
     await page.waitForTimeout(300)
 
-    await expect(page).toHaveScreenshot('toast-stack-bottom-right.png', screenshotOptions)
+    await expect(page).toHaveScreenshot(
+      'toast-stack-bottom-right.png',
+      screenshotOptions,
+    )
   })
 
   test('Card hover 状态保持视觉基准', async ({ page }) => {
     const card = page.getByTestId('card-interactive-hover')
-    const borderBefore = await card.evaluate((element) => getComputedStyle(element).borderColor)
+    const borderBefore = await card.evaluate(
+      (element) => getComputedStyle(element).borderColor,
+    )
     await card.hover()
     await expect
-      .poll(() => card.evaluate((element) => getComputedStyle(element).borderColor))
+      .poll(() =>
+        card.evaluate((element) => getComputedStyle(element).borderColor),
+      )
       .not.toBe(borderBefore)
 
     await expectCardStateScreenshot(page, card, 'card-hover.png')
@@ -191,7 +263,9 @@ test.describe('基础组件视觉回归', () => {
   test('Card focus-visible 状态保持视觉基准', async ({ page }) => {
     const card = await focusInteractiveCard(page)
     await expect(card).toBeFocused()
-    expect(await card.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe('none')
+    expect(
+      await card.evaluate((element) => getComputedStyle(element).boxShadow),
+    ).not.toBe('none')
 
     await expectCardStateScreenshot(page, card, 'card-focus-visible.png')
   })
@@ -199,14 +273,16 @@ test.describe('基础组件视觉回归', () => {
   test('Card active 状态保持视觉基准', async ({ page }) => {
     const cardBefore = page.getByTestId('card-interactive-active')
     const backgroundBefore = await cardBefore.evaluate(
-      (element) => getComputedStyle(element).backgroundColor
+      (element) => getComputedStyle(element).backgroundColor,
     )
     const { card, release } = await pressInteractiveCard(page)
 
     try {
-      expect(await card.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(
-        backgroundBefore
-      )
+      expect(
+        await card.evaluate(
+          (element) => getComputedStyle(element).backgroundColor,
+        ),
+      ).not.toBe(backgroundBefore)
       await expectCardStateScreenshot(page, card, 'card-active.png')
     } finally {
       await release()
@@ -217,13 +293,16 @@ test.describe('基础组件视觉回归', () => {
 async function expectCardStateScreenshot(
   page: Page,
   card: Locator,
-  snapshot: string
+  snapshot: string,
 ): Promise<void> {
   const box = await card.boundingBox()
   expect(box).not.toBeNull()
 
   const padding = 4
-  const scroll = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }))
+  const scroll = await page.evaluate(() => ({
+    x: window.scrollX,
+    y: window.scrollY,
+  }))
   const session = await page.context().newCDPSession(page)
 
   try {
@@ -236,8 +315,8 @@ async function expectCardStateScreenshot(
         y: box!.y + scroll.y - padding,
         width: box!.width + padding * 2,
         height: box!.height + padding * 2,
-        scale: 1
-      }
+        scale: 1,
+      },
     })
     expect(Buffer.from(data, 'base64')).toMatchSnapshot(snapshot)
   } finally {

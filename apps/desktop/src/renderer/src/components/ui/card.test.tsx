@@ -9,7 +9,7 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle
+  CardTitle,
 } from '@/components/ui/card'
 
 describe('Card', () => {
@@ -22,7 +22,12 @@ describe('Card', () => {
     const footerRef = createRef<HTMLDivElement>()
 
     render(
-      <Card ref={cardRef} id="agent-card" className="custom-card" aria-label="Agent 配置">
+      <Card
+        ref={cardRef}
+        id="agent-card"
+        className="custom-card"
+        aria-label="Agent 配置"
+      >
         <CardHeader ref={headerRef} className="custom-header">
           <CardTitle ref={titleRef} className="custom-title">
             Agent 配置
@@ -37,7 +42,7 @@ describe('Card', () => {
         <CardFooter ref={footerRef} className="custom-footer">
           保存
         </CardFooter>
-      </Card>
+      </Card>,
     )
 
     const card = screen.getByLabelText('Agent 配置')
@@ -51,7 +56,7 @@ describe('Card', () => {
       [titleRef, 'card-title', 'custom-title'],
       [descriptionRef, 'card-description', 'custom-description'],
       [contentRef, 'card-content', 'custom-content'],
-      [footerRef, 'card-footer', 'custom-footer']
+      [footerRef, 'card-footer', 'custom-footer'],
     ] as const
 
     expect(cardRef.current).toBe(card)
@@ -68,7 +73,7 @@ describe('Card', () => {
         <CardHeader>Header</CardHeader>
         <CardContent>Content</CardContent>
         <CardFooter>Footer</CardFooter>
-      </Card>
+      </Card>,
     )
 
     let card = screen.getByLabelText('默认 Card')
@@ -80,14 +85,14 @@ describe('Card', () => {
 
     for (const slot of ['card-header', 'card-content', 'card-footer']) {
       expect(card.querySelector(`[data-slot="${slot}"]`)?.className).toContain(
-        'p-[var(--card-padding)]'
+        'p-[var(--card-padding)]',
       )
     }
 
     rerender(
       <Card size="compact" aria-label="紧凑 Card">
         <CardContent>Content</CardContent>
-      </Card>
+      </Card>,
     )
 
     card = screen.getByLabelText('紧凑 Card')
@@ -104,7 +109,7 @@ describe('Card', () => {
         <Card ref={interactiveRef} interactive aria-pressed="true" disabled>
           可操作 Card
         </Card>
-      </>
+      </>,
     )
 
     const staticCard = screen.getByLabelText('静态 Card')
@@ -129,7 +134,7 @@ describe('Card', () => {
       'aria-pressed:border-primary',
       'aria-selected:border-primary',
       'disabled:opacity-[var(--disabled-opacity)]',
-      'aria-disabled:opacity-[var(--disabled-opacity)]'
+      'aria-disabled:opacity-[var(--disabled-opacity)]',
     ]) {
       expect(interactiveCard.className).toContain(className)
     }

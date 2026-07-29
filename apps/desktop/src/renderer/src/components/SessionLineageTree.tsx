@@ -24,7 +24,7 @@ export interface SessionLineageTreeProps {
  * @returns 父会话标识到子会话列表的映射，子会话按更新时间倒序。
  */
 function groupChildrenByParentId(
-  sessions: readonly AgentSessionSummary[]
+  sessions: readonly AgentSessionSummary[],
 ): Map<string, AgentSessionSummary[]> {
   const children = new Map<string, AgentSessionSummary[]>()
 
@@ -38,7 +38,9 @@ function groupChildrenByParentId(
   }
 
   for (const siblings of children.values()) {
-    siblings.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    siblings.sort((left, right) =>
+      right.updatedAt.localeCompare(left.updatedAt),
+    )
   }
 
   return children
@@ -69,15 +71,17 @@ function SessionLineageNode(props: {
     selectedSessionId,
     pendingApprovalSessionIds,
     visitedSessionIds,
-    onSelect
+    onSelect,
   } = props
   const isSelected = session.sessionId === selectedSessionId
-  const hasPendingApproval = pendingApprovalSessionIds.includes(session.sessionId)
+  const hasPendingApproval = pendingApprovalSessionIds.includes(
+    session.sessionId,
+  )
   const isRunning = session.state === 'running' || session.state === 'queued'
   const isRoot = depth === 1
-  const childSessions = (childrenByParentId.get(session.sessionId) ?? []).filter(
-    (child) => !visitedSessionIds.includes(child.sessionId)
-  )
+  const childSessions = (
+    childrenByParentId.get(session.sessionId) ?? []
+  ).filter((child) => !visitedSessionIds.includes(child.sessionId))
 
   return (
     <div role="none">
@@ -87,8 +91,8 @@ function SessionLineageNode(props: {
         aria-level={depth}
         aria-selected={isSelected}
         data-session-id={session.sessionId}
-        className={`flex w-full cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
-          isRoot ? 'h-10 text-caption' : 'h-8 text-[11px]'
+        className={`focus-visible:ring-ring/50 flex w-full cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-left transition-colors focus-visible:ring-[3px] focus-visible:outline-none ${
+          isRoot ? 'text-caption h-10' : 'h-8 text-[11px]'
         } ${
           isSelected
             ? isRoot
@@ -108,7 +112,9 @@ function SessionLineageNode(props: {
       >
         <span
           className={`min-w-0 flex-1 truncate ${
-            isRoot ? `text-body ${isSelected ? 'font-semibold' : 'font-medium'}` : ''
+            isRoot
+              ? `text-body ${isSelected ? 'font-semibold' : 'font-medium'}`
+              : ''
           }`}
         >
           {session.title}
@@ -121,12 +127,14 @@ function SessionLineageNode(props: {
                 hasPendingApproval ? 'bg-warning' : 'bg-info'
               }`}
             />
-            <span className="sr-only">{hasPendingApproval ? '待审批' : '运行中'}</span>
+            <span className="sr-only">
+              {hasPendingApproval ? '待审批' : '运行中'}
+            </span>
           </>
         )}
       </div>
       {childSessions.length > 0 && (
-        <div role="group" className="ml-4 border-l border-border pl-2">
+        <div role="group" className="border-border ml-4 border-l pl-2">
           {childSessions.map((childSession) => (
             <SessionLineageNode
               key={childSession.sessionId}
@@ -160,9 +168,12 @@ export function SessionLineageTree({
   rootSessions,
   selectedSessionId,
   pendingApprovalSessionIds,
-  onSelect
+  onSelect,
 }: SessionLineageTreeProps): React.JSX.Element {
-  const childrenByParentId = useMemo(() => groupChildrenByParentId(sessions), [sessions])
+  const childrenByParentId = useMemo(
+    () => groupChildrenByParentId(sessions),
+    [sessions],
+  )
 
   return (
     <>

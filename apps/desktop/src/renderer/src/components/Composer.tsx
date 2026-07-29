@@ -1,7 +1,11 @@
 import { Paperclip, Send, StopCircle } from 'lucide-react'
 import { useCallback, useRef, useState, type KeyboardEvent } from 'react'
 
-import type { ModelDescriptor, ProviderDescriptor, SessionModelInfo } from '@tangyuan/contracts'
+import type {
+  ModelDescriptor,
+  ProviderDescriptor,
+  SessionModelInfo,
+} from '@tangyuan/contracts'
 
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -11,11 +15,16 @@ import {
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 /**
  * Composer 组件的属性。
@@ -91,7 +100,7 @@ export function Composer({
   isSwitchingModel,
   selectableModels,
   onModelChange,
-  onThinkingLevelChange
+  onThinkingLevelChange,
 }: ComposerProps): React.JSX.Element {
   const [isComposing, setIsComposing] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -133,10 +142,12 @@ export function Composer({
   const thinkingLevels = sessionModelInfo?.supportedThinkingLevels ?? []
   const selectedThinkingIndex = Math.max(
     0,
-    thinkingLevels.indexOf(sessionModelInfo?.thinkingLevel ?? 'off')
+    thinkingLevels.indexOf(sessionModelInfo?.thinkingLevel ?? 'off'),
   )
   const thinkingProgress =
-    thinkingLevels.length <= 1 ? 0 : selectedThinkingIndex / (thinkingLevels.length - 1)
+    thinkingLevels.length <= 1
+      ? 0
+      : selectedThinkingIndex / (thinkingLevels.length - 1)
 
   return (
     <form
@@ -150,7 +161,7 @@ export function Composer({
     >
       <div
         data-testid="composer-card"
-        className="flex min-h-[131px] flex-col rounded-[20px] bg-card p-[18px] shadow-[inset_0_0_0_1px_var(--border)] transition-[box-shadow] duration-200 focus-within:shadow-[inset_0_0_0_1px_var(--ring)] focus-within:ring-[3px] focus-within:ring-ring/25"
+        className="bg-card focus-within:ring-ring/25 flex min-h-[131px] flex-col rounded-[20px] p-[18px] shadow-[inset_0_0_0_1px_var(--border)] transition-[box-shadow] duration-200 focus-within:shadow-[inset_0_0_0_1px_var(--ring)] focus-within:ring-[3px]"
       >
         <Label htmlFor="composer" className="sr-only">
           消息
@@ -158,7 +169,7 @@ export function Composer({
         <Textarea
           ref={textareaRef}
           id="composer"
-          className="max-h-40 min-h-[52px] resize-none rounded-none border-0 bg-transparent px-0 py-0 text-body shadow-none placeholder:text-disabled-foreground hover:border-0 focus-visible:border-0 focus-visible:ring-0"
+          className="text-body placeholder:text-disabled-foreground max-h-40 min-h-[52px] resize-none rounded-none border-0 bg-transparent px-0 py-0 shadow-none hover:border-0 focus-visible:border-0 focus-visible:ring-0"
           placeholder={placeholder}
           value={value}
           onChange={(event) => {
@@ -178,7 +189,7 @@ export function Composer({
         <Separator />
 
         <div className="flex min-h-10 items-end justify-between gap-2 pt-2.5">
-          <div className="flex min-w-0 flex-1 items-center gap-2.5 text-caption text-muted-foreground">
+          <div className="text-caption text-muted-foreground flex min-w-0 flex-1 items-center gap-2.5">
             {sessionModelInfo ? (
               <Select
                 value={sessionModelInfo.modelId}
@@ -190,7 +201,7 @@ export function Composer({
                 <SelectTrigger
                   aria-label="模型"
                   size="sm"
-                  className="h-[26px] w-auto min-w-0 gap-1 rounded-md border-0 bg-secondary px-2.5 text-caption font-medium text-secondary-foreground"
+                  className="bg-secondary text-caption text-secondary-foreground h-[26px] w-auto min-w-0 gap-1 rounded-md border-0 px-2.5 font-medium"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -215,18 +226,18 @@ export function Composer({
                 <SelectTrigger
                   aria-label="思考强度"
                   size="sm"
-                  className="h-6 w-[96px] gap-1.5 border-0 bg-transparent p-0 text-caption text-muted-foreground hover:border-0 [&>svg]:hidden"
+                  className="text-caption text-muted-foreground h-6 w-[96px] gap-1.5 border-0 bg-transparent p-0 hover:border-0 [&>svg]:hidden"
                 >
                   <span>思考</span>
-                  <span className="relative h-[5px] w-16 shrink-0 rounded-full bg-border">
+                  <span className="bg-border relative h-[5px] w-16 shrink-0 rounded-full">
                     <span
                       aria-hidden="true"
-                      className="absolute inset-y-0 left-0 rounded-full bg-primary"
+                      className="bg-primary absolute inset-y-0 left-0 rounded-full"
                       style={{ width: `${thinkingProgress * 100}%` }}
                     />
                     <span
                       aria-hidden="true"
-                      className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-background"
+                      className="border-primary bg-background absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
                       style={{ left: `${thinkingProgress * 100}%` }}
                     />
                   </span>
@@ -244,7 +255,9 @@ export function Composer({
             ) : null}
 
             {isLoadingModelInfo ? (
-              <span className="shrink-0 text-[10px] text-muted-foreground">加载中...</span>
+              <span className="text-muted-foreground shrink-0 text-[10px]">
+                加载中...
+              </span>
             ) : null}
           </div>
 

@@ -8,7 +8,7 @@ import {
   type DesktopIpcChannel,
   type DesktopIpcRequest,
   type DesktopIpcResponse,
-  type RuntimeSnapshot
+  type RuntimeSnapshot,
 } from '@tangyuan/contracts'
 import { describe, expect, it, vi } from 'vitest'
 import type { TangyuanRuntime } from '@tangyuan/agent-runtime'
@@ -16,7 +16,7 @@ import { registerDesktopAppIpc, type IpcMainLike } from './ipc'
 
 type IpcHandler<Channel extends DesktopIpcChannel> = (
   event: unknown,
-  payload: DesktopIpcRequest<Channel>
+  payload: DesktopIpcRequest<Channel>,
 ) => Promise<DesktopIpcResponse<Channel>>
 
 describe('registerDesktopAppIpc', () => {
@@ -25,20 +25,22 @@ describe('registerDesktopAppIpc', () => {
     const ipcMain: IpcMainLike = {
       handle: vi.fn((channel, handler) => {
         handlers.set(channel, handler as IpcHandler<DesktopIpcChannel>)
-      }) as IpcMainLike['handle']
+      }) as IpcMainLike['handle'],
     }
     const snapshot = createMissingConfigurationSnapshot()
     const session = createSessionSummary()
     const lastActiveSession = {
       agentId: 'tangyuan',
       sessionId: 'session-1',
-      updatedAt: '2026-07-28T14:00:00.000Z'
+      updatedAt: '2026-07-28T14:00:00.000Z',
     }
     const runtime: TangyuanRuntime = {
       getRuntimeSnapshot: vi.fn().mockResolvedValue(snapshot),
       refreshRuntime: vi.fn().mockResolvedValue(snapshot),
       saveRuntimeConfiguration: vi.fn().mockResolvedValue(snapshot),
-      cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(snapshot),
+      cancelRuntimeConfigurationVerification: vi
+        .fn()
+        .mockResolvedValue(snapshot),
       listSessions: vi.fn().mockResolvedValue([session]),
       getLastActiveSession: vi.fn().mockResolvedValue(lastActiveSession),
       setLastActiveSession: vi.fn().mockResolvedValue(lastActiveSession),
@@ -47,25 +49,25 @@ describe('registerDesktopAppIpc', () => {
         sessionId: 'session-1',
         agentId: 'tangyuan',
         entries: [],
-        updatedAt: '2026-01-01T00:00:00.000Z'
+        updatedAt: '2026-01-01T00:00:00.000Z',
       }),
       sendMessage: vi.fn().mockResolvedValue({
         sessionId: 'session-1',
         agentId: 'tangyuan',
         entries: [],
-        updatedAt: '2026-01-01T00:00:00.000Z'
+        updatedAt: '2026-01-01T00:00:00.000Z',
       }),
       retryMessage: vi.fn().mockResolvedValue({
         sessionId: 'session-1',
         agentId: 'tangyuan',
         entries: [],
-        updatedAt: '2026-01-01T00:00:00.000Z'
+        updatedAt: '2026-01-01T00:00:00.000Z',
       }),
       forkSession: vi.fn().mockResolvedValue(session),
       archiveSession: vi.fn().mockResolvedValue({
         status: 'archived',
         affectedSessionIds: ['session-1'],
-        affectedActivities: []
+        affectedActivities: [],
       }),
       recoverSession: vi.fn().mockResolvedValue([session]),
       deleteSession: vi.fn(),
@@ -79,9 +81,10 @@ describe('registerDesktopAppIpc', () => {
       updateAgentConfig: vi.fn().mockResolvedValue(snapshot.agents[0]),
       archiveAgent: vi.fn().mockResolvedValue(snapshot.agents[0]),
       recoverAgent: vi.fn().mockResolvedValue(snapshot.agents[0]),
-      reconcileAgentDirectories: vi
-        .fn()
-        .mockResolvedValue({ agents: snapshot.agents, unclaimedDirectories: [] }),
+      reconcileAgentDirectories: vi.fn().mockResolvedValue({
+        agents: snapshot.agents,
+        unclaimedDirectories: [],
+      }),
       claimAgentDirectory: vi.fn().mockResolvedValue(snapshot.agents[0]),
       rebuildTangyuanHome: vi.fn().mockResolvedValue(snapshot.agents[0]),
       getSessionModelInfo: vi.fn().mockResolvedValue({
@@ -90,7 +93,7 @@ describe('registerDesktopAppIpc', () => {
         displayName: 'Claude Sonnet 4.5',
         thinkingLevel: null,
         supportedThinkingLevels: [],
-        supportsThinking: false
+        supportsThinking: false,
       }),
       setSessionModel: vi.fn().mockResolvedValue({
         providerId: 'anthropic',
@@ -98,7 +101,7 @@ describe('registerDesktopAppIpc', () => {
         displayName: 'Claude Sonnet 4.5',
         thinkingLevel: null,
         supportedThinkingLevels: [],
-        supportsThinking: false
+        supportsThinking: false,
       }),
       setSessionThinkingLevel: vi.fn().mockResolvedValue({
         providerId: 'anthropic',
@@ -106,28 +109,28 @@ describe('registerDesktopAppIpc', () => {
         displayName: 'Claude Sonnet 4.5',
         thinkingLevel: 'medium',
         supportedThinkingLevels: ['low', 'medium', 'high'],
-        supportsThinking: true
+        supportsThinking: true,
       }),
       getSoul: vi.fn().mockResolvedValue({
         agentId: 'tangyuan',
         content: '# Soul content',
         updatedAt: '2026-07-08T00:00:00.000Z',
-        version: 'sha256:soul'
+        version: 'sha256:soul',
       }),
       getUserProfile: vi.fn().mockResolvedValue({
         content: '# User profile',
         updatedAt: '2026-07-08T00:00:00.000Z',
-        version: 'sha256:user'
+        version: 'sha256:user',
       }),
       updateSoul: vi.fn().mockResolvedValue({
         target: 'soul',
         status: 'updated',
-        version: 'sha256:new-soul'
+        version: 'sha256:new-soul',
       }),
       updateUserProfile: vi.fn().mockResolvedValue({
         target: 'user',
         status: 'updated',
-        version: 'sha256:new-user'
+        version: 'sha256:new-user',
       }),
       reloadAgentSessions: vi.fn().mockResolvedValue(undefined),
       reloadAllSessions: vi.fn().mockResolvedValue(undefined),
@@ -137,8 +140,8 @@ describe('registerDesktopAppIpc', () => {
           description: 'A skill.',
           source: 'agent',
           path: '/path/SKILL.md',
-          hasScripts: false
-        }
+          hasScripts: false,
+        },
       ]),
       listSharedSkills: vi.fn().mockResolvedValue([
         {
@@ -146,8 +149,8 @@ describe('registerDesktopAppIpc', () => {
           description: 'A shared skill.',
           source: 'shared',
           path: '/skills/shared/SKILL.md',
-          hasScripts: false
-        }
+          hasScripts: false,
+        },
       ]),
       approveBash: vi.fn().mockResolvedValue(undefined),
       rejectBash: vi.fn().mockResolvedValue(undefined),
@@ -161,7 +164,7 @@ describe('registerDesktopAppIpc', () => {
       approveSkillOperation: vi.fn().mockResolvedValue(undefined),
       rejectSkillOperation: vi.fn().mockResolvedValue(undefined),
       getPendingSkillApprovals: vi.fn().mockReturnValue([]),
-      getSkillInstallRecords: vi.fn().mockResolvedValue([])
+      getSkillInstallRecords: vi.fn().mockResolvedValue([]),
     }
     const broadcastAgentEvent = vi.fn()
     const openExternalLink = vi.fn().mockResolvedValue(undefined)
@@ -169,151 +172,180 @@ describe('registerDesktopAppIpc', () => {
       listener(createAttemptStartedEvent())
 
       return {
-        unsubscribe: vi.fn()
+        unsubscribe: vi.fn(),
       }
     })
 
-    registerDesktopAppIpc(ipcMain, runtime, broadcastAgentEvent, openExternalLink)
+    registerDesktopAppIpc(
+      ipcMain,
+      runtime,
+      broadcastAgentEvent,
+      openExternalLink,
+    )
 
     expect(ipcMain.handle).toHaveBeenCalledTimes(47)
-    expect(broadcastAgentEvent).toHaveBeenCalledWith(createAttemptStartedEvent())
+    expect(broadcastAgentEvent).toHaveBeenCalledWith(
+      createAttemptStartedEvent(),
+    )
     await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(
+        null,
+        undefined,
+      ),
     ).resolves.toEqual(snapshot)
     await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeRefresh)(null, undefined)
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeRefresh)(
+        null,
+        undefined,
+      ),
     ).resolves.toEqual(snapshot)
     await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration)(null, {
-        providerId: 'anthropic',
-        modelId: 'claude-sonnet-4-5',
-        apiKey: 'sk-test-secret-7890'
-      })
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration)(
+        null,
+        {
+          providerId: 'anthropic',
+          modelId: 'claude-sonnet-4-5',
+          apiKey: 'sk-test-secret-7890',
+        },
+      ),
     ).resolves.toEqual(snapshot)
     await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification)(null, {
-        verificationId: 'verify-1'
-      })
+      getHandler(
+        handlers,
+        DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification,
+      )(null, {
+        verificationId: 'verify-1',
+      }),
     ).resolves.toEqual(snapshot)
     await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsList)(null, { agentId: 'agent-2' })
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsList)(null, {
+        agentId: 'agent-2',
+      }),
     ).resolves.toEqual([session])
     expect(runtime.listSessions).toHaveBeenCalledWith('agent-2', undefined)
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsList)(null, {
         agentId: 'agent-2',
-        includeArchived: true
-      })
+        includeArchived: true,
+      }),
     ).resolves.toEqual([session])
     expect(runtime.listSessions).toHaveBeenLastCalledWith('agent-2', true)
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsCreate)(null, {
         agentId: 'tangyuan',
-        title: '新会话'
-      })
+        title: '新会话',
+      }),
     ).resolves.toEqual(session)
     await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsGetLastActive)(null, undefined)
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsGetLastActive)(
+        null,
+        undefined,
+      ),
     ).resolves.toEqual(lastActiveSession)
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsSetLastActive)(null, {
         agentId: 'tangyuan',
-        sessionId: 'session-1'
-      })
+        sessionId: 'session-1',
+      }),
     ).resolves.toEqual(lastActiveSession)
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsGetTranscript)(null, {
         agentId: 'tangyuan',
-        sessionId: 'session-1'
-      })
+        sessionId: 'session-1',
+      }),
     ).resolves.toEqual({
       sessionId: 'session-1',
       agentId: 'tangyuan',
       entries: [],
-      updatedAt: '2026-01-01T00:00:00.000Z'
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsSendMessage)(null, {
         agentId: 'tangyuan',
         sessionId: 'session-1',
-        content: '你好'
-      })
+        content: '你好',
+      }),
     ).resolves.toEqual({
       sessionId: 'session-1',
       agentId: 'tangyuan',
       entries: [],
-      updatedAt: '2026-01-01T00:00:00.000Z'
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsCancelRun)(null, {
         agentId: 'tangyuan',
-        sessionId: 'session-1'
-      })
+        sessionId: 'session-1',
+      }),
     ).resolves.toEqual(session)
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsArchive)(null, {
         agentId: 'tangyuan',
         sessionId: 'session-1',
-        confirmActivityStop: false
-      })
+        confirmActivityStop: false,
+      }),
     ).resolves.toMatchObject({ status: 'archived' })
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsRecover)(null, {
         agentId: 'tangyuan',
-        sessionId: 'session-1'
-      })
+        sessionId: 'session-1',
+      }),
     ).resolves.toEqual([session])
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.openExternalLink)(null, {
-        url: 'https://example.com'
-      })
+        url: 'https://example.com',
+      }),
     ).resolves.toBeUndefined()
     expect(openExternalLink).toHaveBeenCalledWith('https://example.com')
     expect(runtime.createSession).toHaveBeenCalledWith({
       agentId: 'tangyuan',
-      title: '新会话'
+      title: '新会话',
     })
     expect(runtime.saveRuntimeConfiguration).toHaveBeenCalledWith({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
-      apiKey: 'sk-test-secret-7890'
+      apiKey: 'sk-test-secret-7890',
     })
-    expect(runtime.cancelRuntimeConfigurationVerification).toHaveBeenCalledWith({
-      verificationId: 'verify-1'
-    })
+    expect(runtime.cancelRuntimeConfigurationVerification).toHaveBeenCalledWith(
+      {
+        verificationId: 'verify-1',
+      },
+    )
     expect(runtime.getTranscript).toHaveBeenCalledWith({
       agentId: 'tangyuan',
-      sessionId: 'session-1'
+      sessionId: 'session-1',
     })
     expect(runtime.sendMessage).toHaveBeenCalledWith({
       agentId: 'tangyuan',
       sessionId: 'session-1',
-      content: '你好'
+      content: '你好',
     })
     expect(runtime.cancelRun).toHaveBeenCalledWith({
       agentId: 'tangyuan',
-      sessionId: 'session-1'
+      sessionId: 'session-1',
     })
 
     // Profile channel tests
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.profileGetSoul)(null, {
-        agentId: 'tangyuan'
-      })
+        agentId: 'tangyuan',
+      }),
     ).resolves.toEqual({
       agentId: 'tangyuan',
       content: '# Soul content',
       updatedAt: '2026-07-08T00:00:00.000Z',
-      version: 'sha256:soul'
+      version: 'sha256:soul',
     })
     expect(runtime.getSoul).toHaveBeenCalledWith('tangyuan')
 
     await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.profileGetUser)(null, undefined)
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.profileGetUser)(
+        null,
+        undefined,
+      ),
     ).resolves.toEqual({
       content: '# User profile',
       updatedAt: '2026-07-08T00:00:00.000Z',
-      version: 'sha256:user'
+      version: 'sha256:user',
     })
     expect(runtime.getUserProfile).toHaveBeenCalledOnce()
 
@@ -321,53 +353,63 @@ describe('registerDesktopAppIpc', () => {
       getHandler(handlers, DESKTOP_IPC_CHANNELS.profileUpdateSoul)(null, {
         agentId: 'tangyuan',
         content: 'New soul',
-        expectedVersion: 'sha256:old'
-      })
+        expectedVersion: 'sha256:old',
+      }),
     ).resolves.toEqual({
       target: 'soul',
       status: 'updated',
-      version: 'sha256:new-soul'
+      version: 'sha256:new-soul',
     })
-    expect(runtime.updateSoul).toHaveBeenCalledWith('tangyuan', 'New soul', 'sha256:old')
+    expect(runtime.updateSoul).toHaveBeenCalledWith(
+      'tangyuan',
+      'New soul',
+      'sha256:old',
+    )
 
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.profileUpdateUser)(null, {
         content: 'New user profile',
-        expectedVersion: 'sha256:old'
-      })
+        expectedVersion: 'sha256:old',
+      }),
     ).resolves.toEqual({
       target: 'user',
       status: 'updated',
-      version: 'sha256:new-user'
+      version: 'sha256:new-user',
     })
-    expect(runtime.updateUserProfile).toHaveBeenCalledWith('New user profile', 'sha256:old')
+    expect(runtime.updateUserProfile).toHaveBeenCalledWith(
+      'New user profile',
+      'sha256:old',
+    )
 
     // Skills channel tests
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.skillsListAgent)(null, {
-        agentId: 'agent-1'
-      })
+        agentId: 'agent-1',
+      }),
     ).resolves.toEqual([
       {
         name: 'skill-1',
         description: 'A skill.',
         source: 'agent',
         path: '/path/SKILL.md',
-        hasScripts: false
-      }
+        hasScripts: false,
+      },
     ])
     expect(runtime.listAgentSkills).toHaveBeenCalledWith('agent-1')
 
     await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.skillsListShared)(null, undefined)
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.skillsListShared)(
+        null,
+        undefined,
+      ),
     ).resolves.toEqual([
       {
         name: 'shared-skill',
         description: 'A shared skill.',
         source: 'shared',
         path: '/skills/shared/SKILL.md',
-        hasScripts: false
-      }
+        hasScripts: false,
+      },
     ])
     expect(runtime.listSharedSkills).toHaveBeenCalledOnce()
   })
@@ -377,14 +419,16 @@ describe('registerDesktopAppIpc', () => {
     const ipcMain: IpcMainLike = {
       handle: vi.fn((channel, handler) => {
         handlers.set(channel, handler as IpcHandler<DesktopIpcChannel>)
-      }) as IpcMainLike['handle']
+      }) as IpcMainLike['handle'],
     }
     const snapshot = createMissingConfigurationSnapshot()
     const runtime: TangyuanRuntime = {
       getRuntimeSnapshot: vi.fn().mockResolvedValue(snapshot),
       refreshRuntime: vi.fn().mockResolvedValue(snapshot),
       saveRuntimeConfiguration: vi.fn().mockResolvedValue(snapshot),
-      cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(snapshot),
+      cancelRuntimeConfigurationVerification: vi
+        .fn()
+        .mockResolvedValue(snapshot),
       listSessions: vi.fn().mockResolvedValue([]),
       getLastActiveSession: vi.fn().mockResolvedValue(null),
       setLastActiveSession: vi.fn().mockResolvedValue(null),
@@ -393,19 +437,19 @@ describe('registerDesktopAppIpc', () => {
         sessionId: 'session-1',
         agentId: 'tangyuan',
         entries: [],
-        updatedAt: '2026-01-01T00:00:00.000Z'
+        updatedAt: '2026-01-01T00:00:00.000Z',
       }),
       sendMessage: vi.fn().mockResolvedValue({
         sessionId: 'session-1',
         agentId: 'tangyuan',
         entries: [],
-        updatedAt: '2026-01-01T00:00:00.000Z'
+        updatedAt: '2026-01-01T00:00:00.000Z',
       }),
       retryMessage: vi.fn().mockResolvedValue({
         sessionId: 'session-1',
         agentId: 'tangyuan',
         entries: [],
-        updatedAt: '2026-01-01T00:00:00.000Z'
+        updatedAt: '2026-01-01T00:00:00.000Z',
       }),
       forkSession: vi.fn(),
       archiveSession: vi.fn(),
@@ -421,9 +465,10 @@ describe('registerDesktopAppIpc', () => {
       updateAgentConfig: vi.fn().mockResolvedValue(snapshot.agents[0]),
       archiveAgent: vi.fn().mockResolvedValue(snapshot.agents[0]),
       recoverAgent: vi.fn().mockResolvedValue(snapshot.agents[0]),
-      reconcileAgentDirectories: vi
-        .fn()
-        .mockResolvedValue({ agents: snapshot.agents, unclaimedDirectories: [] }),
+      reconcileAgentDirectories: vi.fn().mockResolvedValue({
+        agents: snapshot.agents,
+        unclaimedDirectories: [],
+      }),
       claimAgentDirectory: vi.fn().mockResolvedValue(snapshot.agents[0]),
       rebuildTangyuanHome: vi.fn().mockResolvedValue(snapshot.agents[0]),
       getSessionModelInfo: vi.fn().mockResolvedValue({
@@ -432,7 +477,7 @@ describe('registerDesktopAppIpc', () => {
         displayName: 'Claude Sonnet 4.5',
         thinkingLevel: null,
         supportedThinkingLevels: [],
-        supportsThinking: false
+        supportsThinking: false,
       }),
       setSessionModel: vi.fn().mockResolvedValue({
         providerId: 'anthropic',
@@ -440,7 +485,7 @@ describe('registerDesktopAppIpc', () => {
         displayName: 'Claude Sonnet 4.5',
         thinkingLevel: null,
         supportedThinkingLevels: [],
-        supportsThinking: false
+        supportsThinking: false,
       }),
       setSessionThinkingLevel: vi.fn().mockResolvedValue({
         providerId: 'anthropic',
@@ -448,28 +493,28 @@ describe('registerDesktopAppIpc', () => {
         displayName: 'Claude Sonnet 4.5',
         thinkingLevel: 'medium',
         supportedThinkingLevels: ['low', 'medium', 'high'],
-        supportsThinking: true
+        supportsThinking: true,
       }),
       getSoul: vi.fn().mockResolvedValue({
         agentId: 'tangyuan',
         content: '',
         updatedAt: '',
-        version: 'sha256:empty'
+        version: 'sha256:empty',
       }),
       getUserProfile: vi.fn().mockResolvedValue({
         content: '',
         updatedAt: '',
-        version: 'sha256:empty'
+        version: 'sha256:empty',
       }),
       updateSoul: vi.fn().mockResolvedValue({
         target: 'soul' as const,
         status: 'updated' as const,
-        version: 'sha256:new-soul'
+        version: 'sha256:new-soul',
       }),
       updateUserProfile: vi.fn().mockResolvedValue({
         target: 'user' as const,
         status: 'updated' as const,
-        version: 'sha256:new-user'
+        version: 'sha256:new-user',
       }),
       listAgentSkills: vi.fn().mockResolvedValue([]),
       listSharedSkills: vi.fn().mockResolvedValue([]),
@@ -487,7 +532,7 @@ describe('registerDesktopAppIpc', () => {
       approveSkillOperation: vi.fn().mockResolvedValue(undefined),
       rejectSkillOperation: vi.fn().mockResolvedValue(undefined),
       getPendingSkillApprovals: vi.fn().mockReturnValue([]),
-      getSkillInstallRecords: vi.fn().mockResolvedValue([])
+      getSkillInstallRecords: vi.fn().mockResolvedValue([]),
     }
 
     registerDesktopAppIpc(ipcMain, runtime)
@@ -495,16 +540,16 @@ describe('registerDesktopAppIpc', () => {
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsCreate)(null, {
         agentId: 'tangyuan',
-        title: '   '
-      })
+        title: '   ',
+      }),
     ).rejects.toThrow()
     expect(runtime.createSession).not.toHaveBeenCalled()
 
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsArchive)(null, {
         agentId: 'tangyuan',
-        sessionId: 'session-1'
-      } as never)
+        sessionId: 'session-1',
+      } as never),
     ).rejects.toThrow()
     expect(runtime.archiveSession).not.toHaveBeenCalled()
   })
@@ -514,12 +559,12 @@ describe('registerDesktopAppIpc', () => {
     const ipcMain: IpcMainLike = {
       handle: vi.fn((channel, handler) => {
         handlers.set(channel, handler as IpcHandler<DesktopIpcChannel>)
-      }) as IpcMainLike['handle']
+      }) as IpcMainLike['handle'],
     }
     const runtime = {
       getRuntimeSnapshot: vi.fn().mockResolvedValue({
         ...createMissingConfigurationSnapshot(),
-        status: 'unexpected-status'
+        status: 'unexpected-status',
       }),
       refreshRuntime: vi.fn(),
       saveRuntimeConfiguration: vi.fn(),
@@ -531,7 +576,7 @@ describe('registerDesktopAppIpc', () => {
         sessionId: 'session-1',
         agentId: 'tangyuan',
         entries: [],
-        updatedAt: '2026-01-01T00:00:00.000Z'
+        updatedAt: '2026-01-01T00:00:00.000Z',
       }),
       forkSession: vi.fn(),
       archiveSession: vi.fn(),
@@ -552,13 +597,16 @@ describe('registerDesktopAppIpc', () => {
       approveSkillOperation: vi.fn(),
       rejectSkillOperation: vi.fn(),
       getPendingSkillApprovals: vi.fn(),
-      getSkillInstallRecords: vi.fn()
+      getSkillInstallRecords: vi.fn(),
     } as unknown as TangyuanRuntime
 
     registerDesktopAppIpc(ipcMain, runtime)
 
     await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(
+        null,
+        undefined,
+      ),
     ).rejects.toThrow()
   })
 })
@@ -573,7 +621,7 @@ describe('registerDesktopAppIpc', () => {
  */
 function getHandler<Channel extends DesktopIpcChannel>(
   handlers: Map<DesktopIpcChannel, IpcHandler<DesktopIpcChannel>>,
-  channel: Channel
+  channel: Channel,
 ): IpcHandler<Channel> {
   const handler = handlers.get(channel)
 
@@ -600,21 +648,21 @@ function createMissingConfigurationSnapshot(): RuntimeSnapshot {
         initialized: false,
         bootstrapRequired: true,
         soulUpdatedAt: null,
-        userUpdatedAt: null
-      }
+        userUpdatedAt: null,
+      },
     },
     providers: [],
     models: [],
     settings: {
       selectedProviderId: null,
-      selectedModelId: null
+      selectedModelId: null,
     },
     auth: {
       apiKey: {
         configured: false,
-        maskedValue: null
-      }
-    }
+        maskedValue: null,
+      },
+    },
   })
 }
 
@@ -628,7 +676,7 @@ function createSessionSummary(): AgentSessionSummary {
   return createDefaultSessionSummary({
     sessionId: 'session-1',
     title: '新会话',
-    updatedAt: '2026-07-08T00:00:00.000Z'
+    updatedAt: '2026-07-08T00:00:00.000Z',
   })
 }
 
@@ -644,6 +692,6 @@ function createAttemptStartedEvent(): AgentEvent {
     agentId: TANGYUAN_DEFAULT_AGENT_ID,
     sessionId: 'session-1',
     runId: 'run-1',
-    occurredAt: '2026-07-08T00:00:00.000Z'
+    occurredAt: '2026-07-08T00:00:00.000Z',
   }
 }

@@ -9,7 +9,7 @@ export async function focusInteractiveCard(page: Page): Promise<Locator> {
 }
 
 export async function pressInteractiveCard(
-  page: Page
+  page: Page,
 ): Promise<{ card: Locator; release: () => Promise<void> }> {
   const card = page.getByTestId('card-interactive-active')
   await card.scrollIntoViewIfNeeded()
@@ -24,6 +24,6 @@ export async function pressInteractiveCard(
 
   return {
     card,
-    release: () => page.mouse.up()
+    release: () => page.mouse.up(),
   }
 }

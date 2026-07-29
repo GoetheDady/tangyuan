@@ -1,5 +1,14 @@
 import type { RuntimeConfiguration, RuntimeSnapshot } from '@tangyuan/contracts'
-import { Eye, EyeOff, History, LoaderCircle, Lock, RefreshCcw, ShieldCheck, TriangleAlert } from 'lucide-react'
+import {
+  Eye,
+  EyeOff,
+  History,
+  LoaderCircle,
+  Lock,
+  RefreshCcw,
+  ShieldCheck,
+  TriangleAlert,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -12,7 +21,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from '@/components/ui/select'
 
 /**
@@ -35,8 +44,11 @@ export function ConsoleProviderPage(): React.JSX.Element {
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isVerifying, setIsVerifying] = useState(false)
-  const [verificationError, setVerificationError] = useState<string | null>(null)
-  const [isRestoringConfiguration, setIsRestoringConfiguration] = useState(false)
+  const [verificationError, setVerificationError] = useState<string | null>(
+    null,
+  )
+  const [isRestoringConfiguration, setIsRestoringConfiguration] =
+    useState(false)
 
   const [selectedProviderId, setSelectedProviderId] = useState('')
   const [apiKey, setApiKey] = useState('')
@@ -59,7 +71,9 @@ export function ConsoleProviderPage(): React.JSX.Element {
       })
       .catch((error: unknown) => {
         if (!isMounted) return
-        toast.error(error instanceof Error ? error.message : '无法读取运行时状态')
+        toast.error(
+          error instanceof Error ? error.message : '无法读取运行时状态',
+        )
       })
       .finally(() => {
         if (isMounted) setIsLoading(false)
@@ -74,34 +88,54 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
   // 当前选中 Provider 的可用模型列表
   const selectableModels = useMemo(
-    () => runtime?.models.filter((m) => m.providerId === selectedProviderId) ?? [],
-    [runtime, selectedProviderId]
+    () =>
+      runtime?.models.filter((m) => m.providerId === selectedProviderId) ?? [],
+    [runtime, selectedProviderId],
   )
 
   // 当前选中 Provider 的展示名称
   const selectedProviderDisplayName = useMemo(
-    () => runtime?.providers.find((p) => p.providerId === selectedProviderId)?.displayName ?? '',
-    [runtime, selectedProviderId]
+    () =>
+      runtime?.providers.find((p) => p.providerId === selectedProviderId)
+        ?.displayName ?? '',
+    [runtime, selectedProviderId],
   )
 
   // 当前选中 Model 的展示名称
   const selectedModelDisplayName = useMemo(
-    () => selectableModels.find((m) => m.modelId === selectedModelId)?.displayName ?? '',
-    [selectableModels, selectedModelId]
+    () =>
+      selectableModels.find((m) => m.modelId === selectedModelId)
+        ?.displayName ?? '',
+    [selectableModels, selectedModelId],
   )
 
-  const canSubmit = Boolean(selectedProviderId) && apiKey.trim().length > 0 && Boolean(selectedModelId)
+  const canSubmit =
+    Boolean(selectedProviderId) &&
+    apiKey.trim().length > 0 &&
+    Boolean(selectedModelId)
 
   // 配置已就绪时自动跳转（仅 ChatGuard 强制跳转场景，有 redirect 参数时才执行）
   const initialRedirectAttempted = useRef(false)
   useEffect(() => {
     if (initialRedirectAttempted.current) return
     const wasRedirectedFromGuard = searchParams.has('redirect')
-    if (!isLoading && !isVerifying && runtime?.status === 'ready' && wasRedirectedFromGuard) {
+    if (
+      !isLoading &&
+      !isVerifying &&
+      runtime?.status === 'ready' &&
+      wasRedirectedFromGuard
+    ) {
       initialRedirectAttempted.current = true
       navigate(redirectTarget, { replace: true })
     }
-  }, [isLoading, isVerifying, runtime?.status, navigate, redirectTarget, searchParams])
+  }, [
+    isLoading,
+    isVerifying,
+    runtime?.status,
+    navigate,
+    redirectTarget,
+    searchParams,
+  ])
 
   /**
    * 刷新 Provider 和模型资源。
@@ -115,7 +149,9 @@ export function ConsoleProviderPage(): React.JSX.Element {
       setRuntime(nextRuntime)
 
       // 刷新后如果当前 Provider 不再可用，切换到第一个
-      if (!nextRuntime.providers.find((p) => p.providerId === selectedProviderId)) {
+      if (
+        !nextRuntime.providers.find((p) => p.providerId === selectedProviderId)
+      ) {
         const firstProvider = nextRuntime.providers[0]
         setSelectedProviderId(firstProvider?.providerId ?? '')
         setSelectedModelId('')
@@ -140,14 +176,15 @@ export function ConsoleProviderPage(): React.JSX.Element {
     const configuration: RuntimeConfiguration = {
       providerId: selectedProviderId,
       modelId: selectedModelId,
-      apiKey
+      apiKey,
     }
 
     setIsVerifying(true)
     setVerificationError(null)
 
     try {
-      const nextRuntime = await window.api.saveRuntimeConfiguration(configuration)
+      const nextRuntime =
+        await window.api.saveRuntimeConfiguration(configuration)
       setRuntime(nextRuntime)
       setApiKey('')
       setVerificationError(null)
@@ -158,7 +195,9 @@ export function ConsoleProviderPage(): React.JSX.Element {
       navigate(redirectTarget, { replace: true })
     } catch (error) {
       setVerificationError(
-        error instanceof Error ? error.message : '认证失败，请检查 API Key 是否有效或网络是否可用。'
+        error instanceof Error
+          ? error.message
+          : '认证失败，请检查 API Key 是否有效或网络是否可用。',
       )
     } finally {
       setIsVerifying(false)
@@ -173,9 +212,10 @@ export function ConsoleProviderPage(): React.JSX.Element {
    */
   const cancelVerification = async (): Promise<void> => {
     try {
-      const nextRuntime = await window.api.cancelRuntimeConfigurationVerification({
-        verificationId: 'current'
-      })
+      const nextRuntime =
+        await window.api.cancelRuntimeConfigurationVerification({
+          verificationId: 'current',
+        })
       setRuntime(nextRuntime)
       setVerificationError(null)
       toast.success('已取消配置验证')
@@ -202,7 +242,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
   // ===== 加载态 =====
   if (isLoading) {
     return (
-      <main className="grid min-h-full place-items-center bg-background text-foreground">
+      <main className="bg-background text-foreground grid min-h-full place-items-center">
         <div className="text-body text-muted-foreground">正在打开控制台...</div>
       </main>
     )
@@ -215,15 +255,21 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
   if (isConfigCorrupted) {
     return (
-      <main className="flex min-h-full items-center justify-center bg-background px-6 text-foreground">
+      <main className="bg-background text-foreground flex min-h-full items-center justify-center px-6">
         <div className="w-full max-w-[520px] space-y-6">
           {/* 警告图标 */}
-          <div className="grid size-11 place-items-center rounded-xl bg-warning-soft">
-            <TriangleAlert size={20} className="text-warning-foreground" aria-hidden="true" />
+          <div className="bg-warning-soft grid size-11 place-items-center rounded-xl">
+            <TriangleAlert
+              size={20}
+              className="text-warning-foreground"
+              aria-hidden="true"
+            />
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-page-title font-semibold leading-tight">无法读取本地配置</h1>
+            <h1 className="text-page-title leading-tight font-semibold">
+              无法读取本地配置
+            </h1>
             <p className="text-body text-muted-foreground">
               {runtime?.configRecovery.state === 'migration-failed'
                 ? '本地配置在迁移过程中出现问题。你可以恢复最近的备份，或清除配置后重新连接模型服务。'
@@ -233,11 +279,17 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
           {/* 备份可用提示 */}
           {runtime?.configRecovery.hasBackup ? (
-            <div className="flex items-start gap-2.5 rounded-lg bg-card p-3">
-              <History size={15} className="mt-px shrink-0 text-success-foreground" aria-hidden="true" />
+            <div className="bg-card flex items-start gap-2.5 rounded-lg p-3">
+              <History
+                size={15}
+                className="text-success-foreground mt-px shrink-0"
+                aria-hidden="true"
+              />
               <div>
                 <p className="text-caption font-semibold">最近备份可用</p>
-                <p className="text-[10px] text-muted-foreground">恢复后将重新检查 Provider 和模型配置</p>
+                <p className="text-muted-foreground text-[10px]">
+                  恢复后将重新检查 Provider 和模型配置
+                </p>
               </div>
             </div>
           ) : null}
@@ -255,7 +307,9 @@ export function ConsoleProviderPage(): React.JSX.Element {
                     setRuntime(nextRuntime)
                     toast.success('已从备份恢复配置')
                   } catch (error) {
-                    toast.error(error instanceof Error ? error.message : '恢复配置失败')
+                    toast.error(
+                      error instanceof Error ? error.message : '恢复配置失败',
+                    )
                   } finally {
                     setIsRestoringConfiguration(false)
                   }
@@ -276,7 +330,9 @@ export function ConsoleProviderPage(): React.JSX.Element {
                   setRuntime(nextRuntime)
                   toast.success('已重置配置')
                 } catch (error) {
-                  toast.error(error instanceof Error ? error.message : '重置配置失败')
+                  toast.error(
+                    error instanceof Error ? error.message : '重置配置失败',
+                  )
                 } finally {
                   setIsRestoringConfiguration(false)
                 }
@@ -288,8 +344,14 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
           {/* 数据安全提示 */}
           <div className="flex items-center gap-2">
-            <ShieldCheck size={13} className="shrink-0 text-muted-foreground" aria-hidden="true" />
-            <p className="text-[10px] text-muted-foreground">不会删除 Agent、用户资料或历史会话</p>
+            <ShieldCheck
+              size={13}
+              className="text-muted-foreground shrink-0"
+              aria-hidden="true"
+            />
+            <p className="text-muted-foreground text-[10px]">
+              不会删除 Agent、用户资料或历史会话
+            </p>
           </div>
         </div>
       </main>
@@ -298,14 +360,16 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
   // ===== 默认 / 验证中 / 验证失败态 =====
   return (
-    <main className="flex min-h-full items-center justify-center bg-background px-6 text-foreground">
+    <main className="bg-background text-foreground flex min-h-full items-center justify-center px-6">
       <div className="w-full max-w-[520px] space-y-5">
         {/* 表单头部 */}
         <div className="space-y-2">
-          <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-muted-foreground text-[9px] font-semibold tracking-wide uppercase">
             首次配置
           </p>
-          <h1 className="text-page-title font-semibold leading-tight">连接模型服务</h1>
+          <h1 className="text-page-title leading-tight font-semibold">
+            连接模型服务
+          </h1>
           <p className="text-body text-muted-foreground">
             配置一个可用的模型服务，并将所选模型作为默认 Agent 汤圆的初始模型。
           </p>
@@ -315,9 +379,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
         <div className="space-y-4">
           {/* Provider */}
           <div className="space-y-[7px]">
-            <Label className="text-label font-medium">
-              Provider
-            </Label>
+            <Label className="text-label font-medium">Provider</Label>
             <Select
               value={selectedProviderId}
               onValueChange={handleProviderChange}
@@ -325,13 +387,16 @@ export function ConsoleProviderPage(): React.JSX.Element {
             >
               <SelectTrigger
                 data-testid="setup-provider-select"
-                className="h-10 bg-card text-body"
+                className="bg-card text-body h-10"
               >
                 <SelectValue placeholder="选择 Provider" />
               </SelectTrigger>
               <SelectContent>
                 {runtime?.providers.map((provider) => (
-                  <SelectItem key={provider.providerId} value={provider.providerId}>
+                  <SelectItem
+                    key={provider.providerId}
+                    value={provider.providerId}
+                  >
                     {provider.displayName}
                   </SelectItem>
                 ))}
@@ -341,7 +406,10 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
           {/* API Key */}
           <div className="space-y-[7px]">
-            <Label htmlFor="setup-api-key-input" className="text-label font-medium">
+            <Label
+              htmlFor="setup-api-key-input"
+              className="text-label font-medium"
+            >
               API Key
             </Label>
             <div className="relative">
@@ -356,28 +424,34 @@ export function ConsoleProviderPage(): React.JSX.Element {
                   setVerificationError(null)
                 }}
                 disabled={isVerifying}
-                className={verificationError ? 'border-destructive ring-destructive/20' : ''}
+                className={
+                  verificationError
+                    ? 'border-destructive ring-destructive/20'
+                    : ''
+                }
                 aria-invalid={Boolean(verificationError)}
               />
               <button
                 type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors duration-200 hover:text-foreground disabled:opacity-50"
+                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors duration-200 disabled:opacity-50"
                 onClick={() => {
                   setShowApiKey(!showApiKey)
                 }}
                 disabled={isVerifying}
                 aria-label={showApiKey ? '隐藏 API Key' : '显示 API Key'}
               >
-                {showApiKey ? <EyeOff size={15} aria-hidden="true" /> : <Eye size={15} aria-hidden="true" />}
+                {showApiKey ? (
+                  <EyeOff size={15} aria-hidden="true" />
+                ) : (
+                  <Eye size={15} aria-hidden="true" />
+                )}
               </button>
             </div>
           </div>
 
           {/* Model */}
           <div className="space-y-[7px]">
-            <Label className="text-label font-medium">
-              Model
-            </Label>
+            <Label className="text-label font-medium">Model</Label>
             <Select
               value={selectedModelId}
               onValueChange={(value) => {
@@ -388,13 +462,16 @@ export function ConsoleProviderPage(): React.JSX.Element {
             >
               <SelectTrigger
                 data-testid="setup-model-select"
-                className="h-10 bg-card text-body"
+                className="bg-card text-body h-10"
               >
                 <SelectValue placeholder="选择模型" />
               </SelectTrigger>
               <SelectContent>
                 {selectableModels.map((model) => (
-                  <SelectItem key={`${model.providerId}:${model.modelId}`} value={model.modelId}>
+                  <SelectItem
+                    key={`${model.providerId}:${model.modelId}`}
+                    value={model.modelId}
+                  >
                     {model.displayName}
                   </SelectItem>
                 ))}
@@ -405,26 +482,44 @@ export function ConsoleProviderPage(): React.JSX.Element {
 
         {/* 安全提示 */}
         <div className="flex items-center gap-2">
-          <Lock size={13} className="shrink-0 text-muted-foreground" aria-hidden="true" />
-          <p className="text-[10px] text-muted-foreground">API Key 使用 macOS 安全存储加密保存在本机</p>
+          <Lock
+            size={13}
+            className="text-muted-foreground shrink-0"
+            aria-hidden="true"
+          />
+          <p className="text-muted-foreground text-[10px]">
+            API Key 使用 macOS 安全存储加密保存在本机
+          </p>
         </div>
 
         {/* 验证错误提示 */}
         {verificationError ? (
-          <div className="flex items-start gap-2.5 rounded-lg bg-destructive-soft border border-destructive-border p-3">
-            <TriangleAlert size={15} className="mt-px shrink-0 text-destructive-soft-foreground" aria-hidden="true" />
+          <div className="bg-destructive-soft border-destructive-border flex items-start gap-2.5 rounded-lg border p-3">
+            <TriangleAlert
+              size={15}
+              className="text-destructive-soft-foreground mt-px shrink-0"
+              aria-hidden="true"
+            />
             <div className="space-y-1">
-              <p className="text-caption font-semibold text-destructive-soft-foreground">无法连接模型服务</p>
-              <p className="text-[10px] leading-[1.45] text-destructive-soft-foreground">{verificationError}</p>
+              <p className="text-caption text-destructive-soft-foreground font-semibold">
+                无法连接模型服务
+              </p>
+              <p className="text-destructive-soft-foreground text-[10px] leading-[1.45]">
+                {verificationError}
+              </p>
             </div>
           </div>
         ) : null}
 
         {/* 验证中状态提示 */}
         {isVerifying ? (
-          <div className="flex items-center gap-2 rounded-lg bg-info-soft p-2.5">
-            <LoaderCircle size={14} className="animate-spin text-info-foreground" aria-hidden="true" />
-            <p className="text-caption font-medium text-info-foreground">
+          <div className="bg-info-soft flex items-center gap-2 rounded-lg p-2.5">
+            <LoaderCircle
+              size={14}
+              className="text-info-foreground animate-spin"
+              aria-hidden="true"
+            />
+            <p className="text-caption text-info-foreground font-medium">
               正在连接 {selectedProviderDisplayName}
               {selectedModelDisplayName ? ` · ${selectedModelDisplayName}` : ''}
             </p>
@@ -442,7 +537,11 @@ export function ConsoleProviderPage(): React.JSX.Element {
           >
             {isVerifying ? (
               <>
-                <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
+                <LoaderCircle
+                  size={14}
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
                 正在验证
               </>
             ) : verificationError ? (
@@ -455,7 +554,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
           {isVerifying ? (
             <button
               type="button"
-              className="block w-full rounded-lg py-2 text-caption font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground"
+              className="text-caption text-muted-foreground hover:text-foreground block w-full rounded-lg py-2 font-medium transition-colors duration-200"
               onClick={() => {
                 void cancelVerification()
               }}
@@ -504,8 +603,13 @@ export function ConsoleProviderPage(): React.JSX.Element {
  * @returns 无返回值。
  * @throws Preload API 错误会透传给调用方。
  */
-async function openBootstrapSessionIfRequired(nextRuntime: RuntimeSnapshot): Promise<void> {
-  if (nextRuntime.status !== 'ready' || !nextRuntime.activeAgent.profile.bootstrapRequired) {
+async function openBootstrapSessionIfRequired(
+  nextRuntime: RuntimeSnapshot,
+): Promise<void> {
+  if (
+    nextRuntime.status !== 'ready' ||
+    !nextRuntime.activeAgent.profile.bootstrapRequired
+  ) {
     return
   }
 
@@ -517,6 +621,6 @@ async function openBootstrapSessionIfRequired(nextRuntime: RuntimeSnapshot): Pro
 
   await window.api.createSession({
     agentId: nextRuntime.activeAgent.agentId,
-    title: 'Bootstrap 初始化'
+    title: 'Bootstrap 初始化',
   })
 }

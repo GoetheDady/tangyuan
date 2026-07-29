@@ -6,11 +6,18 @@ import type {
   DesktopPreloadApi,
   QuestionClarificationRequest,
   RuntimeSnapshot,
-  TranscriptSnapshot
+  TranscriptSnapshot,
 } from '@tangyuan/contracts'
 import { applyTranscriptDelta } from '@tangyuan/contracts'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
+import {
+  HashRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router'
 import { toast } from 'sonner'
 
 import { Toaster } from '@/components/ui/sonner'
@@ -20,14 +27,17 @@ import { ConsoleProviderPage } from '@/pages/ConsoleProviderPage'
 import { ConsoleAgentListPage } from '@/pages/ConsoleAgentListPage'
 import { ConsoleAgentDetailPage } from '@/pages/ConsoleAgentDetailPage'
 
-const componentFixturesEnabled = import.meta.env.DEV || import.meta.env.MODE === 'test'
+const componentFixturesEnabled =
+  import.meta.env.DEV || import.meta.env.MODE === 'test'
 const BaseComponentsFixturePage = componentFixturesEnabled
   ? lazy(() => import('@/fixtures/BaseComponentsFixturePage'))
   : null
 const ConversationComponentsFixturePage = componentFixturesEnabled
   ? lazy(() => import('@/fixtures/ConversationComponentsFixturePage'))
   : null
-const RendererRoutes = componentFixturesEnabled ? FixtureAwareRendererRoutes : DesktopRoutes
+const RendererRoutes = componentFixturesEnabled
+  ? FixtureAwareRendererRoutes
+  : DesktopRoutes
 
 interface DesktopWorkbenchState {
   runtime: RuntimeSnapshot | null
@@ -44,30 +54,39 @@ interface DesktopWorkbenchState {
 
 interface DesktopWorkbenchAction {
   setRuntime(value: RuntimeSnapshot | null): void
-  setAgents(value: AgentSummary[] | ((currentValue: AgentSummary[]) => AgentSummary[])): void
+  setAgents(
+    value: AgentSummary[] | ((currentValue: AgentSummary[]) => AgentSummary[]),
+  ): void
   setSessions(
-    value: AgentSessionSummary[] | ((currentValue: AgentSessionSummary[]) => AgentSessionSummary[])
+    value:
+      | AgentSessionSummary[]
+      | ((currentValue: AgentSessionSummary[]) => AgentSessionSummary[]),
   ): void
   setSelectedSessionId(
-    value: string | null | ((currentValue: string | null) => string | null)
+    value: string | null | ((currentValue: string | null) => string | null),
   ): void
   setTranscript(value: TranscriptSnapshot | null): void
   setComposerText(value: string): void
   setIsLoading(value: boolean): void
   setIsSendingMessage(value: boolean): void
   setPendingApprovals(
-    value: BashApprovalRequest[] | ((currentValue: BashApprovalRequest[]) => BashApprovalRequest[])
+    value:
+      | BashApprovalRequest[]
+      | ((currentValue: BashApprovalRequest[]) => BashApprovalRequest[]),
   ): void
   setPendingClarifications(
     value:
       | QuestionClarificationRequest[]
-      | ((currentValue: QuestionClarificationRequest[]) => QuestionClarificationRequest[])
+      | ((
+          currentValue: QuestionClarificationRequest[],
+        ) => QuestionClarificationRequest[]),
   ): void
   /** 将命令加入当前会话的"始终允许"列表。 */
   addAlwaysAllowedCommand(sessionId: string, command: string): void
 }
 
-export interface DesktopWorkbenchContext extends DesktopWorkbenchState, DesktopWorkbenchAction {}
+export interface DesktopWorkbenchContext
+  extends DesktopWorkbenchState, DesktopWorkbenchAction {}
 
 /**
  * 渲染桌面端应用的前端路由入口。
@@ -95,7 +114,10 @@ function App(): React.JSX.Element {
 function FixtureAwareRendererRoutes(): React.JSX.Element {
   const location = useLocation()
 
-  if (location.pathname === '/__fixtures__/base-components' && BaseComponentsFixturePage) {
+  if (
+    location.pathname === '/__fixtures__/base-components' &&
+    BaseComponentsFixturePage
+  ) {
     return (
       <Suspense fallback={<LoadingScreen />}>
         <BaseComponentsFixturePage />
@@ -128,13 +150,17 @@ function DesktopRoutes(): React.JSX.Element {
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null)
   const [agents, setAgents] = useState<AgentSummary[]>([])
   const [sessions, setSessions] = useState<AgentSessionSummary[]>([])
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    null,
+  )
   const selectedSessionIdRef = useRef<string | null>(null)
   const [transcript, setTranscript] = useState<TranscriptSnapshot | null>(null)
   const [composerText, setComposerText] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
-  const [pendingApprovals, setPendingApprovals] = useState<BashApprovalRequest[]>([])
+  const [pendingApprovals, setPendingApprovals] = useState<
+    BashApprovalRequest[]
+  >([])
   const [pendingClarifications, setPendingClarifications] = useState<
     QuestionClarificationRequest[]
   >([])
@@ -181,7 +207,7 @@ function DesktopRoutes(): React.JSX.Element {
     setIsSendingMessage,
     setPendingApprovals,
     setPendingClarifications,
-    addAlwaysAllowedCommand
+    addAlwaysAllowedCommand,
   }
 
   useEffect(() => {
@@ -195,7 +221,8 @@ function DesktopRoutes(): React.JSX.Element {
         setAgents(workbench.agents)
         setSessions(workbench.sessions)
         setSelectedSessionId(
-          (currentSessionId) => currentSessionId ?? workbench.activeSession?.sessionId ?? null
+          (currentSessionId) =>
+            currentSessionId ?? workbench.activeSession?.sessionId ?? null,
         )
         setTranscript((currentTranscript) => {
           const activeSessionId = selectedSessionIdRef.current
@@ -215,7 +242,9 @@ function DesktopRoutes(): React.JSX.Element {
       .catch((error: unknown) => {
         if (!isMounted) return
 
-        toast.error(error instanceof Error ? error.message : '无法读取桌面端运行时状态')
+        toast.error(
+          error instanceof Error ? error.message : '无法读取桌面端运行时状态',
+        )
         navigate('/console/providers', { replace: true })
       })
       .finally(() => {
@@ -233,10 +262,12 @@ function DesktopRoutes(): React.JSX.Element {
     return window.api.subscribeToAgentEvents((event) => {
       if (event.type === 'agent-created') {
         setAgents((currentAgents) => {
-          const exists = currentAgents.some((agent) => agent.agentId === event.agent.agentId)
+          const exists = currentAgents.some(
+            (agent) => agent.agentId === event.agent.agentId,
+          )
           if (exists) {
             return currentAgents.map((agent) =>
-              agent.agentId === event.agent.agentId ? event.agent : agent
+              agent.agentId === event.agent.agentId ? event.agent : agent,
             )
           }
           return [...currentAgents, event.agent]
@@ -248,8 +279,8 @@ function DesktopRoutes(): React.JSX.Element {
       if (event.type === 'agent-archived') {
         setAgents((currentAgents) =>
           currentAgents.map((agent) =>
-            agent.agentId === event.agent.agentId ? event.agent : agent
-          )
+            agent.agentId === event.agent.agentId ? event.agent : agent,
+          ),
         )
         toast.success(`已归档 Agent「${event.agent.displayName}」`)
         return
@@ -258,8 +289,8 @@ function DesktopRoutes(): React.JSX.Element {
       if (event.type === 'agent-recovered') {
         setAgents((currentAgents) =>
           currentAgents.map((agent) =>
-            agent.agentId === event.agent.agentId ? event.agent : agent
-          )
+            agent.agentId === event.agent.agentId ? event.agent : agent,
+          ),
         )
         toast.success(`已恢复 Agent「${event.agent.displayName}」`)
         return
@@ -268,8 +299,8 @@ function DesktopRoutes(): React.JSX.Element {
       if (event.type === 'agent-config-updated') {
         setAgents((currentAgents) =>
           currentAgents.map((agent) =>
-            agent.agentId === event.agent.agentId ? event.agent : agent
-          )
+            agent.agentId === event.agent.agentId ? event.agent : agent,
+          ),
         )
         return
       }
@@ -281,25 +312,33 @@ function DesktopRoutes(): React.JSX.Element {
             setRuntime(nextRuntime)
           })
           .catch((error: unknown) => {
-            toast.error(error instanceof Error ? error.message : '刷新 Profile 状态失败')
+            toast.error(
+              error instanceof Error ? error.message : '刷新 Profile 状态失败',
+            )
           })
       }
 
       if (event.type === 'approval-required') {
         // 检查是否已"始终允许"此会话中的此命令
-        const sessionCommands = alwaysAllowedCommandsRef.current.get(event.sessionId)
+        const sessionCommands = alwaysAllowedCommandsRef.current.get(
+          event.sessionId,
+        )
         if (sessionCommands?.has(event.approval.command)) {
           // 自动批准，不展示审批卡片
           void window.api.approveBash({ approvalId: event.approval.approvalId })
           return
         }
         setPendingApprovals((current) => [...current, event.approval])
-        toast.info(`Bash 命令需要审批：${event.approval.command.slice(0, 60)}...`)
+        toast.info(
+          `Bash 命令需要审批：${event.approval.command.slice(0, 60)}...`,
+        )
         return
       }
 
       if (event.type === 'approval-resolved') {
-        setPendingApprovals((current) => current.filter((a) => a.approvalId !== event.approvalId))
+        setPendingApprovals((current) =>
+          current.filter((a) => a.approvalId !== event.approvalId),
+        )
         if (event.status === 'approved') {
           toast.success('已批准 Bash 命令执行')
         } else {
@@ -310,13 +349,15 @@ function DesktopRoutes(): React.JSX.Element {
 
       if (event.type === 'clarification-required') {
         setPendingClarifications((current) => [...current, event.clarification])
-        toast.info(`Agent 需要更多信息：${event.clarification.question.slice(0, 60)}...`)
+        toast.info(
+          `Agent 需要更多信息：${event.clarification.question.slice(0, 60)}...`,
+        )
         return
       }
 
       if (event.type === 'clarification-resolved') {
         setPendingClarifications((current) =>
-          current.filter((c) => c.clarificationId !== event.clarificationId)
+          current.filter((c) => c.clarificationId !== event.clarificationId),
         )
         if (event.status === 'answered') {
           toast.success(`已回答：${event.answer}`)
@@ -337,7 +378,10 @@ function DesktopRoutes(): React.JSX.Element {
         toast.error(event.error.message)
       }
 
-      if (event.type === 'transcript-delta' && event.sessionId === selectedSessionId) {
+      if (
+        event.type === 'transcript-delta' &&
+        event.sessionId === selectedSessionId
+      ) {
         setTranscript((current) => {
           if (!current || current.sessionId !== event.sessionId) return current
           return applyTranscriptDelta(current, event.delta)
@@ -362,17 +406,28 @@ function DesktopRoutes(): React.JSX.Element {
           <StartupRedirect
             runtime={runtime}
             activeSession={
-              sessions.find((session) => session.sessionId === selectedSessionId) ?? null
+              sessions.find(
+                (session) => session.sessionId === selectedSessionId,
+              ) ?? null
             }
             isLoading={isLoading}
           />
         }
       />
-      <Route path="/chat/:agentId?/:sessionId?" element={<ChatGuard context={context} />} />
-      <Route path="/console" element={<Navigate to="/console/providers" replace />} />
+      <Route
+        path="/chat/:agentId?/:sessionId?"
+        element={<ChatGuard context={context} />}
+      />
+      <Route
+        path="/console"
+        element={<Navigate to="/console/providers" replace />}
+      />
       <Route path="/console/providers" element={<ConsoleProviderPage />} />
       <Route path="/console/agents" element={<ConsoleAgentListPage />} />
-      <Route path="/console/agents/:agentId" element={<ConsoleAgentDetailPage />} />
+      <Route
+        path="/console/agents/:agentId"
+        element={<ConsoleAgentDetailPage />}
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
@@ -418,12 +473,14 @@ type StateSetter<T> = (value: T | ((currentValue: T) => T)) => void
  */
 function applyAgentEventToSessions(
   event: AgentEvent,
-  setSessions: StateSetter<AgentSessionSummary[]>
+  setSessions: StateSetter<AgentSessionSummary[]>,
 ): void {
   if (event.type === 'session-created') {
     setSessions((currentSessions) => [
       event.session,
-      ...currentSessions.filter((session) => session.sessionId !== event.session.sessionId)
+      ...currentSessions.filter(
+        (session) => session.sessionId !== event.session.sessionId,
+      ),
     ])
     return
   }
@@ -439,8 +496,8 @@ function applyAgentEventToSessions(
     currentSessions.map((session) =>
       session.sessionId === sessionId
         ? { ...session, state: nextState, updatedAt: event.occurredAt }
-        : session
-    )
+        : session,
+    ),
   )
 }
 
@@ -481,7 +538,7 @@ function getAgentEventSessionId(event: AgentEvent): string | null {
  * @throws 此方法不会主动抛出错误。
  */
 function getAgentEventRunState(
-  event: AgentEvent
+  event: AgentEvent,
 ): 'idle' | 'queued' | 'running' | 'completed' | 'cancelled' | 'failed' | null {
   if (event.type === 'attempt-started') {
     return 'running'
@@ -525,29 +582,38 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
       defaultProviderId: runtime.settings.selectedProviderId,
       defaultModelId: runtime.settings.selectedModelId,
       homePath: runtime.activeAgent.homePath,
-      archivedAt: null
-    }
+      archivedAt: null,
+    },
   ]
 
   if (runtime.status !== 'ready') {
-    return { runtime, agents, sessions: [], activeSession: null, transcript: null }
+    return {
+      runtime,
+      agents,
+      sessions: [],
+      activeSession: null,
+      transcript: null,
+    }
   }
 
   const lastActiveSession = await api.getLastActiveSession()
-  const activeAgentId = lastActiveSession?.agentId ?? runtime.activeAgent.agentId
+  const activeAgentId =
+    lastActiveSession?.agentId ?? runtime.activeAgent.agentId
   let nextSessions = await api.listSessions({ agentId: activeAgentId })
   let activeSession: AgentSessionSummary | null = null
   let transcript: TranscriptSnapshot | null = null
 
   if (lastActiveSession) {
     activeSession =
-      nextSessions.find((session) => session.sessionId === lastActiveSession.sessionId) ??
+      nextSessions.find(
+        (session) => session.sessionId === lastActiveSession.sessionId,
+      ) ??
       nextSessions[0] ??
       null
     transcript = activeSession
       ? await api.getTranscript({
           agentId: activeSession.agentId,
-          sessionId: activeSession.sessionId
+          sessionId: activeSession.sessionId,
         })
       : null
   }
@@ -555,22 +621,26 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   if (!activeSession) {
     activeSession = await api.createSession({
       agentId: activeAgentId,
-      title: runtime.activeAgent.profile.bootstrapRequired ? 'Bootstrap 初始化' : '新会话'
+      title: runtime.activeAgent.profile.bootstrapRequired
+        ? 'Bootstrap 初始化'
+        : '新会话',
     })
     nextSessions = [
       activeSession,
-      ...nextSessions.filter((session) => session.sessionId !== activeSession?.sessionId)
+      ...nextSessions.filter(
+        (session) => session.sessionId !== activeSession?.sessionId,
+      ),
     ]
     transcript = await api.getTranscript({
       agentId: activeSession.agentId,
-      sessionId: activeSession.sessionId
+      sessionId: activeSession.sessionId,
     })
   }
 
   if (!lastActiveSession) {
     await api.setLastActiveSession({
       agentId: activeSession.agentId,
-      sessionId: activeSession.sessionId
+      sessionId: activeSession.sessionId,
     })
   }
 

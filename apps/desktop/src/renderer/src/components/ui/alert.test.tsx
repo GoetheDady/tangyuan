@@ -12,7 +12,7 @@ describe('Alert', () => {
         <Info aria-hidden="true" />
         <AlertTitle>配置提示</AlertTitle>
         <AlertDescription>请选择模型并配置 Provider 凭据。</AlertDescription>
-      </Alert>
+      </Alert>,
     )
 
     const alert = screen.getByRole('alert')
@@ -23,23 +23,35 @@ describe('Alert', () => {
     expect(alert.className).toContain('border')
     expect(alert.className).toContain('shadow-level-0')
 
-    expect(screen.getByText('配置提示')).toHaveAttribute('data-slot', 'alert-title')
-    expect(screen.getByText('请选择模型并配置 Provider 凭据。')).toHaveAttribute(
+    expect(screen.getByText('配置提示')).toHaveAttribute(
       'data-slot',
-      'alert-description'
+      'alert-title',
     )
+    expect(
+      screen.getByText('请选择模型并配置 Provider 凭据。'),
+    ).toHaveAttribute('data-slot', 'alert-description')
   })
 
   it.each([
     ['info', 'border-info-border', 'bg-info-soft', 'text-info-foreground'],
-    ['success', 'border-success-border', 'bg-success-soft', 'text-success-foreground'],
-    ['warning', 'border-warning-border', 'bg-warning-soft', 'text-warning-foreground'],
+    [
+      'success',
+      'border-success-border',
+      'bg-success-soft',
+      'text-success-foreground',
+    ],
+    [
+      'warning',
+      'border-warning-border',
+      'bg-warning-soft',
+      'text-warning-foreground',
+    ],
     [
       'destructive',
       'border-destructive-border',
       'bg-destructive-soft',
-      'text-destructive-soft-foreground'
-    ]
+      'text-destructive-soft-foreground',
+    ],
   ] as const)(
     'renders the %s semantic variant with shared status tokens',
     (variant, borderClass, backgroundClass, foregroundClass) => {
@@ -48,7 +60,7 @@ describe('Alert', () => {
           <CircleAlert aria-hidden="true" />
           <AlertTitle>{variant}</AlertTitle>
           <AlertDescription>状态说明</AlertDescription>
-        </Alert>
+        </Alert>,
       )
 
       const alert = screen.getByRole('alert', { name: `${variant} feedback` })
@@ -56,8 +68,10 @@ describe('Alert', () => {
       expect(alert.className).toContain(borderClass)
       expect(alert.className).toContain(backgroundClass)
       expect(alert.className).toContain(foregroundClass)
-      expect(alert.className).toContain('*:data-[slot=alert-description]:text-foreground')
-    }
+      expect(alert.className).toContain(
+        '*:data-[slot=alert-description]:text-foreground',
+      )
+    },
   )
 
   it('forwards native props, allows role overrides and merges className', () => {
@@ -72,7 +86,7 @@ describe('Alert', () => {
         onClick={onClick}
       >
         已保存
-      </Alert>
+      </Alert>,
     )
 
     const alert = screen.getByRole('status')
@@ -94,7 +108,7 @@ describe('Alert', () => {
           <p>这是一段会跨越多行的说明内容，用于验证有限宽度下仍然保持可读。</p>
           <button type="button">查看详情</button>
         </AlertDescription>
-      </Alert>
+      </Alert>,
     )
 
     const title = screen.getByText(/这是一个需要自然换行/)

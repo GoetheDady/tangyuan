@@ -18,7 +18,9 @@ const repoRoot = resolve(appRoot, '../..')
  */
 async function main() {
   if (process.platform !== 'darwin') {
-    throw new Error('packaged smoke test 当前只支持 macOS，因为 issue #10 要验证 .app 包。')
+    throw new Error(
+      'packaged smoke test 当前只支持 macOS，因为 issue #10 要验证 .app 包。',
+    )
   }
 
   const tempRoot = await mkdtemp(join(tmpdir(), 'tangyuan-packaged-smoke-'))
@@ -34,7 +36,7 @@ async function main() {
     await runPackagedApp(executablePath, resultPath, {
       ...process.env,
       HOME: homePath,
-      TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: resultPath
+      TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: resultPath,
     })
 
     const result = JSON.parse(await readFile(resultPath, 'utf8'))
@@ -54,8 +56,8 @@ async function main() {
         `App bundle: ${appBundlePath}`,
         `Page: ${result.pageKind}`,
         `Runtime: ${result.runtimeStatus}`,
-        `Agent Home: ${agentHomePath}`
-      ].join('\n')
+        `Agent Home: ${agentHomePath}`,
+      ].join('\n'),
     )
   } finally {
     if (process.env['TANGYUAN_KEEP_SMOKE_TEST_TEMP'] !== '1') {
@@ -78,7 +80,7 @@ async function runCommand(command, args, cwd) {
     const child = spawn(command, args, {
       cwd,
       stdio: 'inherit',
-      env: process.env
+      env: process.env,
     })
 
     child.on('error', rejectPromise)
@@ -89,7 +91,9 @@ async function runCommand(command, args, cwd) {
       }
 
       rejectPromise(
-        new Error(`${command} ${args.join(' ')} failed with ${signal ?? `exit code ${code}`}`)
+        new Error(
+          `${command} ${args.join(' ')} failed with ${signal ?? `exit code ${code}`}`,
+        ),
       )
     })
   })
@@ -105,7 +109,7 @@ function findPackagedAppBundle() {
   const candidates = [
     join(appRoot, 'dist', 'mac-arm64', 'apps-desktop.app'),
     join(appRoot, 'dist', 'mac', 'apps-desktop.app'),
-    join(appRoot, 'dist', 'mac-universal', 'apps-desktop.app')
+    join(appRoot, 'dist', 'mac-universal', 'apps-desktop.app'),
   ]
   const appBundlePath = candidates.find((candidate) => existsSync(candidate))
 
@@ -125,7 +129,12 @@ function findPackagedAppBundle() {
  */
 function resolveMacExecutablePath(appBundlePath) {
   const executableName = basename(appBundlePath, '.app')
-  const executablePath = join(appBundlePath, 'Contents', 'MacOS', executableName)
+  const executablePath = join(
+    appBundlePath,
+    'Contents',
+    'MacOS',
+    executableName,
+  )
 
   if (!existsSync(executablePath)) {
     throw new Error(`没有找到 .app 内部可执行文件：${executablePath}`)
@@ -148,12 +157,14 @@ async function runPackagedApp(executablePath, resultPath, env) {
     const child = spawn(executablePath, [], {
       cwd: repoRoot,
       stdio: 'inherit',
-      env
+      env,
     })
     const timeout = setTimeout(async () => {
       child.kill('SIGTERM')
       const progress = await readSmokeTestProgress(resultPath)
-      rejectPromise(new Error(`打包应用启动后 30 秒内没有完成自检。当前阶段：${progress}`))
+      rejectPromise(
+        new Error(`打包应用启动后 30 秒内没有完成自检。当前阶段：${progress}`),
+      )
     }, 30_000)
 
     child.on('error', (error) => {
@@ -168,7 +179,9 @@ async function runPackagedApp(executablePath, resultPath, env) {
         return
       }
 
-      rejectPromise(new Error(`打包应用自检进程失败：${signal ?? `exit code ${code}`}`))
+      rejectPromise(
+        new Error(`打包应用自检进程失败：${signal ?? `exit code ${code}`}`),
+      )
     })
   })
 }

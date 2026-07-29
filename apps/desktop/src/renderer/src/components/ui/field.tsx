@@ -11,13 +11,13 @@ const fieldVariants = cva(
       orientation: {
         vertical: 'grid-cols-1',
         horizontal:
-          'grid-cols-1 @md/field-group:grid-cols-[120px_minmax(0,1fr)] @md/field-group:items-start @md/field-group:gap-x-3 @md/field-group:gap-y-0'
-      }
+          'grid-cols-1 @md/field-group:grid-cols-[120px_minmax(0,1fr)] @md/field-group:items-start @md/field-group:gap-x-3 @md/field-group:gap-y-0',
+      },
     },
     defaultVariants: {
-      orientation: 'vertical'
-    }
-  }
+      orientation: 'vertical',
+    },
+  },
 )
 
 type FieldContextValue = {
@@ -58,11 +58,13 @@ const Field = React.forwardRef<HTMLDivElement, FieldProps>(
       optional = false,
       ...props
     },
-    ref
+    ref,
   ) => {
     const generatedId = React.useId()
     const fallbackControlId = controlId ?? `${generatedId}-control`
-    const [registeredControlId, setControlId] = React.useState<string | null>(null)
+    const [registeredControlId, setControlId] = React.useState<string | null>(
+      null,
+    )
     const [descriptionIds, registerDescription] = useRegisteredIds()
     const [errorIds, registerError] = useRegisteredIds()
 
@@ -78,7 +80,7 @@ const Field = React.forwardRef<HTMLDivElement, FieldProps>(
         required,
         optional: !required && optional,
         registerDescription,
-        registerError
+        registerError,
       }),
       [
         descriptionIds,
@@ -90,8 +92,8 @@ const Field = React.forwardRef<HTMLDivElement, FieldProps>(
         registerDescription,
         registerError,
         registeredControlId,
-        required
-      ]
+        required,
+      ],
     )
 
     return (
@@ -113,35 +115,37 @@ const Field = React.forwardRef<HTMLDivElement, FieldProps>(
         </div>
       </FieldContext.Provider>
     )
-  }
+  },
 )
 Field.displayName = 'Field'
 
-const FieldGroup = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<'div'>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      data-slot="field-group"
-      className={cn(
-        'group/field-group @container/field-group flex w-full min-w-0 flex-col gap-5',
-        className
-      )}
-      {...props}
-    />
-  )
-)
+const FieldGroup = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentPropsWithoutRef<'div'>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    data-slot="field-group"
+    className={cn(
+      'group/field-group @container/field-group flex w-full min-w-0 flex-col gap-5',
+      className,
+    )}
+    {...props}
+  />
+))
 FieldGroup.displayName = 'FieldGroup'
 
-const FieldContent = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<'div'>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      data-slot="field-content"
-      className={cn('flex min-w-0 flex-1 flex-col gap-1', className)}
-      {...props}
-    />
-  )
-)
+const FieldContent = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentPropsWithoutRef<'div'>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    data-slot="field-content"
+    className={cn('flex min-w-0 flex-1 flex-col gap-1', className)}
+    {...props}
+  />
+))
 FieldContent.displayName = 'FieldContent'
 
 type FieldLabelProps = React.ComponentPropsWithoutRef<typeof Label> & {
@@ -149,46 +153,47 @@ type FieldLabelProps = React.ComponentPropsWithoutRef<typeof Label> & {
   optional?: boolean
 }
 
-const FieldLabel = React.forwardRef<React.ComponentRef<typeof Label>, FieldLabelProps>(
-  ({ children, className, htmlFor, required, optional, ...props }, ref) => {
-    const field = React.useContext(FieldContext)
-    const isRequired = required ?? field?.required ?? false
-    const isOptional = !isRequired && (optional ?? field?.optional ?? false)
+const FieldLabel = React.forwardRef<
+  React.ComponentRef<typeof Label>,
+  FieldLabelProps
+>(({ children, className, htmlFor, required, optional, ...props }, ref) => {
+  const field = React.useContext(FieldContext)
+  const isRequired = required ?? field?.required ?? false
+  const isOptional = !isRequired && (optional ?? field?.optional ?? false)
 
-    return (
-      <Label
-        ref={ref}
-        htmlFor={htmlFor ?? field?.controlId}
-        data-slot="field-label"
-        data-required={isRequired || undefined}
-        data-optional={isOptional || undefined}
-        className={cn(
-          'flex w-fit items-center gap-1 text-xs leading-5 group-data-[disabled=true]/field:text-disabled-foreground group-data-[invalid=true]/field:text-destructive group-data-[orientation=horizontal]/field:w-full',
-          className
-        )}
-        {...props}
-      >
-        {children}
-        {isRequired ? (
-          <span
-            data-slot="field-required"
-            aria-hidden="true"
-            className="font-semibold text-destructive"
-          >
-            *
-          </span>
-        ) : isOptional ? (
-          <span
-            data-slot="field-optional"
-            className="ml-0.5 text-[10px] font-normal text-muted-foreground"
-          >
-            （可选）
-          </span>
-        ) : null}
-      </Label>
-    )
-  }
-)
+  return (
+    <Label
+      ref={ref}
+      htmlFor={htmlFor ?? field?.controlId}
+      data-slot="field-label"
+      data-required={isRequired || undefined}
+      data-optional={isOptional || undefined}
+      className={cn(
+        'group-data-[disabled=true]/field:text-disabled-foreground group-data-[invalid=true]/field:text-destructive flex w-fit items-center gap-1 text-xs leading-5 group-data-[orientation=horizontal]/field:w-full',
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      {isRequired ? (
+        <span
+          data-slot="field-required"
+          aria-hidden="true"
+          className="text-destructive font-semibold"
+        >
+          *
+        </span>
+      ) : isOptional ? (
+        <span
+          data-slot="field-optional"
+          className="text-muted-foreground ml-0.5 text-[10px] font-normal"
+        >
+          （可选）
+        </span>
+      ) : null}
+    </Label>
+  )
+})
 FieldLabel.displayName = 'FieldLabel'
 
 type FieldControlElementProps = {
@@ -221,7 +226,7 @@ function FieldControl({ children }: FieldControlProps): React.JSX.Element {
   const describedBy = mergeIds(
     children.props['aria-describedby'],
     ...field.descriptionIds,
-    ...field.errorIds
+    ...field.errorIds,
   )
 
   return React.cloneElement(children, {
@@ -230,7 +235,7 @@ function FieldControl({ children }: FieldControlProps): React.JSX.Element {
     required: field.required || children.props.required,
     'aria-required': field.required ? true : children.props['aria-required'],
     'aria-invalid': field.invalid ? true : children.props['aria-invalid'],
-    'aria-describedby': describedBy
+    'aria-describedby': describedBy,
   })
 }
 
@@ -240,12 +245,13 @@ const FieldDescription = React.forwardRef<
 >(({ className, id, ...props }, ref) => {
   const field = React.useContext(FieldContext)
   const generatedId = React.useId()
-  const descriptionId = id ?? (field ? `${field.controlId}-description` : generatedId)
+  const descriptionId =
+    id ?? (field ? `${field.controlId}-description` : generatedId)
 
   const registerDescription = field?.registerDescription
   React.useLayoutEffect(
     () => registerDescription?.(descriptionId),
-    [descriptionId, registerDescription]
+    [descriptionId, registerDescription],
   )
 
   return (
@@ -254,8 +260,8 @@ const FieldDescription = React.forwardRef<
       id={descriptionId}
       data-slot="field-description"
       className={cn(
-        'm-0 text-[11px] leading-[18px] font-normal text-muted-foreground group-data-[disabled=true]/field:text-disabled-foreground',
-        className
+        'text-muted-foreground group-data-[disabled=true]/field:text-disabled-foreground m-0 text-[11px] leading-[18px] font-normal',
+        className,
       )}
       {...props}
     />
@@ -278,7 +284,9 @@ const FieldError = React.forwardRef<HTMLDivElement, FieldErrorProps>(
       }
 
       const uniqueMessages = [
-        ...new Set(errors?.map((error) => error?.message).filter(Boolean) as string[])
+        ...new Set(
+          errors?.map((error) => error?.message).filter(Boolean) as string[],
+        ),
       ]
 
       if (uniqueMessages.length === 0) {
@@ -302,7 +310,7 @@ const FieldError = React.forwardRef<HTMLDivElement, FieldErrorProps>(
     const hasContent = Boolean(content)
     React.useLayoutEffect(
       () => (hasContent ? registerError?.(errorId) : undefined),
-      [errorId, hasContent, registerError]
+      [errorId, hasContent, registerError],
     )
 
     if (!content) {
@@ -315,31 +323,49 @@ const FieldError = React.forwardRef<HTMLDivElement, FieldErrorProps>(
         id={errorId}
         role="alert"
         data-slot="field-error"
-        className={cn('text-[11px] leading-[18px] font-normal text-destructive', className)}
+        className={cn(
+          'text-destructive text-[11px] leading-[18px] font-normal',
+          className,
+        )}
         {...props}
       >
         {content}
       </div>
     )
-  }
+  },
 )
 FieldError.displayName = 'FieldError'
 
 function useRegisteredIds(): readonly [string[], (id: string) => () => void] {
   const [ids, setIds] = React.useState<string[]>([])
   const register = React.useCallback((id: string) => {
-    setIds((currentIds) => (currentIds.includes(id) ? currentIds : [...currentIds, id]))
+    setIds((currentIds) =>
+      currentIds.includes(id) ? currentIds : [...currentIds, id],
+    )
 
-    return () => setIds((currentIds) => currentIds.filter((item) => item !== id))
+    return () =>
+      setIds((currentIds) => currentIds.filter((item) => item !== id))
   }, [])
 
   return [ids, register] as const
 }
 
 function mergeIds(...values: Array<string | undefined>): string | undefined {
-  const ids = [...new Set(values.flatMap((value) => value?.split(/\s+/).filter(Boolean) ?? []))]
+  const ids = [
+    ...new Set(
+      values.flatMap((value) => value?.split(/\s+/).filter(Boolean) ?? []),
+    ),
+  ]
 
   return ids.length > 0 ? ids.join(' ') : undefined
 }
 
-export { Field, FieldContent, FieldControl, FieldDescription, FieldError, FieldGroup, FieldLabel }
+export {
+  Field,
+  FieldContent,
+  FieldControl,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+}

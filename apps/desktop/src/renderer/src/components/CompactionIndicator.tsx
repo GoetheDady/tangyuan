@@ -21,10 +21,12 @@ export interface CompactionIndicatorProps {
  * @returns 压缩提示条元素。
  * @throws 此组件不会主动抛出错误。
  */
-export function CompactionIndicator({ timestamp }: CompactionIndicatorProps): React.JSX.Element {
+export function CompactionIndicator({
+  timestamp,
+}: CompactionIndicatorProps): React.JSX.Element {
   const formattedTime = new Date(timestamp).toLocaleTimeString('zh-CN', {
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
   })
 
   return (
@@ -33,12 +35,12 @@ export function CompactionIndicator({ timestamp }: CompactionIndicatorProps): Re
       aria-label={`上下文已于 ${formattedTime} 自动压缩`}
       className="my-4 flex items-center justify-center gap-2"
     >
-      <span className="h-px flex-1 bg-border" />
-      <span className="flex items-center gap-1.5 whitespace-nowrap text-label text-muted-foreground">
+      <span className="bg-border h-px flex-1" />
+      <span className="text-label text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
         <Archive size={12} aria-hidden="true" />
         上下文已于 {formattedTime} 自动压缩
       </span>
-      <span className="h-px flex-1 bg-border" />
+      <span className="bg-border h-px flex-1" />
     </div>
   )
 }

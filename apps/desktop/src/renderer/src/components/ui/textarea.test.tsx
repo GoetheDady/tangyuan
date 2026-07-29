@@ -33,7 +33,7 @@ describe('Textarea', () => {
         cols={40}
         maxLength={500}
         aria-label="描述"
-      />
+      />,
     )
 
     const textarea = screen.getByRole('textbox', { name: '描述' })
@@ -70,7 +70,9 @@ describe('Textarea', () => {
   })
 
   it('renders read-only state', () => {
-    render(<Textarea readOnly defaultValue="只读内容" aria-label="只读文本域" />)
+    render(
+      <Textarea readOnly defaultValue="只读内容" aria-label="只读文本域" />,
+    )
 
     const textarea = screen.getByRole('textbox', { name: '只读文本域' })
     expect(textarea).toHaveAttribute('readonly')
@@ -109,7 +111,14 @@ describe('Textarea', () => {
   it('does not allow typing when read-only', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    render(<Textarea readOnly onChange={onChange} defaultValue="固定" aria-label="只读事件" />)
+    render(
+      <Textarea
+        readOnly
+        onChange={onChange}
+        defaultValue="固定"
+        aria-label="只读事件"
+      />,
+    )
 
     const textarea = screen.getByRole('textbox', { name: '只读事件' })
     await user.type(textarea, 'x')
@@ -123,7 +132,7 @@ describe('Textarea', () => {
       <div>
         <label htmlFor="test-textarea-id">测试标签</label>
         <Textarea id="test-textarea-id" />
-      </div>
+      </div>,
     )
 
     const textarea = screen.getByLabelText('测试标签')

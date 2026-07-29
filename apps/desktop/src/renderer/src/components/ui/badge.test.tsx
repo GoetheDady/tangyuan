@@ -15,13 +15,19 @@ describe('Badge', () => {
     expect(badge).toHaveAttribute('data-variant', 'default')
   })
 
-  it.each(['default', 'secondary', 'success', 'destructive', 'outline'] as const)(
+  it.each([
+    'default',
+    'secondary',
+    'success',
+    'destructive',
+    'outline',
+  ] as const)(
     'renders variant %s without changing the public element contract',
     (variant) => {
       render(<Badge variant={variant}>{variant}</Badge>)
 
       expect(screen.getByText(variant)).toHaveAttribute('data-variant', variant)
-    }
+    },
   )
 
   it('merges className and forwards native div props', async () => {
@@ -29,9 +35,14 @@ describe('Badge', () => {
     const onClick = vi.fn()
 
     render(
-      <Badge className="custom-badge" id="status-badge" title="状态" onClick={onClick}>
+      <Badge
+        className="custom-badge"
+        id="status-badge"
+        title="状态"
+        onClick={onClick}
+      >
         可用
-      </Badge>
+      </Badge>,
     )
 
     const badge = screen.getByText('可用')
@@ -48,7 +59,7 @@ describe('Badge', () => {
     render(
       <Badge asChild variant="success" className="linked-badge">
         <a href="/status">已配置</a>
-      </Badge>
+      </Badge>,
     )
 
     const link = screen.getByRole('link', { name: '已配置' })

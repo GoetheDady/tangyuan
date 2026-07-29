@@ -4,7 +4,7 @@ import type {
   QuestionClarificationRequest,
   SessionModelInfo,
   TranscriptEntry,
-  TranscriptSnapshot
+  TranscriptSnapshot,
 } from '@tangyuan/contracts'
 import { useMemo, useState } from 'react'
 
@@ -26,17 +26,25 @@ const modelInfo: SessionModelInfo = {
   displayName: 'Claude Sonnet 4.5',
   thinkingLevel: 'medium',
   supportedThinkingLevels: ['low', 'medium', 'high'],
-  supportsThinking: true
+  supportsThinking: true,
 }
 
 const providers = [
   { providerId: 'anthropic', displayName: 'Anthropic' },
-  { providerId: 'openai', displayName: 'OpenAI' }
+  { providerId: 'openai', displayName: 'OpenAI' },
 ]
 
 const models = [
-  { providerId: 'anthropic', modelId: 'claude-sonnet-4-5', displayName: 'Claude Sonnet 4.5' },
-  { providerId: 'anthropic', modelId: 'claude-opus-4-1', displayName: 'Claude Opus 4.1' }
+  {
+    providerId: 'anthropic',
+    modelId: 'claude-sonnet-4-5',
+    displayName: 'Claude Sonnet 4.5',
+  },
+  {
+    providerId: 'anthropic',
+    modelId: 'claude-opus-4-1',
+    displayName: 'Claude Opus 4.1',
+  },
 ]
 
 /** 创建使用固定时间的执行尝试夹具。
@@ -52,7 +60,7 @@ function createAttemptFixture(
     ? T extends { error?: infer E }
       ? E
       : never
-    : never
+    : never,
 ): NonNullable<AgentReplyEntry['attempt']> {
   return {
     attemptId: `attempt-${status}`,
@@ -60,7 +68,7 @@ function createAttemptFixture(
     status,
     startedAt: FIXED_TIME,
     completedAt: status === 'running' ? null : FIXED_END_TIME,
-    ...(error ? { error } : {})
+    ...(error ? { error } : {}),
   }
 }
 
@@ -70,7 +78,9 @@ function createAttemptFixture(
  * @returns 带默认完成状态的确定性 Agent 回复条目。
  * @throws 此测试辅助方法不会抛出错误。
  */
-function createAgentReplyFixture(overrides: Partial<AgentReplyEntry>): AgentReplyEntry {
+function createAgentReplyFixture(
+  overrides: Partial<AgentReplyEntry>,
+): AgentReplyEntry {
   return {
     kind: 'agent-reply',
     index: 1,
@@ -80,7 +90,7 @@ function createAgentReplyFixture(overrides: Partial<AgentReplyEntry>): AgentRepl
     attempt: createAttemptFixture('completed'),
     turns: [],
     inReplyTo: 'user-default',
-    ...overrides
+    ...overrides,
   }
 }
 
@@ -100,7 +110,7 @@ const completedReply = createAgentReplyFixture({
           content: '先核对对话结构、键盘路径和视觉层级，再输出结论。',
           status: 'completed',
           startedAt: FIXED_TIME,
-          completedAt: '2026-07-22T08:30:01.000Z'
+          completedAt: '2026-07-22T08:30:01.000Z',
         },
         {
           index: 1,
@@ -110,11 +120,11 @@ const completedReply = createAgentReplyFixture({
           content: '读取 4 个组件文件并核对布局约束',
           status: 'completed',
           startedAt: '2026-07-22T08:30:01.000Z',
-          completedAt: '2026-07-22T08:30:02.250Z'
-        }
-      ]
-    }
-  ]
+          completedAt: '2026-07-22T08:30:02.250Z',
+        },
+      ],
+    },
+  ],
 })
 
 const activeToolLoopReply = createAgentReplyFixture({
@@ -136,7 +146,7 @@ const activeToolLoopReply = createAgentReplyFixture({
           content: '正在检查窄宽度下 Composer 与对话动作是否互相遮挡。',
           status: 'completed',
           startedAt: FIXED_TIME,
-          completedAt: '2026-07-22T08:30:01.000Z'
+          completedAt: '2026-07-22T08:30:01.000Z',
         },
         {
           index: 1,
@@ -146,11 +156,11 @@ const activeToolLoopReply = createAgentReplyFixture({
           content: '在 1024、1280、1536 三个桌面宽度执行布局检查',
           status: 'running',
           startedAt: '2026-07-22T08:30:01.000Z',
-          completedAt: null
-        }
-      ]
-    }
-  ]
+          completedAt: null,
+        },
+      ],
+    },
+  ],
 })
 
 const candidateReply = createAgentReplyFixture({
@@ -172,11 +182,11 @@ const candidateReply = createAgentReplyFixture({
           content: '候选正文正在形成，尚未由 Runtime 确认完成。',
           status: 'running',
           startedAt: FIXED_TIME,
-          completedAt: null
-        }
-      ]
-    }
-  ]
+          completedAt: null,
+        },
+      ],
+    },
+  ],
 })
 
 const failedReply = createAgentReplyFixture({
@@ -186,7 +196,7 @@ const failedReply = createAgentReplyFixture({
   attempt: createAttemptFixture('failed', {
     code: 'unknown',
     message: '连接在读取响应时中断。',
-    recoverable: true
+    recoverable: true,
   }),
   turns: [
     {
@@ -202,11 +212,11 @@ const failedReply = createAgentReplyFixture({
           content: '保留中断前已经确认的执行历史。',
           status: 'failed',
           startedAt: FIXED_TIME,
-          completedAt: FIXED_END_TIME
-        }
-      ]
-    }
-  ]
+          completedAt: FIXED_END_TIME,
+        },
+      ],
+    },
+  ],
 })
 
 const cancelledReply = createAgentReplyFixture({
@@ -216,7 +226,7 @@ const cancelledReply = createAgentReplyFixture({
   attempt: createAttemptFixture('cancelled', {
     code: 'run-cancelled',
     message: '用户停止了本次生成。',
-    recoverable: true
+    recoverable: true,
   }),
   turns: [
     {
@@ -232,11 +242,11 @@ const cancelledReply = createAgentReplyFixture({
           content: '保留中断前已经确认的执行历史。',
           status: 'completed',
           startedAt: FIXED_TIME,
-          completedAt: FIXED_END_TIME
-        }
-      ]
-    }
-  ]
+          completedAt: FIXED_END_TIME,
+        },
+      ],
+    },
+  ],
 })
 
 const integratedEntries: TranscriptEntry[] = [
@@ -245,7 +255,7 @@ const integratedEntries: TranscriptEntry[] = [
     index: 0,
     messageId: 'user-1',
     content: '请对完整对话体验做一次跨组件验收。',
-    createdAt: FIXED_TIME
+    createdAt: FIXED_TIME,
   },
   { ...completedReply, index: 1, inReplyTo: 'user-1' },
   { kind: 'compaction', index: 2, timestamp: '2026-07-22T08:28:00.000Z' },
@@ -254,20 +264,20 @@ const integratedEntries: TranscriptEntry[] = [
     index: 3,
     messageId: 'user-2',
     content: '继续检查长内容、工具循环和窄窗口。',
-    createdAt: '2026-07-22T08:31:00.000Z'
+    createdAt: '2026-07-22T08:31:00.000Z',
   },
   {
     ...activeToolLoopReply,
     index: 4,
-    inReplyTo: 'user-2'
-  }
+    inReplyTo: 'user-2',
+  },
 ]
 
 const integratedTranscript: TranscriptSnapshot = {
   sessionId: 'fixture-session',
   agentId: 'tangyuan',
   entries: integratedEntries,
-  updatedAt: FIXED_END_TIME
+  updatedAt: FIXED_END_TIME,
 }
 
 const longTranscript: TranscriptSnapshot = {
@@ -284,7 +294,7 @@ const longTranscript: TranscriptSnapshot = {
         index,
         messageId: `long-user-${index}`,
         content: `第 ${Math.floor(index / 2) + 1} 轮用户消息：验证长历史滚动与虚拟列表锚点。`,
-        createdAt: FIXED_TIME
+        createdAt: FIXED_TIME,
       }
     }
     return createAgentReplyFixture({
@@ -298,11 +308,11 @@ const longTranscript: TranscriptSnapshot = {
         '```ts',
         `const turn = ${index}`,
         'export const accepted = turn > 0',
-        '```'
+        '```',
       ].join('\n'),
-      inReplyTo: `long-user-${index - 1}`
+      inReplyTo: `long-user-${index - 1}`,
     })
-  })
+  }),
 }
 
 const approvals: Record<'once' | 'always' | 'reject', BashApprovalRequest> = {
@@ -315,7 +325,7 @@ const approvals: Record<'once' | 'always' | 'reject', BashApprovalRequest> = {
     cwd: '/Users/gdsw/gdsw/tangyuan',
     riskDescription: '命令会执行测试脚本，但不会写入生产数据。',
     status: 'pending',
-    createdAt: FIXED_TIME
+    createdAt: FIXED_TIME,
   },
   always: {
     approvalId: 'approval-always',
@@ -326,7 +336,7 @@ const approvals: Record<'once' | 'always' | 'reject', BashApprovalRequest> = {
     cwd: '/Users/gdsw/gdsw/tangyuan',
     riskDescription: '始终允许只对当前会话中的完全相同命令生效。',
     status: 'pending',
-    createdAt: FIXED_TIME
+    createdAt: FIXED_TIME,
   },
   reject: {
     approvalId: 'approval-reject',
@@ -337,8 +347,8 @@ const approvals: Record<'once' | 'always' | 'reject', BashApprovalRequest> = {
     cwd: '/Users/gdsw/gdsw/tangyuan',
     riskDescription: '命令会删除构建产物，应在确认无需保留后执行。',
     status: 'pending',
-    createdAt: FIXED_TIME
-  }
+    createdAt: FIXED_TIME,
+  },
 }
 
 const clarifications: QuestionClarificationRequest[] = [
@@ -351,7 +361,7 @@ const clarifications: QuestionClarificationRequest[] = [
     options: ['1024', '1280', '1440+'],
     allowCustomAnswer: true,
     status: 'pending',
-    createdAt: FIXED_TIME
+    createdAt: FIXED_TIME,
   },
   {
     clarificationId: 'clarification-2',
@@ -362,8 +372,8 @@ const clarifications: QuestionClarificationRequest[] = [
     options: ['立即运行', '仅运行常规回归'],
     allowCustomAnswer: true,
     status: 'pending',
-    createdAt: FIXED_TIME
-  }
+    createdAt: FIXED_TIME,
+  },
 ]
 
 /** 对话业务组件的独立 Renderer 验收夹具。 */
@@ -372,15 +382,19 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
   const [submitCount, setSubmitCount] = useState(0)
   const [cancelCount, setCancelCount] = useState(0)
   const [modelId, setModelId] = useState<string>(modelInfo.modelId)
-  const [thinkingLevel, setThinkingLevel] = useState<string>(modelInfo.thinkingLevel ?? 'medium')
+  const [thinkingLevel, setThinkingLevel] = useState<string>(
+    modelInfo.thinkingLevel ?? 'medium',
+  )
   const [retryCount, setRetryCount] = useState(0)
-  const [approvalResults, setApprovalResults] = useState<Record<string, string>>({})
+  const [approvalResults, setApprovalResults] = useState<
+    Record<string, string>
+  >({})
   const [clarificationIndex, setClarificationIndex] = useState(0)
   const [clarificationAnswers, setClarificationAnswers] = useState<string[]>([])
 
   const currentModelInfo = useMemo(
     () => ({ ...modelInfo, modelId, thinkingLevel }),
-    [modelId, thinkingLevel]
+    [modelId, thinkingLevel],
   )
 
   /** 记录审批场景的已确认结果。
@@ -394,20 +408,23 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
     setApprovalResults((current) => ({ ...current, [id]: result }))
   }
 
-  const currentClarification = clarifications[clarificationIndex] ?? clarifications[0]!
+  const currentClarification =
+    clarifications[clarificationIndex] ?? clarifications[0]!
 
   return (
     <main
-      className="min-h-full overflow-x-hidden bg-background px-6 py-10 text-foreground"
+      className="bg-background text-foreground min-h-full overflow-x-hidden px-6 py-10"
       data-fixture="conversation-components-v1"
     >
       <div className="mx-auto max-w-6xl space-y-12">
         <header className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">
             Renderer acceptance fixture
           </p>
-          <h1 className="text-3xl font-semibold tracking-tight">对话业务组件跨组件验收</h1>
-          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            对话业务组件跨组件验收
+          </h1>
+          <p className="text-muted-foreground max-w-3xl text-sm leading-6">
             固定 Chromium、浅色方案、reduced
             motion、时间戳、耗时和测试数据；附件入口仅作为禁用占位展示。
           </p>
@@ -419,7 +436,7 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
           description="真实 TranscriptMessages + Composer 组合。"
         >
           <div
-            className="overflow-hidden rounded-xl border bg-card shadow-level-0"
+            className="bg-card shadow-level-0 overflow-hidden rounded-xl border"
             data-testid="integrated-chat"
           >
             <div className="h-[620px] min-h-0 px-6 py-5">
@@ -431,7 +448,7 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
                 onFork={() => undefined}
               />
             </div>
-            <div className="border-t bg-background px-6 py-4">
+            <div className="bg-background border-t px-6 py-4">
               <Composer
                 value={composerValue}
                 onChange={setComposerValue}
@@ -444,11 +461,18 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
                 isSwitchingModel={false}
                 providers={providers}
                 selectableModels={models}
-                onModelChange={(_providerId, nextModelId) => setModelId(nextModelId)}
+                onModelChange={(_providerId, nextModelId) =>
+                  setModelId(nextModelId)
+                }
                 onThinkingLevelChange={setThinkingLevel}
               />
-              <output className="sr-only" aria-live="polite" data-testid="composer-result">
-                提交 {submitCount} 次，停止 {cancelCount} 次，模型 {modelId}，思考 {thinkingLevel}
+              <output
+                className="sr-only"
+                aria-live="polite"
+                data-testid="composer-result"
+              >
+                提交 {submitCount} 次，停止 {cancelCount} 次，模型 {modelId}
+                ，思考 {thinkingLevel}
               </output>
             </div>
           </div>
@@ -460,18 +484,20 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
           description="UserMessage、StreamdownMessage 与 CompactionIndicator 的确定性内容。"
         >
           <div className="grid gap-5 lg:grid-cols-2">
-            <div className="rounded-xl border bg-card p-5">
-              <p className="mb-3 text-xs font-semibold text-muted-foreground">
+            <div className="bg-card rounded-xl border p-5">
+              <p className="text-muted-foreground mb-3 text-xs font-semibold">
                 UserMessage · 纯文本
               </p>
               <article className="flex justify-end">
-                <div className="max-w-[76%] rounded-lg bg-primary px-4 py-3 text-sm leading-6 text-primary-foreground">
-                  <UserMessage content={'# 不解析 Markdown\n保留用户输入的换行。'} />
+                <div className="bg-primary text-primary-foreground max-w-[76%] rounded-lg px-4 py-3 text-sm leading-6">
+                  <UserMessage
+                    content={'# 不解析 Markdown\n保留用户输入的换行。'}
+                  />
                 </div>
               </article>
             </div>
-            <div className="rounded-xl border bg-card p-5">
-              <p className="mb-3 text-xs font-semibold text-muted-foreground">
+            <div className="bg-card rounded-xl border p-5">
+              <p className="text-muted-foreground mb-3 text-xs font-semibold">
                 StreamdownMessage · Markdown
               </p>
               <StreamdownMessage
@@ -480,7 +506,7 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
                 }
               />
             </div>
-            <div className="rounded-xl border bg-card p-5 lg:col-span-2">
+            <div className="bg-card rounded-xl border p-5 lg:col-span-2">
               <CompactionIndicator timestamp={FIXED_TIME} />
             </div>
           </div>
@@ -498,7 +524,10 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
             <StateCard label="运行中 · 候选正文" testId="assistant-candidate">
               <AssistantMessage entry={candidateReply} isStreaming />
             </StateCard>
-            <StateCard label="完成 · 默认收起 / 手动展开" testId="assistant-completed">
+            <StateCard
+              label="完成 · 默认收起 / 手动展开"
+              testId="assistant-completed"
+            >
               <AssistantMessage entry={completedReply} isStreaming={false} />
             </StateCard>
             <StateCard label="失败 · 可重试" testId="assistant-failed">
@@ -507,7 +536,11 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
                 isStreaming={false}
                 onRetry={() => setRetryCount((value) => value + 1)}
               />
-              <output className="sr-only" aria-live="polite" data-testid="retry-result">
+              <output
+                className="sr-only"
+                aria-live="polite"
+                data-testid="retry-result"
+              >
                 已重试 {retryCount} 次
               </output>
             </StateCard>
@@ -523,41 +556,52 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
           description="Bash 三种决策与连续单问题澄清；完成后保留确认结果。"
         >
           <div className="space-y-6">
-            {(Object.keys(approvals) as Array<keyof typeof approvals>).map((scenario) => {
-              const approval = approvals[scenario]
-              return (
-                <div
-                  key={scenario}
-                  data-approval-scenario={scenario}
-                  className="rounded-xl border bg-muted/20 p-4"
-                >
-                  <BashApprovalCard
-                    approval={approval}
-                    onApproveOnce={(id) => resolveApproval(id, '仅允许本次')}
-                    onApproveAlways={(id) => resolveApproval(id, '始终允许')}
-                    onReject={(id) => resolveApproval(id, '已拒绝')}
-                  />
-                  <output role="status" className="block text-center text-xs text-muted-foreground">
-                    {approvalResults[approval.approvalId] ?? '等待决策'}
-                  </output>
-                </div>
-              )
-            })}
+            {(Object.keys(approvals) as Array<keyof typeof approvals>).map(
+              (scenario) => {
+                const approval = approvals[scenario]
+                return (
+                  <div
+                    key={scenario}
+                    data-approval-scenario={scenario}
+                    className="bg-muted/20 rounded-xl border p-4"
+                  >
+                    <BashApprovalCard
+                      approval={approval}
+                      onApproveOnce={(id) => resolveApproval(id, '仅允许本次')}
+                      onApproveAlways={(id) => resolveApproval(id, '始终允许')}
+                      onReject={(id) => resolveApproval(id, '已拒绝')}
+                    />
+                    <output
+                      role="status"
+                      className="text-muted-foreground block text-center text-xs"
+                    >
+                      {approvalResults[approval.approvalId] ?? '等待决策'}
+                    </output>
+                  </div>
+                )
+              },
+            )}
 
-            <div className="rounded-xl border bg-muted/20 p-4" data-testid="clarification-sequence">
+            <div
+              className="bg-muted/20 rounded-xl border p-4"
+              data-testid="clarification-sequence"
+            >
               <QuestionClarificationCard
                 clarification={currentClarification}
                 onAnswer={async (_id, answer) => {
                   setClarificationAnswers((current) => [...current, answer])
                   setClarificationIndex((current) =>
-                    Math.min(current + 1, clarifications.length - 1)
+                    Math.min(current + 1, clarifications.length - 1),
                   )
                 }}
                 onCancel={async () => {
                   setClarificationAnswers((current) => [...current, '已取消'])
                 }}
               />
-              <output role="status" className="block text-center text-xs text-muted-foreground">
+              <output
+                role="status"
+                className="text-muted-foreground block text-center text-xs"
+              >
                 已确认：{clarificationAnswers.join(' → ') || '等待回答'}
               </output>
             </div>
@@ -583,7 +627,9 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
                 isSwitchingModel={false}
                 providers={providers}
                 selectableModels={models}
-                onModelChange={(_providerId, nextModelId) => setModelId(nextModelId)}
+                onModelChange={(_providerId, nextModelId) =>
+                  setModelId(nextModelId)
+                }
                 onThinkingLevelChange={setThinkingLevel}
               />
             </StateCard>
@@ -613,7 +659,7 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
           description="48 个结构化条目、代码块和压缩提示，固定高度内滚动。"
         >
           <div
-            className="h-[720px] min-h-0 overflow-hidden rounded-xl border bg-card px-5 py-4"
+            className="bg-card h-[720px] min-h-0 overflow-hidden rounded-xl border px-5 py-4"
             data-testid="long-history"
           >
             <TranscriptMessages
@@ -647,10 +693,13 @@ function FixtureSection(props: {
       className="space-y-5"
     >
       <div className="space-y-1.5">
-        <h2 id={`fixture-${props.id}`} className="text-xl font-semibold tracking-tight">
+        <h2
+          id={`fixture-${props.id}`}
+          className="text-xl font-semibold tracking-tight"
+        >
           {props.title}
         </h2>
-        <p className="text-sm text-muted-foreground">{props.description}</p>
+        <p className="text-muted-foreground text-sm">{props.description}</p>
       </div>
       {props.children}
     </section>
@@ -669,8 +718,13 @@ function StateCard(props: {
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <div className="min-w-0 rounded-xl border bg-card p-5" data-testid={props.testId}>
-      <p className="mb-4 text-xs font-semibold text-muted-foreground">{props.label}</p>
+    <div
+      className="bg-card min-w-0 rounded-xl border p-5"
+      data-testid={props.testId}
+    >
+      <p className="text-muted-foreground mb-4 text-xs font-semibold">
+        {props.label}
+      </p>
       {props.children}
     </div>
   )

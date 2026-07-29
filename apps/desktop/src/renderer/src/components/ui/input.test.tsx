@@ -31,7 +31,7 @@ describe('Input', () => {
         defaultValue="汤圆"
         placeholder="请输入名称"
         aria-label="显示名称"
-      />
+      />,
     )
 
     const input = screen.getByRole('textbox', { name: '显示名称' })
@@ -120,7 +120,14 @@ describe('Input', () => {
   it('does not allow typing when read-only', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    render(<Input readOnly onChange={onChange} defaultValue="固定" aria-label="只读事件" />)
+    render(
+      <Input
+        readOnly
+        onChange={onChange}
+        defaultValue="固定"
+        aria-label="只读事件"
+      />,
+    )
 
     const input = screen.getByRole('textbox', { name: '只读事件' })
     await user.type(input, 'x')
@@ -134,7 +141,7 @@ describe('Input', () => {
       <div>
         <label htmlFor="test-id">测试标签</label>
         <Input id="test-id" />
-      </div>
+      </div>,
     )
 
     const input = screen.getByLabelText('测试标签')

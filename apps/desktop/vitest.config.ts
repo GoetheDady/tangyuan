@@ -6,13 +6,13 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': new URL('./src/renderer/src', import.meta.url).pathname,
-      '@renderer': new URL('./src/renderer/src', import.meta.url).pathname
-    }
+      '@renderer': new URL('./src/renderer/src', import.meta.url).pathname,
+    },
   },
   test: {
     environment: 'jsdom',
     globals: true,
     include: ['src/**/*.test.{ts,tsx}'],
-    setupFiles: ['./vitest.setup.ts']
-  }
+    setupFiles: ['./vitest.setup.ts'],
+  },
 })

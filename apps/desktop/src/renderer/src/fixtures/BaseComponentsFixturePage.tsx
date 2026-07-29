@@ -11,7 +11,7 @@ import {
   Info,
   Search,
   Send,
-  Settings
+  Settings,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -27,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogMedia,
   AlertDialogTitle,
-  AlertDialogTrigger
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -38,7 +38,7 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle
+  CardTitle,
 } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -54,7 +54,7 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
   Field,
@@ -63,7 +63,7 @@ import {
   FieldDescription,
   FieldError,
   FieldGroup,
-  FieldLabel
+  FieldLabel,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import {
@@ -72,7 +72,7 @@ import {
   InputGroupButton,
   InputGroupInput,
   InputGroupText,
-  InputGroupTextarea
+  InputGroupTextarea,
 } from '@/components/ui/input-group'
 import { Label } from '@/components/ui/label'
 import {
@@ -83,11 +83,16 @@ import {
   SelectLabel,
   SelectSeparator,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 /** 夹具构建产物探针；生产构建不得包含此值。 */
 export const BASE_COMPONENTS_FIXTURE_MARKER = 'base-components-fixture-v1'
@@ -111,7 +116,7 @@ const CARD_STATE_FIXTURES: readonly CardStateFixture[] = [
   { id: 'focus', label: '键盘聚焦' },
   { id: 'active', label: '按下' },
   { id: 'selected', label: '已选中', pressed: true, selectedIcon: true },
-  { id: 'disabled', label: '禁用', disabled: true }
+  { id: 'disabled', label: '禁用', disabled: true },
 ]
 
 /**
@@ -122,7 +127,10 @@ const CARD_STATE_FIXTURES: readonly CardStateFixture[] = [
 export default function BaseComponentsFixturePage(): React.JSX.Element {
   return (
     <TooltipProvider delayDuration={0}>
-      <main data-fixture-marker={BASE_COMPONENTS_FIXTURE_MARKER} className={styles.page}>
+      <main
+        data-fixture-marker={BASE_COMPONENTS_FIXTURE_MARKER}
+        className={styles.page}
+      >
         <div className={styles.container}>
           <header className={styles.header}>
             <Badge variant="outline" className={styles.fixtureBadge}>
@@ -130,7 +138,8 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
             </Badge>
             <h1 className={styles.heading}>基础组件验收夹具</h1>
             <p className={styles.introduction}>
-              以稳定分区展示黑芝麻汤圆主题下的 variant、size、状态与 Portal 场景。
+              以稳定分区展示黑芝麻汤圆主题下的 variant、size、状态与 Portal
+              场景。
             </p>
           </header>
 
@@ -186,13 +195,25 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
               <Button variant="secondary" size="icon" aria-label="通知">
                 <Bell />
               </Button>
-              <Button variant="outline" size="icon-xs" aria-label="超小图标按钮">
+              <Button
+                variant="outline"
+                size="icon-xs"
+                aria-label="超小图标按钮"
+              >
                 <Search />
               </Button>
-              <Button variant="outline" size="icon-sm" aria-label="小号图标按钮">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label="小号图标按钮"
+              >
                 <Settings />
               </Button>
-              <Button variant="outline" size="icon-lg" aria-label="大号图标按钮">
+              <Button
+                variant="outline"
+                size="icon-lg"
+                aria-label="大号图标按钮"
+              >
                 <Bell />
               </Button>
             </div>
@@ -282,13 +303,19 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
               </div>
 
               <div className={styles.tooltipSample}>
-                <span className={styles.tooltipSampleLabel}>长文本与 10px 偏移</span>
+                <span className={styles.tooltipSampleLabel}>
+                  长文本与 10px 偏移
+                </span>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="secondary">查看较长辅助说明</Button>
                   </TooltipTrigger>
-                  <TooltipContent sideOffset={10} className={styles.tooltipLongContent}>
-                    当前 Agent 将继承默认模型设置；你可以稍后在设置页面为它选择不同模型。
+                  <TooltipContent
+                    sideOffset={10}
+                    className={styles.tooltipLongContent}
+                  >
+                    当前 Agent
+                    将继承默认模型设置；你可以稍后在设置页面为它选择不同模型。
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -297,7 +324,11 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                 <span className={styles.tooltipSampleLabel}>图标触发器</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" aria-label="查看模型继承说明">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label="查看模型继承说明"
+                    >
                       <Info aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
@@ -305,15 +336,23 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                 </Tooltip>
               </div>
 
-              <div className={`${styles.tooltipSample} ${styles.tooltipEdgeSample}`}>
-                <span className={styles.tooltipSampleLabel}>右侧边缘自动避让</span>
+              <div
+                className={`${styles.tooltipSample} ${styles.tooltipEdgeSample}`}
+              >
+                <span className={styles.tooltipSampleLabel}>
+                  右侧边缘自动避让
+                </span>
                 <div className={styles.tooltipEdgeTrack}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button variant="outline">靠近右侧边缘</Button>
                     </TooltipTrigger>
-                    <TooltipContent side="right" className={styles.tooltipLongContent}>
-                      当右侧空间不足时，Radix 会自动选择可用方位，避免 Tooltip 溢出视口。
+                    <TooltipContent
+                      side="right"
+                      className={styles.tooltipLongContent}
+                    >
+                      当右侧空间不足时，Radix 会自动选择可用方位，避免 Tooltip
+                      溢出视口。
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -334,30 +373,47 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                   <span>跟随父容器宽度，不通过阴影制造层级。</span>
                 </div>
                 <Separator data-testid="separator-full-width" />
-                <span className={styles.separatorHint}>默认 decorative · Level 0</span>
+                <span className={styles.separatorHint}>
+                  默认 decorative · Level 0
+                </span>
               </div>
 
-              <div className={`${styles.separatorSample} ${styles.separatorMutedSample}`}>
+              <div
+                className={`${styles.separatorSample} ${styles.separatorMutedSample}`}
+              >
                 <span className={styles.separatorSampleLabel}>水平内缩</span>
                 <div className={styles.separatorCopy}>
                   <strong>会话分组</strong>
                   <span>内缩由父布局提供，基础组件 API 保持不变。</span>
                 </div>
-                <div className={styles.separatorInsetWrapper} data-testid="separator-inset-wrapper">
+                <div
+                  className={styles.separatorInsetWrapper}
+                  data-testid="separator-inset-wrapper"
+                >
                   <Separator data-testid="separator-inset" />
                 </div>
-                <span className={styles.separatorHint}>父布局左右各提供 24px</span>
+                <span className={styles.separatorHint}>
+                  父布局左右各提供 24px
+                </span>
               </div>
 
-              <div className={`${styles.separatorSample} ${styles.separatorMutedSample}`}>
+              <div
+                className={`${styles.separatorSample} ${styles.separatorMutedSample}`}
+              >
                 <span className={styles.separatorSampleLabel}>垂直方向</span>
-                <div className={styles.separatorToolbar} aria-label="Separator 垂直工具栏">
+                <div
+                  className={styles.separatorToolbar}
+                  aria-label="Separator 垂直工具栏"
+                >
                   <span>刷新</span>
                   <span
                     className={styles.separatorVerticalTrack}
                     data-testid="separator-vertical-track"
                   >
-                    <Separator data-testid="separator-vertical" orientation="vertical" />
+                    <Separator
+                      data-testid="separator-vertical"
+                      orientation="vertical"
+                    />
                   </span>
                   <span>导出</span>
                   <span className={styles.separatorVerticalTrack}>
@@ -365,11 +421,15 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                   </span>
                   <span>设置</span>
                 </div>
-                <span className={styles.separatorHint}>在 24px 确定父高度中完整填充</span>
+                <span className={styles.separatorHint}>
+                  在 24px 确定父高度中完整填充
+                </span>
               </div>
 
               <div className={styles.separatorSample}>
-                <span className={styles.separatorSampleLabel}>文字分隔组合</span>
+                <span className={styles.separatorSampleLabel}>
+                  文字分隔组合
+                </span>
                 <div className={styles.separatorLabelRow}>
                   <strong>高级设置</strong>
                   <Separator className="min-w-0 flex-1" />
@@ -392,21 +452,31 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
             <div className={styles.formGrid}>
               <div className={styles.field}>
                 <div className="text-muted-foreground">
-                  <Label htmlFor="fixture-name" data-fixture-label-state="default">
+                  <Label
+                    htmlFor="fixture-name"
+                    data-fixture-label-state="default"
+                  >
                     显示名称
                   </Label>
                 </div>
                 <Input id="fixture-name" defaultValue="汤圆" />
               </div>
               <div className={styles.field}>
-                <Label htmlFor="fixture-long-label" data-fixture-label-state="long">
+                <Label
+                  htmlFor="fixture-long-label"
+                  data-fixture-label-state="long"
+                >
                   这是一个用于验证标签在有限宽度内保持清晰排版的长文本控件名称
                 </Label>
                 <Input id="fixture-long-label" defaultValue="长标签关联控件" />
               </div>
               <div className={styles.field}>
                 <Label htmlFor="fixture-password">API Key</Label>
-                <Input id="fixture-password" type="password" defaultValue="secret-token-1234" />
+                <Input
+                  id="fixture-password"
+                  type="password"
+                  defaultValue="secret-token-1234"
+                />
               </div>
               <div className={styles.field}>
                 <Label htmlFor="fixture-long-value">长值输入</Label>
@@ -420,10 +490,18 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                 <Input id="fixture-placeholder" placeholder="请输入内容..." />
               </div>
               <div className={styles.field}>
-                <Label htmlFor="fixture-disabled" data-fixture-label-state="disabled-input">
+                <Label
+                  htmlFor="fixture-disabled"
+                  data-fixture-label-state="disabled-input"
+                >
                   禁用输入
                 </Label>
-                <Input id="fixture-disabled" value="不可编辑" disabled readOnly />
+                <Input
+                  id="fixture-disabled"
+                  value="不可编辑"
+                  disabled
+                  readOnly
+                />
               </div>
               <div className={styles.field}>
                 <Label htmlFor="fixture-readonly">只读输入</Label>
@@ -458,7 +536,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                   <SelectContent>
                     <SelectGroup>
                       <SelectLabel>可用服务</SelectLabel>
-                      <SelectItem value="anthropic">Anthropic（测试数据）</SelectItem>
+                      <SelectItem value="anthropic">
+                        Anthropic（测试数据）
+                      </SelectItem>
                       <SelectItem value="openai">OpenAI（测试数据）</SelectItem>
                     </SelectGroup>
                   </SelectContent>
@@ -466,14 +546,23 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
               </div>
             </div>
             <div className={styles.field}>
-              <Label htmlFor="fixture-notes" data-fixture-label-state="textarea">
+              <Label
+                htmlFor="fixture-notes"
+                data-fixture-label-state="textarea"
+              >
                 验收说明
               </Label>
-              <Textarea id="fixture-notes" defaultValue="固定测试数据，不包含真实 API Key。" />
+              <Textarea
+                id="fixture-notes"
+                defaultValue="固定测试数据，不包含真实 API Key。"
+              />
             </div>
             <div className={styles.field}>
               <Label htmlFor="fixture-textarea-empty">空文本域</Label>
-              <Textarea id="fixture-textarea-empty" placeholder="请输入多行内容..." />
+              <Textarea
+                id="fixture-textarea-empty"
+                placeholder="请输入多行内容..."
+              />
             </div>
             <div className={styles.field}>
               <Label htmlFor="fixture-textarea-multiline">多行内容</Label>
@@ -492,7 +581,11 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
             </div>
             <div className={styles.field}>
               <Label htmlFor="fixture-textarea-tall">指定高度</Label>
-              <Textarea id="fixture-textarea-tall" defaultValue="高文本域" rows={8} />
+              <Textarea
+                id="fixture-textarea-tall"
+                defaultValue="高文本域"
+                rows={8}
+              />
             </div>
             <div className={styles.field}>
               <Label htmlFor="fixture-textarea-resize">可拖拽调整大小</Label>
@@ -524,13 +617,20 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                 aria-invalid="true"
                 aria-describedby="fixture-textarea-invalid-help"
               />
-              <p id="fixture-textarea-invalid-help" className={styles.errorText}>
+              <p
+                id="fixture-textarea-invalid-help"
+                className={styles.errorText}
+              >
                 请检查输入格式。
               </p>
             </div>
             <div className={styles.field}>
               <Label htmlFor="fixture-textarea-required">必填文本域</Label>
-              <Textarea id="fixture-textarea-required" required placeholder="此项必填" />
+              <Textarea
+                id="fixture-textarea-required"
+                required
+                placeholder="此项必填"
+              />
             </div>
 
             <div className={styles.compositionBlock} data-fixture-field-matrix>
@@ -548,7 +648,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                       <Input defaultValue="sk-test-invalid" />
                     </FieldControl>
                     <FieldDescription>凭据仅保存在当前设备。</FieldDescription>
-                    <FieldError>当前凭据无法通过验证，请检查内容后重试。</FieldError>
+                    <FieldError>
+                      当前凭据无法通过验证，请检查内容后重试。
+                    </FieldError>
                   </FieldContent>
                 </Field>
 
@@ -558,7 +660,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                     <FieldControl>
                       <Input value="Claude Sonnet 4.5" readOnly />
                     </FieldControl>
-                    <FieldDescription>当前模型由默认 Agent 统一管理。</FieldDescription>
+                    <FieldDescription>
+                      当前模型由默认 Agent 统一管理。
+                    </FieldDescription>
                   </FieldContent>
                 </Field>
 
@@ -568,7 +672,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                     <FieldControl>
                       <Input placeholder="请输入名称" />
                     </FieldControl>
-                    <FieldDescription>创建后仍可在 Agent 设置中修改。</FieldDescription>
+                    <FieldDescription>
+                      创建后仍可在 Agent 设置中修改。
+                    </FieldDescription>
                   </FieldContent>
                 </Field>
 
@@ -584,17 +690,24 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
 
               <div className={styles.horizontalFieldGroup}>
                 <FieldGroup>
-                  <Field orientation="horizontal" data-testid="field-horizontal-provider">
+                  <Field
+                    orientation="horizontal"
+                    data-testid="field-horizontal-provider"
+                  >
                     <FieldLabel>横向 Provider</FieldLabel>
                     <FieldContent>
                       <FieldControl>
                         <Input defaultValue="Anthropic（测试数据）" />
                       </FieldControl>
-                      <FieldDescription>横向布局保持统一标签起点。</FieldDescription>
+                      <FieldDescription>
+                        横向布局保持统一标签起点。
+                      </FieldDescription>
                     </FieldContent>
                   </Field>
                   <Field orientation="horizontal">
-                    <FieldLabel>这是一个用于验证横向标签列换行和内容对齐的长标签</FieldLabel>
+                    <FieldLabel>
+                      这是一个用于验证横向标签列换行和内容对齐的长标签
+                    </FieldLabel>
                     <FieldContent>
                       <FieldControl>
                         <Textarea defaultValue="长标签不会压缩或覆盖右侧控件。" />
@@ -606,13 +719,18 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
 
               <div className={styles.narrowFieldDemo}>
                 <FieldGroup>
-                  <Field orientation="horizontal" data-testid="field-horizontal-narrow">
+                  <Field
+                    orientation="horizontal"
+                    data-testid="field-horizontal-narrow"
+                  >
                     <FieldLabel>紧凑窗口字段</FieldLabel>
                     <FieldContent>
                       <FieldControl>
                         <Input defaultValue="自动堆叠" />
                       </FieldControl>
-                      <FieldDescription>容器较窄时标签回到控件上方。</FieldDescription>
+                      <FieldDescription>
+                        容器较窄时标签回到控件上方。
+                      </FieldDescription>
                     </FieldContent>
                   </Field>
                 </FieldGroup>
@@ -623,7 +741,8 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
               <div className={styles.compositionHeader}>
                 <h3 className={styles.compositionTitle}>InputGroup 组合矩阵</h3>
                 <p className={styles.compositionDescription}>
-                  Input、Textarea、图标、文本 addon 和操作按钮共享外层边框、焦点环与状态。
+                  Input、Textarea、图标、文本 addon
+                  和操作按钮共享外层边框、焦点环与状态。
                 </p>
               </div>
               <div className={styles.compositionGrid}>
@@ -631,7 +750,10 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                   <InputGroupAddon data-testid="input-group-search-addon">
                     <Search aria-hidden="true" />
                   </InputGroupAddon>
-                  <InputGroupInput aria-label="搜索 Agent" placeholder="搜索 Agent" />
+                  <InputGroupInput
+                    aria-label="搜索 Agent"
+                    placeholder="搜索 Agent"
+                  />
                 </InputGroup>
 
                 <InputGroup data-testid="input-group-action-flow">
@@ -651,25 +773,39 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                   <InputGroupAddon>
                     <InputGroupText>https://</InputGroupText>
                   </InputGroupAddon>
-                  <InputGroupInput aria-label="网址组合输入" defaultValue="example.com" />
+                  <InputGroupInput
+                    aria-label="网址组合输入"
+                    defaultValue="example.com"
+                  />
                 </InputGroup>
 
                 <InputGroup>
-                  <InputGroupInput aria-label="文件名组合输入" defaultValue="config" />
+                  <InputGroupInput
+                    aria-label="文件名组合输入"
+                    defaultValue="config"
+                  />
                   <InputGroupAddon align="inline-end">
                     <InputGroupText>.json</InputGroupText>
                   </InputGroupAddon>
                 </InputGroup>
 
                 <InputGroup invalid data-testid="input-group-invalid">
-                  <InputGroupInput aria-label="无效组合输入" defaultValue="invalid-value" />
+                  <InputGroupInput
+                    aria-label="无效组合输入"
+                    defaultValue="invalid-value"
+                  />
                   <InputGroupAddon align="inline-end">格式错误</InputGroupAddon>
                 </InputGroup>
 
                 <InputGroup disabled data-testid="input-group-disabled">
-                  <InputGroupInput aria-label="禁用组合输入" defaultValue="不可编辑" />
+                  <InputGroupInput
+                    aria-label="禁用组合输入"
+                    defaultValue="不可编辑"
+                  />
                   <InputGroupAddon align="inline-end">
-                    <InputGroupButton aria-label="禁用组合操作">操作</InputGroupButton>
+                    <InputGroupButton aria-label="禁用组合操作">
+                      操作
+                    </InputGroupButton>
                   </InputGroupAddon>
                 </InputGroup>
 
@@ -677,8 +813,15 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                   className={styles.inputGroupTextarea}
                   data-testid="input-group-textarea"
                 >
-                  <InputGroupTextarea aria-label="发送消息" placeholder="给汤圆发送消息" rows={3} />
-                  <InputGroupAddon align="block-end" data-testid="input-group-textarea-addon">
+                  <InputGroupTextarea
+                    aria-label="发送消息"
+                    placeholder="给汤圆发送消息"
+                    rows={3}
+                  />
+                  <InputGroupAddon
+                    align="block-end"
+                    data-testid="input-group-textarea-addon"
+                  >
                     <InputGroupText>Claude Sonnet 4.5</InputGroupText>
                     <InputGroupButton size="sm" aria-label="发送组合消息">
                       <Send data-icon="inline-start" aria-hidden="true" />
@@ -723,7 +866,10 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
               <div className={styles.field}>
                 <Label htmlFor="fixture-select-invalid">无效选择器</Label>
                 <Select>
-                  <SelectTrigger id="fixture-select-invalid" aria-invalid="true">
+                  <SelectTrigger
+                    id="fixture-select-invalid"
+                    aria-invalid="true"
+                  >
                     <SelectValue placeholder="格式待修正" />
                   </SelectTrigger>
                   <SelectContent>
@@ -811,7 +957,11 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
             </div>
             <Separator />
             <div className={styles.row}>
-              <Badge variant="secondary" className="max-w-48" data-testid="badge-long-text">
+              <Badge
+                variant="secondary"
+                className="max-w-48"
+                data-testid="badge-long-text"
+              >
                 这是一段很长很长很长很长用来验证高度与溢出的 Badge 文案
               </Badge>
               <Badge variant="success" data-testid="badge-icon">
@@ -863,7 +1013,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                     variant="outline"
                     onClick={() => {
                       toast.dismiss()
-                      toast.loading('正在保存 Agent 配置', { id: TOAST_FIXTURE_LOADING_ID })
+                      toast.loading('正在保存 Agent 配置', {
+                        id: TOAST_FIXTURE_LOADING_ID,
+                      })
                     }}
                   >
                     显示 loading Toast
@@ -871,7 +1023,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                   <Button
                     variant="secondary"
                     onClick={() =>
-                      toast.success('Agent 配置已保存', { id: TOAST_FIXTURE_LOADING_ID })
+                      toast.success('Agent 配置已保存', {
+                        id: TOAST_FIXTURE_LOADING_ID,
+                      })
                     }
                   >
                     更新 loading Toast
@@ -886,7 +1040,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                     variant="outline"
                     onClick={() => {
                       toast.dismiss()
-                      toast.error('操作失败', { description: '请检查网络连接后重试。' })
+                      toast.error('操作失败', {
+                        description: '请检查网络连接后重试。',
+                      })
                     }}
                   >
                     显示标题与说明 Toast
@@ -900,8 +1056,10 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                         action: {
                           label: '撤销归档',
                           onClick: () =>
-                            toast.success('已撤销 Agent 归档', { id: TOAST_FIXTURE_ACTION_ID })
-                        }
+                            toast.success('已撤销 Agent 归档', {
+                              id: TOAST_FIXTURE_ACTION_ID,
+                            }),
+                        },
                       })
                     }}
                   >
@@ -916,8 +1074,10 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                         cancel: {
                           label: '取消操作',
                           onClick: () =>
-                            toast.info('已取消批量操作', { id: TOAST_FIXTURE_CANCEL_ID })
-                        }
+                            toast.info('已取消批量操作', {
+                              id: TOAST_FIXTURE_CANCEL_ID,
+                            }),
+                        },
                       })
                     }}
                   >
@@ -932,12 +1092,18 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                         description: '新的默认模型将在下次会话中生效。',
                         action: {
                           label: '查看详情',
-                          onClick: () => toast.info('已打开配置详情', { id: TOAST_FIXTURE_FULL_ID })
+                          onClick: () =>
+                            toast.info('已打开配置详情', {
+                              id: TOAST_FIXTURE_FULL_ID,
+                            }),
                         },
                         cancel: {
                           label: '稍后处理',
-                          onClick: () => toast.info('已稍后处理', { id: TOAST_FIXTURE_FULL_ID })
-                        }
+                          onClick: () =>
+                            toast.info('已稍后处理', {
+                              id: TOAST_FIXTURE_FULL_ID,
+                            }),
+                        },
                       })
                     }}
                   >
@@ -950,7 +1116,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                       for (const index of [1, 2, 3, 4]) {
                         toast.info(`队列通知 ${index}`, {
                           id: `fixture-queue-toast-${index}`,
-                          duration: Number.POSITIVE_INFINITY
+                          duration: Number.POSITIVE_INFINITY,
                         })
                       }
                     }}
@@ -964,7 +1130,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
               <Alert variant="info" data-testid="alert-info">
                 <Info aria-hidden="true" />
                 <AlertTitle>有可用更新</AlertTitle>
-                <AlertDescription>新版本将在下次启动时自动应用。</AlertDescription>
+                <AlertDescription>
+                  新版本将在下次启动时自动应用。
+                </AlertDescription>
               </Alert>
               <Alert variant="success" data-testid="alert-success">
                 <CheckCircle2 aria-hidden="true" />
@@ -1025,7 +1193,10 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                 media={<Archive aria-hidden="true" />}
                 title="确认归档这个 Agent？"
                 dialogDescription={
-                  <>归档后将无法创建新会话，但历史记录仍会保留。你之后可以从 Agent 列表中恢复。</>
+                  <>
+                    归档后将无法创建新会话，但历史记录仍会保留。你之后可以从
+                    Agent 列表中恢复。
+                  </>
                 }
                 cancelLabel="取消"
                 actionLabel="归档 Agent"
@@ -1053,7 +1224,9 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
               <Card data-testid="card-default">
                 <CardHeader>
                   <CardTitle>Agent 配置</CardTitle>
-                  <CardDescription>管理当前 Agent 的模型与运行参数。</CardDescription>
+                  <CardDescription>
+                    管理当前 Agent 的模型与运行参数。
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <dl className={styles.cardDetails}>
@@ -1085,7 +1258,10 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
-                  <Button variant="secondary" onClick={() => toast.success('组件验收通知已显示')}>
+                  <Button
+                    variant="secondary"
+                    onClick={() => toast.success('组件验收通知已显示')}
+                  >
                     显示验收通知
                   </Button>
                 </CardFooter>
@@ -1094,11 +1270,14 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
               <Card size="compact" data-testid="card-compact">
                 <CardHeader>
                   <CardTitle>紧凑运行摘要</CardTitle>
-                  <CardDescription>16px 内边距用于并列信息与紧凑列表。</CardDescription>
+                  <CardDescription>
+                    16px 内边距用于并列信息与紧凑列表。
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className={styles.longCardCopy}>
-                    这是一段用于验证长内容换行的固定说明。Card 在 1024、1280 与 1440+
+                    这是一段用于验证长内容换行的固定说明。Card 在 1024、1280 与
+                    1440+
                     宽度下都应保持边框、内边距和内容层级稳定，不依赖装饰阴影制造分组。
                   </p>
                 </CardContent>
@@ -1119,9 +1298,13 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                       <span className={styles.interactiveCardContent}>
                         <span className={styles.interactiveCardTitle}>
                           Agent 卡片
-                          {state.selectedIcon ? <CheckCircle2 aria-hidden="true" /> : null}
+                          {state.selectedIcon ? (
+                            <CheckCircle2 aria-hidden="true" />
+                          ) : null}
                         </span>
-                        <span className={styles.interactiveCardDescription}>状态说明</span>
+                        <span className={styles.interactiveCardDescription}>
+                          状态说明
+                        </span>
                       </span>
                     </button>
                   </Card>
@@ -1141,18 +1324,27 @@ function DropdownMenuFixtureMatrix(): React.JSX.Element {
   const [timestampsVisible, setTimestampsVisible] = useState(false)
   const [uncontrolledDensity, setUncontrolledDensity] = useState('compact')
   const [controlledDensity, setControlledDensity] = useState('detailed')
-  const [uncontrolledSubmenuState, setUncontrolledSubmenuState] = useState('closed')
+  const [uncontrolledSubmenuState, setUncontrolledSubmenuState] =
+    useState('closed')
   const [controlledSubmenuOpen, setControlledSubmenuOpen] = useState(false)
 
   return (
     <div className={styles.dropdownMenuGrid} data-fixture-dropdown-menus>
-      <div className={styles.dropdownMenuSample} data-testid="dropdown-menu-actions-sample">
-        <span className={styles.dropdownMenuSampleLabel}>普通操作、分组与状态</span>
+      <div
+        className={styles.dropdownMenuSample}
+        data-testid="dropdown-menu-actions-sample"
+      >
+        <span className={styles.dropdownMenuSampleLabel}>
+          普通操作、分组与状态
+        </span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline">菜单：普通操作</Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" data-testid="dropdown-menu-actions-content">
+          <DropdownMenuContent
+            align="start"
+            data-testid="dropdown-menu-actions-content"
+          >
             <DropdownMenuLabel>Agent 操作</DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem onSelect={() => setLastAction('重命名')}>
@@ -1163,32 +1355,47 @@ function DropdownMenuFixtureMatrix(): React.JSX.Element {
                 复制
                 <DropdownMenuShortcut>⌘D</DropdownMenuShortcut>
               </DropdownMenuItem>
-              <DropdownMenuItem disabled onSelect={() => setLastAction('禁用项被激活')}>
+              <DropdownMenuItem
+                disabled
+                onSelect={() => setLastAction('禁用项被激活')}
+              >
                 锁定项（不可用）
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuSub
-              onOpenChange={(open) => setUncontrolledSubmenuState(open ? 'open' : 'closed')}
+              onOpenChange={(open) =>
+                setUncontrolledSubmenuState(open ? 'open' : 'closed')
+              }
             >
               <DropdownMenuSubTrigger>移动到</DropdownMenuSubTrigger>
               <DropdownMenuSubContent data-testid="dropdown-menu-uncontrolled-sub-content">
-                <DropdownMenuItem onSelect={() => setLastAction('移动到工作空间')}>
+                <DropdownMenuItem
+                  onSelect={() => setLastAction('移动到工作空间')}
+                >
                   工作空间
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setLastAction('移动到归档区')}>
+                <DropdownMenuItem
+                  onSelect={() => setLastAction('移动到归档区')}
+                >
                   归档区
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onSelect={() => setLastAction('归档 Agent')}>
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => setLastAction('归档 Agent')}
+            >
               归档 Agent
               <DropdownMenuShortcut>⌥⌘A</DropdownMenuShortcut>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <output className={styles.dropdownMenuStatus} data-testid="dropdown-menu-last-action">
+        <output
+          className={styles.dropdownMenuStatus}
+          data-testid="dropdown-menu-last-action"
+        >
           最近操作：{lastAction}
         </output>
         <output
@@ -1199,13 +1406,21 @@ function DropdownMenuFixtureMatrix(): React.JSX.Element {
         </output>
       </div>
 
-      <div className={styles.dropdownMenuSample} data-testid="dropdown-menu-checkbox-sample">
-        <span className={styles.dropdownMenuSampleLabel}>Checkbox · 非受控与受控</span>
+      <div
+        className={styles.dropdownMenuSample}
+        data-testid="dropdown-menu-checkbox-sample"
+      >
+        <span className={styles.dropdownMenuSampleLabel}>
+          Checkbox · 非受控与受控
+        </span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline">菜单：Checkbox</Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" data-testid="dropdown-menu-checkbox-content">
+          <DropdownMenuContent
+            align="start"
+            data-testid="dropdown-menu-checkbox-content"
+          >
             <DropdownMenuLabel>显示选项</DropdownMenuLabel>
             <DropdownMenuCheckboxItem
               defaultChecked
@@ -1215,37 +1430,67 @@ function DropdownMenuFixtureMatrix(): React.JSX.Element {
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={timestampsVisible}
-              onCheckedChange={(checked) => setTimestampsVisible(checked === true)}
+              onCheckedChange={(checked) =>
+                setTimestampsVisible(checked === true)
+              }
             >
               显示时间戳
             </DropdownMenuCheckboxItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <output className={styles.dropdownMenuStatus} data-testid="dropdown-menu-history-state">
+        <output
+          className={styles.dropdownMenuStatus}
+          data-testid="dropdown-menu-history-state"
+        >
           非受控：{historyKept ? 'checked' : 'unchecked'}
         </output>
-        <output className={styles.dropdownMenuStatus} data-testid="dropdown-menu-timestamps-state">
+        <output
+          className={styles.dropdownMenuStatus}
+          data-testid="dropdown-menu-timestamps-state"
+        >
           受控：{timestampsVisible ? 'checked' : 'unchecked'}
         </output>
       </div>
 
-      <div className={styles.dropdownMenuSample} data-testid="dropdown-menu-radio-sample">
-        <span className={styles.dropdownMenuSampleLabel}>Radio · 非受控与受控</span>
+      <div
+        className={styles.dropdownMenuSample}
+        data-testid="dropdown-menu-radio-sample"
+      >
+        <span className={styles.dropdownMenuSampleLabel}>
+          Radio · 非受控与受控
+        </span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline">菜单：Radio</Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" data-testid="dropdown-menu-radio-content">
+          <DropdownMenuContent
+            align="start"
+            data-testid="dropdown-menu-radio-content"
+          >
             <DropdownMenuLabel>非受控密度</DropdownMenuLabel>
-            <DropdownMenuRadioGroup defaultValue="compact" onValueChange={setUncontrolledDensity}>
-              <DropdownMenuRadioItem value="compact">紧凑</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="comfortable">舒适</DropdownMenuRadioItem>
+            <DropdownMenuRadioGroup
+              defaultValue="compact"
+              onValueChange={setUncontrolledDensity}
+            >
+              <DropdownMenuRadioItem value="compact">
+                紧凑
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="comfortable">
+                舒适
+              </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>受控布局</DropdownMenuLabel>
-            <DropdownMenuRadioGroup value={controlledDensity} onValueChange={setControlledDensity}>
-              <DropdownMenuRadioItem value="compact">列表布局</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="detailed">详细布局</DropdownMenuRadioItem>
+            <DropdownMenuRadioGroup
+              value={controlledDensity}
+              onValueChange={setControlledDensity}
+            >
+              <DropdownMenuRadioItem value="compact">
+                列表布局
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="detailed">
+                详细布局
+              </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -1263,18 +1508,31 @@ function DropdownMenuFixtureMatrix(): React.JSX.Element {
         </output>
       </div>
 
-      <div className={styles.dropdownMenuSample} data-testid="dropdown-menu-submenu-sample">
+      <div
+        className={styles.dropdownMenuSample}
+        data-testid="dropdown-menu-submenu-sample"
+      >
         <span className={styles.dropdownMenuSampleLabel}>Submenu · 受控</span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline">菜单：受控子菜单</Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" data-testid="dropdown-menu-controlled-root-content">
-            <DropdownMenuItem onSelect={() => setLastAction('查看详情')}>查看详情</DropdownMenuItem>
-            <DropdownMenuSub open={controlledSubmenuOpen} onOpenChange={setControlledSubmenuOpen}>
+          <DropdownMenuContent
+            align="start"
+            data-testid="dropdown-menu-controlled-root-content"
+          >
+            <DropdownMenuItem onSelect={() => setLastAction('查看详情')}>
+              查看详情
+            </DropdownMenuItem>
+            <DropdownMenuSub
+              open={controlledSubmenuOpen}
+              onOpenChange={setControlledSubmenuOpen}
+            >
               <DropdownMenuSubTrigger>共享到</DropdownMenuSubTrigger>
               <DropdownMenuSubContent data-testid="dropdown-menu-controlled-sub-content">
-                <DropdownMenuItem onSelect={() => setLastAction('共享到工作空间')}>
+                <DropdownMenuItem
+                  onSelect={() => setLastAction('共享到工作空间')}
+                >
                   工作空间
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setLastAction('共享到文件')}>
@@ -1320,7 +1578,7 @@ function AlertDialogFixtureSample({
   dialogDescription,
   cancelLabel,
   actionLabel,
-  actionVariant = 'default'
+  actionVariant = 'default',
 }: AlertDialogFixtureSampleProps): React.JSX.Element {
   return (
     <div className={styles.alertDialogSample}>
@@ -1338,7 +1596,9 @@ function AlertDialogFixtureSample({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
-            <AlertDialogAction variant={actionVariant}>{actionLabel}</AlertDialogAction>
+            <AlertDialogAction variant={actionVariant}>
+              {actionLabel}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

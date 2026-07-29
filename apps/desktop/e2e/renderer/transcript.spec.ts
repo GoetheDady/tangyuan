@@ -5,30 +5,34 @@ import type {
   RuntimeSnapshot,
   TranscriptEntry,
   TranscriptSnapshot,
-  UserMessageEntry
+  UserMessageEntry,
 } from '@tangyuan/contracts'
 import {
   createPreloadApiInitScript,
   createReadyRuntimeSnapshot,
-  createTestSessions
+  createTestSessions,
 } from '../fixtures/preload-mock'
 
 const FIXED_TIME = '2026-07-22T08:30:00.000Z'
 
-function userEntry(index: number, content: string, sessionId = 'session-1'): UserMessageEntry {
+function userEntry(
+  index: number,
+  content: string,
+  sessionId = 'session-1',
+): UserMessageEntry {
   return {
     kind: 'user-message',
     index,
     messageId: `${sessionId}-user-${index}`,
     content,
-    createdAt: FIXED_TIME
+    createdAt: FIXED_TIME,
   }
 }
 
 function agentEntry(
   index: number,
   content: string,
-  overrides: Partial<AgentReplyEntry> = {}
+  overrides: Partial<AgentReplyEntry> = {},
 ): AgentReplyEntry {
   return {
     kind: 'agent-reply',
@@ -38,32 +42,34 @@ function agentEntry(
     createdAt: FIXED_TIME,
     attempt: null,
     turns: [],
-    ...overrides
+    ...overrides,
   }
 }
 
 function transcript(
   sessionId: string,
   entries: TranscriptEntry[],
-  agentId = 'tangyuan'
+  agentId = 'tangyuan',
 ): TranscriptSnapshot {
   return { sessionId, agentId, entries, updatedAt: FIXED_TIME }
 }
 
-function completedAttempt(runId: string): NonNullable<AgentReplyEntry['attempt']> {
+function completedAttempt(
+  runId: string,
+): NonNullable<AgentReplyEntry['attempt']> {
   return {
     attemptId: runId,
     runId,
     status: 'completed',
     startedAt: FIXED_TIME,
-    completedAt: '2026-07-22T08:30:04.000Z'
+    completedAt: '2026-07-22T08:30:04.000Z',
   }
 }
 
 function createRendererInitScript(
   runtime: RuntimeSnapshot,
   sessions: AgentSessionSummary[],
-  transcripts: Record<string, TranscriptSnapshot>
+  transcripts: Record<string, TranscriptSnapshot>,
 ): string {
   const base = createPreloadApiInitScript(runtime, sessions, [])
   const serialized = JSON.stringify(transcripts)
@@ -122,7 +128,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
                 content: '先定位相关测试与 Renderer 调用路径。',
                 status: 'completed',
                 startedAt: FIXED_TIME,
-                completedAt: '2026-07-22T08:30:01.000Z'
+                completedAt: '2026-07-22T08:30:01.000Z',
               },
               {
                 index: 1,
@@ -132,9 +138,9 @@ test.describe('Transcript 真实 Renderer 回归', () => {
                 content: '读取对话组件和测试配置',
                 status: 'completed',
                 startedAt: '2026-07-22T08:30:01.000Z',
-                completedAt: '2026-07-22T08:30:02.000Z'
-              }
-            ]
+                completedAt: '2026-07-22T08:30:02.000Z',
+              },
+            ],
           },
           {
             index: 1,
@@ -151,21 +157,25 @@ test.describe('Transcript 真实 Renderer 回归', () => {
                 content: '运行 Renderer 测试',
                 status: 'completed',
                 startedAt: '2026-07-22T08:30:02.000Z',
-                completedAt: '2026-07-22T08:30:04.000Z'
-              }
-            ]
-          }
-        ]
-      })
+                completedAt: '2026-07-22T08:30:04.000Z',
+              },
+            ],
+          },
+        ],
+      }),
     ])
 
     await page.addInitScript({
-      content: createRendererInitScript(runtime, sessions, { 'session-1': structured })
+      content: createRendererInitScript(runtime, sessions, {
+        'session-1': structured,
+      }),
     })
     await page.goto('/#/chat/tangyuan')
 
     await expect(page.getByText('请检查实现并运行测试。')).toBeVisible()
-    await expect(page.getByRole('button', { name: '已完成执行过程' })).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: '已完成执行过程' }),
+    ).toBeVisible()
     await page.getByRole('button', { name: '已完成执行过程' }).click()
     await expect(page.getByText('读取对话组件和测试配置')).toBeVisible()
     await expect(page.getByText('运行 Renderer 测试')).toBeVisible()
@@ -175,7 +185,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1).map((session) => ({
       ...session,
-      state: 'running' as const
+      state: 'running' as const,
     }))
     const initial = transcript('session-1', [
       userEntry(0, '开始流式测试。'),
@@ -185,14 +195,16 @@ test.describe('Transcript 真实 Renderer 回归', () => {
           runId: 'run-stream',
           status: 'running',
           startedAt: FIXED_TIME,
-          completedAt: null
+          completedAt: null,
         },
-        turns: []
-      })
+        turns: [],
+      }),
     ])
 
     await page.addInitScript({
-      content: createRendererInitScript(runtime, sessions, { 'session-1': initial })
+      content: createRendererInitScript(runtime, sessions, {
+        'session-1': initial,
+      }),
     })
     await page.goto('/#/chat/tangyuan')
     await page.waitForSelector('#composer')
@@ -205,7 +217,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
           agentId: 'tangyuan',
           sessionId: 'session-1',
           delta: { type: 'delta-appended', index: 1, delta: text },
-          occurredAt: '2026-07-22T08:30:01.000Z'
+          occurredAt: '2026-07-22T08:30:01.000Z',
         })
       }, delta)
     }
@@ -220,8 +232,8 @@ test.describe('Transcript 真实 Renderer 回归', () => {
     const entries = createAlternatingEntries(40, '底部消息')
     await page.addInitScript({
       content: createRendererInitScript(runtime, sessions, {
-        'session-1': transcript('session-1', entries)
-      })
+        'session-1': transcript('session-1', entries),
+      }),
     })
     await page.goto('/#/chat/tangyuan')
 
@@ -243,10 +255,10 @@ test.describe('Transcript 真实 Renderer 回归', () => {
             content: '新消息已到达',
             createdAt: '2026-07-22T08:31:00.000Z',
             attempt: null,
-            turns: []
-          }
+            turns: [],
+          },
         },
-        occurredAt: '2026-07-22T08:31:00.000Z'
+        occurredAt: '2026-07-22T08:31:00.000Z',
       })
     })
 
@@ -259,8 +271,8 @@ test.describe('Transcript 真实 Renderer 回归', () => {
     const entries = createAlternatingEntries(60, '历史消息')
     await page.addInitScript({
       content: createRendererInitScript(runtime, sessions, {
-        'session-1': transcript('session-1', entries)
-      })
+        'session-1': transcript('session-1', entries),
+      }),
     })
     await page.goto('/#/chat/tangyuan')
 
@@ -288,14 +300,16 @@ test.describe('Transcript 真实 Renderer 回归', () => {
             content: '不应该强制滚动',
             createdAt: '2026-07-22T08:31:00.000Z',
             attempt: null,
-            turns: []
-          }
+            turns: [],
+          },
         },
-        occurredAt: '2026-07-22T08:31:00.000Z'
+        occurredAt: '2026-07-22T08:31:00.000Z',
       })
     })
 
-    await expect.poll(() => scrollArea.evaluate((element) => element.scrollTop)).toBeLessThan(80)
+    await expect
+      .poll(() => scrollArea.evaluate((element) => element.scrollTop))
+      .toBeLessThan(80)
   })
 
   test('500 个结构化条目保持虚拟化和可交互', async ({ page }) => {
@@ -304,8 +318,8 @@ test.describe('Transcript 真实 Renderer 回归', () => {
     const entries = createAlternatingEntries(500, '批量消息')
     await page.addInitScript({
       content: createRendererInitScript(runtime, sessions, {
-        'session-1': transcript('session-1', entries)
-      })
+        'session-1': transcript('session-1', entries),
+      }),
     })
     await page.goto('/#/chat/tangyuan')
 
@@ -324,10 +338,12 @@ test.describe('Transcript 真实 Renderer 回归', () => {
     const structured = transcript('session-1', [
       userEntry(0, '压缩前'),
       { kind: 'compaction', index: 1, timestamp: FIXED_TIME },
-      agentEntry(2, '压缩后继续')
+      agentEntry(2, '压缩后继续'),
     ])
     await page.addInitScript({
-      content: createRendererInitScript(runtime, sessions, { 'session-1': structured })
+      content: createRendererInitScript(runtime, sessions, {
+        'session-1': structured,
+      }),
     })
     await page.goto('/#/chat/tangyuan')
 
@@ -339,12 +355,14 @@ test.describe('Transcript 真实 Renderer 回归', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(2)
     const first = transcript('session-1', [userEntry(0, '第一会话内容')])
-    const second = transcript('session-2', [userEntry(0, '第二会话内容', 'session-2')])
+    const second = transcript('session-2', [
+      userEntry(0, '第二会话内容', 'session-2'),
+    ])
     await page.addInitScript({
       content: createRendererInitScript(runtime, sessions, {
         'session-1': first,
-        'session-2': second
-      })
+        'session-2': second,
+      }),
     })
     await page.goto('/#/chat/tangyuan')
 
@@ -354,14 +372,16 @@ test.describe('Transcript 真实 Renderer 回归', () => {
       .poll(() => page.evaluate(() => window.__getTranscriptCalls__))
       .toContainEqual({ agentId: 'tangyuan', sessionId: 'session-2' })
     await expect(page.getByText('第二会话内容')).toBeVisible()
-    await expect(page.getByTestId('message-scroll-area').getByText('第一会话内容')).toHaveCount(0)
+    await expect(
+      page.getByTestId('message-scroll-area').getByText('第一会话内容'),
+    ).toHaveCount(0)
   })
 
   test('失败尝试可以重试且保留原用户消息', async ({ page }) => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1).map((session) => ({
       ...session,
-      state: 'failed' as const
+      state: 'failed' as const,
     }))
     const failed = transcript('session-1', [
       userEntry(0, '请重试这个请求。'),
@@ -373,7 +393,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
           status: 'failed',
           startedAt: FIXED_TIME,
           completedAt: '2026-07-22T08:30:02.000Z',
-          error: { code: 'unknown', message: '网络中断', recoverable: true }
+          error: { code: 'unknown', message: '网络中断', recoverable: true },
         },
         turns: [
           {
@@ -389,22 +409,28 @@ test.describe('Transcript 真实 Renderer 回归', () => {
                 content: '正在处理请求。',
                 status: 'failed',
                 startedAt: FIXED_TIME,
-                completedAt: '2026-07-22T08:30:02.000Z'
-              }
-            ]
-          }
-        ]
-      })
+                completedAt: '2026-07-22T08:30:02.000Z',
+              },
+            ],
+          },
+        ],
+      }),
     ])
     await page.addInitScript({
-      content: createRendererInitScript(runtime, sessions, { 'session-1': failed })
+      content: createRendererInitScript(runtime, sessions, {
+        'session-1': failed,
+      }),
     })
     await page.goto('/#/chat/tangyuan')
 
     await page.getByRole('button', { name: '重试' }).click()
     const calls = await page.evaluate(() => window.__retryMessageCalls__)
     expect(calls).toEqual([
-      { agentId: 'tangyuan', sessionId: 'session-1', userMessageId: 'session-1-user-0' }
+      {
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        userMessageId: 'session-1-user-0',
+      },
     ])
     await expect(page.getByText('请重试这个请求。')).toBeVisible()
   })
@@ -413,7 +439,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1).map((session) => ({
       ...session,
-      state: 'running' as const
+      state: 'running' as const,
     }))
     const initial = transcript('session-1', [
       userEntry(0, '检查动态高度。'),
@@ -423,17 +449,23 @@ test.describe('Transcript 真实 Renderer 回归', () => {
           runId: 'run-height',
           status: 'running',
           startedAt: FIXED_TIME,
-          completedAt: null
-        }
-      })
+          completedAt: null,
+        },
+      }),
     ])
     await page.addInitScript({
-      content: createRendererInitScript(runtime, sessions, { 'session-1': initial })
+      content: createRendererInitScript(runtime, sessions, {
+        'session-1': initial,
+      }),
     })
     await page.goto('/#/chat/tangyuan')
 
-    const inner = page.getByTestId('message-scroll-area').locator(':scope > div')
-    const before = await inner.evaluate((element) => element.getBoundingClientRect().height)
+    const inner = page
+      .getByTestId('message-scroll-area')
+      .locator(':scope > div')
+    const before = await inner.evaluate(
+      (element) => element.getBoundingClientRect().height,
+    )
     await page.evaluate(() => {
       window.__dispatchAgentEvent__?.({
         type: 'transcript-delta',
@@ -442,22 +474,27 @@ test.describe('Transcript 真实 Renderer 回归', () => {
         delta: {
           type: 'delta-appended',
           index: 1,
-          delta: '\n\n' + '增长后的长段落。'.repeat(120)
+          delta: '\n\n' + '增长后的长段落。'.repeat(120),
         },
-        occurredAt: '2026-07-22T08:31:00.000Z'
+        occurredAt: '2026-07-22T08:31:00.000Z',
       })
     })
     await expect
-      .poll(() => inner.evaluate((element) => element.getBoundingClientRect().height))
+      .poll(() =>
+        inner.evaluate((element) => element.getBoundingClientRect().height),
+      )
       .toBeGreaterThan(before)
   })
 })
 
-function createAlternatingEntries(count: number, prefix: string): TranscriptEntry[] {
+function createAlternatingEntries(
+  count: number,
+  prefix: string,
+): TranscriptEntry[] {
   return Array.from({ length: count }, (_, index) =>
     index % 2 === 0
       ? userEntry(index, `${prefix} ${index + 1}：验证虚拟列表。`)
-      : agentEntry(index, `${prefix} ${index + 1}：${'结构化内容 '.repeat(8)}`)
+      : agentEntry(index, `${prefix} ${index + 1}：${'结构化内容 '.repeat(8)}`),
   )
 }
 

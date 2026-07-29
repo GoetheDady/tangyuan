@@ -11,16 +11,17 @@ const badgeVariants = cva(
       variant: {
         default: 'border-transparent bg-primary text-primary-foreground',
         secondary: 'border-transparent bg-secondary text-secondary-foreground',
-        success: 'border-success-border bg-success-soft text-success-foreground',
+        success:
+          'border-success-border bg-success-soft text-success-foreground',
         destructive:
           'border-destructive-border bg-destructive-soft text-destructive-soft-foreground',
-        outline: 'border-border bg-transparent text-foreground'
-      }
+        outline: 'border-border bg-transparent text-foreground',
+      },
     },
     defaultVariants: {
-      variant: 'default'
-    }
-  }
+      variant: 'default',
+    },
+  },
 )
 
 /**
@@ -30,7 +31,9 @@ const badgeVariants = cva(
  * 属性合并到唯一的 React 子元素上；元素专属属性应直接声明在该子元素上。
  */
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {
+  extends
+    React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof badgeVariants> {
   asChild?: boolean
 }
 

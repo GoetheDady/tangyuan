@@ -33,7 +33,7 @@ export interface QuestionClarificationCardProps {
 export function QuestionClarificationCard({
   clarification,
   onAnswer,
-  onCancel
+  onCancel,
 }: QuestionClarificationCardProps): React.JSX.Element {
   const [phase, setPhase] = useState<CardPhase>('entering')
   const [customAnswer, setCustomAnswer] = useState('')
@@ -87,7 +87,8 @@ export function QuestionClarificationCard({
    */
   const submitOption = useCallback(
     async (option: string): Promise<void> => {
-      if (phase === 'submitting' || phase === 'resolved' || phase === 'exiting') return
+      if (phase === 'submitting' || phase === 'resolved' || phase === 'exiting')
+        return
 
       setPhase('submitting')
       setActiveOption(option)
@@ -103,13 +104,14 @@ export function QuestionClarificationCard({
           setPhase('exiting')
         }, 800)
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : '操作失败，请重试'
+        const message =
+          error instanceof Error ? error.message : '操作失败，请重试'
         setErrorMessage(message)
         setPhase('pending')
         setActiveOption(null)
       }
     },
-    [phase, clarification.clarificationId, onAnswer]
+    [phase, clarification.clarificationId, onAnswer],
   )
 
   /**
@@ -122,7 +124,8 @@ export function QuestionClarificationCard({
 
     if (!trimmed) return
 
-    if (phase === 'submitting' || phase === 'resolved' || phase === 'exiting') return
+    if (phase === 'submitting' || phase === 'resolved' || phase === 'exiting')
+      return
 
     setPhase('submitting')
     setErrorMessage(null)
@@ -137,7 +140,8 @@ export function QuestionClarificationCard({
         setPhase('exiting')
       }, 800)
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '操作失败，请重试'
+      const message =
+        error instanceof Error ? error.message : '操作失败，请重试'
       setErrorMessage(message)
       setPhase('pending')
     }
@@ -149,7 +153,8 @@ export function QuestionClarificationCard({
    * @returns 无返回值。
    */
   const handleCancel = useCallback(async (): Promise<void> => {
-    if (phase === 'submitting' || phase === 'resolved' || phase === 'exiting') return
+    if (phase === 'submitting' || phase === 'resolved' || phase === 'exiting')
+      return
 
     setPhase('submitting')
     setErrorMessage(null)
@@ -163,7 +168,8 @@ export function QuestionClarificationCard({
         setPhase('exiting')
       }, 800)
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '操作失败，请重试'
+      const message =
+        error instanceof Error ? error.message : '操作失败，请重试'
       setErrorMessage(message)
       setPhase('pending')
     }
@@ -184,12 +190,16 @@ export function QuestionClarificationCard({
         void handleCancel()
       }
 
-      if (event.key === 'Enter' && showCustomInput && customAnswer.trim().length > 0) {
+      if (
+        event.key === 'Enter' &&
+        showCustomInput &&
+        customAnswer.trim().length > 0
+      ) {
         event.preventDefault()
         void submitCustomAnswer()
       }
     },
-    [phase, showCustomInput, customAnswer, handleCancel, submitCustomAnswer]
+    [phase, showCustomInput, customAnswer, handleCancel, submitCustomAnswer],
   )
 
   const isSubmitting = phase === 'submitting'
@@ -203,13 +213,15 @@ export function QuestionClarificationCard({
         aria-hidden="true"
         data-testid="clarification-card"
       >
-        <div className="rounded-lg border bg-card px-4 py-3 opacity-0" />
+        <div className="bg-card rounded-lg border px-4 py-3 opacity-0" />
       </div>
     )
   }
 
   const animationClass =
-    phase === 'entering' ? 'animate-[approval-card-enter_240ms_cubic-bezier(0.2,0,0,1)_both]' : ''
+    phase === 'entering'
+      ? 'animate-[approval-card-enter_240ms_cubic-bezier(0.2,0,0,1)_both]'
+      : ''
 
   return (
     <div
@@ -221,7 +233,7 @@ export function QuestionClarificationCard({
     >
       <div
         ref={cardRef}
-        className={`rounded-lg border shadow-level-1 transition-colors duration-200 ${
+        className={`shadow-level-1 rounded-lg border transition-colors duration-200 ${
           isResolved
             ? 'border-success-border bg-success-soft/30'
             : 'border-primary-border/40 bg-primary-soft/10'
@@ -229,17 +241,31 @@ export function QuestionClarificationCard({
         onKeyDown={handleKeyDown}
       >
         {/* 头部 */}
-        <div className="flex items-center gap-2 border-b border-primary-border/30 px-4 py-2.5">
+        <div className="border-primary-border/30 flex items-center gap-2 border-b px-4 py-2.5">
           {isResolved ? (
             <>
-              <Check size={14} className="shrink-0 text-success-foreground" aria-hidden="true" />
-              <span className="text-label font-semibold text-success-foreground">已回答</span>
+              <Check
+                size={14}
+                className="text-success-foreground shrink-0"
+                aria-hidden="true"
+              />
+              <span className="text-label text-success-foreground font-semibold">
+                已回答
+              </span>
             </>
           ) : (
             <>
-              <HelpCircle size={14} className="shrink-0 text-primary" aria-hidden="true" />
-              <span className="text-label font-semibold text-primary">待回答</span>
-              <span className="text-label text-muted-foreground">Agent 需要更多信息</span>
+              <HelpCircle
+                size={14}
+                className="text-primary shrink-0"
+                aria-hidden="true"
+              />
+              <span className="text-label text-primary font-semibold">
+                待回答
+              </span>
+              <span className="text-label text-muted-foreground">
+                Agent 需要更多信息
+              </span>
             </>
           )}
         </div>
@@ -249,7 +275,7 @@ export function QuestionClarificationCard({
           {/* 问题文本 */}
           <div>
             <p
-              className="text-body leading-relaxed text-foreground"
+              className="text-body text-foreground leading-relaxed"
               aria-label={`问题：${clarification.question}`}
             >
               {clarification.question}
@@ -263,9 +289,9 @@ export function QuestionClarificationCard({
                 key={option}
                 ref={index === 0 ? firstOptionRef : undefined}
                 type="button"
-                className={`flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                className={`text-body focus-visible:ring-ring flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none ${
                   isResolved
-                    ? 'cursor-not-allowed border-border text-muted-foreground'
+                    ? 'border-border text-muted-foreground cursor-not-allowed'
                     : 'border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
                 onClick={() => {
@@ -277,11 +303,15 @@ export function QuestionClarificationCard({
                 aria-label={`选择：${option}`}
               >
                 {isSubmitting && activeOption === option ? (
-                  <LoaderCircle size={14} className="animate-spin shrink-0" aria-hidden="true" />
+                  <LoaderCircle
+                    size={14}
+                    className="shrink-0 animate-spin"
+                    aria-hidden="true"
+                  />
                 ) : (
                   <MessageSquare
                     size={14}
-                    className="shrink-0 text-muted-foreground"
+                    className="text-muted-foreground shrink-0"
                     aria-hidden="true"
                   />
                 )}
@@ -296,9 +326,9 @@ export function QuestionClarificationCard({
               {!showCustomInput && !isResolved ? (
                 <button
                   type="button"
-                  className={`flex w-full items-center gap-2 rounded-md border border-dashed px-3 py-2 text-left text-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  className={`text-body focus-visible:ring-ring flex w-full items-center gap-2 rounded-md border border-dashed px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none ${
                     isResolved
-                      ? 'cursor-not-allowed border-border text-muted-foreground'
+                      ? 'border-border text-muted-foreground cursor-not-allowed'
                       : 'border-muted-foreground/30 bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground'
                   }`}
                   onClick={() => setShowCustomInput(true)}
@@ -312,8 +342,10 @@ export function QuestionClarificationCard({
                   <input
                     ref={customInputRef}
                     type="text"
-                    className={`min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      isResolved ? 'cursor-not-allowed text-muted-foreground' : 'border-input'
+                    className={`bg-background text-body focus-visible:ring-ring min-w-0 flex-1 rounded-md border px-3 py-2 focus-visible:ring-2 focus-visible:outline-none ${
+                      isResolved
+                        ? 'text-muted-foreground cursor-not-allowed'
+                        : 'border-input'
                     }`}
                     value={customAnswer}
                     onChange={(e) => setCustomAnswer(e.target.value)}
@@ -323,19 +355,25 @@ export function QuestionClarificationCard({
                   />
                   <button
                     type="button"
-                    className={`inline-flex shrink-0 items-center gap-1 rounded-md px-3 py-2 text-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    className={`text-body focus-visible:ring-ring inline-flex shrink-0 items-center gap-1 rounded-md px-3 py-2 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
                       isResolved || !customAnswer.trim()
-                        ? 'cursor-not-allowed bg-muted text-muted-foreground'
+                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
                         : 'bg-primary text-primary-foreground hover:bg-primary-hover'
                     }`}
                     onClick={() => {
                       void submitCustomAnswer()
                     }}
-                    disabled={isSubmitting || isResolved || !customAnswer.trim()}
+                    disabled={
+                      isSubmitting || isResolved || !customAnswer.trim()
+                    }
                     aria-label="提交自定义答案"
                   >
                     {isSubmitting ? (
-                      <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
+                      <LoaderCircle
+                        size={14}
+                        className="animate-spin"
+                        aria-hidden="true"
+                      />
                     ) : (
                       <Check size={14} aria-hidden="true" />
                     )}
@@ -349,7 +387,7 @@ export function QuestionClarificationCard({
           {/* 错误消息 */}
           {errorMessage && (
             <div
-              className="rounded-md bg-destructive-soft/20 px-3 py-2 text-label text-destructive-foreground"
+              className="bg-destructive-soft/20 text-label text-destructive-foreground rounded-md px-3 py-2"
               role="alert"
             >
               {errorMessage}
@@ -359,10 +397,10 @@ export function QuestionClarificationCard({
 
         {/* 底部取消 */}
         {!isResolved && (
-          <div className="flex items-center justify-end gap-2 border-t border-primary-border/30 px-4 py-2.5">
+          <div className="border-primary-border/30 flex items-center justify-end gap-2 border-t px-4 py-2.5">
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-label font-medium text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="border-border bg-background text-label text-muted-foreground hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1 rounded-md border px-3 py-1.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
               onClick={() => {
                 void handleCancel()
               }}

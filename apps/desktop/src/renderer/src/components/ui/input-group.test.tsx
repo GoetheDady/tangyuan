@@ -11,7 +11,7 @@ import {
   InputGroupButton,
   InputGroupInput,
   InputGroupText,
-  InputGroupTextarea
+  InputGroupTextarea,
 } from '@/components/ui/input-group'
 
 describe('InputGroup', () => {
@@ -21,7 +21,7 @@ describe('InputGroup', () => {
     render(
       <InputGroup ref={ref} className="custom-group" data-testid="group">
         <InputGroupInput aria-label="搜索" />
-      </InputGroup>
+      </InputGroup>,
     )
 
     const group = screen.getByTestId('group')
@@ -49,7 +49,7 @@ describe('InputGroup', () => {
           onChange={onChange}
           aria-label="搜索 Agent"
         />
-      </InputGroup>
+      </InputGroup>,
     )
 
     const input = screen.getByRole('textbox', { name: '搜索 Agent' })
@@ -83,7 +83,7 @@ describe('InputGroup', () => {
         <InputGroupAddon align="block-end">
           <InputGroupText>Claude Sonnet</InputGroupText>
         </InputGroupAddon>
-      </InputGroup>
+      </InputGroup>,
     )
 
     const textarea = screen.getByRole('textbox', { name: '消息' })
@@ -103,7 +103,7 @@ describe('InputGroup', () => {
       <InputGroup>
         <InputGroupAddon data-testid="addon">https://</InputGroupAddon>
         <InputGroupInput aria-label="网址" />
-      </InputGroup>
+      </InputGroup>,
     )
 
     await user.click(screen.getByTestId('addon'))
@@ -115,7 +115,7 @@ describe('InputGroup', () => {
         <InputGroupAddon data-testid="addon" align="block-end">
           辅助信息
         </InputGroupAddon>
-      </InputGroup>
+      </InputGroup>,
     )
 
     await user.click(screen.getByTestId('addon'))
@@ -134,7 +134,7 @@ describe('InputGroup', () => {
             显示
           </InputGroupButton>
         </InputGroupAddon>
-      </InputGroup>
+      </InputGroup>,
     )
 
     await user.tab()
@@ -158,7 +158,7 @@ describe('InputGroup', () => {
         <InputGroupAddon align="inline-end">
           <InputGroupButton aria-label="禁用操作">操作</InputGroupButton>
         </InputGroupAddon>
-      </InputGroup>
+      </InputGroup>,
     )
 
     const group = screen.getByTestId('group')

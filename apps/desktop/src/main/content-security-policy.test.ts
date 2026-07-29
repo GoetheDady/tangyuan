@@ -6,7 +6,9 @@ describe('buildContentSecurityPolicy', () => {
     const policy = buildContentSecurityPolicy('http://localhost:5173')
 
     expect(policy).toContain("script-src 'self' 'unsafe-inline'")
-    expect(policy).toContain("connect-src 'self' http://localhost:5173 ws://localhost:*")
+    expect(policy).toContain(
+      "connect-src 'self' http://localhost:5173 ws://localhost:*",
+    )
   })
 
   it('生产模式继续禁止内联脚本和开发服务器连接', () => {

@@ -35,7 +35,7 @@ import {
   type SkillOperationParams,
   type UpdateAgentConfigRequest,
   type UpdateSoulRequest,
-  type UpdateUserProfileRequest
+  type UpdateUserProfileRequest,
 } from '@tangyuan/contracts'
 
 /**
@@ -51,7 +51,7 @@ export type IpcInvoke = <Channel extends DesktopIpcChannel>(
  */
 export type IpcSubscribe = (
   channel: typeof DESKTOP_AGENT_EVENT_CHANNEL,
-  listener: AgentEventListener
+  listener: AgentEventListener,
 ) => () => void
 
 /**
@@ -64,7 +64,7 @@ export type IpcSubscribe = (
  */
 export function createTangyuanPreloadApi(
   invoke: IpcInvoke,
-  subscribe: IpcSubscribe = () => () => undefined
+  subscribe: IpcSubscribe = () => () => undefined,
 ): DesktopPreloadApi {
   return {
     getRuntimeSnapshot: async () => {
@@ -74,12 +74,18 @@ export function createTangyuanPreloadApi(
       return invoke(DESKTOP_IPC_CHANNELS.runtimeRefresh)
     },
     saveRuntimeConfiguration: async (configuration: RuntimeConfiguration) => {
-      return invoke(DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration, configuration)
+      return invoke(
+        DESKTOP_IPC_CHANNELS.runtimeSaveConfiguration,
+        configuration,
+      )
     },
     cancelRuntimeConfigurationVerification: async (
-      request: CancelConfigurationVerificationRequest
+      request: CancelConfigurationVerificationRequest,
     ) => {
-      return invoke(DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification, request)
+      return invoke(
+        DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification,
+        request,
+      )
     },
     listSessions: async (request?: ListSessionsRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsList, request)
@@ -156,7 +162,9 @@ export function createTangyuanPreloadApi(
     setSessionModel: async (request: SetSessionModelRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsSetModel, request)
     },
-    setSessionThinkingLevel: async (request: SetSessionThinkingLevelRequest) => {
+    setSessionThinkingLevel: async (
+      request: SetSessionThinkingLevelRequest,
+    ) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsSetThinkingLevel, request)
     },
     getSoul: async (request: GetSoulRequest) => {
@@ -212,6 +220,6 @@ export function createTangyuanPreloadApi(
     },
     getPendingClarifications: async () => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications)
-    }
+    },
   }
 }

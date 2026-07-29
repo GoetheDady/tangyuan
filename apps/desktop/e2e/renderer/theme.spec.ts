@@ -3,7 +3,7 @@ import {
   createPreloadApiInitScript,
   createReadyRuntimeSnapshot,
   createTestMessages,
-  createTestSessions
+  createTestSessions,
 } from '../fixtures/preload-mock'
 
 const semanticTokenNames = [
@@ -79,7 +79,7 @@ const semanticTokenNames = [
   'shadow-level-0',
   'shadow-level-1',
   'shadow-level-2',
-  'shadow-level-3'
+  'shadow-level-3',
 ] as const
 
 test.describe('Renderer 全局主题', () => {
@@ -87,7 +87,7 @@ test.describe('Renderer 全局主题', () => {
     const initScript = createPreloadApiInitScript(
       createReadyRuntimeSnapshot(),
       createTestSessions(1),
-      createTestMessages()
+      createTestMessages(),
     )
 
     await page.addInitScript({ content: initScript })
@@ -100,8 +100,8 @@ test.describe('Renderer 全局主题', () => {
       const tokens = Object.fromEntries(
         tokenNames.map((tokenName) => [
           tokenName,
-          rootStyle.getPropertyValue(`--${tokenName}`).trim()
-        ])
+          rootStyle.getPropertyValue(`--${tokenName}`).trim(),
+        ]),
       )
       function readProbe(className: string, style = '') {
         const probe = document.createElement('div')
@@ -117,7 +117,7 @@ test.describe('Renderer 全局主题', () => {
           boxShadow: probeStyle.boxShadow,
           transitionDuration: probeStyle.transitionDuration,
           width: probeStyle.width,
-          height: probeStyle.height
+          height: probeStyle.height,
         }
         probe.remove()
         return result
@@ -129,11 +129,11 @@ test.describe('Renderer 全局主题', () => {
           backgroundColor: bodyStyle.backgroundColor,
           color: bodyStyle.color,
           fontSize: bodyStyle.fontSize,
-          lineHeight: bodyStyle.lineHeight
+          lineHeight: bodyStyle.lineHeight,
         },
         surfaces: {
           card: readProbe('bg-card'),
-          sidebar: readProbe('bg-sidebar')
+          sidebar: readProbe('bg-sidebar'),
         },
         controls: {
           primaryHover: readProbe('bg-primary-hover'),
@@ -144,47 +144,58 @@ test.describe('Renderer 全局主题', () => {
           inputHover: readProbe('border border-input-hover'),
           disabled: readProbe('bg-disabled text-disabled-foreground'),
           hover: readProbe('bg-hover text-hover-foreground'),
-          active: readProbe('bg-active text-active-foreground')
+          active: readProbe('bg-active text-active-foreground'),
         },
         statuses: {
-          info: readProbe('border bg-info-soft border-info-border text-info-foreground'),
+          info: readProbe(
+            'border bg-info-soft border-info-border text-info-foreground',
+          ),
           success: readProbe(
-            'border bg-success-soft border-success-border text-success-foreground'
+            'border bg-success-soft border-success-border text-success-foreground',
           ),
           warning: readProbe(
-            'border bg-warning-soft border-warning-border text-warning-foreground'
+            'border bg-warning-soft border-warning-border text-warning-foreground',
           ),
           destructive: readProbe(
-            'border bg-destructive-soft border-destructive-border text-destructive-soft-foreground'
-          )
+            'border bg-destructive-soft border-destructive-border text-destructive-soft-foreground',
+          ),
         },
-        spacing: readProbe('', 'width: var(--spacing-grid); height: var(--spacing-micro)'),
+        spacing: readProbe(
+          '',
+          'width: var(--spacing-grid); height: var(--spacing-micro)',
+        ),
         focus: readProbe('', 'box-shadow: var(--focus-ring-shadow)'),
         motion: readProbe('', 'transition-duration: var(--duration-base)'),
         shadows: {
           level0: readProbe('shadow-level-0'),
           level1: readProbe('shadow-level-1'),
           level2: readProbe('shadow-level-2'),
-          level3: readProbe('shadow-level-3')
-        }
+          level3: readProbe('shadow-level-3'),
+        },
       }
     }, semanticTokenNames)
 
-    expect(Object.entries(result.tokens).filter(([, value]) => value === '')).toEqual([])
+    expect(
+      Object.entries(result.tokens).filter(([, value]) => value === ''),
+    ).toEqual([])
     expect(result.body).toMatchObject({
       fontSize: '14px',
-      lineHeight: '22px'
+      lineHeight: '22px',
     })
     expect(result.body.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
     expect(result.body.color).not.toBe('rgba(0, 0, 0, 0)')
-    expect(result.surfaces.sidebar.backgroundColor).not.toBe(result.surfaces.card.backgroundColor)
+    expect(result.surfaces.sidebar.backgroundColor).not.toBe(
+      result.surfaces.card.backgroundColor,
+    )
     expect(result.controls.primaryHover.backgroundColor).not.toBe(
-      result.controls.primaryActive.backgroundColor
+      result.controls.primaryActive.backgroundColor,
     )
     expect(result.controls.destructiveHover.backgroundColor).not.toBe(
-      result.controls.destructiveActive.backgroundColor
+      result.controls.destructiveActive.backgroundColor,
     )
-    expect(result.controls.inputHover.borderTopColor).not.toBe(result.controls.input.borderTopColor)
+    expect(result.controls.inputHover.borderTopColor).not.toBe(
+      result.controls.input.borderTopColor,
+    )
     expect(result.controls.disabled.color).not.toBe('rgba(0, 0, 0, 0)')
     expect(result.controls.hover.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
     expect(result.controls.active.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
@@ -203,7 +214,7 @@ test.describe('Renderer 全局主题', () => {
     const raisedShadows = [
       result.shadows.level1.boxShadow,
       result.shadows.level2.boxShadow,
-      result.shadows.level3.boxShadow
+      result.shadows.level3.boxShadow,
     ]
     expect(raisedShadows).not.toContain('none')
     expect(new Set(raisedShadows).size).toBe(3)

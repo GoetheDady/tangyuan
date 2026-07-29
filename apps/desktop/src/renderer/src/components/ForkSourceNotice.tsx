@@ -25,12 +25,12 @@ export interface ForkSourceNoticeProps {
 export function ForkSourceNotice({
   parentSessionTitle,
   isParentAvailable,
-  onViewSource
+  onViewSource,
 }: ForkSourceNoticeProps): React.JSX.Element {
   return (
     <div
       data-testid="fork-source-notice"
-      className="mx-auto flex w-full max-w-[720px] items-center gap-2 border-b border-border px-1 py-2 text-caption text-muted-foreground"
+      className="border-border text-caption text-muted-foreground mx-auto flex w-full max-w-[720px] items-center gap-2 border-b px-1 py-2"
     >
       <GitBranch size={13} aria-hidden="true" className="shrink-0" />
       <span className="min-w-0 flex-1 truncate">
@@ -41,7 +41,7 @@ export function ForkSourceNotice({
       {isParentAvailable && parentSessionTitle && (
         <button
           type="button"
-          className="window-no-drag shrink-0 rounded-md px-2 py-1 text-caption font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="window-no-drag text-caption text-foreground hover:bg-accent focus-visible:ring-ring/50 shrink-0 rounded-md px-2 py-1 font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
           onClick={onViewSource}
         >
           查看来源消息

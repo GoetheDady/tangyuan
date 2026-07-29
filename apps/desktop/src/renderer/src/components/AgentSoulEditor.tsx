@@ -12,7 +12,10 @@ interface AgentSoulEditorProps {
 }
 
 /** 设置页中的 Agent 灵魂受控编辑入口。 */
-export function AgentSoulEditor({ agentId, editable }: AgentSoulEditorProps): React.JSX.Element {
+export function AgentSoulEditor({
+  agentId,
+  editable,
+}: AgentSoulEditorProps): React.JSX.Element {
   const [soul, setSoul] = useState<SoulContent | null>(null)
   const [content, setContent] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -31,7 +34,11 @@ export function AgentSoulEditor({ agentId, editable }: AgentSoulEditorProps): Re
       })
       .catch((loadError: unknown) => {
         if (cancelled) return
-        setError(loadError instanceof Error ? loadError.message : '加载 Agent 灵魂失败')
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : '加载 Agent 灵魂失败',
+        )
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false)
@@ -51,13 +58,15 @@ export function AgentSoulEditor({ agentId, editable }: AgentSoulEditorProps): Re
       const result = await window.api.updateSoul({
         agentId,
         content,
-        expectedVersion: soul.version
+        expectedVersion: soul.version,
       })
 
       if (result.status === 'rejected') {
         setError(result.reason.message)
         if (result.reason.code === 'version-conflict') {
-          const latestSoul = await window.api.getSoul({ agentId }).catch(() => null)
+          const latestSoul = await window.api
+            .getSoul({ agentId })
+            .catch(() => null)
           if (latestSoul) {
             setSoul(latestSoul)
             setContent(latestSoul.content)
@@ -67,18 +76,26 @@ export function AgentSoulEditor({ agentId, editable }: AgentSoulEditorProps): Re
       }
 
       setSoul({ ...soul, content, version: result.version })
-      toast.success(result.status === 'updated' ? 'Agent 灵魂已更新' : 'Agent 灵魂没有变化')
+      toast.success(
+        result.status === 'updated' ? 'Agent 灵魂已更新' : 'Agent 灵魂没有变化',
+      )
     } catch (saveError: unknown) {
-      setError(saveError instanceof Error ? saveError.message : '保存 Agent 灵魂失败')
+      setError(
+        saveError instanceof Error ? saveError.message : '保存 Agent 灵魂失败',
+      )
     } finally {
       setIsSaving(false)
     }
   }
 
-  const canSave = editable && soul !== null && content.trim().length > 0 && content !== soul.content
+  const canSave =
+    editable &&
+    soul !== null &&
+    content.trim().length > 0 &&
+    content !== soul.content
 
   return (
-    <section className="rounded-lg border bg-card p-6">
+    <section className="bg-card rounded-lg border p-6">
       <div className="mb-4 flex items-center justify-between gap-4">
         <h2 className="text-section-heading font-semibold">Agent 灵魂</h2>
         {editable ? (
@@ -89,7 +106,9 @@ export function AgentSoulEditor({ agentId, editable }: AgentSoulEditorProps): Re
         ) : null}
       </div>
       {isLoading ? (
-        <p className="text-body text-muted-foreground">正在加载 Agent 灵魂...</p>
+        <p className="text-body text-muted-foreground">
+          正在加载 Agent 灵魂...
+        </p>
       ) : (
         <Textarea
           id="agent-soul"
@@ -102,7 +121,7 @@ export function AgentSoulEditor({ agentId, editable }: AgentSoulEditorProps): Re
         />
       )}
       {error ? (
-        <p role="alert" className="mt-3 text-label text-destructive">
+        <p role="alert" className="text-label text-destructive mt-3">
           {error}
         </p>
       ) : null}

@@ -9,7 +9,7 @@ export default defineConfig({
   projects: [
     {
       name: 'electron',
-      testMatch: 'electron/**/*.spec.ts'
-    }
-  ]
+      testMatch: 'electron/**/*.spec.ts',
+    },
+  ],
 })

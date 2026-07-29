@@ -5,7 +5,10 @@ import { cn } from './utils'
 describe('cn', () => {
   it('把语义字号 token 当字号处理，不删除同元素的颜色类', () => {
     // 模拟 Button：base 字号 + variant 颜色 + 调用点语义字号
-    const result = cn('text-sm text-primary-foreground', 'text-caption font-semibold')
+    const result = cn(
+      'text-sm text-primary-foreground',
+      'text-caption font-semibold',
+    )
     expect(result).toContain('text-primary-foreground')
     expect(result).toContain('text-caption')
     expect(result).not.toContain('text-sm')

@@ -1,4 +1,11 @@
-import { app, safeStorage, shell, BrowserWindow, ipcMain, session } from 'electron'
+import {
+  app,
+  safeStorage,
+  shell,
+  BrowserWindow,
+  ipcMain,
+  session,
+} from 'electron'
 import { mkdir, writeFile } from 'fs/promises'
 import { homedir } from 'os'
 import { dirname, join } from 'path'
@@ -23,7 +30,7 @@ const safeStorageAdapter: ConfigEncryptionAdapter = {
     }
     return safeStorage.decryptString(Buffer.from(ciphertext, 'base64'))
   },
-  isAvailable: (): boolean => safeStorage.isEncryptionAvailable()
+  isAvailable: (): boolean => safeStorage.isEncryptionAvailable(),
 }
 
 /**
@@ -53,7 +60,8 @@ const tangyuanRuntime = isQaMode
       agentHomePath: '~/.tangyuan-qa-root/.tangyuan/agents/tangyuan',
     })
   : createTangyuanRuntime({ encryptionAdapter })
-const smokeTestResultPath = process.env['TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH']
+const smokeTestResultPath =
+  process.env['TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH']
 let isQuittingAfterCancellingRuns = false
 
 /**
@@ -72,8 +80,8 @@ function registerContentSecurityPolicy(): void {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [csp]
-      }
+        'Content-Security-Policy': [csp],
+      },
     })
   })
 }
@@ -113,7 +121,7 @@ function createWindow(): BrowserWindow {
       ? {
           titleBarStyle: 'hiddenInset' as const,
           // 对齐设计稿：Agent rail padding [8,10] 让 Window controls 组左上角落在窗口 (10, 8)。
-          trafficLightPosition: { x: 10, y: 8 }
+          trafficLightPosition: { x: 10, y: 8 },
         }
       : {}),
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -121,8 +129,8 @@ function createWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
-    }
+      sandbox: true,
+    },
   })
 
   mainWindow.on('ready-to-show', () => {
@@ -164,7 +172,7 @@ async function runPackagedSmokeTest(mainWindow: BrowserWindow): Promise<void> {
     await writeSmokeTestResult({
       ok: false,
       phase: 'electron-ready',
-      checkedAt: new Date().toISOString()
+      checkedAt: new Date().toISOString(),
     })
     const runtimeSnapshot = await tangyuanRuntime.getRuntimeSnapshot()
     await writeSmokeTestResult({
@@ -172,7 +180,7 @@ async function runPackagedSmokeTest(mainWindow: BrowserWindow): Promise<void> {
       phase: 'runtime-snapshot-loaded',
       runtimeStatus: runtimeSnapshot.status,
       agentHomePath: runtimeSnapshot.activeAgent.homePath,
-      checkedAt: new Date().toISOString()
+      checkedAt: new Date().toISOString(),
     })
     await waitForRendererLoad(mainWindow)
     const pageKind = await waitForSmokeTestPage(mainWindow)
@@ -183,7 +191,7 @@ async function runPackagedSmokeTest(mainWindow: BrowserWindow): Promise<void> {
       runtimeStatus: runtimeSnapshot.status,
       agentHomePath: runtimeSnapshot.activeAgent.homePath,
       bootstrapRequired: runtimeSnapshot.activeAgent.profile.bootstrapRequired,
-      checkedAt: new Date().toISOString()
+      checkedAt: new Date().toISOString(),
     }
 
     await writeSmokeTestResult(result)
@@ -193,7 +201,7 @@ async function runPackagedSmokeTest(mainWindow: BrowserWindow): Promise<void> {
       ok: false,
       pageKind: 'unknown',
       error: error instanceof Error ? error.message : '打包冒烟测试失败',
-      checkedAt: new Date().toISOString()
+      checkedAt: new Date().toISOString(),
     })
     app.exit(1)
   }
@@ -215,9 +223,12 @@ async function waitForRendererLoad(mainWindow: BrowserWindow): Promise<void> {
     mainWindow.webContents.once('did-finish-load', () => {
       resolve()
     })
-    mainWindow.webContents.once('did-fail-load', (_event, errorCode, errorDescription) => {
-      reject(new Error(`Renderer 加载失败：${errorCode} ${errorDescription}`))
-    })
+    mainWindow.webContents.once(
+      'did-fail-load',
+      (_event, errorCode, errorDescription) => {
+        reject(new Error(`Renderer 加载失败：${errorCode} ${errorDescription}`))
+      },
+    )
   })
 }
 
@@ -229,13 +240,16 @@ async function waitForRendererLoad(mainWindow: BrowserWindow): Promise<void> {
  * @throws 当 Renderer 执行脚本失败时，Promise 会 reject。
  */
 async function waitForSmokeTestPage(
-  mainWindow: BrowserWindow
+  mainWindow: BrowserWindow,
 ): Promise<'configuration' | 'workbench' | 'unknown'> {
   const deadline = Date.now() + 15_000
 
   while (Date.now() < deadline) {
     const pageText = String(
-      await mainWindow.webContents.executeJavaScript('document.body.innerText', true)
+      await mainWindow.webContents.executeJavaScript(
+        'document.body.innerText',
+        true,
+      ),
     )
     const pageKind = classifySmokeTestPage(pageText)
 
@@ -256,7 +270,9 @@ async function waitForSmokeTestPage(
  * @returns 页面类型；configuration 表示配置页，workbench 表示工作台，unknown 表示未识别。
  * @throws 此方法不会主动抛出错误。
  */
-function classifySmokeTestPage(pageText: string): 'configuration' | 'workbench' | 'unknown' {
+function classifySmokeTestPage(
+  pageText: string,
+): 'configuration' | 'workbench' | 'unknown' {
   if (
     pageText.includes('配置模型服务') &&
     pageText.includes('Provider') &&
@@ -279,13 +295,19 @@ function classifySmokeTestPage(pageText: string): 'configuration' | 'workbench' 
  * @returns 无返回值。
  * @throws 当结果文件目录创建或文件写入失败时，Promise 会 reject。
  */
-async function writeSmokeTestResult(result: Record<string, unknown>): Promise<void> {
+async function writeSmokeTestResult(
+  result: Record<string, unknown>,
+): Promise<void> {
   if (!smokeTestResultPath) {
     return
   }
 
   await mkdir(dirname(smokeTestResultPath), { recursive: true })
-  await writeFile(smokeTestResultPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
+  await writeFile(
+    smokeTestResultPath,
+    `${JSON.stringify(result, null, 2)}\n`,
+    'utf8',
+  )
 }
 
 /**
@@ -305,7 +327,7 @@ if (smokeTestResultPath) {
   void writeSmokeTestResult({
     ok: false,
     phase: 'main-loaded',
-    checkedAt: new Date().toISOString()
+    checkedAt: new Date().toISOString(),
   })
 }
 
@@ -342,7 +364,7 @@ app.whenReady().then(() => {
         throw new Error(`不允许打开非 http/https 链接。`)
       }
       await shell.openExternal(validated)
-    }
+    },
   )
 
   const mainWindow = createWindow()

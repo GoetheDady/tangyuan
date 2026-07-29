@@ -9,16 +9,16 @@ describe('UserProfileEditor', () => {
     const getUserProfile = vi.fn().mockResolvedValue({
       content: '# 旧画像',
       updatedAt: '2026-07-25T00:00:00.000Z',
-      version: 'sha256:old'
+      version: 'sha256:old',
     })
     const updateUserProfile = vi.fn().mockResolvedValue({
       target: 'user',
       status: 'updated',
-      version: 'sha256:new'
+      version: 'sha256:new',
     })
     Object.defineProperty(window, 'api', {
       configurable: true,
-      value: { getUserProfile, updateUserProfile }
+      value: { getUserProfile, updateUserProfile },
     })
 
     render(<UserProfileEditor editable />)
@@ -31,7 +31,7 @@ describe('UserProfileEditor', () => {
     await waitFor(() => {
       expect(updateUserProfile).toHaveBeenCalledWith({
         content: '# 新画像',
-        expectedVersion: 'sha256:old'
+        expectedVersion: 'sha256:old',
       })
     })
   })
@@ -42,12 +42,12 @@ describe('UserProfileEditor', () => {
       .mockResolvedValueOnce({
         content: '# 旧画像',
         updatedAt: '2026-07-25T00:00:00.000Z',
-        version: 'sha256:old'
+        version: 'sha256:old',
       })
       .mockResolvedValueOnce({
         content: '# 其他会话的新画像',
         updatedAt: '2026-07-25T00:01:00.000Z',
-        version: 'sha256:current'
+        version: 'sha256:current',
       })
     Object.defineProperty(window, 'api', {
       configurable: true,
@@ -59,25 +59,27 @@ describe('UserProfileEditor', () => {
           version: 'sha256:current',
           reason: {
             code: 'version-conflict',
-            message: '资料已被其他会话更新，请读取最新内容后重试。'
-          }
-        })
-      }
+            message: '资料已被其他会话更新，请读取最新内容后重试。',
+          },
+        }),
+      },
     })
 
     render(<UserProfileEditor editable />)
 
     fireEvent.change(await screen.findByLabelText('共享用户画像'), {
-      target: { value: '# 冲突修改' }
+      target: { value: '# 冲突修改' },
     })
     fireEvent.click(screen.getByRole('button', { name: '保存用户画像' }))
 
     expect(
-      await screen.findByText('资料已被其他会话更新，请读取最新内容后重试。')
+      await screen.findByText('资料已被其他会话更新，请读取最新内容后重试。'),
     ).toBeInTheDocument()
     await waitFor(() => {
       expect(getUserProfile).toHaveBeenCalledTimes(2)
-      expect(screen.getByLabelText('共享用户画像')).toHaveValue('# 其他会话的新画像')
+      expect(screen.getByLabelText('共享用户画像')).toHaveValue(
+        '# 其他会话的新画像',
+      )
     })
   })
 })

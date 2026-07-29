@@ -4,22 +4,28 @@ import { describe, expect, it } from 'vitest'
 
 describe('renderer process boundary', () => {
   it('does not import Electron, Node.js, Pi SDK, or agent-runtime modules directly', () => {
-    const rendererFiles = collectTypeScriptFiles(join(process.cwd(), 'src/renderer/src'))
+    const rendererFiles = collectTypeScriptFiles(
+      join(process.cwd(), 'src/renderer/src'),
+    )
     const bannedImports = [
       'electron',
       'node:',
       '@tangyuan/agent-runtime',
       '@earendil-works/pi-coding-agent',
       '@pi/agent-sdk',
-      'pi-agent-sdk'
+      'pi-agent-sdk',
     ]
 
     for (const filePath of rendererFiles) {
       const source = readFileSync(filePath, 'utf8')
 
       for (const bannedImport of bannedImports) {
-        expect(source, `${filePath} imports ${bannedImport}`).not.toContain(`from '${bannedImport}`)
-        expect(source, `${filePath} imports ${bannedImport}`).not.toContain(`from "${bannedImport}`)
+        expect(source, `${filePath} imports ${bannedImport}`).not.toContain(
+          `from '${bannedImport}`,
+        )
+        expect(source, `${filePath} imports ${bannedImport}`).not.toContain(
+          `from "${bannedImport}`,
+        )
       }
     }
   })

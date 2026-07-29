@@ -18,7 +18,7 @@ const buttonVariants = cva(
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-split active:bg-border disabled:bg-secondary',
         ghost: 'hover:bg-secondary active:bg-split disabled:bg-transparent',
-        link: 'text-primary underline-offset-4 hover:underline active:opacity-70'
+        link: 'text-primary underline-offset-4 hover:underline active:opacity-70',
       },
       size: {
         default: 'h-9 px-3 py-2',
@@ -28,14 +28,14 @@ const buttonVariants = cva(
         icon: 'size-9',
         'icon-xs': "size-6 [&_svg:not([class*='size-'])]:size-3",
         'icon-sm': 'size-8 [&_svg:not([class*="size-"])]:size-[14px]',
-        'icon-lg': 'size-10'
-      }
+        'icon-lg': 'size-10',
+      },
     },
     defaultVariants: {
       variant: 'default',
-      size: 'default'
-    }
-  }
+      size: 'default',
+    },
+  },
 )
 
 function Button({

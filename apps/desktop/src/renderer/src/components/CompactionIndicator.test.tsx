@@ -24,13 +24,17 @@ describe('CompactionIndicator', () => {
   })
 
   it('渲染 Archive 图标', () => {
-    const { container } = render(<CompactionIndicator timestamp={testTimestamp} />)
+    const { container } = render(
+      <CompactionIndicator timestamp={testTimestamp} />,
+    )
     const archiveIcon = container.querySelector('svg.lucide-archive')
     expect(archiveIcon).toBeInTheDocument()
   })
 
   it('两侧有分割线', () => {
-    const { container } = render(<CompactionIndicator timestamp={testTimestamp} />)
+    const { container } = render(
+      <CompactionIndicator timestamp={testTimestamp} />,
+    )
     const separators = container.querySelectorAll('.h-px.bg-border')
     expect(separators).toHaveLength(2)
   })

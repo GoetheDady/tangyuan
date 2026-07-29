@@ -8,6 +8,10 @@
  * @returns 纯文本消息元素。
  * @throws 此组件不会主动抛出错误。
  */
-export function UserMessage({ content }: { content: string }): React.JSX.Element {
-  return <p className="whitespace-pre-wrap break-words">{content}</p>
+export function UserMessage({
+  content,
+}: {
+  content: string
+}): React.JSX.Element {
+  return <p className="break-words whitespace-pre-wrap">{content}</p>
 }

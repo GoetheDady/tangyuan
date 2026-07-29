@@ -2,7 +2,7 @@ import {
   createDefaultSessionSummary,
   createRuntimeSnapshot,
   type DesktopPreloadApi,
-  type RuntimeSnapshot
+  type RuntimeSnapshot,
 } from '@tangyuan/contracts'
 import { vi } from 'vitest'
 
@@ -16,8 +16,8 @@ export function installDefaultAppApi(): void {
       createReadyRuntimeSnapshot({
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',
-        maskedValue: 'sk-t...7890'
-      })
+        maskedValue: 'sk-t...7890',
+      }),
     ),
     cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(runtime),
     listSessions: vi.fn().mockResolvedValue([
@@ -30,21 +30,21 @@ export function installDefaultAppApi(): void {
     getLastActiveSession: vi.fn().mockResolvedValue({
       agentId: 'tangyuan',
       sessionId: 'welcome',
-      updatedAt: '2026-07-08T00:00:00.000Z'
+      updatedAt: '2026-07-08T00:00:00.000Z',
     }),
     setLastActiveSession: vi.fn().mockResolvedValue(null),
     createSession: vi.fn().mockResolvedValue(
       createDefaultSessionSummary({
         sessionId: 'session-1',
         title: '新会话',
-        updatedAt: '2026-07-08T00:00:00.000Z'
-      })
+        updatedAt: '2026-07-08T00:00:00.000Z',
+      }),
     ),
     getTranscript: vi.fn().mockResolvedValue({
       sessionId: '',
       agentId: 'tangyuan',
       entries: [],
-      updatedAt: '2026-01-01T00:00:00.000Z'
+      updatedAt: '2026-01-01T00:00:00.000Z',
     }),
     sendMessage: vi.fn().mockResolvedValue([
       {
@@ -53,7 +53,7 @@ export function installDefaultAppApi(): void {
         sessionId: 'welcome',
         role: 'user',
         content: '你好',
-        createdAt: '2026-07-08T00:00:00.000Z'
+        createdAt: '2026-07-08T00:00:00.000Z',
       },
       {
         messageId: 'message-2',
@@ -61,21 +61,21 @@ export function installDefaultAppApi(): void {
         sessionId: 'welcome',
         role: 'agent',
         content: '收到：你好',
-        createdAt: '2026-07-08T00:00:00.000Z'
-      }
+        createdAt: '2026-07-08T00:00:00.000Z',
+      },
     ]),
     retryMessage: vi.fn().mockResolvedValue([]),
     forkSession: vi.fn().mockResolvedValue(
       createDefaultSessionSummary({
         sessionId: 'welcome',
         title: '新会话',
-        updatedAt: '2026-07-08T00:00:00.000Z'
-      })
+        updatedAt: '2026-07-08T00:00:00.000Z',
+      }),
     ),
     archiveSession: vi.fn().mockResolvedValue({
       status: 'archived',
       affectedSessionIds: [],
-      affectedActivities: []
+      affectedActivities: [],
     }),
     recoverSession: vi.fn().mockResolvedValue([]),
     deleteSession: vi.fn(),
@@ -83,8 +83,8 @@ export function installDefaultAppApi(): void {
       createDefaultSessionSummary({
         sessionId: 'welcome',
         title: '新会话',
-        updatedAt: '2026-07-08T00:00:00.000Z'
-      })
+        updatedAt: '2026-07-08T00:00:00.000Z',
+      }),
     ),
     subscribeToAgentEvents: vi.fn(() => () => undefined),
     openExternalLink: vi.fn(),
@@ -98,8 +98,8 @@ export function installDefaultAppApi(): void {
         defaultProviderId: null,
         defaultModelId: null,
         homePath: '~/.tangyuan/agents/tangyuan',
-        archivedAt: null
-      }
+        archivedAt: null,
+      },
     ]),
     updateAgentConfig: vi.fn().mockResolvedValue({
       agentId: 'tangyuan',
@@ -108,7 +108,7 @@ export function installDefaultAppApi(): void {
       defaultProviderId: 'anthropic',
       defaultModelId: 'claude-sonnet-4-5',
       homePath: '~/.tangyuan/agents/tangyuan',
-      archivedAt: null
+      archivedAt: null,
     }),
     getSessionModelInfo: vi.fn().mockResolvedValue({
       providerId: 'anthropic',
@@ -116,7 +116,7 @@ export function installDefaultAppApi(): void {
       displayName: 'Claude Sonnet 4.5',
       thinkingLevel: null,
       supportedThinkingLevels: [],
-      supportsThinking: false
+      supportsThinking: false,
     }),
     setSessionModel: vi.fn().mockResolvedValue({
       providerId: 'anthropic',
@@ -124,7 +124,7 @@ export function installDefaultAppApi(): void {
       displayName: 'Claude Sonnet 4.5',
       thinkingLevel: null,
       supportedThinkingLevels: [],
-      supportsThinking: false
+      supportsThinking: false,
     }),
     setSessionThinkingLevel: vi.fn().mockResolvedValue({
       providerId: 'anthropic',
@@ -132,13 +132,13 @@ export function installDefaultAppApi(): void {
       displayName: 'Claude Sonnet 4.5',
       thinkingLevel: 'medium',
       supportedThinkingLevels: ['low', 'medium', 'high'],
-      supportsThinking: true
+      supportsThinking: true,
     }),
     archiveAgent: vi.fn(),
     recoverAgent: vi.fn(),
     reconcileAgentDirectories: vi.fn().mockResolvedValue({
       agents: [],
-      unclaimedDirectories: []
+      unclaimedDirectories: [],
     }),
     claimAgentDirectory: vi.fn(),
     rebuildTangyuanHome: vi.fn(),
@@ -146,22 +146,22 @@ export function installDefaultAppApi(): void {
       agentId: 'tangyuan',
       content: '',
       updatedAt: '',
-      version: 'sha256:empty'
+      version: 'sha256:empty',
     }),
     getUserProfile: vi.fn().mockResolvedValue({
       content: '',
       updatedAt: '',
-      version: 'sha256:empty'
+      version: 'sha256:empty',
     }),
     updateSoul: vi.fn().mockResolvedValue({
       target: 'soul' as const,
       status: 'updated' as const,
-      version: 'sha256:new-soul'
+      version: 'sha256:new-soul',
     }),
     updateUserProfile: vi.fn().mockResolvedValue({
       target: 'user' as const,
       status: 'updated' as const,
-      version: 'sha256:new-user'
+      version: 'sha256:new-user',
     }),
     listAgentSkills: vi.fn().mockResolvedValue([]),
     listSharedSkills: vi.fn().mockResolvedValue([]),
@@ -176,12 +176,12 @@ export function installDefaultAppApi(): void {
     approveSkillOperation: vi.fn().mockResolvedValue(undefined),
     rejectSkillOperation: vi.fn().mockResolvedValue(undefined),
     getPendingSkillApprovals: vi.fn().mockResolvedValue([]),
-    getSkillInstallRecords: vi.fn().mockResolvedValue([])
+    getSkillInstallRecords: vi.fn().mockResolvedValue([]),
   }
 
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: api
+    value: api,
   })
 }
 
@@ -203,10 +203,10 @@ export function createMissingConfigurationSnapshot(
       {
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',
-        displayName: 'Claude Sonnet 4.5'
-      }
-    ]
-  }
+        displayName: 'Claude Sonnet 4.5',
+      },
+    ],
+  },
 ): RuntimeSnapshot {
   return createRuntimeSnapshot({
     activeAgent: {
@@ -217,22 +217,22 @@ export function createMissingConfigurationSnapshot(
         initialized: false,
         bootstrapRequired: true,
         soulUpdatedAt: null,
-        userUpdatedAt: null
-      }
+        userUpdatedAt: null,
+      },
     },
     providers: resources.providers,
     models: resources.models,
     settings: {
       selectedProviderId: null,
-      selectedModelId: null
+      selectedModelId: null,
     },
     configuredProviders: {},
     auth: {
       apiKey: {
         configured: false,
-        maskedValue: null
-      }
-    }
+        maskedValue: null,
+      },
+    },
   })
 }
 
@@ -258,33 +258,33 @@ export function createReadyRuntimeSnapshot(input: {
         initialized: input.profileInitialized ?? false,
         bootstrapRequired: !(input.profileInitialized ?? false),
         soulUpdatedAt: null,
-        userUpdatedAt: null
-      }
+        userUpdatedAt: null,
+      },
     },
     providers: [{ providerId: input.providerId, displayName: 'Anthropic' }],
     models: [
       {
         providerId: input.providerId,
         modelId: input.modelId,
-        displayName: 'Claude Sonnet 4.5'
-      }
+        displayName: 'Claude Sonnet 4.5',
+      },
     ],
     settings: {
       selectedProviderId: input.providerId,
-      selectedModelId: input.modelId
+      selectedModelId: input.modelId,
     },
     configuredProviders: {
       [input.providerId]: {
         configured: true,
-        maskedValue: input.maskedValue
-      }
+        maskedValue: input.maskedValue,
+      },
     },
     auth: {
       apiKey: {
         configured: true,
-        maskedValue: input.maskedValue
-      }
-    }
+        maskedValue: input.maskedValue,
+      },
+    },
   })
 }
 

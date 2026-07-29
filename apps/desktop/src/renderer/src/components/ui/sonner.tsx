@@ -1,4 +1,11 @@
-import { CheckCircle2, CircleAlert, CircleX, Info, LoaderCircle, X } from 'lucide-react'
+import {
+  CheckCircle2,
+  CircleAlert,
+  CircleX,
+  Info,
+  LoaderCircle,
+  X,
+} from 'lucide-react'
 import { Toaster as SonnerToaster } from 'sonner'
 
 const TOAST_DURATION_MS = 4000
@@ -28,11 +35,28 @@ function Toaster(): React.JSX.Element {
       swipeDirections={['right', 'left']}
       icons={{
         info: <Info aria-hidden="true" className="text-info-foreground" />,
-        success: <CheckCircle2 aria-hidden="true" className="text-success-foreground" />,
-        warning: <CircleAlert aria-hidden="true" className="text-warning-foreground" />,
-        error: <CircleX aria-hidden="true" className="text-destructive-soft-foreground" />,
-        loading: <LoaderCircle aria-hidden="true" className="animate-spin text-info-foreground" />,
-        close: <X aria-hidden="true" />
+        success: (
+          <CheckCircle2
+            aria-hidden="true"
+            className="text-success-foreground"
+          />
+        ),
+        warning: (
+          <CircleAlert aria-hidden="true" className="text-warning-foreground" />
+        ),
+        error: (
+          <CircleX
+            aria-hidden="true"
+            className="text-destructive-soft-foreground"
+          />
+        ),
+        loading: (
+          <LoaderCircle
+            aria-hidden="true"
+            className="text-info-foreground animate-spin"
+          />
+        ),
+        close: <X aria-hidden="true" />,
       }}
       toastOptions={{
         closeButtonAriaLabel: '关闭通知',
@@ -42,8 +66,8 @@ function Toaster(): React.JSX.Element {
           description: 'tangyuan-toast-description',
           actionButton: 'tangyuan-toast-action',
           cancelButton: 'tangyuan-toast-cancel',
-          closeButton: 'tangyuan-toast-close'
-        }
+          closeButton: 'tangyuan-toast-close',
+        },
       }}
     />
   )

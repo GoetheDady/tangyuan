@@ -12,7 +12,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle
+  AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
 type RenderAlertDialogOptions = {
@@ -34,11 +34,15 @@ function renderAlertDialog({
   actionSize,
   actionClassName,
   actionDisabled,
-  onActionClick
+  onActionClick,
 }: RenderAlertDialogOptions = {}) {
   return render(
     <AlertDialog defaultOpen>
-      <AlertDialogContent ref={contentRef} size={size} className={contentClassName}>
+      <AlertDialogContent
+        ref={contentRef}
+        size={size}
+        className={contentClassName}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>确认归档 Agent</AlertDialogTitle>
           <AlertDialogDescription>
@@ -58,7 +62,7 @@ function renderAlertDialog({
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
-    </AlertDialog>
+    </AlertDialog>,
   )
 }
 
@@ -90,7 +94,9 @@ describe('AlertDialog', () => {
     renderAlertDialog()
 
     const dialog = screen.getByRole('alertdialog', { name: '确认归档 Agent' })
-    expect(dialog).toHaveAccessibleDescription('归档后 Agent 将从日常使用列表中移除，但仍可恢复。')
+    expect(dialog).toHaveAccessibleDescription(
+      '归档后 Agent 将从日常使用列表中移除，但仍可恢复。',
+    )
     expect(screen.getByRole('button', { name: '取消' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '确认归档' })).toBeInTheDocument()
   })
@@ -99,7 +105,7 @@ describe('AlertDialog', () => {
     renderAlertDialog({
       actionVariant: 'destructive',
       actionSize: 'sm',
-      actionClassName: 'custom-action'
+      actionClassName: 'custom-action',
     })
 
     const action = screen.getByRole('button', { name: '确认归档' })

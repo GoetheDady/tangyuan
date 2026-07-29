@@ -3,7 +3,7 @@ import {
   createReadyRuntimeSnapshot,
   createTestSessions,
   createTestMessages,
-  createPreloadApiInitScript
+  createPreloadApiInitScript,
 } from '../fixtures/preload-mock'
 
 test.describe('聊天页', () => {
@@ -25,7 +25,9 @@ test.describe('聊天页', () => {
     await expect(page.getByText('大语言模型对话')).toBeAttached()
   })
 
-  test('侧栏按 Pencil 使用 64px Agent Rail + 216px Session Pane', async ({ page }) => {
+  test('侧栏按 Pencil 使用 64px Agent Rail + 216px Session Pane', async ({
+    page,
+  }) => {
     const sidebar = page.getByTestId('chat-sidebar')
     const agentRail = page.getByTestId('chat-agent-rail')
     const sessionPane = page.getByTestId('chat-session-pane')
@@ -42,8 +44,14 @@ test.describe('聊天页', () => {
   test('标题栏和 Composer 使用 Pencil 尺寸', async ({ page }) => {
     await expect(page.getByTestId('chat-header')).toHaveCSS('height', '48px')
     await expect(page.getByTestId('composer-card')).toHaveCSS('height', '131px')
-    await expect(page.getByTestId('composer-card')).toHaveCSS('border-radius', '20px')
-    await expect(page.getByTestId('composer-card')).toHaveCSS('max-width', 'none')
+    await expect(page.getByTestId('composer-card')).toHaveCSS(
+      'border-radius',
+      '20px',
+    )
+    await expect(page.getByTestId('composer-card')).toHaveCSS(
+      'max-width',
+      'none',
+    )
 
     const composerForm = page.getByTestId('composer-card').locator('..')
     await expect(composerForm).toHaveCSS('max-width', '720px')
@@ -56,9 +64,15 @@ test.describe('聊天页', () => {
 
   test('会话列表展示 mock sessions', async ({ page }) => {
     // 验证 3 个测试会话都在侧边栏谱系树中（使用 role="treeitem" 定位侧边栏会话项）
-    await expect(page.getByRole('treeitem', { name: /测试会话 1/ })).toBeVisible()
-    await expect(page.getByRole('treeitem', { name: /测试会话 2/ })).toBeVisible()
-    await expect(page.getByRole('treeitem', { name: /测试会话 3/ })).toBeVisible()
+    await expect(
+      page.getByRole('treeitem', { name: /测试会话 1/ }),
+    ).toBeVisible()
+    await expect(
+      page.getByRole('treeitem', { name: /测试会话 2/ }),
+    ).toBeVisible()
+    await expect(
+      page.getByRole('treeitem', { name: /测试会话 3/ }),
+    ).toBeVisible()
   })
 
   test('会话列表只显示影响操作的状态', async ({ page }) => {
@@ -73,7 +87,9 @@ test.describe('聊天页', () => {
     // 用户消息和 Agent 回复都应渲染
     await expect(page.getByText('你好汤圆，请帮我写一段代码。')).toBeVisible()
     await expect(
-      page.getByText('你好！我很乐意帮你写代码。请告诉我你需要什么功能，我会为你生成相应的代码。')
+      page.getByText(
+        '你好！我很乐意帮你写代码。请告诉我你需要什么功能，我会为你生成相应的代码。',
+      ),
     ).toBeVisible()
   })
 
@@ -122,9 +138,13 @@ test.describe('聊天主界面 Toast 回归', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1).map((session) => ({
       ...session,
-      state: 'running' as const
+      state: 'running' as const,
     }))
-    const initScript = createPreloadApiInitScript(runtime, sessions, createTestMessages())
+    const initScript = createPreloadApiInitScript(
+      runtime,
+      sessions,
+      createTestMessages(),
+    )
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/chat/tangyuan')
@@ -132,6 +152,9 @@ test.describe('聊天主界面 Toast 回归', () => {
 
     const item = page.locator('[data-sonner-toast][data-type="success"]')
     await expect(item).toContainText('已停止生成')
-    await expect(page.locator('[data-sonner-toaster]')).toHaveAttribute('data-x-position', 'right')
+    await expect(page.locator('[data-sonner-toaster]')).toHaveAttribute(
+      'data-x-position',
+      'right',
+    )
   })
 })

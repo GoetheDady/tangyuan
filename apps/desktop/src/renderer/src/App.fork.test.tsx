@@ -7,7 +7,7 @@ import App from './App'
 import {
   createReadyRuntimeSnapshot,
   installDefaultAppApi,
-  resetAppTestEnvironment
+  resetAppTestEnvironment,
 } from './app.test-helpers'
 
 describe('App independent session fork', () => {
@@ -19,24 +19,24 @@ describe('App independent session fork', () => {
     const parent = createDefaultSessionSummary({
       sessionId: 'parent-session',
       title: '父会话',
-      updatedAt: '2026-07-28T00:00:00.000Z'
+      updatedAt: '2026-07-28T00:00:00.000Z',
     })
     const child = {
       ...createDefaultSessionSummary({
         sessionId: 'child-session',
         title: '父会话（分叉）',
-        updatedAt: '2026-07-28T00:01:00.000Z'
+        updatedAt: '2026-07-28T00:01:00.000Z',
       }),
       forkedFrom: {
         sessionId: parent.sessionId,
-        entryId: 'source-user'
-      }
+        entryId: 'source-user',
+      },
     }
     const readyRuntime = createReadyRuntimeSnapshot({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       maskedValue: 'sk-t...7890',
-      profileInitialized: true
+      profileInitialized: true,
     })
 
     window.location.hash = '#/chat/tangyuan/parent-session'
@@ -55,7 +55,7 @@ describe('App independent session fork', () => {
                 index: 0,
                 messageId: 'before-user',
                 content: '之前的问题',
-                createdAt: '2026-07-28T00:00:00.000Z'
+                createdAt: '2026-07-28T00:00:00.000Z',
               },
               {
                 kind: 'agent-reply',
@@ -64,15 +64,15 @@ describe('App independent session fork', () => {
                 content: '之前的回答',
                 createdAt: '2026-07-28T00:00:10.000Z',
                 attempt: null,
-                turns: []
+                turns: [],
               },
               {
                 kind: 'user-message',
                 index: 2,
                 messageId: 'source-user',
                 content: '换一种方式回答',
-                createdAt: '2026-07-28T00:00:20.000Z'
-              }
+                createdAt: '2026-07-28T00:00:20.000Z',
+              },
             ]
           : [
               {
@@ -80,7 +80,7 @@ describe('App independent session fork', () => {
                 index: 0,
                 messageId: 'before-user',
                 content: '之前的问题',
-                createdAt: '2026-07-28T00:00:00.000Z'
+                createdAt: '2026-07-28T00:00:00.000Z',
               },
               {
                 kind: 'agent-reply',
@@ -89,10 +89,10 @@ describe('App independent session fork', () => {
                 content: '之前的回答',
                 createdAt: '2026-07-28T00:00:10.000Z',
                 attempt: null,
-                turns: []
-              }
+                turns: [],
+              },
             ],
-      updatedAt: '2026-07-28T00:01:00.000Z'
+      updatedAt: '2026-07-28T00:01:00.000Z',
     }))
     vi.mocked(window.api.forkSession).mockImplementation(async () => {
       sessions = [parent, child]
@@ -105,25 +105,29 @@ describe('App independent session fork', () => {
     await user.hover(sourceMessage)
     await user.click(
       within(sourceMessage.closest('article')!).getByRole('button', {
-        name: '从此处分叉'
-      })
+        name: '从此处分叉',
+      }),
     )
 
     await waitFor(() => {
       expect(window.api.forkSession).toHaveBeenCalledWith({
         agentId: 'tangyuan',
         sessionId: 'parent-session',
-        entryId: 'source-user'
+        entryId: 'source-user',
       })
     })
-    expect(await screen.findByDisplayValue('换一种方式回答')).toBeInTheDocument()
+    expect(
+      await screen.findByDisplayValue('换一种方式回答'),
+    ).toBeInTheDocument()
     expect(window.api.sendMessage).not.toHaveBeenCalled()
-    expect(screen.getByRole('heading', { name: '父会话（分叉）' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: '父会话（分叉）' }),
+    ).toBeInTheDocument()
     expect(window.location.hash).toBe('#/chat/tangyuan/child-session')
     expect(screen.getAllByText('父会话（分叉）')).toHaveLength(2)
     expect(window.api.setLastActiveSession).toHaveBeenCalledWith({
       agentId: 'tangyuan',
-      sessionId: 'child-session'
+      sessionId: 'child-session',
     })
   })
 })
