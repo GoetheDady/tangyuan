@@ -88,8 +88,7 @@ export function createTangyuanRuntime(
   const fsRoot = options?.fsRoot ?? homedir()
   const now = options?.now ?? (() => new Date().toISOString())
   const layout = new DirectoryLayout({
-    agentHomePath:
-      options?.agentHomePath ?? '~/.tangyuan/agents/tangyuan',
+    agentHomePath: options?.agentHomePath ?? '~/.tangyuan/agents/tangyuan',
     fsRoot,
     userDataPath: options?.userDataPath ?? join(fsRoot, '.tangyuan'),
   })

@@ -458,10 +458,7 @@ export const questionClarificationRequestSchema = z.strictObject({
   sessionId: nonEmptyIdentifierSchema,
   runId: nonEmptyIdentifierSchema,
   question: z.string().min(1),
-  options: z
-    .array(z.string().min(1))
-    .min(2)
-    .max(5),
+  options: z.array(z.string().min(1)).min(2).max(5),
   allowCustomAnswer: z.boolean(),
   status: z.enum(['pending', 'answered', 'cancelled']),
   createdAt: timestampSchema,

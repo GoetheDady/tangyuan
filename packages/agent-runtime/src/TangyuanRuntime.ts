@@ -132,9 +132,7 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
     }))
     // 对非归档会话检查祖先谱系完整性
     if (!includeArchived) {
-      const sessionsById = new Map(
-        sessions.map((s) => [s.sessionId, s]),
-      )
+      const sessionsById = new Map(sessions.map((s) => [s.sessionId, s]))
       const lineageCache = new Map<string, boolean>()
 
       for (const session of sessions) {
@@ -205,9 +203,7 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
       }
     }
 
-    const fallbackSessions = await this.listSessions(
-      TANGYUAN_DEFAULT_AGENT_ID,
-    )
+    const fallbackSessions = await this.listSessions(TANGYUAN_DEFAULT_AGENT_ID)
     let fallbackSession: AgentSessionSummary | undefined
 
     for (const session of fallbackSessions) {
@@ -700,7 +696,10 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
     const forkSourceSession = this.sessionCache.find(request.sessionId)
     if (forkSourceSession) this.assertLineageAvailable(forkSourceSession)
     const pendingFork = this.sessionDriver.forkSession(request)
-    return this.sessionArchiveCoordinator.trackFork(request.sessionId, pendingFork)
+    return this.sessionArchiveCoordinator.trackFork(
+      request.sessionId,
+      pendingFork,
+    )
   }
 
   /**
@@ -712,7 +711,9 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
   async archiveSession(
     request: ArchiveSessionRequest,
   ): Promise<ArchiveSessionResult> {
-    const archiveLease = this.sessionArchiveCoordinator.acquire(request.sessionId)
+    const archiveLease = this.sessionArchiveCoordinator.acquire(
+      request.sessionId,
+    )
 
     try {
       let sessions = await this.listSessions(request.agentId, true)
@@ -863,9 +864,7 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
       }
 
       await Promise.all(
-        affectedSessionIds.map((sessionId) =>
-          this.waitForRunStart(sessionId),
-        ),
+        affectedSessionIds.map((sessionId) => this.waitForRunStart(sessionId)),
       )
       const currentSessions = await this.listSessions(request.agentId, true)
       const currentSubtree = collectSessionSubtree(
@@ -893,10 +892,7 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
       await this.sessionDriver.deleteSessions(affectedSessionIds)
 
       const lastActive = await this.lastActiveSessionStore.read()
-      if (
-        lastActive &&
-        affectedSessionIds.includes(lastActive.sessionId)
-      ) {
+      if (lastActive && affectedSessionIds.includes(lastActive.sessionId)) {
         await this.lastActiveSessionStore.clear()
       }
 
@@ -931,7 +927,10 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
 
     return sessions.flatMap((session) => {
       const kinds: SessionLineageActivityKind[] = []
-      if (session.state === 'running' || this.isRunStarting(session.sessionId)) {
+      if (
+        session.state === 'running' ||
+        this.isRunStarting(session.sessionId)
+      ) {
         kinds.push('running')
       }
       if (session.state === 'queued') kinds.push('queued')

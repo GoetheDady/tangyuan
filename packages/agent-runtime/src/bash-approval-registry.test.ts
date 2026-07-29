@@ -63,8 +63,12 @@ describe('BashApprovalRegistry', () => {
 
   it('rejectSession 只拒绝匹配会话的审批', async () => {
     const { registry } = createRegistry()
-    const p1 = registry.register(makeRequest({ approvalId: 'a1', sessionId: 's1' }))
-    const p2 = registry.register(makeRequest({ approvalId: 'a2', sessionId: 's2' }))
+    const p1 = registry.register(
+      makeRequest({ approvalId: 'a1', sessionId: 's1' }),
+    )
+    const p2 = registry.register(
+      makeRequest({ approvalId: 'a2', sessionId: 's2' }),
+    )
 
     registry.rejectSession('s1')
 
@@ -77,7 +81,9 @@ describe('BashApprovalRegistry', () => {
   it('rejectAll 拒绝全部并清空', async () => {
     const { registry } = createRegistry()
     const p1 = registry.register(makeRequest({ approvalId: 'a1' }))
-    const p2 = registry.register(makeRequest({ approvalId: 'a2', sessionId: 's2' }))
+    const p2 = registry.register(
+      makeRequest({ approvalId: 'a2', sessionId: 's2' }),
+    )
 
     registry.rejectAll()
 

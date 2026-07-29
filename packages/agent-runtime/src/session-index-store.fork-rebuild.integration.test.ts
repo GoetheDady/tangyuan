@@ -140,7 +140,9 @@ describe('SessionIndexStore 从真实 Pi session 重建会话谱系', () => {
     const rebuiltStore = new SessionIndexStore({ layout, configStore, gateway })
     await rebuiltStore.load()
 
-    expect(rebuiltStore.getSummary(parent.sessionId)?.forkedFrom).toBeUndefined()
+    expect(
+      rebuiltStore.getSummary(parent.sessionId)?.forkedFrom,
+    ).toBeUndefined()
     expect(rebuiltStore.getSummary(child.sessionId)).toMatchObject({
       forkedFrom: {
         sessionId: parent.sessionId,

@@ -10,5 +10,8 @@ import type { LastActiveSessionStore } from './last-active-session-store'
 export interface TangyuanRuntimeDependencies {
   runtimeDriver: RuntimeResourceDriver
   sessionDriver: AgentSessionDriver
-  lastActiveSessionStore?: Pick<LastActiveSessionStore, 'read' | 'write' | 'clear'>
+  lastActiveSessionStore?: Pick<
+    LastActiveSessionStore,
+    'read' | 'write' | 'clear'
+  >
 }

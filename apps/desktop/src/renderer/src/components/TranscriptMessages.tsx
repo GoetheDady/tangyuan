@@ -236,6 +236,11 @@ export function TranscriptMessages({
     [transcript, isStreaming, isAwaitingResponse],
   )
 
+  // useVirtualizer 返回的函数依赖内部可变状态，无法被 React Compiler 安全 memo 化，
+  // 这是 TanStack Virtual 的上游 API 约束，调用侧改不动。本组件未启用 React
+  // Compiler（构建里没接 babel-plugin-react-compiler），该提示不影响实际行为；
+  // 若将来启用，需改用 @tanstack/react-virtual 官方给出的兼容方案再移除此行。
+  // eslint-disable-next-line react-hooks/incompatible-library -- 上游 API 限制
   const virtualizer = useVirtualizer({
     count: renderItems.length,
     getScrollElement: () => scrollRef.current,

@@ -23,24 +23,24 @@
 
 全部 16 个面板已确认（2026-07-17）：
 
-| # | 组件 | Pencil 节点 | 阴影层级 |
-|---|------|------------|----------|
-| 00 | 基础规范 | `UVk1L` | — |
-| 01 | Button | `IiJZ9` | Level 0 |
-| 02 | Input | `n0PzQU` | Level 0 |
-| 03 | Textarea | `cVR9i` | Level 0 |
-| 04 | Select | `o9Xft` | Level 0/2 |
-| 05 | Field | `knoXw` | Level 0 |
-| 06 | InputGroup | `KWlgr` | Level 0 |
-| 07 | Badge | `cjmQt` | Level 0 |
-| 08 | Card | `DCStC` | Level 0/1 |
-| 09 | Alert | `h6fLA` | Level 0 |
-| 10 | Separator | `fLD7W` | Level 0 |
-| 11 | Tooltip | `I57e1i` | Level 2 |
-| 12 | AlertDialog | `l0MbeG` | Level 3 |
-| 13 | Label | `p73o4I` | Level 0 |
-| 14 | DropdownMenu | `s1e1k` | Level 2 |
-| 15 | Toast | `QJjJP` | Level 3 |
+| #   | 组件         | Pencil 节点 | 阴影层级  |
+| --- | ------------ | ----------- | --------- |
+| 00  | 基础规范     | `UVk1L`     | —         |
+| 01  | Button       | `IiJZ9`     | Level 0   |
+| 02  | Input        | `n0PzQU`    | Level 0   |
+| 03  | Textarea     | `cVR9i`     | Level 0   |
+| 04  | Select       | `o9Xft`     | Level 0/2 |
+| 05  | Field        | `knoXw`     | Level 0   |
+| 06  | InputGroup   | `KWlgr`     | Level 0   |
+| 07  | Badge        | `cjmQt`     | Level 0   |
+| 08  | Card         | `DCStC`     | Level 0/1 |
+| 09  | Alert        | `h6fLA`     | Level 0   |
+| 10  | Separator    | `fLD7W`     | Level 0   |
+| 11  | Tooltip      | `I57e1i`    | Level 2   |
+| 12  | AlertDialog  | `l0MbeG`    | Level 3   |
+| 13  | Label        | `p73o4I`    | Level 0   |
+| 14  | DropdownMenu | `s1e1k`     | Level 2   |
+| 15  | Toast        | `QJjJP`     | Level 3   |
 
 所有组件已包含显式的 Shadow Level 标注。下一步进入完整页面设计阶段。
 

@@ -436,10 +436,7 @@ describe('PiSdkDriver', () => {
     ).resolves.toContain('# Soul')
     // user.md 不存在
     await expect(
-      readFile(
-        join(rootPath, '.tangyuan/profile/user.md'),
-        'utf8',
-      ),
+      readFile(join(rootPath, '.tangyuan/profile/user.md'), 'utf8'),
     ).rejects.toMatchObject({ code: 'ENOENT' })
     // bootstrap.md 仍存在（初始化阻断保留）
     await expect(
@@ -498,10 +495,7 @@ describe('PiSdkDriver', () => {
     const resolvedHomePath = join(rootPath, homePath.slice(2))
     // user.md 存在于共享路径
     await expect(
-      readFile(
-        join(rootPath, '.tangyuan/profile/user.md'),
-        'utf8',
-      ),
+      readFile(join(rootPath, '.tangyuan/profile/user.md'), 'utf8'),
     ).resolves.toContain('# User')
     // soul.md 不存在
     await expect(

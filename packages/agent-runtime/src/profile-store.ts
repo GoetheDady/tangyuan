@@ -239,7 +239,12 @@ export class ProfileStore {
     const content = await safeReadFile(soulPath)
     const updatedAt = (await getMtimeIso(soulPath)) ?? this.now()
 
-    return { agentId, content, updatedAt, version: createProfileVersion(content) }
+    return {
+      agentId,
+      content,
+      updatedAt,
+      version: createProfileVersion(content),
+    }
   }
 
   /**

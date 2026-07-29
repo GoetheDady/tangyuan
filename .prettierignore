@@ -2,5 +2,14 @@ node_modules
 dist
 out
 coverage
+test-results
+playwright-report
 pnpm-lock.yaml
 .codegraph
+
+# tsconfig 带注释（JSONC），prettier 会按纯 JSON 重排
+tsconfig.json
+tsconfig.*.json
+
+# 本地草稿，不纳入格式化
+.scratch

@@ -85,9 +85,8 @@ export class SkillStore {
     await mkdir(agentSkillsPath, { recursive: true })
     await mkdir(sharedSkillsPath, { recursive: true })
 
-    const { DefaultResourceLoader } = await import(
-      '@earendil-works/pi-coding-agent'
-    )
+    const { DefaultResourceLoader } =
+      await import('@earendil-works/pi-coding-agent')
 
     const loader = new DefaultResourceLoader({
       cwd: this.layout.workspace(agentId),
@@ -114,9 +113,8 @@ export class SkillStore {
 
     await mkdir(sharedSkillsPath, { recursive: true })
 
-    const { DefaultResourceLoader } = await import(
-      '@earendil-works/pi-coding-agent'
-    )
+    const { DefaultResourceLoader } =
+      await import('@earendil-works/pi-coding-agent')
 
     const loader = new DefaultResourceLoader({
       cwd: this.layout.workspace(TANGYUAN_DEFAULT_AGENT_ID),

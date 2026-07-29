@@ -18,7 +18,10 @@ function makeSession(
 describe('SessionCache', () => {
   it('replace 整体替换并可 list 读取', () => {
     const cache = new SessionCache()
-    cache.replace([makeSession({ sessionId: 's1' }), makeSession({ sessionId: 's2' })])
+    cache.replace([
+      makeSession({ sessionId: 's1' }),
+      makeSession({ sessionId: 's2' }),
+    ])
     expect(cache.list().map((s) => s.sessionId)).toEqual(['s1', 's2'])
   })
 

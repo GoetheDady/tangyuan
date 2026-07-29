@@ -153,10 +153,14 @@ describe('TranscriptEmitter tool step handling', () => {
     emitter.startTurn(event)
   }
 
-  type AssistantContentBlock =
-    Extract<DriverEvent, { type: 'turn-ended' }>['message']['content'][number]
-  type SdkToolResult =
-    Extract<DriverEvent, { type: 'turn-ended' }>['toolResults'][number]
+  type AssistantContentBlock = Extract<
+    DriverEvent,
+    { type: 'turn-ended' }
+  >['message']['content'][number]
+  type SdkToolResult = Extract<
+    DriverEvent,
+    { type: 'turn-ended' }
+  >['toolResults'][number]
 
   function emitTurnEnded(
     emitter: TranscriptEmitter,
@@ -486,12 +490,20 @@ describe('TranscriptEmitter tool step handling', () => {
     // 第一轮对话（真实顺序：attempt-started 先于 agent message-appended）
     emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitThinkingDelta(emitter, { runId: 'run-1', messageId: 'msg-1', delta: '第一轮思考' })
+    emitThinkingDelta(emitter, {
+      runId: 'run-1',
+      messageId: 'msg-1',
+      delta: '第一轮思考',
+    })
 
     // 第二轮对话：新 run、新 agent 消息
     emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-2')
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-2', 'agent')
-    emitThinkingDelta(emitter, { runId: 'run-2', messageId: 'msg-2', delta: '第二轮思考' })
+    emitThinkingDelta(emitter, {
+      runId: 'run-2',
+      messageId: 'msg-2',
+      delta: '第二轮思考',
+    })
     emitActivityUpdated(emitter, {
       runId: 'run-2',
       kind: 'tool',
@@ -615,9 +627,19 @@ describe('TranscriptEmitter tool step handling', () => {
     emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
 
     emitTurnStarted(emitter, 0)
-    emitTurnEnded(emitter, 0, [{ type: 'text', text: '第一轮文字' }] as never, [])
+    emitTurnEnded(
+      emitter,
+      0,
+      [{ type: 'text', text: '第一轮文字' }] as never,
+      [],
+    )
     emitTurnStarted(emitter, 1)
-    emitTurnEnded(emitter, 1, [{ type: 'text', text: '第二轮文字' }] as never, [])
+    emitTurnEnded(
+      emitter,
+      1,
+      [{ type: 'text', text: '第二轮文字' }] as never,
+      [],
+    )
 
     const snapshot = getSnapshot('session-1')
     const agentEntry = snapshot!.entries[0]
@@ -769,12 +791,7 @@ describe('TranscriptEmitter tool step handling', () => {
     emitTurnStarted(emitter, 0)
     emitTurnStarted(emitter, 1)
     emitTurnStarted(emitter, 2)
-    emitTurnEnded(
-      emitter,
-      2,
-      [{ type: 'text', text: '回复内容' }] as never,
-      [],
-    )
+    emitTurnEnded(emitter, 2, [{ type: 'text', text: '回复内容' }] as never, [])
 
     const snapshot = getSnapshot('session-1')
     const agentEntry = snapshot!.entries[0]

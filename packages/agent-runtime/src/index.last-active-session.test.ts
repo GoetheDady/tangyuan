@@ -36,38 +36,38 @@ describe('createTangyuanRuntime · 最后激活会话存储', () => {
             model: 'claude-sonnet-4-5',
             agentId: 'tangyuan',
             lastMessagePreview: '',
-            status: 'idle'
-          }
-        ]
+            status: 'idle',
+          },
+        ],
       }),
-      'utf8'
+      'utf8',
     )
     await writeFile(
       join(sessionsPath, 'last-active-session.json'),
       JSON.stringify({
         agentId: 'tangyuan',
         sessionId: 'session-1',
-        updatedAt: '2026-07-28T10:00:00.000Z'
+        updatedAt: '2026-07-28T10:00:00.000Z',
       }),
-      'utf8'
+      'utf8',
     )
     const runtime = createTangyuanRuntime({
       agentHomePath: join(rootPath, 'agents', 'tangyuan'),
       fsRoot: rootPath,
       userDataPath: rootPath,
       gateway: createPiSdkGateway(),
-      encryptionAdapter: createFakeEncryptionAdapter()
+      encryptionAdapter: createFakeEncryptionAdapter(),
     })
     await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
-      apiKey: 'sk-test-secret-7890'
+      apiKey: 'sk-test-secret-7890',
     })
 
     await expect(runtime.getLastActiveSession()).resolves.toEqual({
       agentId: 'tangyuan',
       sessionId: 'session-1',
-      updatedAt: '2026-07-28T10:00:00.000Z'
+      updatedAt: '2026-07-28T10:00:00.000Z',
     })
   })
 })

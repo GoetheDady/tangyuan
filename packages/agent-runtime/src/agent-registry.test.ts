@@ -2,10 +2,7 @@ import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type {
-  AgentEvent,
-  ConfigEncryptionAdapter,
-} from '@tangyuan/contracts'
+import type { AgentEvent, ConfigEncryptionAdapter } from '@tangyuan/contracts'
 import { DirectoryLayout } from './directory-layout'
 import { ConfigStore } from './config-store'
 import { AgentRegistry } from './agent-registry'
@@ -27,7 +24,11 @@ let events: AgentEvent[]
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'agent-registry-'))
   const agentHomePath = join(dir, 'agents', 'tangyuan')
-  layout = new DirectoryLayout({ agentHomePath, fsRoot: dir, userDataPath: dir })
+  layout = new DirectoryLayout({
+    agentHomePath,
+    fsRoot: dir,
+    userDataPath: dir,
+  })
   configStore = new ConfigStore({
     layout,
     encryptionAdapter: fakeAdapter,

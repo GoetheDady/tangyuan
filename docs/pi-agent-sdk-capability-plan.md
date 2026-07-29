@@ -140,26 +140,26 @@ v1 首次启动时创建默认 Agent 工作空间：
 
 Pi Agent SDK 至少包含这些能力：
 
-| 能力 | SDK 入口或概念 | 汤圆处理方式 |
-| --- | --- | --- |
-| 创建会话 | `createAgentSession()` | v1 必须支持 |
-| 发送消息 | `AgentSession.prompt()` | v1 必须支持 |
-| 流式事件 | `AgentSession.subscribe()` | v1 必须支持 |
-| 取消运行 | `AgentSession.abort()` | v1 必须支持 |
-| 模型控制 | `setModel()`、`ModelRegistry` | v1 必须支持基础选择 |
-| API Key / 认证 | `AuthStorage` | v1 使用本地 config JSON 明文存储 |
-| 会话状态 | `messages`、`isStreaming`、`agent.state` | v1 映射为汤圆会话状态 |
-| 内置工具 | `read`、`bash`、`edit`、`write`、`grep`、`find`、`ls` | v1 使用只读工具，并为 Agent profile 文件开放 `edit` / `write` |
-| 自定义工具 | `defineTool()` | v1 不支持 |
-| Skills | `DefaultResourceLoader`、`skillsOverride` | v1 不支持 |
-| Extensions | `ResourceLoader`、extension runtime | v1 不支持 |
-| Prompt Templates / Slash Commands | prompts、templates | v1 不支持 |
-| Context Files | AGENTS/context files | v1 只保留架构兼容，不做 UI |
-| Session Management | persistent/open/list/fork/import | v1 使用 Pi SDK 原生 session 持久化 |
-| Compaction | `compact()`、compaction events | v1 不支持 |
-| Thinking Level | `setThinkingLevel()` | v1 可后置 |
-| Images | prompt images | v1 不支持 |
-| RPC / JSON Event Stream | SDK 运行模式 | v1 不支持 |
+| 能力                              | SDK 入口或概念                                        | 汤圆处理方式                                                  |
+| --------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------- |
+| 创建会话                          | `createAgentSession()`                                | v1 必须支持                                                   |
+| 发送消息                          | `AgentSession.prompt()`                               | v1 必须支持                                                   |
+| 流式事件                          | `AgentSession.subscribe()`                            | v1 必须支持                                                   |
+| 取消运行                          | `AgentSession.abort()`                                | v1 必须支持                                                   |
+| 模型控制                          | `setModel()`、`ModelRegistry`                         | v1 必须支持基础选择                                           |
+| API Key / 认证                    | `AuthStorage`                                         | v1 使用本地 config JSON 明文存储                              |
+| 会话状态                          | `messages`、`isStreaming`、`agent.state`              | v1 映射为汤圆会话状态                                         |
+| 内置工具                          | `read`、`bash`、`edit`、`write`、`grep`、`find`、`ls` | v1 使用只读工具，并为 Agent profile 文件开放 `edit` / `write` |
+| 自定义工具                        | `defineTool()`                                        | v1 不支持                                                     |
+| Skills                            | `DefaultResourceLoader`、`skillsOverride`             | v1 不支持                                                     |
+| Extensions                        | `ResourceLoader`、extension runtime                   | v1 不支持                                                     |
+| Prompt Templates / Slash Commands | prompts、templates                                    | v1 不支持                                                     |
+| Context Files                     | AGENTS/context files                                  | v1 只保留架构兼容，不做 UI                                    |
+| Session Management                | persistent/open/list/fork/import                      | v1 使用 Pi SDK 原生 session 持久化                            |
+| Compaction                        | `compact()`、compaction events                        | v1 不支持                                                     |
+| Thinking Level                    | `setThinkingLevel()`                                  | v1 可后置                                                     |
+| Images                            | prompt images                                         | v1 不支持                                                     |
+| RPC / JSON Event Stream           | SDK 运行模式                                          | v1 不支持                                                     |
 
 ## v1 必须支持
 
@@ -284,17 +284,17 @@ userData/
 
 ```ts
 type SessionIndexItem = {
-  sessionId: string;
-  sdkSessionFile: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  provider: string;
-  model: string;
-  agentId: string;
-  lastMessagePreview: string;
-  status: "idle" | "running" | "completed" | "cancelled" | "failed";
-};
+  sessionId: string
+  sdkSessionFile: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  provider: string
+  model: string
+  agentId: string
+  lastMessagePreview: string
+  status: 'idle' | 'running' | 'completed' | 'cancelled' | 'failed'
+}
 ```
 
 索引写入规则：

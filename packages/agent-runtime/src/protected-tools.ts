@@ -339,7 +339,11 @@ export function createReadFileTool(
       '读取文件请使用此工具，不要用命令行的 cat 或 sed',
     ],
     async execute(toolCallId, params, signal, onUpdate, ctx) {
-      const guard = guardPath(context, (params as { path: string }).path, 'read')
+      const guard = guardPath(
+        context,
+        (params as { path: string }).path,
+        'read',
+      )
 
       if (guard.reason !== undefined) {
         return {
