@@ -442,6 +442,18 @@ export interface AgentSessionDriver {
   listSessions(request: ListSessionsRequest): Promise<AgentSessionSummary[]>
 
   /**
+   * 批量更新会话的归档状态。
+   *
+   * @param sessionIds - 要更新的会话标识。
+   * @param archivedAt - 归档时间；传入 null 表示恢复。
+   * @returns 更新后的会话摘要。
+   */
+  setSessionsArchived?(
+    sessionIds: readonly string[],
+    archivedAt: string | null,
+  ): Promise<AgentSessionSummary[]>
+
+  /**
    * 创建一个新的 Agent 会话。
    *
    * @param request - 新会话所属 Agent 和标题。

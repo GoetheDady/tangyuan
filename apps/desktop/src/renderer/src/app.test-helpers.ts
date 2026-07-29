@@ -24,8 +24,8 @@ export function installDefaultAppApi(): void {
       createDefaultSessionSummary({
         sessionId: 'welcome',
         title: '新会话',
-        updatedAt: '2026-07-08T00:00:00.000Z'
-      })
+        updatedAt: '2026-07-08T00:00:00.000Z',
+      }),
     ]),
     getLastActiveSession: vi.fn().mockResolvedValue({
       agentId: 'tangyuan',
@@ -69,9 +69,15 @@ export function installDefaultAppApi(): void {
       createDefaultSessionSummary({
         sessionId: 'welcome',
         title: '新会话',
-        updatedAt: '2026-07-08T00:00:00.000Z',
-      }),
+        updatedAt: '2026-07-08T00:00:00.000Z'
+      })
     ),
+    archiveSession: vi.fn().mockResolvedValue({
+      status: 'archived',
+      affectedSessionIds: [],
+      affectedActivities: []
+    }),
+    recoverSession: vi.fn().mockResolvedValue([]),
     cancelRun: vi.fn().mockResolvedValue(
       createDefaultSessionSummary({
         sessionId: 'welcome',

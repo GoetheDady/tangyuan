@@ -147,7 +147,19 @@ export class PiSdkDriver
   ): Promise<AgentSessionSummary[]> {
     await this.sessionIndexStore.load()
 
-    return this.sessionIndexStore.listSummaries(request.agentId)
+    return this.sessionIndexStore.listSummaries(
+      request.agentId,
+      request.includeArchived,
+    )
+  }
+
+  /** 批量更新会话归档状态，保留 Pi session 文件与索引条目。 */
+  async setSessionsArchived(
+    sessionIds: readonly string[],
+    archivedAt: string | null,
+  ): Promise<AgentSessionSummary[]> {
+    await this.sessionIndexStore.load()
+    return this.sessionIndexStore.setArchived(sessionIds, archivedAt)
   }
 
   /**

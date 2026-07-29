@@ -3,6 +3,8 @@ import {
   agentSessionSummarySchema,
   answerClarificationRequestSchema,
   approveBashRequestSchema,
+  archiveSessionRequestSchema,
+  archiveSessionResultSchema,
   archiveAgentRequestSchema,
   cancelClarificationRequestSchema,
   cancelConfigurationVerificationRequestSchema,
@@ -18,6 +20,7 @@ import {
   openExternalLinkRequestSchema,
   profileUpdateResultSchema,
   recoverAgentRequestSchema,
+  recoverSessionRequestSchema,
   rejectBashRequestSchema,
   retryRunRequestSchema,
   runtimeConfigurationSchema,
@@ -43,6 +46,11 @@ import {
   setLastActiveSessionRequestSchema,
 } from './schemas'
 import type { LastActiveSession, SetLastActiveSessionRequest } from './last-active-session'
+import type {
+  ArchiveSessionRequest,
+  ArchiveSessionResult,
+  RecoverSessionRequest,
+} from './session-archive-types'
 import type {
   AgentEventListener,
   AgentSessionSummary,
@@ -132,6 +140,8 @@ export const DESKTOP_IPC_CHANNELS = {
   sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
   sessionsRetryMessage: 'tangyuan:sessions:retry-message',
   sessionsFork: 'tangyuan:sessions:fork',
+  sessionsArchive: 'tangyuan:sessions:archive',
+  sessionsRecover: 'tangyuan:sessions:recover',
   sessionsGetLastActive: 'tangyuan:sessions:get-last-active',
   sessionsSetLastActive: 'tangyuan:sessions:set-last-active',
 } as const
@@ -193,6 +203,8 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: GetSessionMessagesRequest
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: RetryRunRequest
   [DESKTOP_IPC_CHANNELS.sessionsFork]: ForkSessionRequest
+  [DESKTOP_IPC_CHANNELS.sessionsArchive]: ArchiveSessionRequest
+  [DESKTOP_IPC_CHANNELS.sessionsRecover]: RecoverSessionRequest
   [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: SetLastActiveSessionRequest
 }
@@ -247,6 +259,8 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: getSessionMessagesRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: retryRunRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsFork]: forkSessionRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsArchive]: archiveSessionRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsRecover]: recoverSessionRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: setLastActiveSessionRequestSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
@@ -317,6 +331,8 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: TranscriptSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: TranscriptSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsFork]: AgentSessionSummary
+  [DESKTOP_IPC_CHANNELS.sessionsArchive]: ArchiveSessionResult
+  [DESKTOP_IPC_CHANNELS.sessionsRecover]: AgentSessionSummary[]
   [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: LastActiveSession | null
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: LastActiveSession | null
 }
@@ -452,6 +468,8 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: transcriptSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: transcriptSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsFork]: agentSessionSummarySchema,
+  [DESKTOP_IPC_CHANNELS.sessionsArchive]: archiveSessionResultSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsRecover]: z.array(agentSessionSummarySchema),
   [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: lastActiveSessionSchema.nullable(),
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: lastActiveSessionSchema.nullable(),
 } satisfies Record<DesktopIpcChannel, z.ZodType>
@@ -597,6 +615,12 @@ export interface DesktopPreloadApi {
    * @throws 当会话不存在或分叉操作失败时，Promise 会 reject。
    */
   forkSession(request: ForkSessionRequest): Promise<AgentSessionSummary>
+
+  /** 归档目标会话及其全部后代，活动子树需要显式确认。 */
+  archiveSession(request: ArchiveSessionRequest): Promise<ArchiveSessionResult>
+
+  /** 恢复目标会话及其全部后代。 */
+  recoverSession(request: RecoverSessionRequest): Promise<AgentSessionSummary[]>
 
   /**
    * 订阅 Main 进程转发的 Agent 标准事件。

@@ -37,6 +37,8 @@ export interface PersistedSessionIndexEntry {
   agentId: AgentId
   lastMessagePreview: string
   status: AgentRunState
+  /** 会话归档时间；未归档时省略。 */
+  archivedAt?: string
   /** 执行尝试记录列表，用于会话重建时还原 attempt 状态。 */
   attempts?: PersistedAttemptEntry[]
   /** 分叉来源信息；为根会话（非分叉）时省略。 */

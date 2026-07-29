@@ -238,6 +238,8 @@ export interface AgentSessionSummary {
   title: string
   state: AgentRunState
   updatedAt: string
+  /** 归档时间；日常可见会话省略。 */
+  archivedAt?: string
   /** 分叉来源信息；为根会话（非分叉）时省略。 */
   forkedFrom?: ForkSource
 }
@@ -657,6 +659,8 @@ export interface CreateSessionRequest {
  */
 export interface ListSessionsRequest {
   agentId: AgentId
+  /** 是否包含已归档会话；省略时仅返回日常可见会话。 */
+  includeArchived?: boolean
 }
 
 /**

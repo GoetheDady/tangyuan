@@ -62,6 +62,12 @@ describe('registerDesktopAppIpc', () => {
         updatedAt: '2026-01-01T00:00:00.000Z'
       }),
       forkSession: vi.fn().mockResolvedValue(session),
+      archiveSession: vi.fn().mockResolvedValue({
+        status: 'archived',
+        affectedSessionIds: ['session-1'],
+        affectedActivities: []
+      }),
+      recoverSession: vi.fn().mockResolvedValue([session]),
       cancelRun: vi.fn().mockResolvedValue(session),
       subscribe: vi.fn(),
       cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined),
@@ -168,7 +174,7 @@ describe('registerDesktopAppIpc', () => {
 
     registerDesktopAppIpc(ipcMain, runtime, broadcastAgentEvent, openExternalLink)
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(44)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(46)
     expect(broadcastAgentEvent).toHaveBeenCalledWith(createAttemptStartedEvent())
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
@@ -191,7 +197,14 @@ describe('registerDesktopAppIpc', () => {
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsList)(null, { agentId: 'agent-2' })
     ).resolves.toEqual([session])
-    expect(runtime.listSessions).toHaveBeenCalledWith('agent-2')
+    expect(runtime.listSessions).toHaveBeenCalledWith('agent-2', undefined)
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsList)(null, {
+        agentId: 'agent-2',
+        includeArchived: true
+      })
+    ).resolves.toEqual([session])
+    expect(runtime.listSessions).toHaveBeenLastCalledWith('agent-2', true)
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsCreate)(null, {
         agentId: 'tangyuan',
@@ -236,6 +249,19 @@ describe('registerDesktopAppIpc', () => {
         sessionId: 'session-1'
       })
     ).resolves.toEqual(session)
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsArchive)(null, {
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        confirmActivityStop: false
+      })
+    ).resolves.toMatchObject({ status: 'archived' })
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsRecover)(null, {
+        agentId: 'tangyuan',
+        sessionId: 'session-1'
+      })
+    ).resolves.toEqual([session])
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.openExternalLink)(null, {
         url: 'https://example.com'
@@ -381,6 +407,8 @@ describe('registerDesktopAppIpc', () => {
         updatedAt: '2026-01-01T00:00:00.000Z'
       }),
       forkSession: vi.fn(),
+      archiveSession: vi.fn(),
+      recoverSession: vi.fn(),
       cancelRun: vi.fn(),
       subscribe: vi.fn(),
       cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined),
@@ -469,6 +497,14 @@ describe('registerDesktopAppIpc', () => {
       })
     ).rejects.toThrow()
     expect(runtime.createSession).not.toHaveBeenCalled()
+
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsArchive)(null, {
+        agentId: 'tangyuan',
+        sessionId: 'session-1'
+      } as never)
+    ).rejects.toThrow()
+    expect(runtime.archiveSession).not.toHaveBeenCalled()
   })
 
   it('rejects malformed runtime responses before they cross IPC', async () => {
@@ -496,6 +532,8 @@ describe('registerDesktopAppIpc', () => {
         updatedAt: '2026-01-01T00:00:00.000Z'
       }),
       forkSession: vi.fn(),
+      archiveSession: vi.fn(),
+      recoverSession: vi.fn(),
       cancelRun: vi.fn(),
       subscribe: vi.fn(),
       cancelAllActiveRuns: vi.fn(),

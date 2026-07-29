@@ -166,6 +166,7 @@ export const agentSessionSummarySchema = z.strictObject({
     'failed',
   ]),
   updatedAt: timestampSchema,
+  archivedAt: timestampSchema.optional(),
   forkedFrom: z
     .strictObject({
       sessionId: nonEmptyIdentifierSchema,
@@ -181,6 +182,35 @@ export const forkSessionRequestSchema = z.strictObject({
   agentId: nonEmptyIdentifierSchema,
   sessionId: nonEmptyIdentifierSchema,
   entryId: nonEmptyIdentifierSchema,
+})
+
+/** 校验会话谱系归档请求。 */
+export const archiveSessionRequestSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+  confirmActivityStop: z.boolean(),
+})
+
+/** 校验会话谱系恢复请求。 */
+export const recoverSessionRequestSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+})
+
+/** 校验归档前受影响的单个会话活动。 */
+export const sessionLineageActivitySchema = z.strictObject({
+  sessionId: nonEmptyIdentifierSchema,
+  title: z.string(),
+  kinds: z.array(
+    z.enum(['running', 'queued', 'pending-approval', 'pending-clarification']),
+  ),
+})
+
+/** 校验会话谱系归档结果。 */
+export const archiveSessionResultSchema = z.strictObject({
+  status: z.enum(['confirmation-required', 'archived']),
+  affectedSessionIds: z.array(nonEmptyIdentifierSchema),
+  affectedActivities: z.array(sessionLineageActivitySchema),
 })
 
 /**
@@ -609,6 +639,7 @@ export const createSessionRequestSchema = z.strictObject({
  */
 export const listSessionsRequestSchema = z.strictObject({
   agentId: nonEmptyIdentifierSchema,
+  includeArchived: z.boolean().optional(),
 })
 
 /**
