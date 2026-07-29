@@ -13,20 +13,20 @@ export default defineConfig(
   {
     settings: {
       react: {
-        version: 'detect'
-      }
-    }
+        version: 'detect',
+      },
+    },
   },
   {
     files: ['**/*.{ts,tsx}'],
     plugins: {
       'react-hooks': eslintPluginReactHooks,
-      'react-refresh': eslintPluginReactRefresh
+      'react-refresh': eslintPluginReactRefresh,
     },
     rules: {
       ...eslintPluginReactHooks.configs.recommended.rules,
-      ...eslintPluginReactRefresh.configs.vite.rules
-    }
+      ...eslintPluginReactRefresh.configs.vite.rules,
+    },
   },
   {
     // shadcn/ui 组件使用 React.forwardRef 的标准模式，不需要显式返回类型
@@ -34,26 +34,29 @@ export default defineConfig(
     files: ['src/renderer/src/components/ui/**/*.tsx'],
     rules: {
       '@typescript-eslint/explicit-function-return-type': 'off',
-      'react-refresh/only-export-components': 'off'
-    }
+      'react-refresh/only-export-components': 'off',
+    },
   },
   {
     // 测试文件的 describe/it/test 不需要显式返回类型
     files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
     rules: {
-      '@typescript-eslint/explicit-function-return-type': 'off'
-    }
+      '@typescript-eslint/explicit-function-return-type': 'off',
+    },
   },
   {
     rules: {
-      'max-lines': ['error', { max: 1000, skipBlankLines: true, skipComments: true }]
-    }
+      'max-lines': [
+        'error',
+        { max: 1000, skipBlankLines: true, skipComments: true },
+      ],
+    },
   },
   {
     files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
     rules: {
-      'max-lines': 'off'
-    }
+      'max-lines': 'off',
+    },
   },
-  eslintConfigPrettier
+  eslintConfigPrettier,
 )

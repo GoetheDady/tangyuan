@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import {
   createDefaultSessionSummary,
   type AgentSessionSummary,
-  type TranscriptSnapshot
+  type TranscriptSnapshot,
 } from '@tangyuan/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -12,33 +12,33 @@ import {
   createDeferred,
   createReadyRuntimeSnapshot,
   installDefaultAppApi,
-  resetAppTestEnvironment
+  resetAppTestEnvironment,
 } from './app.test-helpers'
 
 /** 创建带分叉来源的会话摘要。 */
 function createSession(
   sessionId: string,
   title: string,
-  forkedFrom?: { sessionId: string; entryId: string }
+  forkedFrom?: { sessionId: string; entryId: string },
 ): AgentSessionSummary {
   return {
     ...createDefaultSessionSummary({
       sessionId,
       title,
-      updatedAt: '2026-07-28T00:00:00.000Z'
+      updatedAt: '2026-07-28T00:00:00.000Z',
     }),
-    ...(forkedFrom ? { forkedFrom } : {})
+    ...(forkedFrom ? { forkedFrom } : {}),
   }
 }
 
 const PARENT = createSession('parent-session', '父会话')
 const CHILD = createSession('child-session', '子会话', {
   sessionId: 'parent-session',
-  entryId: 'source-user'
+  entryId: 'source-user',
 })
 const GRANDCHILD = createSession('grandchild-session', '孙会话', {
   sessionId: 'child-session',
-  entryId: 'child-source-user'
+  entryId: 'child-source-user',
 })
 
 /**
@@ -49,16 +49,20 @@ function installLineageApi(): void {
     providerId: 'anthropic',
     modelId: 'claude-sonnet-4-5',
     maskedValue: 'sk-t...7890',
-    profileInitialized: true
+    profileInitialized: true,
   })
   vi.mocked(window.api.getRuntimeSnapshot).mockResolvedValue(readyRuntime)
   vi.mocked(window.api.refreshRuntime).mockResolvedValue(readyRuntime)
   vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
     agentId: 'tangyuan',
     sessionId: 'parent-session',
-    updatedAt: '2026-07-28T00:02:00.000Z'
+    updatedAt: '2026-07-28T00:02:00.000Z',
   })
-  vi.mocked(window.api.listSessions).mockResolvedValue([PARENT, CHILD, GRANDCHILD])
+  vi.mocked(window.api.listSessions).mockResolvedValue([
+    PARENT,
+    CHILD,
+    GRANDCHILD,
+  ])
   vi.mocked(window.api.getTranscript).mockImplementation(async (request) => {
     const entriesBySession: Record<string, unknown[]> = {
       'parent-session': [
@@ -67,7 +71,7 @@ function installLineageApi(): void {
           index: 0,
           messageId: 'first-user',
           content: '父会话第一条',
-          createdAt: '2026-07-28T00:00:00.000Z'
+          createdAt: '2026-07-28T00:00:00.000Z',
         },
         {
           kind: 'agent-reply',
@@ -76,15 +80,15 @@ function installLineageApi(): void {
           content: '父会话回答',
           createdAt: '2026-07-28T00:00:10.000Z',
           attempt: null,
-          turns: []
+          turns: [],
         },
         {
           kind: 'user-message',
           index: 2,
           messageId: 'source-user',
           content: '父会话的来源消息',
-          createdAt: '2026-07-28T00:00:20.000Z'
-        }
+          createdAt: '2026-07-28T00:00:20.000Z',
+        },
       ],
       'child-session': [
         {
@@ -92,8 +96,8 @@ function installLineageApi(): void {
           index: 0,
           messageId: 'child-source-user',
           content: '子会话的来源消息',
-          createdAt: '2026-07-28T00:01:00.000Z'
-        }
+          createdAt: '2026-07-28T00:01:00.000Z',
+        },
       ],
       'grandchild-session': [
         {
@@ -101,16 +105,16 @@ function installLineageApi(): void {
           index: 0,
           messageId: 'grandchild-user',
           content: '孙会话的消息',
-          createdAt: '2026-07-28T00:02:00.000Z'
-        }
-      ]
+          createdAt: '2026-07-28T00:02:00.000Z',
+        },
+      ],
     }
 
     return {
       sessionId: request.sessionId,
       agentId: 'tangyuan',
       entries: entriesBySession[request.sessionId] ?? [],
-      updatedAt: '2026-07-28T00:02:00.000Z'
+      updatedAt: '2026-07-28T00:02:00.000Z',
     } as never
   })
 }
@@ -127,12 +131,17 @@ describe('App 递归会话谱系与分叉来源提示', () => {
 
     render(<App />)
 
-    expect(await screen.findByRole('treeitem', { name: /父会话/ })).toHaveAttribute(
+    expect(
+      await screen.findByRole('treeitem', { name: /父会话/ }),
+    ).toHaveAttribute('aria-level', '1')
+    expect(screen.getByRole('treeitem', { name: /子会话/ })).toHaveAttribute(
       'aria-level',
-      '1'
+      '2',
     )
-    expect(screen.getByRole('treeitem', { name: /子会话/ })).toHaveAttribute('aria-level', '2')
-    expect(screen.getByRole('treeitem', { name: /孙会话/ })).toHaveAttribute('aria-level', '3')
+    expect(screen.getByRole('treeitem', { name: /孙会话/ })).toHaveAttribute(
+      'aria-level',
+      '3',
+    )
   })
 
   it('分叉会话顶部展示来源提示，点击后跳回父会话的来源消息', async () => {
@@ -147,13 +156,17 @@ describe('App 递归会话谱系与分叉来源提示', () => {
     await waitFor(() => {
       expect(window.location.hash).toBe('#/chat/tangyuan/parent-session')
     })
-    expect(await screen.findByRole('heading', { name: '父会话' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: '父会话' }),
+    ).toBeInTheDocument()
     await waitFor(() => {
-      expect(screen.getByTestId('fork-source-message')).toHaveTextContent('父会话的来源消息')
+      expect(screen.getByTestId('fork-source-message')).toHaveTextContent(
+        '父会话的来源消息',
+      )
     })
     expect(window.api.setLastActiveSession).toHaveBeenCalledWith({
       agentId: 'tangyuan',
-      sessionId: 'parent-session'
+      sessionId: 'parent-session',
     })
   })
 
@@ -170,7 +183,9 @@ describe('App 递归会话谱系与分叉来源提示', () => {
       expect(window.location.hash).toBe('#/chat/tangyuan/child-session')
     })
     await waitFor(() => {
-      expect(screen.getByTestId('fork-source-message')).toHaveTextContent('子会话的来源消息')
+      expect(screen.getByTestId('fork-source-message')).toHaveTextContent(
+        '子会话的来源消息',
+      )
     })
     expect(await screen.findByText('分叉自「父会话」')).toBeInTheDocument()
   })
@@ -178,7 +193,7 @@ describe('App 递归会话谱系与分叉来源提示', () => {
   it('父会话已不可用时来源提示降级且不提供跳转', async () => {
     const orphan = createSession('orphan-session', '孤立分叉', {
       sessionId: 'missing-session',
-      entryId: 'missing-entry'
+      entryId: 'missing-entry',
     })
     vi.mocked(window.api.listSessions).mockResolvedValue([orphan])
     window.location.hash = '#/chat/tangyuan/orphan-session'
@@ -186,9 +201,14 @@ describe('App 递归会话谱系与分叉来源提示', () => {
     render(<App />)
 
     expect(await screen.findByText('分叉自已不可用的会话')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '查看来源消息' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: '查看来源消息' }),
+    ).not.toBeInTheDocument()
     // 父会话缺失的分叉仍要在侧边栏可见，作为根节点展示。
-    expect(screen.getByRole('treeitem', { name: /孤立分叉/ })).toHaveAttribute('aria-level', '1')
+    expect(screen.getByRole('treeitem', { name: /孤立分叉/ })).toHaveAttribute(
+      'aria-level',
+      '1',
+    )
   })
 
   it('快速切换父会话与分叉时只保留最后一次选择', async () => {
@@ -197,7 +217,9 @@ describe('App 递归会话谱系与分叉来源提示', () => {
 
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: '父会话' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: '父会话' }),
+    ).toBeInTheDocument()
     const parentTranscript = createDeferred<TranscriptSnapshot>()
     vi.mocked(window.api.getTranscript).mockImplementation(async (request) => {
       if (request.sessionId === PARENT.sessionId) {
@@ -213,10 +235,10 @@ describe('App 递归会话谱系与分叉来源提示', () => {
             index: 0,
             messageId: 'latest-child-message',
             content: '最后选择的子会话内容',
-            createdAt: '2026-07-28T00:03:00.000Z'
-          }
+            createdAt: '2026-07-28T00:03:00.000Z',
+          },
         ],
-        updatedAt: '2026-07-28T00:03:00.000Z'
+        updatedAt: '2026-07-28T00:03:00.000Z',
       }
     })
     vi.mocked(window.api.setLastActiveSession).mockClear()
@@ -227,7 +249,7 @@ describe('App 递归会话谱系与分叉来源提示', () => {
     await waitFor(() => {
       expect(window.api.setLastActiveSession).toHaveBeenLastCalledWith({
         agentId: 'tangyuan',
-        sessionId: 'child-session'
+        sessionId: 'child-session',
       })
     })
     expect(await screen.findByText('最后选择的子会话内容')).toBeInTheDocument()
@@ -242,10 +264,10 @@ describe('App 递归会话谱系与分叉来源提示', () => {
             index: 0,
             messageId: 'stale-parent-message',
             content: '过期返回的父会话内容',
-            createdAt: '2026-07-28T00:04:00.000Z'
-          }
+            createdAt: '2026-07-28T00:04:00.000Z',
+          },
         ],
-        updatedAt: '2026-07-28T00:04:00.000Z'
+        updatedAt: '2026-07-28T00:04:00.000Z',
       })
       await parentTranscript.promise
     })
@@ -254,7 +276,7 @@ describe('App 递归会话谱系与分叉来源提示', () => {
     expect(screen.queryByText('过期返回的父会话内容')).not.toBeInTheDocument()
     expect(window.api.setLastActiveSession).toHaveBeenLastCalledWith({
       agentId: 'tangyuan',
-      sessionId: 'child-session'
+      sessionId: 'child-session',
     })
     expect(window.location.hash).toBe('#/chat/tangyuan/child-session')
   })
@@ -267,27 +289,33 @@ describe('App 递归会话谱系与分叉来源提示', () => {
 
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: '父会话' })).toBeInTheDocument()
-    vi.mocked(window.api.setLastActiveSession).mockImplementation(async (request) => {
-      if (request.sessionId === PARENT.sessionId) {
-        await releaseParentWrite.promise
-      }
-      persistedSessionId = request.sessionId
-      return {
-        ...request,
-        updatedAt: '2026-07-28T00:05:00.000Z'
-      }
-    })
+    expect(
+      await screen.findByRole('heading', { name: '父会话' }),
+    ).toBeInTheDocument()
+    vi.mocked(window.api.setLastActiveSession).mockImplementation(
+      async (request) => {
+        if (request.sessionId === PARENT.sessionId) {
+          await releaseParentWrite.promise
+        }
+        persistedSessionId = request.sessionId
+        return {
+          ...request,
+          updatedAt: '2026-07-28T00:05:00.000Z',
+        }
+      },
+    )
 
     await user.click(screen.getByRole('treeitem', { name: /父会话/ }))
     await waitFor(() => {
       expect(window.api.setLastActiveSession).toHaveBeenCalledWith({
         agentId: 'tangyuan',
-        sessionId: 'parent-session'
+        sessionId: 'parent-session',
       })
     })
     await user.click(screen.getByRole('treeitem', { name: /子会话/ }))
-    expect(await screen.findByRole('heading', { name: '子会话' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: '子会话' }),
+    ).toBeInTheDocument()
 
     releaseParentWrite.resolve()
 

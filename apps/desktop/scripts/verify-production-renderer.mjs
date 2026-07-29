@@ -11,9 +11,12 @@ const forbiddenValues = [
   '基础组件验收夹具',
   '/__fixtures__/conversation-components',
   'conversation-components-v1',
-  '对话业务组件跨组件验收'
+  '对话业务组件跨组件验收',
 ]
-const forbiddenAssetNames = ['BaseComponentsFixturePage', 'ConversationComponentsFixturePage']
+const forbiddenAssetNames = [
+  'BaseComponentsFixturePage',
+  'ConversationComponentsFixturePage',
+]
 
 /**
  * 验证普通生产 Renderer 构建没有包含组件验收夹具模块。
@@ -24,21 +27,31 @@ async function main() {
   for (const assetFile of assetFiles) {
     const relativeAssetPath = relative(appRoot, assetFile)
 
-    if (forbiddenAssetNames.some((assetName) => relativeAssetPath.includes(assetName))) {
-      throw new Error(`生产 Renderer 构建包含组件验收夹具资产：${relativeAssetPath}`)
+    if (
+      forbiddenAssetNames.some((assetName) =>
+        relativeAssetPath.includes(assetName),
+      )
+    ) {
+      throw new Error(
+        `生产 Renderer 构建包含组件验收夹具资产：${relativeAssetPath}`,
+      )
     }
 
     const content = await readFile(assetFile, 'utf8')
-    const forbiddenValue = forbiddenValues.find((value) => content.includes(value))
+    const forbiddenValue = forbiddenValues.find((value) =>
+      content.includes(value),
+    )
 
     if (forbiddenValue) {
       throw new Error(
-        `生产 Renderer 构建包含组件验收夹具标记 ${JSON.stringify(forbiddenValue)}：${relativeAssetPath}`
+        `生产 Renderer 构建包含组件验收夹具标记 ${JSON.stringify(forbiddenValue)}：${relativeAssetPath}`,
       )
     }
   }
 
-  console.log(`Production renderer fixture exclusion passed (${assetFiles.length} assets checked).`)
+  console.log(
+    `Production renderer fixture exclusion passed (${assetFiles.length} assets checked).`,
+  )
 }
 
 /**
@@ -57,8 +70,10 @@ async function collectTextAssets(directory) {
         return collectTextAssets(entryPath)
       }
 
-      return ['.html', '.js', '.css'].includes(extname(entry.name)) ? [entryPath] : []
-    })
+      return ['.html', '.js', '.css'].includes(extname(entry.name))
+        ? [entryPath]
+        : []
+    }),
   )
 
   return files.flat()

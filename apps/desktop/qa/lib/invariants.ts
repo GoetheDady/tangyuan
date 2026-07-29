@@ -22,14 +22,16 @@ export interface InvariantViolation {
  * @param harness - 应用夹具。
  * @returns 违反的不变量列表；为空表示通过。
  */
-export async function checkAppHealth(harness: AppHarness): Promise<InvariantViolation[]> {
+export async function checkAppHealth(
+  harness: AppHarness,
+): Promise<InvariantViolation[]> {
   const violations: InvariantViolation[] = []
 
   // 窗口未被销毁
   if (harness.app.windows().length === 0) {
     violations.push({
       code: 'window-closed',
-      message: '应用窗口在测试过程中意外关闭（可能崩溃）。'
+      message: '应用窗口在测试过程中意外关闭（可能崩溃）。',
     })
     return violations
   }
@@ -39,7 +41,7 @@ export async function checkAppHealth(harness: AppHarness): Promise<InvariantViol
     violations.push({
       code: 'page-error',
       message: '渲染进程出现未捕获异常。',
-      detail: harness.pageErrors.join('\n')
+      detail: harness.pageErrors.join('\n'),
     })
   }
 
@@ -48,16 +50,18 @@ export async function checkAppHealth(harness: AppHarness): Promise<InvariantViol
     violations.push({
       code: 'console-error',
       message: '渲染进程控制台出现 error 级日志。',
-      detail: harness.consoleErrors.join('\n')
+      detail: harness.consoleErrors.join('\n'),
     })
   }
 
   // 页面未白屏：body 有可见文本
-  const bodyText = await harness.window.evaluate(() => document.body.innerText?.trim() ?? '')
+  const bodyText = await harness.window.evaluate(
+    () => document.body.innerText?.trim() ?? '',
+  )
   if (bodyText.length === 0) {
     violations.push({
       code: 'blank-screen',
-      message: '页面渲染为空白（body 无文本）。'
+      message: '页面渲染为空白（body 无文本）。',
     })
   }
 
@@ -70,10 +74,14 @@ export async function checkAppHealth(harness: AppHarness): Promise<InvariantViol
  * @param harness - 应用夹具。
  * @returns 违反列表；配置缺失会阻断后续对话测试。
  */
-export async function checkRuntimeReady(harness: AppHarness): Promise<InvariantViolation[]> {
+export async function checkRuntimeReady(
+  harness: AppHarness,
+): Promise<InvariantViolation[]> {
   const snapshot = await harness.window.evaluate(async () => {
     return await (
-      window as unknown as { api: { getRuntimeSnapshot: () => Promise<{ status?: string }> } }
+      window as unknown as {
+        api: { getRuntimeSnapshot: () => Promise<{ status?: string }> }
+      }
     ).api.getRuntimeSnapshot()
   })
 
@@ -81,9 +89,10 @@ export async function checkRuntimeReady(harness: AppHarness): Promise<InvariantV
     return [
       {
         code: 'runtime-not-ready',
-        message: '运行时未就绪，无法进行真实对话（通常是 Provider/API Key 未配置或钥匙串不可用）。',
-        detail: `status=${String(snapshot?.status)}`
-      }
+        message:
+          '运行时未就绪，无法进行真实对话（通常是 Provider/API Key 未配置或钥匙串不可用）。',
+        detail: `status=${String(snapshot?.status)}`,
+      },
     ]
   }
 

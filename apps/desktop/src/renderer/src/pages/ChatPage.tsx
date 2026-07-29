@@ -6,7 +6,7 @@ import type {
   QuestionClarificationRequest,
   RuntimeSnapshot,
   SessionModelInfo,
-  TranscriptSnapshot
+  TranscriptSnapshot,
 } from '@tangyuan/contracts'
 import { MessageSquarePlus, Settings } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -21,7 +21,7 @@ import {
   SessionArchiveButton,
   SessionArchiveDialog,
   SessionDeleteButton,
-  SessionDeleteDialog
+  SessionDeleteDialog,
 } from '@/components/SessionArchiveControls'
 import { SessionLineageTree } from '@/components/SessionLineageTree'
 import { Button } from '@/components/ui/button'
@@ -44,30 +44,39 @@ interface DesktopWorkbenchState {
 
 interface DesktopWorkbenchAction {
   setRuntime(value: RuntimeSnapshot | null): void
-  setAgents(value: AgentSummary[] | ((currentValue: AgentSummary[]) => AgentSummary[])): void
+  setAgents(
+    value: AgentSummary[] | ((currentValue: AgentSummary[]) => AgentSummary[]),
+  ): void
   setSessions(
-    value: AgentSessionSummary[] | ((currentValue: AgentSessionSummary[]) => AgentSessionSummary[])
+    value:
+      | AgentSessionSummary[]
+      | ((currentValue: AgentSessionSummary[]) => AgentSessionSummary[]),
   ): void
   setSelectedSessionId(
-    value: string | null | ((currentValue: string | null) => string | null)
+    value: string | null | ((currentValue: string | null) => string | null),
   ): void
   setTranscript(value: TranscriptSnapshot | null): void
   setComposerText(value: string): void
   setIsLoading(value: boolean): void
   setIsSendingMessage(value: boolean): void
   setPendingApprovals(
-    value: BashApprovalRequest[] | ((currentValue: BashApprovalRequest[]) => BashApprovalRequest[])
+    value:
+      | BashApprovalRequest[]
+      | ((currentValue: BashApprovalRequest[]) => BashApprovalRequest[]),
   ): void
   setPendingClarifications(
     value:
       | QuestionClarificationRequest[]
-      | ((currentValue: QuestionClarificationRequest[]) => QuestionClarificationRequest[])
+      | ((
+          currentValue: QuestionClarificationRequest[],
+        ) => QuestionClarificationRequest[]),
   ): void
   /** 将命令加入当前会话的"始终允许"列表。 */
   addAlwaysAllowedCommand(sessionId: string, command: string): void
 }
 
-interface DesktopWorkbenchContext extends DesktopWorkbenchState, DesktopWorkbenchAction {}
+interface DesktopWorkbenchContext
+  extends DesktopWorkbenchState, DesktopWorkbenchAction {}
 
 function getAgentInitial(displayName: string): string {
   return Array.from(displayName.trim())[0] ?? '汤'
@@ -80,7 +89,9 @@ function getAgentInitial(displayName: string): string {
  * @returns 聊天页、控制台重定向或加载态。
  * @throws 此组件不会主动抛出错误。
  */
-export function ChatGuard(props: { context: DesktopWorkbenchContext }): React.JSX.Element {
+export function ChatGuard(props: {
+  context: DesktopWorkbenchContext
+}): React.JSX.Element {
   const { agentId } = useParams<{ agentId: string; sessionId: string }>()
 
   if (props.context.isLoading) {
@@ -90,7 +101,10 @@ export function ChatGuard(props: { context: DesktopWorkbenchContext }): React.JS
   if (props.context.runtime?.status !== 'ready') {
     const redirectTarget = agentId ? `/chat/${agentId}` : '/chat/tangyuan'
     return (
-      <Navigate to={`/console/providers?redirect=${encodeURIComponent(redirectTarget)}`} replace />
+      <Navigate
+        to={`/console/providers?redirect=${encodeURIComponent(redirectTarget)}`}
+        replace
+      />
     )
   }
 
@@ -104,17 +118,23 @@ export function ChatGuard(props: { context: DesktopWorkbenchContext }): React.JS
  * @returns 聊天主界面组件树。
  * @throws 此组件不会主动抛出错误；交互错误会通过 toast 反馈。
  */
-function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Element {
+function ChatPage(props: {
+  context: DesktopWorkbenchContext
+}): React.JSX.Element {
   const { context } = props
-  const { agentId, sessionId } = useParams<{ agentId: string; sessionId: string }>()
+  const { agentId, sessionId } = useParams<{
+    agentId: string
+    sessionId: string
+  }>()
   const navigate = useNavigate()
-  const activeAgentId = agentId ?? context.runtime?.activeAgent.agentId ?? 'tangyuan'
+  const activeAgentId =
+    agentId ?? context.runtime?.activeAgent.agentId ?? 'tangyuan'
 
   const activeAgent = useMemo(
     () =>
       context.agents.find((agent) => agent.agentId === activeAgentId) ??
       context.runtime?.activeAgent,
-    [context.agents, activeAgentId, context.runtime?.activeAgent]
+    [context.agents, activeAgentId, context.runtime?.activeAgent],
   )
   const activeAgentDisplayName =
     'displayName' in (activeAgent ?? {})
@@ -124,17 +144,24 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
   // 当 URL 中无 agentId 时补充默认值
   useEffect(() => {
     if (!agentId) {
-      navigate(`/chat/${activeAgentId}${sessionId ? `/${sessionId}` : ''}`, { replace: true })
+      navigate(`/chat/${activeAgentId}${sessionId ? `/${sessionId}` : ''}`, {
+        replace: true,
+      })
     }
   }, [agentId, activeAgentId, sessionId, navigate])
 
-  const [sessionModelInfo, setSessionModelInfo] = useState<SessionModelInfo | null>(null)
+  const [sessionModelInfo, setSessionModelInfo] =
+    useState<SessionModelInfo | null>(null)
   const [isLoadingModelInfo, setIsLoadingModelInfo] = useState(false)
   const [isSwitchingModel, setIsSwitchingModel] = useState(false)
   const openSessionRequestIdRef = useRef(0)
-  const persistLastActiveSessionQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const persistLastActiveSessionQueueRef = useRef<Promise<void>>(
+    Promise.resolve(),
+  )
   /** 跳转后需要在父会话中定位的分叉来源消息标识。 */
-  const [forkSourceMessageId, setForkSourceMessageId] = useState<string | null>(null)
+  const [forkSourceMessageId, setForkSourceMessageId] = useState<string | null>(
+    null,
+  )
 
   // 当选中 session 变化时加载模型信息
   useEffect(() => {
@@ -151,7 +178,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     void window.api
       .getSessionModelInfo({
         agentId: activeAgentId,
-        sessionId: currentSessionId
+        sessionId: currentSessionId,
       })
       .then((info) => {
         setSessionModelInfo(info)
@@ -170,11 +197,14 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     if (!context.runtime || !sessionModelInfo) return []
 
     return context.runtime.models.filter(
-      (model) => model.providerId === sessionModelInfo.providerId
+      (model) => model.providerId === sessionModelInfo.providerId,
     )
   }, [context.runtime, sessionModelInfo])
 
-  async function handleSessionModelChange(providerId: string, modelId: string): Promise<void> {
+  async function handleSessionModelChange(
+    providerId: string,
+    modelId: string,
+  ): Promise<void> {
     const currentSessionId = sessionId ?? context.selectedSessionId
 
     if (!currentSessionId || !activeAgentId) return
@@ -186,7 +216,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
         agentId: activeAgentId,
         sessionId: currentSessionId,
         providerId,
-        modelId
+        modelId,
       })
       setSessionModelInfo(info)
       toast.success(`已切换到 ${info.displayName}`)
@@ -206,21 +236,25 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
       const info = await window.api.setSessionThinkingLevel({
         agentId: activeAgentId,
         sessionId: currentSessionId,
-        level
+        level,
       })
       setSessionModelInfo(info)
       toast.success(`已切换到 Thinking Level: ${level}`)
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : '切换 Thinking Level 失败')
+      toast.error(
+        error instanceof Error ? error.message : '切换 Thinking Level 失败',
+      )
     }
   }
 
   const selectedSession = useMemo(
     () =>
-      context.sessions.find((session) => session.sessionId === context.selectedSessionId) ??
+      context.sessions.find(
+        (session) => session.sessionId === context.selectedSessionId,
+      ) ??
       context.sessions[0] ??
       null,
-    [context.sessions, context.selectedSessionId]
+    [context.sessions, context.selectedSessionId],
   )
   const isSelectedSessionRunning = selectedSession?.state === 'running'
   // 响应等待提示信号：正在发送、排队或运行中。具体是否展示占位
@@ -230,7 +264,9 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     selectedSession?.state === 'running' ||
     selectedSession?.state === 'queued'
   const selectedTranscript =
-    context.transcript?.sessionId === selectedSession?.sessionId ? context.transcript : null
+    context.transcript?.sessionId === selectedSession?.sessionId
+      ? context.transcript
+      : null
   const sessionArchive = useSessionArchive({
     agentId: activeAgentId,
     selectedSession,
@@ -238,10 +274,12 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     onArchived: (target, result) => {
       const affectedIds = new Set(result.affectedSessionIds)
       context.setPendingApprovals((current) =>
-        current.filter((approval) => !affectedIds.has(approval.sessionId))
+        current.filter((approval) => !affectedIds.has(approval.sessionId)),
       )
       context.setPendingClarifications((current) =>
-        current.filter((clarification) => !affectedIds.has(clarification.sessionId))
+        current.filter(
+          (clarification) => !affectedIds.has(clarification.sessionId),
+        ),
       )
       context.setSelectedSessionId(null)
       context.setTranscript(null)
@@ -250,10 +288,12 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     onDeleted: (target, result) => {
       const affectedIds = new Set(result.affectedSessionIds)
       context.setPendingApprovals((current) =>
-        current.filter((approval) => !affectedIds.has(approval.sessionId))
+        current.filter((approval) => !affectedIds.has(approval.sessionId)),
       )
       context.setPendingClarifications((current) =>
-        current.filter((clarification) => !affectedIds.has(clarification.sessionId))
+        current.filter(
+          (clarification) => !affectedIds.has(clarification.sessionId),
+        ),
       )
       context.setSelectedSessionId(null)
       context.setTranscript(null)
@@ -264,7 +304,11 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     const parentSessionId = selectedSession?.forkedFrom?.sessionId
     if (!parentSessionId) return null
 
-    return context.sessions.find((session) => session.sessionId === parentSessionId) ?? null
+    return (
+      context.sessions.find(
+        (session) => session.sessionId === parentSessionId,
+      ) ?? null
+    )
   }, [context.sessions, selectedSession?.forkedFrom?.sessionId])
 
   /**
@@ -274,17 +318,22 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
    * @returns 无返回值。
    * @throws Preload API 错误会被捕获并通过 toast 反馈。
    */
-  function persistLastActiveSession(session: AgentSessionSummary): Promise<void> {
-    persistLastActiveSessionQueueRef.current = persistLastActiveSessionQueueRef.current
-      .then(async () => {
-        await window.api.setLastActiveSession({
-          agentId: session.agentId,
-          sessionId: session.sessionId
+  function persistLastActiveSession(
+    session: AgentSessionSummary,
+  ): Promise<void> {
+    persistLastActiveSessionQueueRef.current =
+      persistLastActiveSessionQueueRef.current
+        .then(async () => {
+          await window.api.setLastActiveSession({
+            agentId: session.agentId,
+            sessionId: session.sessionId,
+          })
         })
-      })
-      .catch((error) => {
-        toast.error(error instanceof Error ? error.message : '无法记录最后打开的会话')
-      })
+        .catch((error) => {
+          toast.error(
+            error instanceof Error ? error.message : '无法记录最后打开的会话',
+          )
+        })
 
     return persistLastActiveSessionQueueRef.current
   }
@@ -299,11 +348,13 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     try {
       const session = await window.api.createSession({
         agentId: activeAgentId,
-        title: '新会话'
+        title: '新会话',
       })
       context.setSessions((currentSessions) => [
         session,
-        ...currentSessions.filter((candidate) => candidate.sessionId !== session.sessionId)
+        ...currentSessions.filter(
+          (candidate) => candidate.sessionId !== session.sessionId,
+        ),
       ])
       context.setSelectedSessionId(session.sessionId)
       context.setTranscript(null)
@@ -328,7 +379,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     try {
       const nextTranscript = await window.api.getTranscript({
         agentId: session.agentId,
-        sessionId: session.sessionId
+        sessionId: session.sessionId,
       })
       if (requestId !== openSessionRequestIdRef.current) return
 
@@ -344,7 +395,9 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
   // 当 URL 中有 sessionId 时自动选中对应会话
   useEffect(() => {
     if (sessionId && sessionId !== context.selectedSessionId) {
-      const targetSession = context.sessions.find((s) => s.sessionId === sessionId)
+      const targetSession = context.sessions.find(
+        (s) => s.sessionId === sessionId,
+      )
       if (targetSession) {
         void openSession(targetSession)
       }
@@ -376,11 +429,15 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
       const nextTranscript = await window.api.sendMessage({
         agentId: selectedSession.agentId,
         sessionId: selectedSession.sessionId,
-        content
+        content,
       })
       context.setTranscript(nextTranscript)
-      context.setSessions(await window.api.listSessions({ agentId: selectedSession.agentId }))
-      navigate(`/chat/${activeAgentId}/${selectedSession.sessionId}`, { replace: true })
+      context.setSessions(
+        await window.api.listSessions({ agentId: selectedSession.agentId }),
+      )
+      navigate(`/chat/${activeAgentId}/${selectedSession.sessionId}`, {
+        replace: true,
+      })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '发送消息失败')
     } finally {
@@ -407,10 +464,12 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
       const nextTranscript = await window.api.retryMessage({
         agentId: selectedSession.agentId,
         sessionId: selectedSession.sessionId,
-        userMessageId
+        userMessageId,
       })
       context.setTranscript(nextTranscript)
-      context.setSessions(await window.api.listSessions({ agentId: selectedSession.agentId }))
+      context.setSessions(
+        await window.api.listSessions({ agentId: selectedSession.agentId }),
+      )
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '重试消息失败')
     } finally {
@@ -432,28 +491,32 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     }
 
     const sourceEntry = selectedTranscript?.entries.find(
-      (entry) => entry.kind === 'user-message' && entry.messageId === userMessageId
+      (entry) =>
+        entry.kind === 'user-message' && entry.messageId === userMessageId,
     )
-    const sourceMessageContent = sourceEntry?.kind === 'user-message' ? sourceEntry.content : ''
+    const sourceMessageContent =
+      sourceEntry?.kind === 'user-message' ? sourceEntry.content : ''
 
     try {
       const childSession = await window.api.forkSession({
         agentId: selectedSession.agentId,
         sessionId: selectedSession.sessionId,
-        entryId: userMessageId
+        entryId: userMessageId,
       })
       const [sessions, childTranscript] = await Promise.all([
         window.api.listSessions({ agentId: childSession.agentId }),
         window.api.getTranscript({
           agentId: childSession.agentId,
-          sessionId: childSession.sessionId
-        })
+          sessionId: childSession.sessionId,
+        }),
       ])
       context.setSessions(sessions)
       context.setSelectedSessionId(childSession.sessionId)
       context.setTranscript(childTranscript)
       context.setComposerText(sourceMessageContent)
-      navigate(`/chat/${activeAgentId}/${childSession.sessionId}`, { replace: true })
+      navigate(`/chat/${activeAgentId}/${childSession.sessionId}`, {
+        replace: true,
+      })
       await persistLastActiveSession(childSession)
       toast.success('已创建分叉会话')
     } catch (error) {
@@ -475,11 +538,13 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     try {
       await window.api.cancelRun({
         agentId: selectedSession.agentId,
-        sessionId: selectedSession.sessionId
+        sessionId: selectedSession.sessionId,
       })
       context.setIsSendingMessage(false)
       // 刷新 sessions 以同步取消后的状态，避免仅依赖异步推送事件
-      context.setSessions(await window.api.listSessions({ agentId: selectedSession.agentId }))
+      context.setSessions(
+        await window.api.listSessions({ agentId: selectedSession.agentId }),
+      )
       toast.success('已停止生成')
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : '取消运行失败')
@@ -490,25 +555,29 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
 
   const sessionGroups = useMemo(() => {
     const today = new Date().toDateString()
-    const knownSessionIds = new Set(context.sessions.map((session) => session.sessionId))
+    const knownSessionIds = new Set(
+      context.sessions.map((session) => session.sessionId),
+    )
     // 父会话已不在列表里的分叉也作为根展示，避免整条谱系不可见。
     const rootSessions = context.sessions.filter(
-      (session) => !session.forkedFrom || !knownSessionIds.has(session.forkedFrom.sessionId)
+      (session) =>
+        !session.forkedFrom ||
+        !knownSessionIds.has(session.forkedFrom.sessionId),
     )
 
     const groups = [
       {
         label: '今天',
         sessions: rootSessions.filter(
-          (session) => new Date(session.updatedAt).toDateString() === today
-        )
+          (session) => new Date(session.updatedAt).toDateString() === today,
+        ),
       },
       {
         label: '更早',
         sessions: rootSessions.filter(
-          (session) => new Date(session.updatedAt).toDateString() !== today
-        )
-      }
+          (session) => new Date(session.updatedAt).toDateString() !== today,
+        ),
+      },
     ]
 
     return groups.filter((group) => group.sessions.length > 0)
@@ -519,7 +588,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
       context.pendingApprovals
         .filter((approval) => approval.status === 'pending')
         .map((approval) => approval.sessionId),
-    [context.pendingApprovals]
+    [context.pendingApprovals],
   )
 
   /**
@@ -544,7 +613,9 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
 
     setForkSourceMessageId(selectedSession.forkedFrom.entryId)
     await openSession(parentSession)
-    navigate(`/chat/${activeAgentId}/${parentSession.sessionId}`, { replace: true })
+    navigate(`/chat/${activeAgentId}/${parentSession.sessionId}`, {
+      replace: true,
+    })
   }
 
   /**
@@ -563,23 +634,25 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
       const sessions = await window.api.listSessions({ agentId: nextAgentId })
       context.setSessions(sessions)
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : '加载 Agent 会话失败')
+      toast.error(
+        error instanceof Error ? error.message : '加载 Agent 会话失败',
+      )
     }
   }
 
   return (
-    <main className="h-full overflow-hidden bg-background text-foreground">
+    <main className="bg-background text-foreground h-full overflow-hidden">
       <h1 className="sr-only">{activeAgentDisplayName}</h1>
       <p className="sr-only">大语言模型对话</p>
       <div className="grid h-full min-h-0 grid-cols-[292px_minmax(0,1fr)]">
         <aside
           data-testid="chat-sidebar"
-          className="grid min-h-0 grid-cols-[76px_216px] border-r border-split bg-sidebar"
+          className="border-split bg-sidebar grid min-h-0 grid-cols-[76px_216px] border-r"
         >
           <nav
             aria-label="Agent 切换"
             data-testid="chat-agent-rail"
-            className="window-no-drag relative z-50 flex min-h-0 flex-col items-center gap-2.5 border-r border-split bg-sidebar px-2.5 py-2"
+            className="window-no-drag border-split bg-sidebar relative z-50 flex min-h-0 flex-col items-center gap-2.5 border-r px-2.5 py-2"
           >
             <div aria-hidden="true" className="h-9 shrink-0" />
 
@@ -594,7 +667,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                     aria-label={`切换到 Agent ${agent.displayName}`}
                     aria-current={isActive ? 'page' : undefined}
                     title={agent.displayName}
-                    className={`window-no-drag grid size-9 shrink-0 place-items-center rounded-[10px] border text-label font-semibold transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
+                    className={`window-no-drag text-label focus-visible:ring-ring/50 grid size-9 shrink-0 place-items-center rounded-[10px] border font-semibold transition-colors focus-visible:ring-[3px] focus-visible:outline-none ${
                       isActive
                         ? 'border-primary bg-primary text-primary-foreground'
                         : 'border-border bg-card text-foreground hover:bg-background'
@@ -613,7 +686,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
               type="button"
               aria-label="设置"
               title="设置"
-              className="window-no-drag grid size-9 shrink-0 place-items-center rounded-[10px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              className="window-no-drag text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:ring-ring/50 grid size-9 shrink-0 place-items-center rounded-[10px] transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
               onClick={() => {
                 navigate('/console/providers')
               }}
@@ -624,26 +697,38 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
 
           <section
             data-testid="chat-session-pane"
-            className="flex min-h-0 min-w-0 flex-col bg-background/50"
+            className="bg-background/50 flex min-h-0 min-w-0 flex-col"
           >
             <div className="window-no-drag relative z-50 p-[8px_10px_10px]">
               <Button
-                className="h-9 w-full gap-1.5 rounded-lg px-2 text-label font-semibold"
+                className="text-label h-9 w-full gap-1.5 rounded-lg px-2 font-semibold"
                 onClick={() => {
                   void createSession()
                 }}
               >
-                <MessageSquarePlus data-icon="inline-start" size={14} aria-hidden="true" />
+                <MessageSquarePlus
+                  data-icon="inline-start"
+                  size={14}
+                  aria-hidden="true"
+                />
                 新建会话
               </Button>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
               {sessionGroups.length > 0 ? (
-                <div role="tree" aria-label="会话谱系" className="flex flex-col gap-0.5">
+                <div
+                  role="tree"
+                  aria-label="会话谱系"
+                  className="flex flex-col gap-0.5"
+                >
                   {sessionGroups.map((group) => (
-                    <div key={group.label} role="group" aria-label={group.label}>
-                      <p className="flex h-5 items-center px-2.5 font-mono text-[8px] font-semibold text-muted-foreground">
+                    <div
+                      key={group.label}
+                      role="group"
+                      aria-label={group.label}
+                    >
+                      <p className="text-muted-foreground flex h-5 items-center px-2.5 font-mono text-[8px] font-semibold">
                         {group.label}
                       </p>
                       <SessionLineageTree
@@ -657,7 +742,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                   ))}
                 </div>
               ) : (
-                <div className="px-2.5 py-3 text-caption text-muted-foreground">
+                <div className="text-caption text-muted-foreground px-2.5 py-3">
                   <p className="font-medium">暂无会话</p>
                   <p className="mt-1 text-[10px]">新建会话后会显示在这里</p>
                 </div>
@@ -675,13 +760,13 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
 
         <section
           data-testid="chat-main"
-          className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-background"
+          className="bg-background flex min-h-0 min-w-0 flex-col overflow-hidden"
         >
           <header
             data-testid="chat-header"
-            className="flex h-12 shrink-0 items-center border-b border-border px-[18px]"
+            className="border-border flex h-12 shrink-0 items-center border-b px-[18px]"
           >
-            <h2 className="min-w-0 flex-1 truncate text-section-heading font-semibold">
+            <h2 className="text-section-heading min-w-0 flex-1 truncate font-semibold">
               {selectedSession?.title ?? '新对话'}
             </h2>
             {selectedSession && (
@@ -729,13 +814,13 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
           </div>
 
           {selectedSession && context.pendingApprovals.length > 0 && (
-            <div className="shrink-0 bg-background px-4 py-2">
+            <div className="bg-background shrink-0 px-4 py-2">
               <div className="mx-auto max-w-[720px] space-y-2">
                 {context.pendingApprovals
                   .filter(
                     (approval) =>
                       approval.sessionId === selectedSession.sessionId &&
-                      approval.status === 'pending'
+                      approval.status === 'pending',
                   )
                   .map((approval) => (
                     <BashApprovalCard
@@ -745,7 +830,10 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                         await window.api.approveBash({ approvalId })
                       }}
                       onApproveAlways={async (approvalId) => {
-                        context.addAlwaysAllowedCommand(approval.sessionId, approval.command)
+                        context.addAlwaysAllowedCommand(
+                          approval.sessionId,
+                          approval.command,
+                        )
                         await window.api.approveBash({ approvalId })
                       }}
                       onReject={async (approvalId) => {
@@ -758,23 +846,28 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
           )}
 
           {selectedSession && context.pendingClarifications.length > 0 && (
-            <div className="shrink-0 bg-background px-4 py-2">
+            <div className="bg-background shrink-0 px-4 py-2">
               <div className="mx-auto max-w-[720px] space-y-2">
                 {context.pendingClarifications
                   .filter(
                     (clarification) =>
                       clarification.sessionId === selectedSession.sessionId &&
-                      clarification.status === 'pending'
+                      clarification.status === 'pending',
                   )
                   .map((clarification) => (
                     <QuestionClarificationCard
                       key={clarification.clarificationId}
                       clarification={clarification}
                       onAnswer={async (clarificationId, answer) => {
-                        await window.api.answerClarification({ clarificationId, answer })
+                        await window.api.answerClarification({
+                          clarificationId,
+                          answer,
+                        })
                       }}
                       onCancel={async (clarificationId) => {
-                        await window.api.cancelClarification({ clarificationId })
+                        await window.api.cancelClarification({
+                          clarificationId,
+                        })
                       }}
                     />
                   ))}
@@ -784,7 +877,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
 
           <footer
             data-testid="chat-composer-area"
-            className="shrink-0 bg-background px-4 pb-[6px] pt-[5px]"
+            className="bg-background shrink-0 px-4 pt-[5px] pb-[6px]"
           >
             <Composer
               value={context.composerText}
@@ -793,7 +886,9 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                 void sendMessage()
               }}
               placeholder={
-                selectedSession ? '继续输入...' : `给${activeAgentDisplayName}发送消息...`
+                selectedSession
+                  ? '继续输入...'
+                  : `给${activeAgentDisplayName}发送消息...`
               }
               isRunning={isSelectedSessionRunning || context.isSendingMessage}
               onCancel={() => {
@@ -843,7 +938,7 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
  */
 export function LoadingScreen(): React.JSX.Element {
   return (
-    <main className="grid min-h-full place-items-center bg-background text-foreground">
+    <main className="bg-background text-foreground grid min-h-full place-items-center">
       <div className="text-body text-muted-foreground">正在打开汤圆...</div>
     </main>
   )

@@ -31,16 +31,25 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
     agentId: string
     sessions: AgentSessionSummary[]
   }>({ agentId: options.agentId, sessions: [] })
-  const [archiveTarget, setArchiveTarget] = useState<AgentSessionSummary | null>(null)
-  const [archivePreview, setArchivePreview] = useState<ArchiveSessionResult | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<AgentSessionSummary | null>(null)
-  const [deletePreview, setDeletePreview] = useState<DeleteSessionResult | null>(null)
+  const [archiveTarget, setArchiveTarget] =
+    useState<AgentSessionSummary | null>(null)
+  const [archivePreview, setArchivePreview] =
+    useState<ArchiveSessionResult | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<AgentSessionSummary | null>(
+    null,
+  )
+  const [deletePreview, setDeletePreview] =
+    useState<DeleteSessionResult | null>(null)
   const [isArchiving, setIsArchiving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [recoveringSessionId, setRecoveringSessionId] = useState<string | null>(null)
+  const [recoveringSessionId, setRecoveringSessionId] = useState<string | null>(
+    null,
+  )
   const activeAgentIdRef = useRef(options.agentId)
   const archivedSessions =
-    archivedSessionState.agentId === options.agentId ? archivedSessionState.sessions : []
+    archivedSessionState.agentId === options.agentId
+      ? archivedSessionState.sessions
+      : []
 
   useLayoutEffect(() => {
     activeAgentIdRef.current = options.agentId
@@ -55,7 +64,9 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
         if (isMounted) {
           setArchivedSessionState({
             agentId: options.agentId,
-            sessions: sessions.filter((session) => session.archivedAt !== undefined)
+            sessions: sessions.filter(
+              (session) => session.archivedAt !== undefined,
+            ),
           })
         }
       })
@@ -75,7 +86,7 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
 
     const [sessions, allSessions] = await Promise.all([
       window.api.listSessions({ agentId }),
-      window.api.listSessions({ agentId, includeArchived: true })
+      window.api.listSessions({ agentId, includeArchived: true }),
     ])
 
     if (activeAgentIdRef.current !== agentId) return false
@@ -83,12 +94,16 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
     options.onSessionsChange(sessions)
     setArchivedSessionState({
       agentId,
-      sessions: allSessions.filter((session) => session.archivedAt !== undefined)
+      sessions: allSessions.filter(
+        (session) => session.archivedAt !== undefined,
+      ),
     })
     return true
   }
 
-  async function archiveSelectedSession(confirmActivityStop: boolean): Promise<void> {
+  async function archiveSelectedSession(
+    confirmActivityStop: boolean,
+  ): Promise<void> {
     const target = confirmActivityStop ? archiveTarget : options.selectedSession
     if (!target) return
 
@@ -99,7 +114,7 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
       const result = await window.api.archiveSession({
         agentId: target.agentId,
         sessionId: target.sessionId,
-        confirmActivityStop
+        confirmActivityStop,
       })
 
       if (result.status === 'confirmation-required') {
@@ -132,7 +147,7 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
     try {
       await window.api.recoverSession({
         agentId: session.agentId,
-        sessionId: session.sessionId
+        sessionId: session.sessionId,
       })
       await refreshSessionLists(session.agentId)
       toast.success('已恢复会话谱系')
@@ -143,7 +158,9 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
     }
   }
 
-  async function deleteSelectedSession(confirmActivityStop: boolean): Promise<void> {
+  async function deleteSelectedSession(
+    confirmActivityStop: boolean,
+  ): Promise<void> {
     const target = confirmActivityStop ? deleteTarget : options.selectedSession
     if (!target) return
 

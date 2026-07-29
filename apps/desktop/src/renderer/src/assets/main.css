@@ -1,9 +1,11 @@
 @import 'tailwindcss';
 
-@source "../node_modules/streamdown/dist/*.js";
-@source "../node_modules/@streamdown/code/dist/*.js";
-@source "../node_modules/@streamdown/cjk/dist/*.js";
-@source inline("bg-card bg-sidebar bg-primary-hover bg-primary-active bg-primary-soft border-primary-border bg-destructive-hover bg-destructive-active border border-input border-input-hover bg-info-soft border-info-border text-info-foreground bg-success-soft border-success-border text-success-foreground bg-warning-soft border-warning-border text-warning-foreground bg-destructive-soft border-destructive-border text-destructive-soft-foreground bg-disabled text-disabled-foreground bg-hover text-hover-foreground bg-active text-active-foreground shadow-level-0 shadow-level-1 shadow-level-2 shadow-level-3");
+@source '../node_modules/streamdown/dist/*.js';
+@source '../node_modules/@streamdown/code/dist/*.js';
+@source '../node_modules/@streamdown/cjk/dist/*.js';
+@source inline(
+  'bg-card bg-sidebar bg-primary-hover bg-primary-active bg-primary-soft border-primary-border bg-destructive-hover bg-destructive-active border border-input border-input-hover bg-info-soft border-info-border text-info-foreground bg-success-soft border-success-border text-success-foreground bg-warning-soft border-warning-border text-warning-foreground bg-destructive-soft border-destructive-border text-destructive-soft-foreground bg-disabled text-disabled-foreground bg-hover text-hover-foreground bg-active text-active-foreground shadow-level-0 shadow-level-1 shadow-level-2 shadow-level-3'
+);
 
 @theme inline {
   /* 背景、表面与文字：沿用唯一一套 shadcn 语义 Token。 */
@@ -80,8 +82,11 @@
 
   /* 已确认的正文排版和常用层级。 */
   --font-sans:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  --font-mono:
+    'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
   --text-page-title: 1.75rem;
   --text-page-title--line-height: 2.25rem;
   --text-section-heading: 1.125rem;
@@ -109,8 +114,10 @@
 
   /* 现有 shadow 工具保持可用；新增 Level 0–3 表达真实层级。 */
   --shadow-xs: 0 1px 2px 0 rgb(33 27 22 / 0.04);
-  --shadow-sm: 0 1px 3px 0 rgb(33 27 22 / 0.06), 0 1px 2px -1px rgb(33 27 22 / 0.05);
-  --shadow: 0 3px 6px -1px rgb(33 27 22 / 0.07), 0 2px 4px -2px rgb(33 27 22 / 0.05);
+  --shadow-sm:
+    0 1px 3px 0 rgb(33 27 22 / 0.06), 0 1px 2px -1px rgb(33 27 22 / 0.05);
+  --shadow:
+    0 3px 6px -1px rgb(33 27 22 / 0.07), 0 2px 4px -2px rgb(33 27 22 / 0.05);
   --shadow-level-0: var(--elevation-0);
   --shadow-level-1: var(--elevation-1);
   --shadow-level-2: var(--elevation-2);
@@ -214,8 +221,10 @@
     --border-width: 1px;
     --focus-ring-width: 3px;
     --focus-ring-offset: 0px;
-    --focus-ring-shadow: 0 0 0 var(--focus-ring-width) oklch(0.5782 0.0383 61.2 / 0.25);
-    --invalid-ring-shadow: 0 0 0 var(--focus-ring-width) oklch(0.6106 0.0962 27.6 / 0.19);
+    --focus-ring-shadow: 0 0 0 var(--focus-ring-width)
+      oklch(0.5782 0.0383 61.2 / 0.25);
+    --invalid-ring-shadow: 0 0 0 var(--focus-ring-width)
+      oklch(0.6106 0.0962 27.6 / 0.19);
     --radius: 0.5rem;
 
     /* 动效只表达状态反馈与层级变化。 */
@@ -327,7 +336,10 @@
 @keyframes select-content-drop-in {
   from {
     opacity: 0;
-    transform: scale(var(--select-content-enter-scale-x), var(--select-content-enter-scale-y));
+    transform: scale(
+      var(--select-content-enter-scale-x),
+      var(--select-content-enter-scale-y)
+    );
   }
 
   to {
@@ -344,7 +356,10 @@
 
   to {
     opacity: 0;
-    transform: scale(var(--select-content-enter-scale-x), var(--select-content-enter-scale-y));
+    transform: scale(
+      var(--select-content-enter-scale-x),
+      var(--select-content-enter-scale-y)
+    );
   }
 }
 
@@ -378,11 +393,13 @@
   }
 
   [data-slot='alert-dialog-overlay'][data-state='open'] {
-    animation: alert-dialog-overlay-fade-in var(--duration-slow) var(--ease-standard) both;
+    animation: alert-dialog-overlay-fade-in var(--duration-slow)
+      var(--ease-standard) both;
   }
 
   [data-slot='alert-dialog-overlay'][data-state='closed'] {
-    animation: alert-dialog-overlay-fade-out var(--duration-fast) var(--ease-standard) both;
+    animation: alert-dialog-overlay-fade-out var(--duration-fast)
+      var(--ease-standard) both;
   }
 
   [data-slot='alert-dialog-content'] {
@@ -391,11 +408,13 @@
   }
 
   [data-slot='alert-dialog-content'][data-state='open'] {
-    animation: alert-dialog-content-fade-scale-in var(--duration-slow) var(--ease-standard) both;
+    animation: alert-dialog-content-fade-scale-in var(--duration-slow)
+      var(--ease-standard) both;
   }
 
   [data-slot='alert-dialog-content'][data-state='closed'] {
-    animation: alert-dialog-content-fade-scale-out var(--duration-fast) var(--ease-standard) both;
+    animation: alert-dialog-content-fade-scale-out var(--duration-fast)
+      var(--ease-standard) both;
   }
 
   [data-slot='tooltip-content'] {
@@ -405,11 +424,13 @@
 
   [data-slot='tooltip-content'][data-state='delayed-open'],
   [data-slot='tooltip-content'][data-state='instant-open'] {
-    animation: tooltip-content-fade-scale-in var(--duration-base) var(--ease-standard) both;
+    animation: tooltip-content-fade-scale-in var(--duration-base)
+      var(--ease-standard) both;
   }
 
   [data-slot='tooltip-content'][data-state='closed'] {
-    animation: tooltip-content-fade-scale-out var(--duration-fast) var(--ease-standard) both;
+    animation: tooltip-content-fade-scale-out var(--duration-fast)
+      var(--ease-standard) both;
   }
 
   [data-slot='select-content'] {
@@ -439,11 +460,13 @@
   }
 
   [data-slot='select-content'][data-state='open'] {
-    animation: select-content-drop-in var(--duration-base) var(--ease-standard) both;
+    animation: select-content-drop-in var(--duration-base) var(--ease-standard)
+      both;
   }
 
   [data-slot='select-content'][data-state='closed'] {
-    animation: select-content-drop-out var(--duration-fast) var(--ease-standard) both;
+    animation: select-content-drop-out var(--duration-fast) var(--ease-standard)
+      both;
   }
 }
 
@@ -489,7 +512,8 @@
   --y: translateX(calc(-100% - var(--offset-left)));
 }
 
-[data-sonner-toaster] [data-sonner-toast][data-styled='true'].tangyuan-toast[data-removed='true'] {
+[data-sonner-toaster]
+  [data-sonner-toast][data-styled='true'].tangyuan-toast[data-removed='true'] {
   transition-duration: var(--duration-toast-exit);
 }
 
@@ -506,7 +530,8 @@
 [data-sonner-toaster]
   [data-sonner-toast][data-styled='true'].tangyuan-toast[data-removed='true'][data-swipe-out='false'][data-front='false'][data-expanded='false'] {
   --scale: calc(var(--toasts-before) * 0.05 + 1);
-  --y: translateY(calc(var(--lift-amount) * var(--toasts-before))) scale(calc(-1 * var(--scale)));
+  --y: translateY(calc(var(--lift-amount) * var(--toasts-before)))
+    scale(calc(-1 * var(--scale)));
 }
 
 [data-sonner-toaster] [data-sonner-toast] [data-icon] {

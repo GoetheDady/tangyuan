@@ -12,7 +12,7 @@ import {
   SelectLabel,
   SelectSeparator,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from '@/components/ui/select'
 
 function renderSelect({
@@ -23,7 +23,7 @@ function renderSelect({
   className,
   size,
   onValueChange,
-  children
+  children,
 }: {
   defaultValue?: string
   placeholder?: string
@@ -54,7 +54,7 @@ function renderSelect({
           </>
         )}
       </SelectContent>
-    </Select>
+    </Select>,
   )
 }
 
@@ -88,7 +88,7 @@ describe('Select', () => {
         <SelectTrigger ref={ref} aria-label="Ref 选择器">
           <SelectValue placeholder="请选择" />
         </SelectTrigger>
-      </Select>
+      </Select>,
     )
 
     expect(ref.current).toBeInstanceOf(HTMLButtonElement)
@@ -113,7 +113,7 @@ describe('Select', () => {
             <SelectValue placeholder="请选择" />
           </SelectTrigger>
         </Select>
-      </>
+      </>,
     )
 
     const input = screen.getByRole('textbox', { name: '参照输入框' })
@@ -123,7 +123,7 @@ describe('Select', () => {
       'focus-visible:outline-none',
       'focus-visible:border-ring',
       'focus-visible:ring-[3px]',
-      'focus-visible:ring-ring/25'
+      'focus-visible:ring-ring/25',
     ]
 
     for (const className of sharedInteractionClasses) {
@@ -220,7 +220,7 @@ describe('Select', () => {
           </SelectItem>
           <SelectItem value="c">选项 C</SelectItem>
         </SelectContent>
-      </Select>
+      </Select>,
     )
 
     const trigger = screen.getByRole('combobox', { name: '测试选择器' })
@@ -255,7 +255,7 @@ describe('Select', () => {
             <SelectItem value="carrot">胡萝卜</SelectItem>
           </SelectGroup>
         </SelectContent>
-      </Select>
+      </Select>,
     )
 
     await user.click(screen.getByRole('combobox', { name: '测试选择器' }))
@@ -280,7 +280,7 @@ describe('Select', () => {
           <SelectSeparator data-testid="select-separator" />
           <SelectItem value="b">选项 B</SelectItem>
         </SelectContent>
-      </Select>
+      </Select>,
     )
 
     await user.click(screen.getByRole('combobox', { name: '测试选择器' }))
@@ -302,7 +302,9 @@ describe('Select', () => {
 
     await user.keyboard('{Escape}')
 
-    expect(screen.queryByRole('option', { name: '选项 A' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('option', { name: '选项 A' }),
+    ).not.toBeInTheDocument()
   })
 
   it('does not open when disabled', async () => {

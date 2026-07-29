@@ -27,7 +27,7 @@ describe('Button', () => {
     render(
       <Button variant="destructive" size="lg">
         危险
-      </Button>
+      </Button>,
     )
 
     const button = screen.getByRole('button', { name: '危险' })
@@ -35,21 +35,31 @@ describe('Button', () => {
     expect(button).toHaveAttribute('data-size', 'lg')
   })
 
-  it.each(['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const)(
-    'renders variant %s without error',
-    (variant) => {
-      render(<Button variant={variant}>{variant}</Button>)
-      expect(screen.getByRole('button')).toHaveAttribute('data-variant', variant)
-    }
-  )
+  it.each([
+    'default',
+    'secondary',
+    'outline',
+    'ghost',
+    'destructive',
+    'link',
+  ] as const)('renders variant %s without error', (variant) => {
+    render(<Button variant={variant}>{variant}</Button>)
+    expect(screen.getByRole('button')).toHaveAttribute('data-variant', variant)
+  })
 
-  it.each(['xs', 'sm', 'default', 'lg', 'icon', 'icon-xs', 'icon-sm', 'icon-lg'] as const)(
-    'renders size %s without error',
-    (size) => {
-      render(<Button size={size}>{size}</Button>)
-      expect(screen.getByRole('button')).toHaveAttribute('data-size', size)
-    }
-  )
+  it.each([
+    'xs',
+    'sm',
+    'default',
+    'lg',
+    'icon',
+    'icon-xs',
+    'icon-sm',
+    'icon-lg',
+  ] as const)('renders size %s without error', (size) => {
+    render(<Button size={size}>{size}</Button>)
+    expect(screen.getByRole('button')).toHaveAttribute('data-size', size)
+  })
 
   it('merges className with variant classes', () => {
     render(<Button className="custom-class">合并</Button>)
@@ -72,7 +82,7 @@ describe('Button', () => {
     render(
       <Button asChild>
         <a href="/test">链接按钮</a>
-      </Button>
+      </Button>,
     )
 
     const link = screen.getByRole('link', { name: '链接按钮' })
@@ -83,9 +93,15 @@ describe('Button', () => {
 
   it('passes through native button props', () => {
     render(
-      <Button type="submit" disabled aria-label="提交表单" name="submit-btn" value="1">
+      <Button
+        type="submit"
+        disabled
+        aria-label="提交表单"
+        name="submit-btn"
+        value="1"
+      >
         提交
-      </Button>
+      </Button>,
     )
 
     const button = screen.getByRole('button', { name: '提交表单' })
@@ -110,7 +126,7 @@ describe('Button', () => {
     render(
       <Button disabled onClick={onClick}>
         不可点击
-      </Button>
+      </Button>,
     )
 
     await user.click(screen.getByRole('button', { name: '不可点击' }))

@@ -1,6 +1,9 @@
 import { defineConfig } from '@playwright/test'
 
-import { commonPlaywrightConfig, createRendererWebServer } from './playwright.shared'
+import {
+  commonPlaywrightConfig,
+  createRendererWebServer,
+} from './playwright.shared'
 
 const fixtureBaseUrl = 'http://127.0.0.1:4174'
 
@@ -20,21 +23,24 @@ export default defineConfig({
     locale: 'zh-CN',
     reducedMotion: 'reduce',
     timezoneId: 'Asia/Shanghai',
-    viewport: { width: 1440, height: 1000 }
+    viewport: { width: 1440, height: 1000 },
   },
   webServer: createRendererWebServer(4174),
   projects: [
     {
       name: 'chromium-fixtures',
-      testMatch: ['**/base-components.spec.ts', '**/conversation-components.spec.ts']
+      testMatch: [
+        '**/base-components.spec.ts',
+        '**/conversation-components.spec.ts',
+      ],
     },
     {
       name: 'chromium-fixtures-visual',
       testMatch: [
         '**/base-components.visual.spec.ts',
         '**/conversation-components.visual.spec.ts',
-        '**/chat-page.visual.spec.ts'
-      ]
-    }
-  ]
+        '**/chat-page.visual.spec.ts',
+      ],
+    },
+  ],
 })

@@ -1,5 +1,11 @@
 import { test, expect, _electron as electron } from '@playwright/test'
-import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ElectronApplication, Page } from '@playwright/test'
@@ -33,8 +39,8 @@ function writeStartupRestorationFixture(tempHome: string): string {
       providers: {
         anthropic: {
           encryptedApiKey: 'sk-electron-e2e-placeholder',
-          updatedAt: childTimestamp
-        }
+          updatedAt: childTimestamp,
+        },
       },
       agents: {
         tangyuan: {
@@ -42,10 +48,10 @@ function writeStartupRestorationFixture(tempHome: string): string {
           defaultProviderId: 'anthropic',
           defaultModelId: SESSION_MODEL_ID,
           status: 'active',
-          archivedAt: null
-        }
-      }
-    })
+          archivedAt: null,
+        },
+      },
+    }),
   )
   writeFileSync(
     parentSessionFile,
@@ -55,18 +61,22 @@ function writeStartupRestorationFixture(tempHome: string): string {
         version: 3,
         id: PARENT_SESSION_ID,
         timestamp: parentTimestamp,
-        cwd: agentHomePath
+        cwd: agentHomePath,
       },
       {
         type: 'message',
         id: PARENT_SOURCE_MESSAGE_ID,
         parentId: null,
         timestamp: parentTimestamp,
-        message: { role: 'user', content: '父会话中的分叉源消息', timestamp: 1 }
-      }
+        message: {
+          role: 'user',
+          content: '父会话中的分叉源消息',
+          timestamp: 1,
+        },
+      },
     ]
       .map((entry) => JSON.stringify(entry))
-      .join('\n') + '\n'
+      .join('\n') + '\n',
   )
   writeFileSync(
     childSessionFile,
@@ -77,7 +87,7 @@ function writeStartupRestorationFixture(tempHome: string): string {
         id: CHILD_SESSION_ID,
         timestamp: childTimestamp,
         cwd: agentHomePath,
-        parentSession: parentSessionFile
+        parentSession: parentSessionFile,
       },
       {
         type: 'custom',
@@ -85,7 +95,10 @@ function writeStartupRestorationFixture(tempHome: string): string {
         id: 'electron-fork-source',
         parentId: null,
         timestamp: childTimestamp,
-        data: { sessionId: PARENT_SESSION_ID, entryId: PARENT_SOURCE_MESSAGE_ID }
+        data: {
+          sessionId: PARENT_SESSION_ID,
+          entryId: PARENT_SOURCE_MESSAGE_ID,
+        },
       },
       {
         type: 'model_change',
@@ -93,25 +106,29 @@ function writeStartupRestorationFixture(tempHome: string): string {
         parentId: 'electron-fork-source',
         timestamp: childTimestamp,
         provider: 'anthropic',
-        modelId: SESSION_MODEL_ID
+        modelId: SESSION_MODEL_ID,
       },
       {
         type: 'thinking_level_change',
         id: 'electron-thinking-change',
         parentId: 'electron-model-change',
         timestamp: childTimestamp,
-        thinkingLevel: 'high'
+        thinkingLevel: 'high',
       },
       {
         type: 'message',
         id: 'electron-child-message',
         parentId: 'electron-thinking-change',
         timestamp: childTimestamp,
-        message: { role: 'user', content: '最后激活分叉会话内容', timestamp: 2 }
-      }
+        message: {
+          role: 'user',
+          content: '最后激活分叉会话内容',
+          timestamp: 2,
+        },
+      },
     ]
       .map((entry) => JSON.stringify(entry))
-      .join('\n') + '\n'
+      .join('\n') + '\n',
   )
   writeFileSync(
     join(sessionDir, 'index.json'),
@@ -131,8 +148,8 @@ function writeStartupRestorationFixture(tempHome: string): string {
           status: 'completed',
           forkedFrom: {
             sessionId: PARENT_SESSION_ID,
-            entryId: PARENT_SOURCE_MESSAGE_ID
-          }
+            entryId: PARENT_SOURCE_MESSAGE_ID,
+          },
         },
         {
           sessionId: PARENT_SESSION_ID,
@@ -145,18 +162,18 @@ function writeStartupRestorationFixture(tempHome: string): string {
           thinkingLevel: 'low',
           agentId: 'tangyuan',
           lastMessagePreview: '父会话中的分叉源消息',
-          status: 'completed'
-        }
-      ]
-    })
+          status: 'completed',
+        },
+      ],
+    }),
   )
   writeFileSync(
     join(sessionDir, 'last-active-session.json'),
     JSON.stringify({
       agentId: 'tangyuan',
       sessionId: CHILD_SESSION_ID,
-      updatedAt: childTimestamp
-    })
+      updatedAt: childTimestamp,
+    }),
   )
 
   return childSessionFile
@@ -171,7 +188,7 @@ function writeStartupRestorationFixture(tempHome: string): string {
  */
 async function launchRestorationApp(
   mainEntry: string,
-  tempHome: string
+  tempHome: string,
 ): Promise<{ app: ElectronApplication; window: Page }> {
   const app = await electron.launch({
     args: [mainEntry],
@@ -179,8 +196,8 @@ async function launchRestorationApp(
       ...process.env,
       HOME: tempHome,
       TANGYUAN_QA_API_KEY: 'enable-plaintext-e2e-adapter',
-      TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: ''
-    }
+      TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: '',
+    },
   })
   const window = await app.firstWindow()
   await window.waitForLoadState('domcontentloaded')
@@ -212,8 +229,8 @@ test.describe('Electron 窗口', () => {
         ...process.env,
         HOME: tempHome,
         // 确保不会触发打包 smoke test 模式
-        TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: ''
-      }
+        TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: '',
+      },
     })
 
     // 等待第一个窗口加载完成
@@ -275,13 +292,13 @@ test.describe('Electron 窗口', () => {
         await window.api.forkSession({
           agentId: 'tangyuan',
           sessionId: 'missing-session',
-          entryId: 'missing-entry'
+          entryId: 'missing-entry',
         })
         return { rejected: false, message: '' }
       } catch (error) {
         return {
           rejected: true,
-          message: error instanceof Error ? error.message : String(error)
+          message: error instanceof Error ? error.message : String(error),
         }
       }
     })
@@ -305,7 +322,8 @@ test.describe('Electron 窗口', () => {
       bodyText.includes('连接模型服务') &&
       bodyText.includes('Provider') &&
       bodyText.includes('API Key')
-    const isChatPage = bodyText.includes('大语言模型对话') && bodyText.includes('新建会话')
+    const isChatPage =
+      bodyText.includes('大语言模型对话') && bodyText.includes('新建会话')
 
     expect(isSetupPage || isChatPage).toBe(true)
   })
@@ -349,7 +367,7 @@ test.describe('Electron 窗口', () => {
       const initial = await window.api.getLastActiveSession()
       const updated = await window.api.setLastActiveSession({
         agentId: 'tangyuan',
-        sessionId: 'missing-session'
+        sessionId: 'missing-session',
       })
       return { initial, updated }
     })
@@ -385,27 +403,27 @@ test.describe('真实 Electron 启动恢复', () => {
         ({ sessionId, transcriptText }) =>
           window.location.hash === `#/chat/tangyuan/${sessionId}` &&
           document.body.innerText.includes(transcriptText),
-        { sessionId: CHILD_SESSION_ID, transcriptText: '最后激活分叉会话内容' }
+        { sessionId: CHILD_SESSION_ID, transcriptText: '最后激活分叉会话内容' },
       )
 
       await expect(
-        firstLaunch.window.getByRole('heading', { name: '应恢复的分叉会话' })
+        firstLaunch.window.getByRole('heading', { name: '应恢复的分叉会话' }),
       ).toBeVisible()
-      await expect(firstLaunch.window.getByTestId('fork-source-notice')).toContainText(
-        '分叉自「默认 Agent 最近可用会话」'
-      )
+      await expect(
+        firstLaunch.window.getByTestId('fork-source-notice'),
+      ).toContainText('分叉自「默认 Agent 最近可用会话」')
       const sessionModelInfo = await firstLaunch.window.evaluate(
         async ({ agentId, sessionId }) =>
           window.api.getSessionModelInfo({
             agentId,
-            sessionId
+            sessionId,
           }),
-        { agentId: 'tangyuan', sessionId: CHILD_SESSION_ID }
+        { agentId: 'tangyuan', sessionId: CHILD_SESSION_ID },
       )
       expect(sessionModelInfo).toMatchObject({
         providerId: 'anthropic',
         modelId: SESSION_MODEL_ID,
-        thinkingLevel: 'high'
+        thinkingLevel: 'high',
       })
 
       const archiveRoundTrip = await firstLaunch.window.evaluate(
@@ -413,51 +431,51 @@ test.describe('真实 Electron 启动恢复', () => {
           const archived = await window.api.archiveSession({
             agentId,
             sessionId: parentSessionId,
-            confirmActivityStop: false
+            confirmActivityStop: false,
           })
           const visibleAfterArchive = await window.api.listSessions({ agentId })
           const allAfterArchive = await window.api.listSessions({
             agentId,
-            includeArchived: true
+            includeArchived: true,
           })
           const recovered = await window.api.recoverSession({
             agentId,
-            sessionId: parentSessionId
+            sessionId: parentSessionId,
           })
           const childTranscript = await window.api.getTranscript({
             agentId,
-            sessionId: childSessionId
+            sessionId: childSessionId,
           })
           return {
             archived,
             visibleAfterArchive,
             allAfterArchive,
             recovered,
-            childTranscript
+            childTranscript,
           }
         },
         {
           agentId: 'tangyuan',
           parentSessionId: PARENT_SESSION_ID,
-          childSessionId: CHILD_SESSION_ID
-        }
+          childSessionId: CHILD_SESSION_ID,
+        },
       )
       expect(archiveRoundTrip.archived).toMatchObject({
         status: 'archived',
-        affectedSessionIds: [PARENT_SESSION_ID, CHILD_SESSION_ID]
+        affectedSessionIds: [PARENT_SESSION_ID, CHILD_SESSION_ID],
       })
       expect(archiveRoundTrip.visibleAfterArchive).toEqual([])
       expect(archiveRoundTrip.allAfterArchive).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             sessionId: PARENT_SESSION_ID,
-            archivedAt: expect.any(String)
+            archivedAt: expect.any(String),
           }),
           expect.objectContaining({
             sessionId: CHILD_SESSION_ID,
-            archivedAt: expect.any(String)
-          })
-        ])
+            archivedAt: expect.any(String),
+          }),
+        ]),
       )
       expect(archiveRoundTrip.recovered).toHaveLength(2)
       expect(archiveRoundTrip.childTranscript.sessionId).toBe(CHILD_SESSION_ID)
@@ -472,11 +490,16 @@ test.describe('真实 Electron 启动恢复', () => {
         ({ sessionId, transcriptText }) =>
           window.location.hash === `#/chat/tangyuan/${sessionId}` &&
           document.body.innerText.includes(transcriptText),
-        { sessionId: PARENT_SESSION_ID, transcriptText: '父会话中的分叉源消息' }
+        {
+          sessionId: PARENT_SESSION_ID,
+          transcriptText: '父会话中的分叉源消息',
+        },
       )
 
       expect(
-        await secondLaunch.window.evaluate(async () => window.api.getLastActiveSession())
+        await secondLaunch.window.evaluate(async () =>
+          window.api.getLastActiveSession(),
+        ),
       ).toMatchObject({ agentId: 'tangyuan', sessionId: PARENT_SESSION_ID })
     } finally {
       await runningApp?.close()

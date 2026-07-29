@@ -4,7 +4,7 @@ import {
   createPreloadApiInitScript,
   createReadyRuntimeSnapshot,
   createTestMessages,
-  createTestSessions
+  createTestSessions,
 } from '../fixtures/preload-mock'
 
 /**
@@ -18,22 +18,30 @@ test.describe('页面人工截图 artifact', () => {
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
-    await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: '配置模型服务' }),
+    ).toBeVisible()
 
-    await page.screenshot({ path: 'e2e/renderer/setup-page.png', fullPage: true })
+    await page.screenshot({
+      path: 'e2e/renderer/setup-page.png',
+      fullPage: true,
+    })
   })
 
   test('生成聊天页 artifact', async ({ page }) => {
     const initScript = createPreloadApiInitScript(
       createReadyRuntimeSnapshot(),
       createTestSessions(2),
-      createTestMessages()
+      createTestMessages(),
     )
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/chat/tangyuan')
     await expect(page.getByRole('textbox', { name: '消息' })).toBeVisible()
 
-    await page.screenshot({ path: 'e2e/renderer/chat-page.png', fullPage: true })
+    await page.screenshot({
+      path: 'e2e/renderer/chat-page.png',
+      fullPage: true,
+    })
   })
 })

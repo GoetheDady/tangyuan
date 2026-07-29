@@ -10,7 +10,11 @@ describe('ForkSourceNotice', () => {
     const onViewSource = vi.fn()
 
     render(
-      <ForkSourceNotice parentSessionTitle="父会话" isParentAvailable onViewSource={onViewSource} />
+      <ForkSourceNotice
+        parentSessionTitle="父会话"
+        isParentAvailable
+        onViewSource={onViewSource}
+      />,
     )
 
     expect(screen.getByText(/分叉自/)).toHaveTextContent('分叉自「父会话」')
@@ -25,10 +29,12 @@ describe('ForkSourceNotice', () => {
         parentSessionTitle={null}
         isParentAvailable={false}
         onViewSource={vi.fn()}
-      />
+      />,
     )
 
     expect(screen.getByText('分叉自已不可用的会话')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '查看来源消息' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: '查看来源消息' }),
+    ).not.toBeInTheDocument()
   })
 })

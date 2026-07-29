@@ -1,6 +1,9 @@
 import { defineConfig } from '@playwright/test'
 
-import { commonPlaywrightConfig, createRendererWebServer } from './playwright.shared'
+import {
+  commonPlaywrightConfig,
+  createRendererWebServer,
+} from './playwright.shared'
 
 const rendererBaseUrl = 'http://127.0.0.1:4173'
 
@@ -22,16 +25,16 @@ export default defineConfig({
       testIgnore: 'renderer/artifacts.spec.ts',
       use: {
         bypassCSP: true,
-        baseURL: rendererBaseUrl
-      }
+        baseURL: rendererBaseUrl,
+      },
     },
     {
       name: 'chromium-renderer-artifacts',
       testMatch: 'renderer/artifacts.spec.ts',
       use: {
         bypassCSP: true,
-        baseURL: rendererBaseUrl
-      }
-    }
-  ]
+        baseURL: rendererBaseUrl,
+      },
+    },
+  ],
 })

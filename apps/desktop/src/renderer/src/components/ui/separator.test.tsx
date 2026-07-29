@@ -16,7 +16,7 @@ describe('Separator', () => {
         data-testid="separator"
         title="设置分隔"
         className="custom-separator"
-      />
+      />,
     )
 
     const separator = screen.getByTestId('separator')
@@ -37,8 +37,12 @@ describe('Separator', () => {
     render(
       <>
         <Separator data-testid="custom-horizontal" className="h-2 w-1/2" />
-        <Separator data-testid="custom-vertical" orientation="vertical" className="h-6 w-2" />
-      </>
+        <Separator
+          data-testid="custom-vertical"
+          orientation="vertical"
+          className="h-6 w-2"
+        />
+      </>,
     )
 
     const horizontal = screen.getByTestId('custom-horizontal')
@@ -59,9 +63,13 @@ describe('Separator', () => {
       <>
         <Separator data-testid="decorative-horizontal" />
         <div className="h-8">
-          <Separator data-testid="semantic-vertical" orientation="vertical" decorative={false} />
+          <Separator
+            data-testid="semantic-vertical"
+            orientation="vertical"
+            decorative={false}
+          />
         </div>
-      </>
+      </>,
     )
 
     const decorative = screen.getByTestId('decorative-horizontal')
@@ -97,16 +105,30 @@ describe('Separator', () => {
           <span>或者</span>
           <Separator data-testid="center-label-end" />
         </div>
-      </>
+      </>,
     )
 
-    expect(screen.getByTestId('full-width')).toHaveAttribute('data-orientation', 'horizontal')
-    expect(screen.getByTestId('inset-wrapper')).toContainElement(screen.getByTestId('inset'))
-    expect(screen.getByTestId('vertical')).toHaveAttribute('data-orientation', 'vertical')
+    expect(screen.getByTestId('full-width')).toHaveAttribute(
+      'data-orientation',
+      'horizontal',
+    )
+    expect(screen.getByTestId('inset-wrapper')).toContainElement(
+      screen.getByTestId('inset'),
+    )
+    expect(screen.getByTestId('vertical')).toHaveAttribute(
+      'data-orientation',
+      'vertical',
+    )
     expect(screen.getByText('高级设置')).toBeInTheDocument()
     expect(screen.getByText('或者')).toBeInTheDocument()
     expect(screen.getByTestId('section-label')).toHaveAttribute('role', 'none')
-    expect(screen.getByTestId('center-label-start')).toHaveAttribute('role', 'none')
-    expect(screen.getByTestId('center-label-end')).toHaveAttribute('role', 'none')
+    expect(screen.getByTestId('center-label-start')).toHaveAttribute(
+      'role',
+      'none',
+    )
+    expect(screen.getByTestId('center-label-end')).toHaveAttribute(
+      'role',
+      'none',
+    )
   })
 })

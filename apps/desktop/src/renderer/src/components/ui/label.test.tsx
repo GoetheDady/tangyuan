@@ -14,7 +14,7 @@ describe('Label', () => {
       <div>
         <Label htmlFor="display-name">显示名称</Label>
         <Input id="display-name" />
-      </div>
+      </div>,
     )
 
     const label = screen.getByText('显示名称')
@@ -38,9 +38,14 @@ describe('Label', () => {
     const user = userEvent.setup()
     const onClick = vi.fn()
     render(
-      <Label asChild className="custom-label" data-state="ready" onClick={onClick}>
+      <Label
+        asChild
+        className="custom-label"
+        data-state="ready"
+        onClick={onClick}
+      >
         <span>组合标签</span>
-      </Label>
+      </Label>,
     )
 
     const label = screen.getByText('组合标签')
@@ -58,7 +63,7 @@ describe('Label', () => {
       <div>
         <Label htmlFor="disabled-control">禁用标签</Label>
         <Input id="disabled-control" disabled />
-      </div>
+      </div>,
     )
 
     expect(screen.getByRole('textbox', { name: '禁用标签' })).toBeDisabled()

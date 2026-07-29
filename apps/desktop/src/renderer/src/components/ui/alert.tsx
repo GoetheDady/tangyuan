@@ -15,13 +15,13 @@ const alertVariants = cva(
         warning:
           'border-warning-border bg-warning-soft text-warning-foreground *:data-[slot=alert-description]:text-foreground',
         destructive:
-          'border-destructive-border bg-destructive-soft text-destructive-soft-foreground *:data-[slot=alert-description]:text-foreground'
-      }
+          'border-destructive-border bg-destructive-soft text-destructive-soft-foreground *:data-[slot=alert-description]:text-foreground',
+      },
     },
     defaultVariants: {
-      variant: 'default'
-    }
-  }
+      variant: 'default',
+    },
+  },
 )
 
 /**
@@ -37,7 +37,11 @@ export interface AlertProps
  * @returns 具有 alert 默认语义的反馈容器。
  * @throws 此组件不会主动抛出错误。
  */
-function Alert({ className, variant = 'default', ...props }: AlertProps): React.JSX.Element {
+function Alert({
+  className,
+  variant = 'default',
+  ...props
+}: AlertProps): React.JSX.Element {
   return (
     <div
       data-slot="alert"
@@ -57,13 +61,16 @@ function Alert({ className, variant = 'default', ...props }: AlertProps): React.
  * @returns 可自然换行的标题区域。
  * @throws 此组件不会主动抛出错误。
  */
-function AlertTitle({ className, ...props }: React.ComponentProps<'div'>): React.JSX.Element {
+function AlertTitle({
+  className,
+  ...props
+}: React.ComponentProps<'div'>): React.JSX.Element {
   return (
     <div
       data-slot="alert-title"
       className={cn(
-        'col-start-2 min-w-0 break-words text-sm font-semibold leading-5 tracking-tight',
-        className
+        'col-start-2 min-w-0 text-sm leading-5 font-semibold tracking-tight break-words',
+        className,
       )}
       {...props}
     />
@@ -77,13 +84,16 @@ function AlertTitle({ className, ...props }: React.ComponentProps<'div'>): React
  * @returns 支持多行文字、段落和操作内容的说明区域。
  * @throws 此组件不会主动抛出错误。
  */
-function AlertDescription({ className, ...props }: React.ComponentProps<'div'>): React.JSX.Element {
+function AlertDescription({
+  className,
+  ...props
+}: React.ComponentProps<'div'>): React.JSX.Element {
   return (
     <div
       data-slot="alert-description"
       className={cn(
-        'col-start-2 grid min-w-0 justify-items-start gap-2 break-words text-sm leading-[22px] text-muted-foreground [&_p]:leading-[22px]',
-        className
+        'text-muted-foreground col-start-2 grid min-w-0 justify-items-start gap-2 text-sm leading-[22px] break-words [&_p]:leading-[22px]',
+        className,
       )}
       {...props}
     />

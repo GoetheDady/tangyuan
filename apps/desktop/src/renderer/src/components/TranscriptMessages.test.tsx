@@ -6,38 +6,44 @@ import type {
   ExecutionAttempt,
   TranscriptEntry,
   TranscriptSnapshot,
-  UserMessageEntry
+  UserMessageEntry,
 } from '@tangyuan/contracts'
 import { TranscriptMessages } from './TranscriptMessages'
 
 const FIXED_TIME = '2026-07-21T00:00:00.000Z'
 
 /** 创建测试用的用户消息条目。 */
-function createUserMessageEntry(overrides?: Partial<UserMessageEntry>): UserMessageEntry {
+function createUserMessageEntry(
+  overrides?: Partial<UserMessageEntry>,
+): UserMessageEntry {
   return {
     kind: 'user-message',
     index: 0,
     messageId: 'msg-user-1',
     content: '这是一条测试消息。',
     createdAt: FIXED_TIME,
-    ...overrides
+    ...overrides,
   }
 }
 
 /** 创建测试用的执行尝试。 */
-function createAttempt(overrides?: Partial<ExecutionAttempt>): ExecutionAttempt {
+function createAttempt(
+  overrides?: Partial<ExecutionAttempt>,
+): ExecutionAttempt {
   return {
     attemptId: 'attempt-1',
     runId: 'run-1',
     status: 'completed',
     startedAt: FIXED_TIME,
     completedAt: '2026-07-21T00:00:01.000Z',
-    ...overrides
+    ...overrides,
   }
 }
 
 /** 创建测试用的 AgentReplyEntry（含 turns）。 */
-function createAgentReplyEntry(overrides?: Partial<AgentReplyEntry>): AgentReplyEntry {
+function createAgentReplyEntry(
+  overrides?: Partial<AgentReplyEntry>,
+): AgentReplyEntry {
   return {
     kind: 'agent-reply',
     index: 1,
@@ -46,28 +52,30 @@ function createAgentReplyEntry(overrides?: Partial<AgentReplyEntry>): AgentReply
     createdAt: FIXED_TIME,
     attempt: createAttempt(),
     turns: [],
-    ...overrides
+    ...overrides,
   }
 }
 
 /** 创建测试用的 TranscriptSnapshot。 */
 function createTranscriptSnapshot(
   entries: TranscriptEntry[],
-  overrides?: Partial<TranscriptSnapshot>
+  overrides?: Partial<TranscriptSnapshot>,
 ): TranscriptSnapshot {
   return {
     sessionId: 'session-1',
     agentId: 'tangyuan',
     entries,
     updatedAt: FIXED_TIME,
-    ...overrides
+    ...overrides,
   }
 }
 
-function defineMockApi(openExternalLink = vi.fn().mockResolvedValue(undefined)) {
+function defineMockApi(
+  openExternalLink = vi.fn().mockResolvedValue(undefined),
+) {
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { openExternalLink }
+    value: { openExternalLink },
   })
 }
 
@@ -79,11 +87,17 @@ describe('TranscriptMessages', () => {
       createAgentReplyEntry({
         index: 1,
         messageId: 'msg-2',
-        content: '你好！有什么可以帮助你的？'
-      })
+        content: '你好！有什么可以帮助你的？',
+      }),
     ])
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     expect(screen.getByText('你好')).toBeInTheDocument()
     expect(screen.getByText('你好！有什么可以帮助你的？')).toBeInTheDocument()
@@ -94,10 +108,16 @@ describe('TranscriptMessages', () => {
     const transcript = createTranscriptSnapshot([
       createUserMessageEntry({ index: 0, content: '你好' }),
       { kind: 'compaction', index: 1, timestamp: FIXED_TIME },
-      createAgentReplyEntry({ index: 2, content: '回复' })
+      createAgentReplyEntry({ index: 2, content: '回复' }),
     ])
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     expect(screen.getByText('你好')).toBeInTheDocument()
     expect(screen.getByText('回复')).toBeInTheDocument()
@@ -110,11 +130,21 @@ describe('TranscriptMessages', () => {
       createUserMessageEntry({ index: 0, content: '第一轮' }),
       createAgentReplyEntry({ index: 1, content: '回复' }),
       { kind: 'compaction', index: 2, timestamp: '2026-07-17T10:30:00.000Z' },
-      createUserMessageEntry({ index: 3, messageId: 'msg-3', content: '第二轮' }),
-      createAgentReplyEntry({ index: 4, messageId: 'msg-4', content: '回复2' })
+      createUserMessageEntry({
+        index: 3,
+        messageId: 'msg-3',
+        content: '第二轮',
+      }),
+      createAgentReplyEntry({ index: 4, messageId: 'msg-4', content: '回复2' }),
     ])
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     expect(screen.getByRole('status')).toHaveTextContent('自动压缩')
   })
@@ -126,7 +156,7 @@ describe('TranscriptMessages', () => {
         transcript={createTranscriptSnapshot([])}
         isStreaming={false}
         sessionId="session-1"
-      />
+      />,
     )
 
     expect(screen.getByText('发送第一条消息开始会话。')).toBeInTheDocument()
@@ -134,7 +164,13 @@ describe('TranscriptMessages', () => {
 
   it('shows select-session prompt when sessionId is null', () => {
     defineMockApi()
-    render(<TranscriptMessages transcript={null} isStreaming={false} sessionId={null} />)
+    render(
+      <TranscriptMessages
+        transcript={null}
+        isStreaming={false}
+        sessionId={null}
+      />,
+    )
 
     expect(screen.getByText('选择一个会话后开始。')).toBeInTheDocument()
   })
@@ -143,15 +179,20 @@ describe('TranscriptMessages', () => {
     defineMockApi()
     const transcript = createTranscriptSnapshot([
       createUserMessageEntry({ index: 0, content: '问题' }),
-      createAgentReplyEntry({ index: 1, content: '```js\nconst x = 1' })
+      createAgentReplyEntry({ index: 1, content: '```js\nconst x = 1' }),
     ])
 
-    render(<TranscriptMessages transcript={transcript} isStreaming sessionId="session-1" />)
-
-    expect(document.querySelector('[data-streamdown="code-block"]')).toHaveAttribute(
-      'data-incomplete',
-      'true'
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming
+        sessionId="session-1"
+      />,
     )
+
+    expect(
+      document.querySelector('[data-streamdown="code-block"]'),
+    ).toHaveAttribute('data-incomplete', 'true')
   })
 
   it('does not mark non-last message as animating when streaming', () => {
@@ -160,27 +201,47 @@ describe('TranscriptMessages', () => {
       createUserMessageEntry({ index: 0, content: 'Q1' }),
       createAgentReplyEntry({ index: 1, content: 'A1' }),
       createUserMessageEntry({ index: 2, messageId: 'msg-3', content: 'Q2' }),
-      createAgentReplyEntry({ index: 3, messageId: 'msg-4', content: '```js\nconst y = 2' })
+      createAgentReplyEntry({
+        index: 3,
+        messageId: 'msg-4',
+        content: '```js\nconst y = 2',
+      }),
     ])
 
-    render(<TranscriptMessages transcript={transcript} isStreaming sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming
+        sessionId="session-1"
+      />,
+    )
 
     expect(screen.getByText('A1')).toBeInTheDocument()
-    expect(document.querySelectorAll('[data-incomplete="true"]')).toHaveLength(1)
+    expect(document.querySelectorAll('[data-incomplete="true"]')).toHaveLength(
+      1,
+    )
   })
 
   it('does not reparse unchanged Markdown on rerender', () => {
     defineMockApi()
     const transcript = createTranscriptSnapshot([
       createUserMessageEntry({ index: 0, content: 'Hi' }),
-      createAgentReplyEntry({ index: 1, content: 'Hello world' })
+      createAgentReplyEntry({ index: 1, content: 'Hello world' }),
     ])
 
     const { rerender } = render(
-      <TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
     )
     rerender(
-      <TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
     )
 
     expect(screen.getByText('Hello world')).toBeInTheDocument()
@@ -190,10 +251,16 @@ describe('TranscriptMessages', () => {
     defineMockApi()
     const transcript = createTranscriptSnapshot([
       createUserMessageEntry({ index: 0, content: 'User' }),
-      createAgentReplyEntry({ index: 1, content: 'Agent' })
+      createAgentReplyEntry({ index: 1, content: 'Agent' }),
     ])
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     const articles = document.querySelectorAll('article')
     expect(articles[0]).toHaveClass('items-end')
@@ -204,7 +271,10 @@ describe('TranscriptMessages', () => {
     defineMockApi()
     const onFork = vi.fn()
     const transcript = createTranscriptSnapshot([
-      createUserMessageEntry({ messageId: 'fork-source', content: '从这里分叉' })
+      createUserMessageEntry({
+        messageId: 'fork-source',
+        content: '从这里分叉',
+      }),
     ])
 
     render(
@@ -213,7 +283,7 @@ describe('TranscriptMessages', () => {
         isStreaming={false}
         sessionId="session-1"
         onFork={onFork}
-      />
+      />,
     )
 
     const message = screen.getByText('从这里分叉')
@@ -230,7 +300,11 @@ describe('TranscriptMessages', () => {
     expect(footer).toContainElement(forkButtons[0])
     expect(article!.children[0]).not.toContainElement(time)
     expect(article!.children[0]).toHaveClass('peer')
-    expect(footer).toHaveClass('opacity-0', 'peer-hover:opacity-100', 'hover:opacity-100')
+    expect(footer).toHaveClass(
+      'opacity-0',
+      'peer-hover:opacity-100',
+      'hover:opacity-100',
+    )
     expect(forkButtons[0]).toHaveTextContent('')
     expect(forkButtons[0].querySelectorAll('svg')).toHaveLength(1)
 
@@ -240,14 +314,30 @@ describe('TranscriptMessages', () => {
 
   it('renders many structured entries without crashing', () => {
     defineMockApi()
-    const entries: TranscriptEntry[] = Array.from({ length: 100 }, (_, index) =>
-      index % 2 === 0
-        ? createUserMessageEntry({ index, messageId: `msg-${index}`, content: `Message ${index}` })
-        : createAgentReplyEntry({ index, messageId: `msg-${index}`, content: `Message ${index}` })
+    const entries: TranscriptEntry[] = Array.from(
+      { length: 100 },
+      (_, index) =>
+        index % 2 === 0
+          ? createUserMessageEntry({
+              index,
+              messageId: `msg-${index}`,
+              content: `Message ${index}`,
+            })
+          : createAgentReplyEntry({
+              index,
+              messageId: `msg-${index}`,
+              content: `Message ${index}`,
+            }),
     )
     const transcript = createTranscriptSnapshot(entries)
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     expect(screen.getByText('Message 0')).toBeInTheDocument()
   })
@@ -260,18 +350,24 @@ describe('TranscriptMessages', () => {
         index: 0,
         messageId: 'msg-1',
         content: '用户问题',
-        createdAt: '2026-07-21T00:00:00.000Z'
+        createdAt: '2026-07-21T00:00:00.000Z',
       },
       createAgentReplyEntry({
         index: 1,
         messageId: 'msg-2',
-        content: 'Agent 回复'
-      })
+        content: 'Agent 回复',
+      }),
     ]
 
     const transcript = createTranscriptSnapshot(entries)
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     expect(screen.getByText('用户问题')).toBeInTheDocument()
     expect(screen.getByText('Agent 回复')).toBeInTheDocument()
@@ -285,25 +381,31 @@ describe('TranscriptMessages', () => {
         index: 0,
         messageId: 'msg-1',
         content: '第一轮',
-        createdAt: '2026-07-21T00:00:00.000Z'
+        createdAt: '2026-07-21T00:00:00.000Z',
       },
       {
         kind: 'compaction',
         index: 1,
-        timestamp: '2026-07-21T01:00:00.000Z'
+        timestamp: '2026-07-21T01:00:00.000Z',
       },
       {
         kind: 'user-message',
         index: 2,
         messageId: 'msg-2',
         content: '第二轮',
-        createdAt: '2026-07-21T01:00:01.000Z'
-      }
+        createdAt: '2026-07-21T01:00:01.000Z',
+      },
     ]
 
     const transcript = createTranscriptSnapshot(entries)
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     expect(screen.getByRole('status')).toBeInTheDocument()
     expect(screen.getByText('第一轮')).toBeInTheDocument()
@@ -327,7 +429,7 @@ describe('TranscriptMessages', () => {
               content: '分析中...',
               status: 'completed',
               startedAt: '2026-07-21T00:00:00.000Z',
-              completedAt: '2026-07-21T00:00:01.000Z'
+              completedAt: '2026-07-21T00:00:01.000Z',
             },
             {
               index: 1,
@@ -337,14 +439,14 @@ describe('TranscriptMessages', () => {
               toolName: 'read_file',
               status: 'completed',
               startedAt: '2026-07-21T00:00:01.000Z',
-              completedAt: '2026-07-21T00:00:02.000Z'
-            }
+              completedAt: '2026-07-21T00:00:02.000Z',
+            },
           ],
           status: 'completed',
           startedAt: '2026-07-21T00:00:00.000Z',
-          completedAt: '2026-07-21T00:00:02.000Z'
-        }
-      ]
+          completedAt: '2026-07-21T00:00:02.000Z',
+        },
+      ],
     })
 
     const entries: TranscriptEntry[] = [
@@ -353,14 +455,20 @@ describe('TranscriptMessages', () => {
         index: 0,
         messageId: 'msg-user',
         content: '帮我读文件',
-        createdAt: '2026-07-21T00:00:00.000Z'
+        createdAt: '2026-07-21T00:00:00.000Z',
       },
-      entry
+      entry,
     ]
 
     const transcript = createTranscriptSnapshot(entries)
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     // AssistantMessage 应渲染执行披露栏（已完成的条目默认收起）
     expect(screen.getByText('已完成执行过程')).toBeInTheDocument()
@@ -390,8 +498,8 @@ describe('TranscriptMessages', () => {
         error: {
           code: 'unknown',
           message: '执行失败，请重试',
-          recoverable: true
-        }
+          recoverable: true,
+        },
       }),
       turns: [
         {
@@ -405,14 +513,14 @@ describe('TranscriptMessages', () => {
               toolName: 'bad_tool',
               status: 'failed',
               startedAt: '2026-07-21T00:00:00.000Z',
-              completedAt: '2026-07-21T00:00:01.000Z'
-            }
+              completedAt: '2026-07-21T00:00:01.000Z',
+            },
           ],
           status: 'failed',
           startedAt: '2026-07-21T00:00:00.000Z',
-          completedAt: '2026-07-21T00:00:01.000Z'
-        }
-      ]
+          completedAt: '2026-07-21T00:00:01.000Z',
+        },
+      ],
     })
 
     const entries: TranscriptEntry[] = [
@@ -421,14 +529,20 @@ describe('TranscriptMessages', () => {
         index: 0,
         messageId: 'msg-user',
         content: '触发失败的请求',
-        createdAt: '2026-07-21T00:00:00.000Z'
+        createdAt: '2026-07-21T00:00:00.000Z',
       },
-      entry
+      entry,
     ]
 
     const transcript = createTranscriptSnapshot(entries)
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     // 应展示失败状态（disclosure bar 和 failed footer 各有一个"执行失败"）
     const failureLabels = screen.getAllByText('执行失败')
@@ -453,8 +567,8 @@ describe('TranscriptMessages', () => {
         error: {
           code: 'unknown',
           message: '失败',
-          recoverable: true
-        }
+          recoverable: true,
+        },
       }),
       inReplyTo: 'msg-user-1',
       turns: [
@@ -469,14 +583,14 @@ describe('TranscriptMessages', () => {
               toolName: 'some_tool',
               status: 'failed',
               startedAt: '2026-07-21T00:00:00.000Z',
-              completedAt: '2026-07-21T00:00:01.000Z'
-            }
+              completedAt: '2026-07-21T00:00:01.000Z',
+            },
           ],
           status: 'failed',
           startedAt: '2026-07-21T00:00:00.000Z',
-          completedAt: '2026-07-21T00:00:01.000Z'
-        }
-      ]
+          completedAt: '2026-07-21T00:00:01.000Z',
+        },
+      ],
     })
 
     const entries: TranscriptEntry[] = [
@@ -485,9 +599,9 @@ describe('TranscriptMessages', () => {
         index: 0,
         messageId: 'msg-user-1',
         content: '请求',
-        createdAt: '2026-07-21T00:00:00.000Z'
+        createdAt: '2026-07-21T00:00:00.000Z',
       },
-      entry
+      entry,
     ]
 
     const transcript = createTranscriptSnapshot(entries)
@@ -498,7 +612,7 @@ describe('TranscriptMessages', () => {
         isStreaming={false}
         sessionId="session-1"
         onRetry={onRetry}
-      />
+      />,
     )
 
     // 点击重试按钮（失败条目默认展开，显示重试按钮）
@@ -512,21 +626,29 @@ describe('TranscriptMessages', () => {
     defineMockApi()
     const transcript1 = createTranscriptSnapshot(
       [createUserMessageEntry({ content: 'Session 1 message' })],
-      { sessionId: 'session-1' }
+      { sessionId: 'session-1' },
     )
 
     const { rerender } = render(
-      <TranscriptMessages transcript={transcript1} isStreaming={false} sessionId="session-1" />
+      <TranscriptMessages
+        transcript={transcript1}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
     )
 
     expect(screen.getByText('Session 1 message')).toBeInTheDocument()
 
     const transcript2 = createTranscriptSnapshot(
       [createUserMessageEntry({ content: 'Session 2 message' })],
-      { sessionId: 'session-2' }
+      { sessionId: 'session-2' },
     )
     rerender(
-      <TranscriptMessages transcript={transcript2} isStreaming={false} sessionId="session-2" />
+      <TranscriptMessages
+        transcript={transcript2}
+        isStreaming={false}
+        sessionId="session-2"
+      />,
     )
 
     expect(screen.getByText('Session 2 message')).toBeInTheDocument()
@@ -538,10 +660,16 @@ describe('TranscriptMessages', () => {
     const transcript = createTranscriptSnapshot([
       createUserMessageEntry({ index: 0, content: 'Hi' }),
       { kind: 'compaction', index: 1, timestamp: FIXED_TIME },
-      createAgentReplyEntry({ index: 2, content: 'Hello' })
+      createAgentReplyEntry({ index: 2, content: 'Hello' }),
     ])
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     expect(screen.getByText('Hi')).toBeInTheDocument()
     expect(screen.getByRole('status')).toBeInTheDocument()
@@ -556,18 +684,24 @@ describe('TranscriptMessages', () => {
         index: 0,
         messageId: 'msg-1',
         content: '问题',
-        createdAt: '2026-07-21T00:00:00.000Z'
+        createdAt: '2026-07-21T00:00:00.000Z',
       },
       createAgentReplyEntry({
         index: 1,
         messageId: 'msg-2',
-        content: '```js\nconst incomplete'
-      })
+        content: '```js\nconst incomplete',
+      }),
     ]
 
     const transcript = createTranscriptSnapshot(entries)
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={true} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={true}
+        sessionId="session-1"
+      />,
+    )
 
     // 流式模式下，最后一条 agent 消息的代码块应标记为 incomplete
     const codeBlock = document.querySelector('[data-streamdown="code-block"]')
@@ -577,25 +711,33 @@ describe('TranscriptMessages', () => {
 
   it('renders 200+ structured entries with virtual list and only mounts visible subset', () => {
     defineMockApi()
-    const entries: TranscriptEntry[] = Array.from({ length: 250 }, (_, index) =>
-      index % 2 === 0
-        ? createUserMessageEntry({
-            index,
-            messageId: `msg-${index}`,
-            content: `Message ${index}: Some longer content to fill more space`
-          })
-        : createAgentReplyEntry({
-            index,
-            messageId: `msg-${index}`,
-            content: `Message ${index}: Some longer content to fill more space`
-          })
+    const entries: TranscriptEntry[] = Array.from(
+      { length: 250 },
+      (_, index) =>
+        index % 2 === 0
+          ? createUserMessageEntry({
+              index,
+              messageId: `msg-${index}`,
+              content: `Message ${index}: Some longer content to fill more space`,
+            })
+          : createAgentReplyEntry({
+              index,
+              messageId: `msg-${index}`,
+              content: `Message ${index}: Some longer content to fill more space`,
+            }),
     )
     const transcript = createTranscriptSnapshot(entries)
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     expect(
-      screen.getByText('Message 0: Some longer content to fill more space')
+      screen.getByText('Message 0: Some longer content to fill more space'),
     ).toBeInTheDocument()
     const renderedItems = document.querySelectorAll('[data-index]')
     expect(renderedItems.length).toBeLessThan(50)
@@ -605,7 +747,7 @@ describe('TranscriptMessages', () => {
   it('shows waiting indicator when awaiting response after a user message', () => {
     defineMockApi()
     const transcript = createTranscriptSnapshot([
-      createUserMessageEntry({ index: 0, content: '在吗' })
+      createUserMessageEntry({ index: 0, content: '在吗' }),
     ])
 
     render(
@@ -614,10 +756,12 @@ describe('TranscriptMessages', () => {
         isStreaming={false}
         isAwaitingResponse
         sessionId="session-1"
-      />
+      />,
     )
 
-    expect(screen.getByTestId('awaiting-response-indicator')).toBeInTheDocument()
+    expect(
+      screen.getByTestId('awaiting-response-indicator'),
+    ).toBeInTheDocument()
   })
 
   it('hides waiting indicator once agent reply has visible content', () => {
@@ -627,8 +771,8 @@ describe('TranscriptMessages', () => {
       createAgentReplyEntry({
         index: 1,
         content: '在的',
-        attempt: createAttempt({ status: 'running', completedAt: null })
-      })
+        attempt: createAttempt({ status: 'running', completedAt: null }),
+      }),
     ])
 
     render(
@@ -637,16 +781,18 @@ describe('TranscriptMessages', () => {
         isStreaming
         isAwaitingResponse
         sessionId="session-1"
-      />
+      />,
     )
 
-    expect(screen.queryByTestId('awaiting-response-indicator')).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId('awaiting-response-indicator'),
+    ).not.toBeInTheDocument()
   })
 
   it('does not show waiting indicator when not awaiting response', () => {
     defineMockApi()
     const transcript = createTranscriptSnapshot([
-      createUserMessageEntry({ index: 0, content: '在吗' })
+      createUserMessageEntry({ index: 0, content: '在吗' }),
     ])
 
     render(
@@ -655,10 +801,12 @@ describe('TranscriptMessages', () => {
         isStreaming={false}
         isAwaitingResponse={false}
         sessionId="session-1"
-      />
+      />,
     )
 
-    expect(screen.queryByTestId('awaiting-response-indicator')).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId('awaiting-response-indicator'),
+    ).not.toBeInTheDocument()
   })
 
   it('hides waiting indicator once agent reply is announced with only a thinking step', () => {
@@ -681,15 +829,15 @@ describe('TranscriptMessages', () => {
                 content: '分析中...',
                 status: 'running',
                 startedAt: FIXED_TIME,
-                completedAt: null
-              }
+                completedAt: null,
+              },
             ],
             status: 'running',
             startedAt: FIXED_TIME,
-            completedAt: null
-          }
-        ]
-      })
+            completedAt: null,
+          },
+        ],
+      }),
     ])
 
     render(
@@ -698,10 +846,12 @@ describe('TranscriptMessages', () => {
         isStreaming
         isAwaitingResponse
         sessionId="session-1"
-      />
+      />,
     )
 
-    expect(screen.queryByTestId('awaiting-response-indicator')).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId('awaiting-response-indicator'),
+    ).not.toBeInTheDocument()
   })
 
   it('shows waiting indicator during retry before the new attempt announces its reply', () => {
@@ -715,9 +865,9 @@ describe('TranscriptMessages', () => {
         attempt: createAttempt({
           attemptId: 'attempt-failed',
           status: 'failed',
-          error: { code: 'unknown', message: '失败', recoverable: true }
-        })
-      })
+          error: { code: 'unknown', message: '失败', recoverable: true },
+        }),
+      }),
     ])
 
     render(
@@ -726,10 +876,12 @@ describe('TranscriptMessages', () => {
         isStreaming
         isAwaitingResponse
         sessionId="session-1"
-      />
+      />,
     )
 
-    expect(screen.getByTestId('awaiting-response-indicator')).toBeInTheDocument()
+    expect(
+      screen.getByTestId('awaiting-response-indicator'),
+    ).toBeInTheDocument()
   })
 
   it('hides awaiting indicator when isAwaitingResponse becomes false (cancel scenario)', () => {
@@ -740,8 +892,8 @@ describe('TranscriptMessages', () => {
       createAgentReplyEntry({
         index: 1,
         content: '在的',
-        attempt: createAttempt({ status: 'running', completedAt: null })
-      })
+        attempt: createAttempt({ status: 'running', completedAt: null }),
+      }),
     ])
 
     const { rerender } = render(
@@ -750,11 +902,13 @@ describe('TranscriptMessages', () => {
         isStreaming
         isAwaitingResponse
         sessionId="session-1"
-      />
+      />,
     )
 
     // 运行中：attempt 是 running，所以 indicator 不展示
-    expect(screen.queryByTestId('awaiting-response-indicator')).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId('awaiting-response-indicator'),
+    ).not.toBeInTheDocument()
 
     // 模拟 cancel：isAwaitingResponse 变为 false
     rerender(
@@ -763,11 +917,13 @@ describe('TranscriptMessages', () => {
         isStreaming={false}
         isAwaitingResponse={false}
         sessionId="session-1"
-      />
+      />,
     )
 
     // cancel 后 indicator 应隐藏
-    expect(screen.queryByTestId('awaiting-response-indicator')).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId('awaiting-response-indicator'),
+    ).not.toBeInTheDocument()
   })
 
   it('shows awaiting indicator when isAwaitingResponse is true and attempt is cancelled (mid-cancel window)', () => {
@@ -778,8 +934,11 @@ describe('TranscriptMessages', () => {
       createAgentReplyEntry({
         index: 1,
         content: '部分回复',
-        attempt: createAttempt({ status: 'cancelled', completedAt: FIXED_TIME })
-      })
+        attempt: createAttempt({
+          status: 'cancelled',
+          completedAt: FIXED_TIME,
+        }),
+      }),
     ])
 
     render(
@@ -788,12 +947,14 @@ describe('TranscriptMessages', () => {
         isStreaming={false}
         isAwaitingResponse
         sessionId="session-1"
-      />
+      />,
     )
 
     // attempt 已 cancelled 但 isAwaitingResponse 仍为 true → indicator 应展示
     // 这是重试等待窗口的设计行为
-    expect(screen.getByTestId('awaiting-response-indicator')).toBeInTheDocument()
+    expect(
+      screen.getByTestId('awaiting-response-indicator'),
+    ).toBeInTheDocument()
   })
 
   it('provides stable key for retry attempts via attemptId', () => {
@@ -808,10 +969,10 @@ describe('TranscriptMessages', () => {
         error: {
           code: 'unknown',
           message: 'failed',
-          recoverable: true
-        }
+          recoverable: true,
+        },
       }),
-      inReplyTo: 'msg-user-1'
+      inReplyTo: 'msg-user-1',
     })
 
     const entries: TranscriptEntry[] = [
@@ -820,9 +981,9 @@ describe('TranscriptMessages', () => {
         index: 0,
         messageId: 'msg-user-1',
         content: '请求',
-        createdAt: '2026-07-21T00:00:00.000Z'
+        createdAt: '2026-07-21T00:00:00.000Z',
       },
-      entry1
+      entry1,
     ]
 
     const transcript = createTranscriptSnapshot(entries)
@@ -833,7 +994,7 @@ describe('TranscriptMessages', () => {
         isStreaming={false}
         sessionId="session-1"
         onRetry={vi.fn()}
-      />
+      />,
     )
 
     expect(screen.getByText('第一次回复')).toBeInTheDocument()
@@ -845,9 +1006,9 @@ describe('TranscriptMessages', () => {
       content: '重试回复',
       attempt: createAttempt({
         attemptId: 'attempt-2',
-        status: 'completed'
+        status: 'completed',
       }),
-      inReplyTo: 'msg-user-1'
+      inReplyTo: 'msg-user-1',
     })
 
     const retryTranscript = createTranscriptSnapshot([
@@ -856,9 +1017,9 @@ describe('TranscriptMessages', () => {
         index: 0,
         messageId: 'msg-user-1',
         content: '请求',
-        createdAt: '2026-07-21T00:00:00.000Z'
+        createdAt: '2026-07-21T00:00:00.000Z',
       },
-      retryEntry
+      retryEntry,
     ])
 
     rerender(
@@ -867,7 +1028,7 @@ describe('TranscriptMessages', () => {
         isStreaming={false}
         sessionId="session-1"
         onRetry={vi.fn()}
-      />
+      />,
     )
 
     // 重试回复应可见，旧内容不应存在
@@ -928,7 +1089,7 @@ function createBigDataEntries(): TranscriptEntry[] {
     '- [ ] 日志系统',
     '- [ ] 性能监控',
     '',
-    '> **注意：** 生产环境需要配置 HTTPS 和 CORS 白名单。'
+    '> **注意：** 生产环境需要配置 HTTPS 和 CORS 白名单。',
   ].join('\n')
 
   const manyToolSteps = Array.from({ length: 12 }, (_, i) => ({
@@ -944,7 +1105,7 @@ function createBigDataEntries(): TranscriptEntry[] {
     toolName: i % 3 === 1 ? `tool_${i}` : undefined,
     status: (i < 10 ? 'completed' : 'running') as 'completed' | 'running',
     startedAt: `2026-07-21T00:0${Math.min(i, 9)}:00.000Z`,
-    completedAt: i < 10 ? `2026-07-21T00:0${Math.min(i, 9)}:05.000Z` : null
+    completedAt: i < 10 ? `2026-07-21T00:0${Math.min(i, 9)}:05.000Z` : null,
   }))
 
   const entries: TranscriptEntry[] = [
@@ -953,7 +1114,7 @@ function createBigDataEntries(): TranscriptEntry[] {
       index: 0,
       messageId: 'big-user-1',
       content: '请帮我设计一个完整的 REST API 服务',
-      createdAt: '2026-07-21T00:00:00.000Z'
+      createdAt: '2026-07-21T00:00:00.000Z',
     },
     {
       kind: 'agent-reply',
@@ -966,7 +1127,7 @@ function createBigDataEntries(): TranscriptEntry[] {
         runId: 'big-run-1',
         status: 'completed',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: '2026-07-21T00:03:00.000Z'
+        completedAt: '2026-07-21T00:03:00.000Z',
       },
       turns: [
         {
@@ -975,21 +1136,21 @@ function createBigDataEntries(): TranscriptEntry[] {
           steps: manyToolSteps,
           status: 'completed' as const,
           startedAt: '2026-07-21T00:00:00.000Z',
-          completedAt: '2026-07-21T00:03:00.000Z'
-        }
-      ]
+          completedAt: '2026-07-21T00:03:00.000Z',
+        },
+      ],
     },
     {
       kind: 'compaction',
       index: 2,
-      timestamp: '2026-07-21T01:00:00.000Z'
+      timestamp: '2026-07-21T01:00:00.000Z',
     },
     {
       kind: 'user-message',
       index: 3,
       messageId: 'big-user-2',
       content: '现在加上 WebSocket 支持',
-      createdAt: '2026-07-21T01:00:01.000Z'
+      createdAt: '2026-07-21T01:00:01.000Z',
     },
     {
       kind: 'agent-reply',
@@ -1002,7 +1163,7 @@ function createBigDataEntries(): TranscriptEntry[] {
         runId: 'big-run-2',
         status: 'completed',
         startedAt: '2026-07-21T01:00:01.000Z',
-        completedAt: '2026-07-21T01:01:00.000Z'
+        completedAt: '2026-07-21T01:01:00.000Z',
       },
       turns: [
         {
@@ -1015,15 +1176,15 @@ function createBigDataEntries(): TranscriptEntry[] {
               content: longThinking,
               status: 'completed' as const,
               startedAt: '2026-07-21T01:00:01.000Z',
-              completedAt: '2026-07-21T01:01:00.000Z'
-            }
+              completedAt: '2026-07-21T01:01:00.000Z',
+            },
           ],
           status: 'completed' as const,
           startedAt: '2026-07-21T01:00:01.000Z',
-          completedAt: '2026-07-21T01:01:00.000Z'
-        }
-      ]
-    }
+          completedAt: '2026-07-21T01:01:00.000Z',
+        },
+      ],
+    },
   ]
 
   return entries
@@ -1041,7 +1202,7 @@ function createMultipleAttemptEntries(): TranscriptEntry[] {
     index: 0,
     messageId: 'multi-user-1',
     content: '部署到生产环境',
-    createdAt: '2026-07-21T00:00:00.000Z'
+    createdAt: '2026-07-21T00:00:00.000Z',
   })
 
   // 第一次尝试：失败
@@ -1060,8 +1221,8 @@ function createMultipleAttemptEntries(): TranscriptEntry[] {
       error: {
         code: 'unknown',
         message: '部署脚本执行失败：权限不足',
-        recoverable: true
-      }
+        recoverable: true,
+      },
     },
     turns: [
       {
@@ -1076,14 +1237,14 @@ function createMultipleAttemptEntries(): TranscriptEntry[] {
             toolCallId: 'tc-deploy-1',
             status: 'failed' as const,
             startedAt: '2026-07-21T00:00:00.000Z',
-            completedAt: '2026-07-21T00:00:30.000Z'
-          }
+            completedAt: '2026-07-21T00:00:30.000Z',
+          },
         ],
         status: 'failed' as const,
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: '2026-07-21T00:00:30.000Z'
-      }
-    ]
+        completedAt: '2026-07-21T00:00:30.000Z',
+      },
+    ],
   })
 
   // 重试：成功
@@ -1098,7 +1259,7 @@ function createMultipleAttemptEntries(): TranscriptEntry[] {
       runId: 'multi-run-2',
       status: 'completed',
       startedAt: '2026-07-21T00:01:00.000Z',
-      completedAt: '2026-07-21T00:02:00.000Z'
+      completedAt: '2026-07-21T00:02:00.000Z',
     },
     turns: [
       {
@@ -1113,14 +1274,14 @@ function createMultipleAttemptEntries(): TranscriptEntry[] {
             toolCallId: 'tc-deploy-2',
             status: 'completed' as const,
             startedAt: '2026-07-21T00:01:00.000Z',
-            completedAt: '2026-07-21T00:02:00.000Z'
-          }
+            completedAt: '2026-07-21T00:02:00.000Z',
+          },
         ],
         status: 'completed' as const,
         startedAt: '2026-07-21T00:01:00.000Z',
-        completedAt: '2026-07-21T00:02:00.000Z'
-      }
-    ]
+        completedAt: '2026-07-21T00:02:00.000Z',
+      },
+    ],
   })
 
   return entries
@@ -1138,7 +1299,7 @@ function createMultiCompactionEntries(): TranscriptEntry[] {
       index: entries.length,
       messageId: `comp-user-${i}`,
       content: `第 ${i + 1} 轮提问`,
-      createdAt: new Date(Date.now() + i * 60000).toISOString()
+      createdAt: new Date(Date.now() + i * 60000).toISOString(),
     })
     entries.push({
       kind: 'agent-reply',
@@ -1151,15 +1312,15 @@ function createMultiCompactionEntries(): TranscriptEntry[] {
         runId: `comp-run-${i}`,
         status: 'completed' as const,
         startedAt: new Date(Date.now() + i * 60000).toISOString(),
-        completedAt: new Date(Date.now() + i * 60000 + 10000).toISOString()
+        completedAt: new Date(Date.now() + i * 60000 + 10000).toISOString(),
       },
-      turns: []
+      turns: [],
     })
     if (i % 3 === 2) {
       entries.push({
         kind: 'compaction',
         index: entries.length,
-        timestamp: new Date(Date.now() + i * 60000 + 15000).toISOString()
+        timestamp: new Date(Date.now() + i * 60000 + 15000).toISOString(),
       })
     }
   }
@@ -1173,14 +1334,24 @@ describe('TranscriptMessages 确定性大数据夹具', () => {
     const entries = createBigDataEntries()
     const transcript = createTranscriptSnapshot(entries)
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     // 用户消息应可见
-    expect(screen.getByText('请帮我设计一个完整的 REST API 服务')).toBeInTheDocument()
+    expect(
+      screen.getByText('请帮我设计一个完整的 REST API 服务'),
+    ).toBeInTheDocument()
     expect(screen.getByText('现在加上 WebSocket 支持')).toBeInTheDocument()
 
     // Markdown 渲染应包含代码块（Shiki 高亮后可能包裹在 pre 中）
-    const codeBlocks = document.querySelectorAll('[data-streamdown="code-block"]')
+    const codeBlocks = document.querySelectorAll(
+      '[data-streamdown="code-block"]',
+    )
     expect(codeBlocks.length).toBeGreaterThan(0)
 
     // Compaction 指示器应出现
@@ -1199,7 +1370,9 @@ describe('TranscriptMessages 确定性大数据夹具', () => {
 
     // 12 个步骤中有部分应可见（标签与内容分行）
     expect(screen.getAllByText('tool_1').length).toBeGreaterThan(0)
-    expect(screen.getByText('执行操作 2：调用工具完成子任务')).toBeInTheDocument()
+    expect(
+      screen.getByText('执行操作 2：调用工具完成子任务'),
+    ).toBeInTheDocument()
   })
 
   it('渲染多次执行尝试：失败 + 重试成功', () => {
@@ -1207,7 +1380,13 @@ describe('TranscriptMessages 确定性大数据夹具', () => {
     const entries = createMultipleAttemptEntries()
     const transcript = createTranscriptSnapshot(entries)
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     // 失败的尝试应展示
     const failureLabels = screen.getAllByText('执行失败')
@@ -1227,7 +1406,13 @@ describe('TranscriptMessages 确定性大数据夹具', () => {
     const entries = createMultiCompactionEntries()
     const transcript = createTranscriptSnapshot(entries)
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     // 前面几轮应可见（虚拟列表只渲染视口内项目）
     expect(screen.getByText('第 1 轮提问')).toBeInTheDocument()
@@ -1249,7 +1434,13 @@ describe('TranscriptMessages 确定性大数据夹具', () => {
     const entries = createBigDataEntries()
     const transcript = createTranscriptSnapshot(entries)
 
-    render(<TranscriptMessages transcript={transcript} isStreaming={false} sessionId="session-1" />)
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
 
     const renderedItems = document.querySelectorAll('[data-index]')
     // 大数据条目共 5 条，clientHeight=600，全部在视口内 → 5 条全部渲染

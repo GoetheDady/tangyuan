@@ -5,7 +5,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { BashApprovalRequest } from '@tangyuan/contracts'
 import { BashApprovalCard } from './BashApprovalCard'
 
-function createApproval(overrides?: Partial<BashApprovalRequest>): BashApprovalRequest {
+function createApproval(
+  overrides?: Partial<BashApprovalRequest>,
+): BashApprovalRequest {
   return {
     approvalId: 'approval-1',
     agentId: 'tangyuan',
@@ -16,7 +18,7 @@ function createApproval(overrides?: Partial<BashApprovalRequest>): BashApprovalR
     riskDescription: '此命令将安装第三方软件包 lodash，可能引入未知依赖。',
     status: 'pending',
     createdAt: '2026-07-21T00:00:00.000Z',
-    ...overrides
+    ...overrides,
   }
 }
 
@@ -29,14 +31,12 @@ describe('BashApprovalCard', () => {
         onApproveOnce={vi.fn()}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     expect(screen.getByText('npm install lodash')).toBeInTheDocument()
     expect(screen.getByText('/Users/test/project')).toBeInTheDocument()
-    expect(
-      screen.getByText(/此命令将安装第三方软件包/)
-    ).toBeInTheDocument()
+    expect(screen.getByText(/此命令将安装第三方软件包/)).toBeInTheDocument()
   })
 
   it('shows "待审批" badge in pending state', () => {
@@ -47,7 +47,7 @@ describe('BashApprovalCard', () => {
         onApproveOnce={vi.fn()}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     expect(screen.getByText('待审批')).toBeInTheDocument()
@@ -62,17 +62,19 @@ describe('BashApprovalCard', () => {
         onApproveOnce={vi.fn()}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     expect(
-      screen.getByRole('button', { name: '拒绝此命令执行' })
+      screen.getByRole('button', { name: '拒绝此命令执行' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: '始终允许此命令（当前会话中同命令免审）' })
+      screen.getByRole('button', {
+        name: '始终允许此命令（当前会话中同命令免审）',
+      }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: '仅允许本次执行此命令' })
+      screen.getByRole('button', { name: '仅允许本次执行此命令' }),
     ).toBeInTheDocument()
   })
 
@@ -87,7 +89,7 @@ describe('BashApprovalCard', () => {
         onApproveOnce={onApproveOnce}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     // Wait for phase transition from entering to pending
@@ -96,7 +98,7 @@ describe('BashApprovalCard', () => {
     })
 
     const approveButton = screen.getByRole('button', {
-      name: '仅允许本次执行此命令'
+      name: '仅允许本次执行此命令',
     })
     await user.click(approveButton)
 
@@ -116,7 +118,7 @@ describe('BashApprovalCard', () => {
         onApproveOnce={vi.fn()}
         onApproveAlways={onApproveAlways}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -124,7 +126,7 @@ describe('BashApprovalCard', () => {
     })
 
     const alwaysButton = screen.getByRole('button', {
-      name: '始终允许此命令（当前会话中同命令免审）'
+      name: '始终允许此命令（当前会话中同命令免审）',
     })
     await user.click(alwaysButton)
 
@@ -144,7 +146,7 @@ describe('BashApprovalCard', () => {
         onApproveOnce={vi.fn()}
         onApproveAlways={vi.fn()}
         onReject={onReject}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -152,7 +154,7 @@ describe('BashApprovalCard', () => {
     })
 
     const rejectButton = screen.getByRole('button', {
-      name: '拒绝此命令执行'
+      name: '拒绝此命令执行',
     })
     await user.click(rejectButton)
 
@@ -166,9 +168,7 @@ describe('BashApprovalCard', () => {
     // Return a promise that never resolves to keep loading state
     const onApproveOnce = vi
       .fn()
-      .mockImplementation(
-        () => new Promise<void>(() => undefined)
-      )
+      .mockImplementation(() => new Promise<void>(() => undefined))
     const approval = createApproval()
 
     render(
@@ -177,7 +177,7 @@ describe('BashApprovalCard', () => {
         onApproveOnce={onApproveOnce}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -185,7 +185,7 @@ describe('BashApprovalCard', () => {
     })
 
     const approveButton = screen.getByRole('button', {
-      name: '仅允许本次执行此命令'
+      name: '仅允许本次执行此命令',
     })
     await user.click(approveButton)
 
@@ -200,9 +200,7 @@ describe('BashApprovalCard', () => {
     const user = userEvent.setup()
     const onApproveOnce = vi
       .fn()
-      .mockImplementation(
-        () => new Promise<void>(() => undefined)
-      )
+      .mockImplementation(() => new Promise<void>(() => undefined))
     const approval = createApproval()
 
     render(
@@ -211,7 +209,7 @@ describe('BashApprovalCard', () => {
         onApproveOnce={onApproveOnce}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -219,15 +217,15 @@ describe('BashApprovalCard', () => {
     })
 
     const approveButton = screen.getByRole('button', {
-      name: '仅允许本次执行此命令'
+      name: '仅允许本次执行此命令',
     })
     await user.click(approveButton)
 
     const rejectButton = screen.getByRole('button', {
-      name: '拒绝此命令执行'
+      name: '拒绝此命令执行',
     })
     const alwaysButton = screen.getByRole('button', {
-      name: '始终允许此命令（当前会话中同命令免审）'
+      name: '始终允许此命令（当前会话中同命令免审）',
     })
 
     await waitFor(() => {
@@ -248,7 +246,7 @@ describe('BashApprovalCard', () => {
         onApproveOnce={onApproveOnce}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -256,7 +254,7 @@ describe('BashApprovalCard', () => {
     })
 
     const approveButton = screen.getByRole('button', {
-      name: '仅允许本次执行此命令'
+      name: '仅允许本次执行此命令',
     })
     await user.click(approveButton)
 
@@ -270,7 +268,9 @@ describe('BashApprovalCard', () => {
 
   it('shows error message when action fails', async () => {
     const user = userEvent.setup()
-    const onApproveOnce = vi.fn().mockRejectedValue(new Error('网络错误，请重试'))
+    const onApproveOnce = vi
+      .fn()
+      .mockRejectedValue(new Error('网络错误，请重试'))
     const approval = createApproval()
 
     render(
@@ -279,7 +279,7 @@ describe('BashApprovalCard', () => {
         onApproveOnce={onApproveOnce}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -287,7 +287,7 @@ describe('BashApprovalCard', () => {
     })
 
     const approveButton = screen.getByRole('button', {
-      name: '仅允许本次执行此命令'
+      name: '仅允许本次执行此命令',
     })
     await user.click(approveButton)
 
@@ -312,7 +312,7 @@ describe('BashApprovalCard', () => {
         onApproveOnce={vi.fn()}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     // Focus should be on the first button ("拒绝") after entering phase completes
@@ -322,7 +322,7 @@ describe('BashApprovalCard', () => {
 
     // The first button ref is set on the reject button
     const rejectButton = screen.getByRole('button', {
-      name: '拒绝此命令执行'
+      name: '拒绝此命令执行',
     })
     expect(document.activeElement).toBe(rejectButton)
   })
@@ -338,7 +338,7 @@ describe('BashApprovalCard', () => {
         onApproveOnce={vi.fn()}
         onApproveAlways={vi.fn()}
         onReject={onReject}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -364,17 +364,17 @@ describe('BashApprovalCard', () => {
         onApproveOnce={vi.fn()}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     // region role for the card
     expect(
-      screen.getByRole('region', { name: 'Bash 命令执行审批' })
+      screen.getByRole('region', { name: 'Bash 命令执行审批' }),
     ).toBeInTheDocument()
 
     // aria-live for dynamic updates
     expect(
-      screen.getByRole('region', { name: 'Bash 命令执行审批' })
+      screen.getByRole('region', { name: 'Bash 命令执行审批' }),
     ).toHaveAttribute('aria-live', 'polite')
 
     // alert role for risk description
@@ -390,7 +390,7 @@ describe('BashApprovalCard', () => {
         onApproveOnce={vi.fn()}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     const codeBlock = screen.getByLabelText('命令：npm install lodash')
@@ -400,13 +400,12 @@ describe('BashApprovalCard', () => {
 
   it('prevents double-clicks during submission', async () => {
     const user = userEvent.setup()
-    // eslint-disable-next-line prefer-const
     let resolvePromise: () => void
     const onApproveOnce = vi.fn().mockImplementation(
       () =>
         new Promise<void>((resolve) => {
           resolvePromise = resolve
-        })
+        }),
     )
     const approval = createApproval()
 
@@ -416,7 +415,7 @@ describe('BashApprovalCard', () => {
         onApproveOnce={onApproveOnce}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -424,7 +423,7 @@ describe('BashApprovalCard', () => {
     })
 
     const approveButton = screen.getByRole('button', {
-      name: '仅允许本次执行此命令'
+      name: '仅允许本次执行此命令',
     })
 
     // Click twice rapidly
@@ -445,7 +444,7 @@ describe('BashApprovalCard', () => {
   it('renders different commands correctly', () => {
     const approval = createApproval({
       command: 'rm -rf /tmp/test',
-      riskDescription: '此命令将删除临时文件。'
+      riskDescription: '此命令将删除临时文件。',
     })
 
     render(
@@ -454,7 +453,7 @@ describe('BashApprovalCard', () => {
         onApproveOnce={vi.fn()}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     expect(screen.getByText('rm -rf /tmp/test')).toBeInTheDocument()
@@ -473,11 +472,11 @@ describe('BashApprovalCard', () => {
         onApproveOnce={vi.fn()}
         onApproveAlways={vi.fn()}
         onReject={vi.fn()}
-      />
+      />,
     )
 
     expect(
-      screen.getByText(/此命令将以当前 macOS 用户权限执行/)
+      screen.getByText(/此命令将以当前 macOS 用户权限执行/),
     ).toBeInTheDocument()
   })
 })

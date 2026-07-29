@@ -8,7 +8,7 @@ describe('StreamdownMessage', () => {
   function defineMockApi(openExternalLink = vi.fn()) {
     Object.defineProperty(window, 'api', {
       configurable: true,
-      value: { openExternalLink }
+      value: { openExternalLink },
     })
   }
 
@@ -56,7 +56,9 @@ describe('StreamdownMessage', () => {
 
   it('renders tables', () => {
     defineMockApi()
-    render(<StreamdownMessage content={'| A | B |\n| --- | --- |\n| 1 | 2 |'} />)
+    render(
+      <StreamdownMessage content={'| A | B |\n| --- | --- |\n| 1 | 2 |'} />,
+    )
 
     expect(screen.getByText('A')).toBeInTheDocument()
     expect(screen.getByText('B')).toBeInTheDocument()
@@ -73,7 +75,9 @@ describe('StreamdownMessage', () => {
   it('handles CJK text correctly', () => {
     defineMockApi()
     render(
-      <StreamdownMessage content={'# 你好世界\n\n这是一段**中文**内容，包含*斜体*和`代码`。'} />
+      <StreamdownMessage
+        content={'# 你好世界\n\n这是一段**中文**内容，包含*斜体*和`代码`。'}
+      />,
     )
 
     // 标题应包含"你好世界"
@@ -121,7 +125,8 @@ describe('StreamdownMessage', () => {
 
     // streamdown 会对 URL 做规范化（如添加尾部斜杠）
     expect(openExternalLink).toHaveBeenCalled()
-    const callArg = openExternalLink.mock.calls[0]?.[0] as { url: string } | undefined
+    const callArg = openExternalLink.mock.calls[0]?.[0] as
+      { url: string } | undefined
     expect(callArg?.url).toMatch(/^https:\/\/example\.com/)
   })
 

@@ -6,7 +6,7 @@ import {
   FolderSearch,
   MessageCircle,
   Settings,
-  TriangleAlert
+  TriangleAlert,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
@@ -24,9 +24,13 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle
+  AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import type { AgentSummary, UnclaimedDirectory } from '@tangyuan/contracts'
 
 /**
@@ -42,8 +46,12 @@ export function ConsoleAgentListPage(): React.JSX.Element {
   const [archiveTarget, setArchiveTarget] = useState<AgentSummary | null>(null)
   const [recoverTarget, setRecoverTarget] = useState<AgentSummary | null>(null)
   const [isReconciling, setIsReconciling] = useState(false)
-  const [unclaimedDirectories, setUnclaimedDirectories] = useState<UnclaimedDirectory[]>([])
-  const [claimTarget, setClaimTarget] = useState<UnclaimedDirectory | null>(null)
+  const [unclaimedDirectories, setUnclaimedDirectories] = useState<
+    UnclaimedDirectory[]
+  >([])
+  const [claimTarget, setClaimTarget] = useState<UnclaimedDirectory | null>(
+    null,
+  )
 
   const loadAgents = useCallback(() => {
     void window.api
@@ -67,16 +75,20 @@ export function ConsoleAgentListPage(): React.JSX.Element {
     ? allAgents
     : allAgents.filter((agent) => agent.status === 'active')
 
-  const archivedCount = allAgents.filter((agent) => agent.status === 'archived').length
+  const archivedCount = allAgents.filter(
+    (agent) => agent.status === 'archived',
+  ).length
 
   async function handleArchive(): Promise<void> {
     if (!archiveTarget) return
 
     try {
       const updated = await window.api.archiveAgent({
-        agentId: archiveTarget.agentId
+        agentId: archiveTarget.agentId,
       })
-      setAllAgents((current) => current.map((a) => (a.agentId === updated.agentId ? updated : a)))
+      setAllAgents((current) =>
+        current.map((a) => (a.agentId === updated.agentId ? updated : a)),
+      )
       toast.success(`已归档 Agent「${archiveTarget.displayName}」`)
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : '归档 Agent 失败')
@@ -90,9 +102,11 @@ export function ConsoleAgentListPage(): React.JSX.Element {
 
     try {
       const updated = await window.api.recoverAgent({
-        agentId: recoverTarget.agentId
+        agentId: recoverTarget.agentId,
       })
-      setAllAgents((current) => current.map((a) => (a.agentId === updated.agentId ? updated : a)))
+      setAllAgents((current) =>
+        current.map((a) => (a.agentId === updated.agentId ? updated : a)),
+      )
       toast.success(`已恢复 Agent「${recoverTarget.displayName}」`)
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : '恢复 Agent 失败')
@@ -109,10 +123,12 @@ export function ConsoleAgentListPage(): React.JSX.Element {
       setAllAgents(result.agents)
       setUnclaimedDirectories(result.unclaimedDirectories)
 
-      const damagedCount = result.agents.filter((a) => a.directoryStatus === 'damaged').length
+      const damagedCount = result.agents.filter(
+        (a) => a.directoryStatus === 'damaged',
+      ).length
       if (damagedCount > 0 || result.unclaimedDirectories.length > 0) {
         toast.warning(
-          `对账完成：${damagedCount} 个 Agent 目录异常，${result.unclaimedDirectories.length} 个未归属目录`
+          `对账完成：${damagedCount} 个 Agent 目录异常，${result.unclaimedDirectories.length} 个未归属目录`,
         )
       } else {
         toast.success('目录对账完成，所有 Agent 目录正常')
@@ -124,15 +140,19 @@ export function ConsoleAgentListPage(): React.JSX.Element {
     }
   }
 
-  async function handleClaimDirectory(directory: UnclaimedDirectory): Promise<void> {
+  async function handleClaimDirectory(
+    directory: UnclaimedDirectory,
+  ): Promise<void> {
     try {
       const displayName = directory.agentId
       const updated = await window.api.claimAgentDirectory({
         agentId: directory.agentId,
-        displayName
+        displayName,
       })
       setAllAgents((current) => [...current, updated])
-      setUnclaimedDirectories((current) => current.filter((d) => d.agentId !== directory.agentId))
+      setUnclaimedDirectories((current) =>
+        current.filter((d) => d.agentId !== directory.agentId),
+      )
       toast.success(`已认领 Agent「${displayName}」`)
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : '认领目录失败')
@@ -142,16 +162,20 @@ export function ConsoleAgentListPage(): React.JSX.Element {
   }
 
   return (
-    <main className="min-h-full bg-background px-6 py-8 text-foreground">
+    <main className="bg-background text-foreground min-h-full px-6 py-8">
       <div className="mx-auto max-w-5xl">
         <header className="mb-8">
           <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-md bg-primary text-primary-foreground">
+            <div className="bg-primary text-primary-foreground grid size-10 place-items-center rounded-md">
               <Bot size={20} aria-hidden="true" />
             </div>
             <div>
-              <h1 className="text-2xl font-semibold leading-tight">Agent 管理</h1>
-              <p className="text-body text-muted-foreground">查看和管理所有 Agent 的状态与默认模型</p>
+              <h1 className="text-2xl leading-tight font-semibold">
+                Agent 管理
+              </h1>
+              <p className="text-body text-muted-foreground">
+                查看和管理所有 Agent 的状态与默认模型
+              </p>
             </div>
           </div>
         </header>
@@ -163,16 +187,22 @@ export function ConsoleAgentListPage(): React.JSX.Element {
         </div>
 
         {isLoading ? (
-          <div className="rounded-lg border bg-card p-12 text-center">
-            <p className="text-body text-muted-foreground">正在加载 Agent 列表...</p>
+          <div className="bg-card rounded-lg border p-12 text-center">
+            <p className="text-body text-muted-foreground">
+              正在加载 Agent 列表...
+            </p>
           </div>
         ) : allAgents.length === 0 ? (
-          <div className="rounded-lg border bg-card p-12 text-center">
-            <div className="mx-auto mb-4 grid size-12 place-items-center rounded-full bg-muted">
-              <Bot size={22} className="text-muted-foreground" aria-hidden="true" />
+          <div className="bg-card rounded-lg border p-12 text-center">
+            <div className="bg-muted mx-auto mb-4 grid size-12 place-items-center rounded-full">
+              <Bot
+                size={22}
+                className="text-muted-foreground"
+                aria-hidden="true"
+              />
             </div>
             <h2 className="text-section-heading font-medium">暂无 Agent</h2>
-            <p className="mt-2 max-w-md mx-auto text-body text-muted-foreground">
+            <p className="text-body text-muted-foreground mx-auto mt-2 max-w-md">
               请先在控制台中配置模型服务，然后在汤圆对话中创建新的 Agent。
             </p>
             <div className="mt-6">
@@ -215,15 +245,21 @@ export function ConsoleAgentListPage(): React.JSX.Element {
               {displayedAgents.map((agent) => (
                 <div
                   key={agent.agentId}
-                  className="flex items-center justify-between rounded-lg border bg-card p-4 transition hover:shadow-sm"
+                  className="bg-card flex items-center justify-between rounded-lg border p-4 transition hover:shadow-sm"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2.5">
-                      <h3 className="truncate text-body font-semibold">{agent.displayName}</h3>
+                      <h3 className="text-body truncate font-semibold">
+                        {agent.displayName}
+                      </h3>
                       {agent.agentId === 'tangyuan' ? (
                         <Badge variant="secondary">默认</Badge>
                       ) : null}
-                      <Badge variant={agent.status === 'active' ? 'success' : 'secondary'}>
+                      <Badge
+                        variant={
+                          agent.status === 'active' ? 'success' : 'secondary'
+                        }
+                      >
                         {agent.status === 'active' ? '活跃' : '已归档'}
                       </Badge>
                       {agent.directoryStatus === 'damaged' ? (
@@ -241,16 +277,19 @@ export function ConsoleAgentListPage(): React.JSX.Element {
                         </Tooltip>
                       ) : null}
                     </div>
-                    <p className="mt-1 truncate text-label text-muted-foreground">
+                    <p className="text-label text-muted-foreground mt-1 truncate">
                       ID：{agent.agentId}
                       {agent.defaultProviderId && agent.defaultModelId
                         ? ` · 默认模型：${agent.defaultProviderId}/${agent.defaultModelId}`
                         : ' · 未配置默认模型'}
-                      {agent.archivedAt ? ` · 归档于：${agent.archivedAt}` : null}
+                      {agent.archivedAt
+                        ? ` · 归档于：${agent.archivedAt}`
+                        : null}
                     </p>
                   </div>
                   <div className="ml-4 flex items-center gap-2">
-                    {agent.directoryStatus !== 'damaged' && agent.status === 'active' ? (
+                    {agent.directoryStatus !== 'damaged' &&
+                    agent.status === 'active' ? (
                       <Link to={`/chat/${agent.agentId}`}>
                         <Button variant="outline" size="sm">
                           <MessageCircle aria-hidden="true" />
@@ -258,7 +297,8 @@ export function ConsoleAgentListPage(): React.JSX.Element {
                         </Button>
                       </Link>
                     ) : null}
-                    {agent.status === 'active' && agent.agentId !== 'tangyuan' ? (
+                    {agent.status === 'active' &&
+                    agent.agentId !== 'tangyuan' ? (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -294,19 +334,23 @@ export function ConsoleAgentListPage(): React.JSX.Element {
 
             {unclaimedDirectories.length > 0 ? (
               <div className="mt-8">
-                <h2 className="mb-3 text-section-heading font-semibold">未归属目录</h2>
-                <p className="mb-4 text-body text-muted-foreground">
+                <h2 className="text-section-heading mb-3 font-semibold">
+                  未归属目录
+                </h2>
+                <p className="text-body text-muted-foreground mb-4">
                   以下目录存在于磁盘上但未在配置中注册，可认领为活跃 Agent。
                 </p>
                 <div className="space-y-3">
                   {unclaimedDirectories.map((dir) => (
                     <div
                       key={dir.agentId}
-                      className="flex items-center justify-between rounded-lg border border-dashed bg-card p-4"
+                      className="bg-card flex items-center justify-between rounded-lg border border-dashed p-4"
                     >
                       <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-body font-semibold">{dir.agentId}</h3>
-                        <p className="mt-1 truncate text-label text-muted-foreground">
+                        <h3 className="text-body truncate font-semibold">
+                          {dir.agentId}
+                        </h3>
+                        <p className="text-label text-muted-foreground mt-1 truncate">
                           路径：{dir.homePath}
                           {dir.hasSoul ? ' · 包含 soul.md' : ' · 缺少 soul.md'}
                         </p>
@@ -341,13 +385,16 @@ export function ConsoleAgentListPage(): React.JSX.Element {
           <AlertDialogHeader>
             <AlertDialogTitle>归档 Agent</AlertDialogTitle>
             <AlertDialogDescription>
-              确定归档 Agent「{archiveTarget?.displayName}」吗？归档后该 Agent 将默认隐藏，但
-              soul、skills、workspace 和 Pi session 不会被删除，以后可以恢复。
+              确定归档 Agent「{archiveTarget?.displayName}」吗？归档后该 Agent
+              将默认隐藏，但 soul、skills、workspace 和 Pi session
+              不会被删除，以后可以恢复。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleArchive}>确认归档</AlertDialogAction>
+            <AlertDialogAction onClick={handleArchive}>
+              确认归档
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -368,7 +415,9 @@ export function ConsoleAgentListPage(): React.JSX.Element {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRecover}>确认恢复</AlertDialogAction>
+            <AlertDialogAction onClick={handleRecover}>
+              确认恢复
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -4,3 +4,8 @@ pnpm-lock.yaml
 LICENSE.md
 tsconfig.json
 tsconfig.*.json
+
+# 测试与构建产物，不应被格式化
+coverage
+test-results
+playwright-report

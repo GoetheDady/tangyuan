@@ -4,7 +4,7 @@ import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
   type LastActiveSession,
-  type RuntimeSnapshot
+  type RuntimeSnapshot,
 } from '@tangyuan/contracts'
 
 type LegacyTestMessage = {
@@ -22,7 +22,9 @@ type LegacyTestMessage = {
  * @returns 符合 contracts Zod schema 的就绪态运行时快照。
  * @throws 此方法不会主动抛出错误。
  */
-export function createReadyRuntimeSnapshot(overrides?: Partial<RuntimeSnapshot>): RuntimeSnapshot {
+export function createReadyRuntimeSnapshot(
+  overrides?: Partial<RuntimeSnapshot>,
+): RuntimeSnapshot {
   return createRuntimeSnapshot({
     activeAgent: {
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
@@ -32,34 +34,38 @@ export function createReadyRuntimeSnapshot(overrides?: Partial<RuntimeSnapshot>)
         initialized: true,
         bootstrapRequired: false,
         soulUpdatedAt: '2026-07-01T00:00:00.000Z',
-        userUpdatedAt: '2026-07-01T00:00:00.000Z'
-      }
+        userUpdatedAt: '2026-07-01T00:00:00.000Z',
+      },
     },
     providers: [
       { providerId: 'anthropic', displayName: 'Anthropic' },
-      { providerId: 'openai', displayName: 'OpenAI' }
+      { providerId: 'openai', displayName: 'OpenAI' },
     ],
     models: [
-      { providerId: 'anthropic', modelId: 'claude-sonnet-4-5', displayName: 'Claude Sonnet 4.5' },
-      { providerId: 'openai', modelId: 'gpt-4o', displayName: 'GPT-4o' }
+      {
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        displayName: 'Claude Sonnet 4.5',
+      },
+      { providerId: 'openai', modelId: 'gpt-4o', displayName: 'GPT-4o' },
     ],
     settings: {
       selectedProviderId: 'anthropic',
-      selectedModelId: 'claude-sonnet-4-5'
+      selectedModelId: 'claude-sonnet-4-5',
     },
     configuredProviders: {
       anthropic: {
         configured: true,
-        maskedValue: 'sk-a...7xq'
-      }
+        maskedValue: 'sk-a...7xq',
+      },
     },
     auth: {
       apiKey: {
         configured: true,
-        maskedValue: 'sk-a...7xq'
-      }
+        maskedValue: 'sk-a...7xq',
+      },
     },
-    ...overrides
+    ...overrides,
   })
 }
 
@@ -70,7 +76,9 @@ export function createReadyRuntimeSnapshot(overrides?: Partial<RuntimeSnapshot>)
  * @returns 符合 contracts Zod schema 的缺少配置态运行时快照。
  * @throws 此方法不会主动抛出错误。
  */
-export function createMissingConfigSnapshot(overrides?: Partial<RuntimeSnapshot>): RuntimeSnapshot {
+export function createMissingConfigSnapshot(
+  overrides?: Partial<RuntimeSnapshot>,
+): RuntimeSnapshot {
   return createRuntimeSnapshot({
     activeAgent: {
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
@@ -80,25 +88,29 @@ export function createMissingConfigSnapshot(overrides?: Partial<RuntimeSnapshot>
         initialized: false,
         bootstrapRequired: true,
         soulUpdatedAt: null,
-        userUpdatedAt: null
-      }
+        userUpdatedAt: null,
+      },
     },
     providers: [{ providerId: 'anthropic', displayName: 'Anthropic' }],
     models: [
-      { providerId: 'anthropic', modelId: 'claude-sonnet-4-5', displayName: 'Claude Sonnet 4.5' }
+      {
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        displayName: 'Claude Sonnet 4.5',
+      },
     ],
     settings: {
       selectedProviderId: null,
-      selectedModelId: null
+      selectedModelId: null,
     },
     configuredProviders: {},
     auth: {
       apiKey: {
         configured: false,
-        maskedValue: null
-      }
+        maskedValue: null,
+      },
     },
-    ...overrides
+    ...overrides,
   })
 }
 
@@ -109,7 +121,9 @@ export function createMissingConfigSnapshot(overrides?: Partial<RuntimeSnapshot>
  * @returns 可安全传给 Renderer 的 LegacyTestMessage。
  * @throws 此方法不会主动抛出错误。
  */
-export function createTestMessage(overrides?: Partial<LegacyTestMessage>): LegacyTestMessage {
+export function createTestMessage(
+  overrides?: Partial<LegacyTestMessage>,
+): LegacyTestMessage {
   return {
     messageId: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     agentId: TANGYUAN_DEFAULT_AGENT_ID,
@@ -117,7 +131,7 @@ export function createTestMessage(overrides?: Partial<LegacyTestMessage>): Legac
     role: 'agent',
     content: '这是一条测试消息。',
     createdAt: new Date().toISOString(),
-    ...overrides
+    ...overrides,
   }
 }
 
@@ -131,7 +145,7 @@ export function createLongTestMessage(): LegacyTestMessage {
   const longContent = Array.from(
     { length: 180 },
     (_value, index) =>
-      `第${index + 1}行：这是一段很长的回复内容，用来模拟大语言模型连续输出很多文本时，底部输入框是否仍然留在屏幕里。`
+      `第${index + 1}行：这是一段很长的回复内容，用来模拟大语言模型连续输出很多文本时，底部输入框是否仍然留在屏幕里。`,
   ).join('\n')
 
   return createTestMessage({ content: longContent, messageId: 'long-message' })
@@ -150,9 +164,14 @@ export function createPreloadApiInitScript(
   runtime: RuntimeSnapshot,
   sessions: AgentSessionSummary[] = [],
   messages: LegacyTestMessage[] = [],
-  lastActiveSession: LastActiveSession | null = null
+  lastActiveSession: LastActiveSession | null = null,
 ): string {
-  const serialized = JSON.stringify({ runtime, sessions, messages, lastActiveSession })
+  const serialized = JSON.stringify({
+    runtime,
+    sessions,
+    messages,
+    lastActiveSession,
+  })
 
   return `
     (() => {
@@ -380,8 +399,8 @@ export function createTestSessions(count = 1): AgentSessionSummary[] {
     createDefaultSessionSummary({
       sessionId: `session-${index + 1}`,
       title: `测试会话 ${index + 1}`,
-      updatedAt: new Date().toISOString()
-    })
+      updatedAt: new Date().toISOString(),
+    }),
   )
 }
 
@@ -399,16 +418,17 @@ export function createTestMessages(): LegacyTestMessage[] {
       sessionId: 'session-1',
       role: 'user',
       content: '你好汤圆，请帮我写一段代码。',
-      createdAt: new Date(Date.now() - 60000).toISOString()
+      createdAt: new Date(Date.now() - 60000).toISOString(),
     },
     {
       messageId: 'msg-agent-1',
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
       sessionId: 'session-1',
       role: 'agent',
-      content: '你好！我很乐意帮你写代码。请告诉我你需要什么功能，我会为你生成相应的代码。',
-      createdAt: new Date().toISOString()
-    }
+      content:
+        '你好！我很乐意帮你写代码。请告诉我你需要什么功能，我会为你生成相应的代码。',
+      createdAt: new Date().toISOString(),
+    },
   ]
 }
 
@@ -428,7 +448,7 @@ export function createMarkdownTestMessages(): LegacyTestMessage[] {
       sessionId: 'session-1',
       role: 'user',
       content: '帮我写一段代码',
-      createdAt: new Date(Date.now() - 60000).toISOString()
+      createdAt: new Date(Date.now() - 60000).toISOString(),
     },
     {
       messageId: 'msg-agent-2',
@@ -456,9 +476,9 @@ export function createMarkdownTestMessages(): LegacyTestMessage[] {
         '- [ ] 编写测试',
         '- [ ] 代码审查',
         '',
-        '参考文档：[TypeScript 官网](https://www.typescriptlang.org)'
+        '参考文档：[TypeScript 官网](https://www.typescriptlang.org)',
       ].join('\n'),
-      createdAt: new Date().toISOString()
-    }
+      createdAt: new Date().toISOString(),
+    },
   ]
 }

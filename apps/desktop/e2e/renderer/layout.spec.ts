@@ -3,7 +3,7 @@ import {
   createReadyRuntimeSnapshot,
   createTestSessions,
   createLongTestMessage,
-  createPreloadApiInitScript
+  createPreloadApiInitScript,
 } from '../fixtures/preload-mock'
 
 test.describe('长消息布局', () => {
@@ -11,7 +11,9 @@ test.describe('长消息布局', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
     const longMessage = createLongTestMessage()
-    const initScript = createPreloadApiInitScript(runtime, sessions, [longMessage])
+    const initScript = createPreloadApiInitScript(runtime, sessions, [
+      longMessage,
+    ])
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/chat/tangyuan')
@@ -42,7 +44,9 @@ test.describe('长消息布局', () => {
         // Composer 的 top 不应小于 0（在视口顶部之上）
         expect(composerBox.y).toBeGreaterThanOrEqual(0)
         // Composer 的 bottom 不应超过 viewport height
-        expect(composerBox.y + composerBox.height).toBeLessThanOrEqual(viewport.height)
+        expect(composerBox.y + composerBox.height).toBeLessThanOrEqual(
+          viewport.height,
+        )
       }
     }
   })
@@ -51,7 +55,9 @@ test.describe('长消息布局', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
     const longMessage = createLongTestMessage()
-    const initScript = createPreloadApiInitScript(runtime, sessions, [longMessage])
+    const initScript = createPreloadApiInitScript(runtime, sessions, [
+      longMessage,
+    ])
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/chat/tangyuan')
@@ -67,7 +73,9 @@ test.describe('长消息布局', () => {
       if (viewport) {
         // Footer 完全在视口内
         expect(footerBox.y).toBeGreaterThanOrEqual(0)
-        expect(footerBox.y + footerBox.height).toBeLessThanOrEqual(viewport.height)
+        expect(footerBox.y + footerBox.height).toBeLessThanOrEqual(
+          viewport.height,
+        )
       }
     }
   })
@@ -76,14 +84,18 @@ test.describe('长消息布局', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
     const longMessage = createLongTestMessage()
-    const initScript = createPreloadApiInitScript(runtime, sessions, [longMessage])
+    const initScript = createPreloadApiInitScript(runtime, sessions, [
+      longMessage,
+    ])
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/chat/tangyuan')
     await page.waitForSelector('[data-testid="message-scroll-area"]')
 
     const messageArea = page.locator('[data-testid="message-scroll-area"]')
-    const overflowY = await messageArea.evaluate((el) => getComputedStyle(el).overflowY)
+    const overflowY = await messageArea.evaluate(
+      (el) => getComputedStyle(el).overflowY,
+    )
 
     // 消息区域应有垂直滚动行为
     expect(['auto', 'scroll']).toContain(overflowY)
@@ -93,7 +105,9 @@ test.describe('长消息布局', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
     const longMessage = createLongTestMessage()
-    const initScript = createPreloadApiInitScript(runtime, sessions, [longMessage])
+    const initScript = createPreloadApiInitScript(runtime, sessions, [
+      longMessage,
+    ])
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/chat/tangyuan')
@@ -101,6 +115,8 @@ test.describe('长消息布局', () => {
 
     // 验证长消息中包含的关键文本可被找到
     await expect(page.getByText('第1行：这是一段很长的回复内容')).toBeVisible()
-    await expect(page.getByText('第180行：这是一段很长的回复内容')).toBeVisible()
+    await expect(
+      page.getByText('第180行：这是一段很长的回复内容'),
+    ).toBeVisible()
   })
 })

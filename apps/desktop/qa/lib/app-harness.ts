@@ -34,8 +34,8 @@ export async function launchApp(): Promise<AppHarness> {
     env: {
       ...process.env,
       // 显式不进入打包 smoke test 模式
-      TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: ''
-    }
+      TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: '',
+    },
   })
 
   const window = await app.firstWindow()
@@ -60,7 +60,7 @@ export async function launchApp(): Promise<AppHarness> {
     pageErrors,
     close: async () => {
       await app.close()
-    }
+    },
   }
 }
 
@@ -75,7 +75,7 @@ export async function launchApp(): Promise<AppHarness> {
  * @returns 配置是否成功（key 无效或验证失败时返回 false 及原因）。
  */
 export async function configureForQa(
-  harness: AppHarness
+  harness: AppHarness,
 ): Promise<{ ok: boolean; reason?: string }> {
   const apiKey = process.env.TANGYUAN_QA_API_KEY
   if (!apiKey) {
@@ -104,6 +104,6 @@ export async function configureForQa(
         return { ok: false, reason: String(e) }
       }
     },
-    { providerId, modelId, apiKey }
+    { providerId, modelId, apiKey },
   )
 }

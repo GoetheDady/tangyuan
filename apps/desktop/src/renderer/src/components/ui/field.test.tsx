@@ -11,13 +11,20 @@ import {
   FieldDescription,
   FieldError,
   FieldGroup,
-  FieldLabel
+  FieldLabel,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 
-function AccessibleField(props: { invalid?: boolean; disabled?: boolean }): React.JSX.Element {
+function AccessibleField(props: {
+  invalid?: boolean
+  disabled?: boolean
+}): React.JSX.Element {
   return (
-    <Field controlId="provider" invalid={props.invalid} disabled={props.disabled}>
+    <Field
+      controlId="provider"
+      invalid={props.invalid}
+      disabled={props.disabled}
+    >
       <FieldLabel>模型服务</FieldLabel>
       <FieldContent>
         <FieldControl>
@@ -40,7 +47,7 @@ describe('Field', () => {
         <FieldContent>
           <Input id="name" />
         </FieldContent>
-      </Field>
+      </Field>,
     )
 
     const field = screen.getByTestId('field')
@@ -62,7 +69,7 @@ describe('Field', () => {
             <Input id="email-address" />
           </FieldControl>
         </FieldContent>
-      </Field>
+      </Field>,
     )
 
     const input = screen.getByRole('textbox', { name: '邮箱' })
@@ -85,12 +92,20 @@ describe('Field', () => {
             </FieldControl>
           </FieldContent>
         </Field>
-      </FieldGroup>
+      </FieldGroup>,
     )
 
-    expect(screen.getByTestId('field-group')).toHaveAttribute('data-slot', 'field-group')
-    expect(screen.getByTestId('field')).toHaveAttribute('data-orientation', 'horizontal')
-    expect(screen.getByTestId('field').className).toContain('grid-cols-[120px_minmax(0,1fr)]')
+    expect(screen.getByTestId('field-group')).toHaveAttribute(
+      'data-slot',
+      'field-group',
+    )
+    expect(screen.getByTestId('field')).toHaveAttribute(
+      'data-orientation',
+      'horizontal',
+    )
+    expect(screen.getByTestId('field').className).toContain(
+      'grid-cols-[120px_minmax(0,1fr)]',
+    )
   })
 
   it('associates the label, description, and error with the control', async () => {
@@ -105,7 +120,7 @@ describe('Field', () => {
     expect(label).toHaveAttribute('for', 'provider')
     expect(input).toHaveAttribute(
       'aria-describedby',
-      `${description.getAttribute('id')} ${error.getAttribute('id')}`
+      `${description.getAttribute('id')} ${error.getAttribute('id')}`,
     )
     await user.click(label)
     expect(input).toHaveFocus()
@@ -117,9 +132,12 @@ describe('Field', () => {
     expect(screen.getByRole('group')).toHaveAttribute('data-invalid', 'true')
     expect(screen.getByRole('textbox', { name: '模型服务' })).toHaveAttribute(
       'aria-invalid',
-      'true'
+      'true',
     )
-    expect(screen.getByRole('alert')).toHaveAttribute('data-slot', 'field-error')
+    expect(screen.getByRole('alert')).toHaveAttribute(
+      'data-slot',
+      'field-error',
+    )
   })
 
   it('pairs disabled field structure with the disabled control', () => {
@@ -150,7 +168,7 @@ describe('Field', () => {
             </FieldControl>
           </FieldContent>
         </Field>
-      </FieldGroup>
+      </FieldGroup>,
     )
 
     const requiredInput = screen.getByRole('textbox', { name: 'API Key' })
@@ -159,7 +177,12 @@ describe('Field', () => {
     expect(requiredMarker).toHaveAttribute('data-slot', 'field-required')
     expect(requiredMarker).toHaveAttribute('aria-hidden', 'true')
 
-    expect(screen.getByRole('textbox', { name: /备注.*可选/ })).not.toBeRequired()
-    expect(screen.getByText('（可选）')).toHaveAttribute('data-slot', 'field-optional')
+    expect(
+      screen.getByRole('textbox', { name: /备注.*可选/ }),
+    ).not.toBeRequired()
+    expect(screen.getByText('（可选）')).toHaveAttribute(
+      'data-slot',
+      'field-optional',
+    )
   })
 })

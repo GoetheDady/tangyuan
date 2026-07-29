@@ -7,7 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const contentPropsSpy = vi.hoisted(() => vi.fn())
 
 vi.mock('@radix-ui/react-tooltip', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@radix-ui/react-tooltip')>()
+  const actual =
+    await importOriginal<typeof import('@radix-ui/react-tooltip')>()
   const ReactModule = await import('react')
   const Content = ReactModule.forwardRef<
     React.ComponentRef<typeof actual.Content>,
@@ -21,12 +22,17 @@ vi.mock('@radix-ui/react-tooltip', async (importOriginal) => {
   return { ...actual, Content }
 })
 
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 function renderOpenTooltip({
   side,
   sideOffset,
-  className
+  className,
 }: {
   side?: 'top' | 'right' | 'bottom' | 'left'
   sideOffset?: number
@@ -53,7 +59,7 @@ function renderOpenTooltip({
           当前 Agent 使用默认模型。
         </TooltipContent>
       </Tooltip>
-    </TooltipProvider>
+    </TooltipProvider>,
   )
 
   return { ...result, triggerRef, contentRef }
@@ -67,7 +73,7 @@ describe('Tooltip', () => {
   it('preserves the public composition API, Portal behavior, props, className and refs', () => {
     const { container, triggerRef, contentRef } = renderOpenTooltip({
       sideOffset: 12,
-      className: 'custom-tooltip'
+      className: 'custom-tooltip',
     })
 
     const trigger = screen.getByRole('button', { name: '查看配置说明' })
@@ -82,7 +88,9 @@ describe('Tooltip', () => {
     expect(trigger).toHaveAccessibleName('查看配置说明')
     expect(container).not.toContainElement(content)
     expect(document.body).toContainElement(content)
-    expect(screen.getByRole('tooltip')).toHaveTextContent('当前 Agent 使用默认模型。')
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      '当前 Agent 使用默认模型。',
+    )
     expect(content).toHaveAttribute('data-slot', 'tooltip-content')
     expect(content.className).toContain('custom-tooltip')
   })
@@ -94,7 +102,7 @@ describe('Tooltip', () => {
     expect(content).toHaveAttribute('data-level', '2')
     expect(content).toHaveAttribute('data-side', 'top')
     expect(contentPropsSpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({ side: 'top', sideOffset: 0 })
+      expect.objectContaining({ side: 'top', sideOffset: 0 }),
     )
 
     for (const className of [
@@ -104,7 +112,7 @@ describe('Tooltip', () => {
       'py-1.5',
       'text-xs',
       'text-primary-foreground',
-      'shadow-level-2'
+      'shadow-level-2',
     ]) {
       expect(content.className).toContain(className)
     }
@@ -127,25 +135,34 @@ describe('Tooltip', () => {
             <div data-testid="custom-tooltip-content">自定义 Tooltip 内容</div>
           </TooltipContent>
         </Tooltip>
-      </TooltipProvider>
+      </TooltipProvider>,
     )
 
     const content = contentRef.current!
     expect(content).toBeInstanceOf(HTMLDivElement)
     expect(content).toHaveAttribute('data-slot', 'tooltip-content')
     expect(screen.getByRole('tooltip')).toHaveTextContent('自定义 Tooltip 内容')
-    expect(content.querySelector('[data-slot="tooltip-arrow"]')).not.toBeInTheDocument()
+    expect(
+      content.querySelector('[data-slot="tooltip-arrow"]'),
+    ).not.toBeInTheDocument()
   })
 
   it('allows callers to override side and sideOffset without replacing the trigger name', () => {
     renderOpenTooltip({ side: 'right', sideOffset: 16 })
 
-    expect(screen.getByTestId('tooltip-content')).toHaveAttribute('data-side', 'right')
+    expect(screen.getByTestId('tooltip-content')).toHaveAttribute(
+      'data-side',
+      'right',
+    )
     expect(contentPropsSpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({ avoidCollisions: false, side: 'right', sideOffset: 16 })
+      expect.objectContaining({
+        avoidCollisions: false,
+        side: 'right',
+        sideOffset: 16,
+      }),
     )
-    expect(screen.getByRole('button', { name: '查看配置说明' })).toHaveAccessibleName(
-      '查看配置说明'
-    )
+    expect(
+      screen.getByRole('button', { name: '查看配置说明' }),
+    ).toHaveAccessibleName('查看配置说明')
   })
 })

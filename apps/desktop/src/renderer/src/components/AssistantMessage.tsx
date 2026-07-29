@@ -8,7 +8,7 @@ import {
   CircleStop,
   CircleX,
   LoaderCircle,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useMemo, useState } from 'react'
@@ -40,10 +40,17 @@ export interface AssistantMessageProps {
 /**
  * 根据 turns 和流式状态推导组件的交互状态。
  */
-type AssistantState = 'active-tool-loop' | 'unconfirmed-text' | 'final-confirmed' | 'ended-nonfinal'
+type AssistantState =
+  'active-tool-loop' | 'unconfirmed-text' | 'final-confirmed' | 'ended-nonfinal'
 
-function deriveState(entry: AgentReplyEntry, isStreaming: boolean): AssistantState {
-  if (entry.attempt?.status === 'cancelled' || entry.attempt?.status === 'failed') {
+function deriveState(
+  entry: AgentReplyEntry,
+  isStreaming: boolean,
+): AssistantState {
+  if (
+    entry.attempt?.status === 'cancelled' ||
+    entry.attempt?.status === 'failed'
+  ) {
     return 'ended-nonfinal'
   }
 
@@ -53,7 +60,7 @@ function deriveState(entry: AgentReplyEntry, isStreaming: boolean): AssistantSta
 
   if (isStreaming) {
     const hasToolCalls = entry.turns.some((turn) =>
-      turn.steps.some((step) => step.kind === 'tool-call')
+      turn.steps.some((step) => step.kind === 'tool-call'),
     )
     if (hasToolCalls) {
       return 'active-tool-loop'
@@ -89,7 +96,9 @@ function stripFinalReplyFromTurns(turns: RunTurn[]): RunTurn[] {
     }
   }
   if (finalTextStepIndex === -1) return turns
-  const remainingSteps = lastTurn.steps.filter((_, i) => i !== finalTextStepIndex)
+  const remainingSteps = lastTurn.steps.filter(
+    (_, i) => i !== finalTextStepIndex,
+  )
   const next = [...turns]
   next[lastIndex] = { ...lastTurn, steps: remainingSteps }
   return next
@@ -106,11 +115,13 @@ export function AssistantMessage({
   entry,
   isStreaming,
   onRetry,
-  onToggleStart
+  onToggleStart,
 }: AssistantMessageProps): React.JSX.Element {
   const state = deriveState(entry, isStreaming)
   const shouldExpand =
-    state === 'active-tool-loop' || state === 'unconfirmed-text' || state === 'ended-nonfinal'
+    state === 'active-tool-loop' ||
+    state === 'unconfirmed-text' ||
+    state === 'ended-nonfinal'
 
   const [userToggled, setUserToggled] = useState(false)
   const isExpanded = shouldExpand || userToggled
@@ -149,7 +160,8 @@ export function AssistantMessage({
 
     let durationText = ''
     if (lastStartedAt && lastCompletedAt) {
-      const durationMs = new Date(lastCompletedAt).getTime() - new Date(lastStartedAt).getTime()
+      const durationMs =
+        new Date(lastCompletedAt).getTime() - new Date(lastStartedAt).getTime()
       if (durationMs > 0) {
         durationText =
           durationMs >= 60000
@@ -165,14 +177,19 @@ export function AssistantMessage({
 
   // 完成态下时间线剔除末回合文字步骤（去重）；其他态原样展示全部步骤。
   const timelineTurns =
-    state === 'final-confirmed' ? stripFinalReplyFromTurns(entry.turns) : entry.turns
+    state === 'final-confirmed'
+      ? stripFinalReplyFromTurns(entry.turns)
+      : entry.turns
 
   // 无 turns 时回退到纯文本气泡
   if (!hasTurns) {
     return (
       <article className="flex justify-start" aria-busy={isStreaming}>
-        <div className="w-full max-w-[640px] min-w-0 rounded-[7px] bg-background p-3.5 text-body text-foreground">
-          <StreamdownMessage content={entry.content} isAnimating={isStreaming} />
+        <div className="bg-background text-body text-foreground w-full max-w-[640px] min-w-0 rounded-[7px] p-3.5">
+          <StreamdownMessage
+            content={entry.content}
+            isAnimating={isStreaming}
+          />
         </div>
       </article>
     )
@@ -180,7 +197,7 @@ export function AssistantMessage({
 
   return (
     <article className="flex justify-start" aria-busy={isStreaming}>
-      <div className="flex w-full max-w-[640px] min-w-0 flex-col gap-2.5 rounded-[7px] bg-background p-3.5 text-foreground">
+      <div className="bg-background text-foreground flex w-full max-w-[640px] min-w-0 flex-col gap-2.5 rounded-[7px] p-3.5">
         {/* Execution Disclosure Bar */}
         <ExecutionDisclosure
           state={state}
@@ -200,7 +217,10 @@ export function AssistantMessage({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: TIMELINE_TOGGLE_ANIMATION_MS / 1000, ease: 'easeInOut' }}
+              transition={{
+                duration: TIMELINE_TOGGLE_ANIMATION_MS / 1000,
+                ease: 'easeInOut',
+              }}
               className="overflow-hidden"
             >
               <TurnTimeline turns={timelineTurns} />
@@ -216,11 +236,12 @@ export function AssistantMessage({
         )}
 
         {/* Unconfirmed text (shown while streaming) */}
-        {(state === 'unconfirmed-text' || state === 'active-tool-loop') && entry.content && (
-          <div className="rounded-md border border-warning-border bg-warning-soft px-2.5 py-2 text-caption text-warning-foreground">
-            此文本尚未确认，后续仍可能出现工具调用。
-          </div>
-        )}
+        {(state === 'unconfirmed-text' || state === 'active-tool-loop') &&
+          entry.content && (
+            <div className="border-warning-border bg-warning-soft text-caption text-warning-foreground rounded-md border px-2.5 py-2">
+              此文本尚未确认，后续仍可能出现工具调用。
+            </div>
+          )}
 
         {/* Cancelled / Failed footer */}
         {state === 'ended-nonfinal' && (
@@ -230,7 +251,7 @@ export function AssistantMessage({
             ) : null}
             {entry.attempt?.status === 'cancelled' ? (
               <div
-                className="mt-2 rounded-md bg-warning-soft px-3 py-2 text-label text-warning-foreground"
+                className="bg-warning-soft text-label text-warning-foreground mt-2 rounded-md px-3 py-2"
                 role="status"
               >
                 此回复已在生成过程中被用户中断
@@ -255,7 +276,7 @@ function ExecutionDisclosure({
   turnCount,
   stepCount,
   durationText,
-  attemptStatus
+  attemptStatus,
 }: {
   state: AssistantState
   isExpanded: boolean
@@ -300,14 +321,18 @@ function ExecutionDisclosure({
       type="button"
       aria-expanded={isExpanded}
       onClick={onToggle}
-      className={`flex w-full items-center gap-1.5 rounded-md px-2.5 py-2 text-left transition-colors duration-200 hover:bg-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${bgClass}`}
+      className={`hover:bg-accent focus-visible:ring-ring/50 flex w-full items-center gap-1.5 rounded-md px-2.5 py-2 text-left transition-colors duration-200 focus-visible:ring-[3px] focus-visible:outline-none ${bgClass}`}
     >
-      <ChevronIcon size={13} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+      <ChevronIcon
+        size={13}
+        className="text-muted-foreground shrink-0"
+        aria-hidden="true"
+      />
       <StatusIcon
         size={13}
         className={`shrink-0 ${
           state === 'active-tool-loop' || state === 'unconfirmed-text'
-            ? 'animate-spin text-primary'
+            ? 'text-primary animate-spin'
             : attemptStatus === 'cancelled'
               ? 'text-warning-foreground'
               : attemptStatus === 'failed'
@@ -316,9 +341,15 @@ function ExecutionDisclosure({
         }`}
         aria-hidden="true"
       />
-      <span className="text-caption font-semibold text-foreground">{label}</span>
+      <span className="text-caption text-foreground font-semibold">
+        {label}
+      </span>
       <span className="flex-1" />
-      {meta && <span className="font-mono text-[9px] text-muted-foreground">{meta}</span>}
+      {meta && (
+        <span className="text-muted-foreground font-mono text-[9px]">
+          {meta}
+        </span>
+      )}
     </button>
   )
 }
@@ -330,15 +361,17 @@ function ExecutionDisclosure({
  */
 function TurnTimeline({ turns }: { turns: RunTurn[] }): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-3 px-2.5 pb-0.5 pt-1">
+    <div className="flex flex-col gap-3 px-2.5 pt-1 pb-0.5">
       {turns.map((turn, turnIdx) => (
         <div key={turnIdx} className="flex flex-col gap-2">
           {/* Turn header：英文标签 + 水平分隔线 */}
           <div className="flex items-center gap-2">
-            <span className="text-[8px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {turnIdx === turns.length - 1 ? 'FINAL TURN' : `TURN ${turnIdx + 1}`}
+            <span className="text-muted-foreground text-[8px] font-semibold tracking-wider uppercase">
+              {turnIdx === turns.length - 1
+                ? 'FINAL TURN'
+                : `TURN ${turnIdx + 1}`}
             </span>
-            <span className="h-px flex-1 bg-split" aria-hidden="true" />
+            <span className="bg-split h-px flex-1" aria-hidden="true" />
           </div>
 
           {/* Steps */}
@@ -359,7 +392,9 @@ function TurnTimeline({ turns }: { turns: RunTurn[] }): React.JSX.Element {
                     aria-hidden="true"
                   />
                 </span>
-                <span className="text-[10px] text-muted-foreground">等待中…</span>
+                <span className="text-muted-foreground text-[10px]">
+                  等待中…
+                </span>
               </div>
             )}
           </div>
@@ -376,10 +411,17 @@ function TurnTimeline({ turns }: { turns: RunTurn[] }): React.JSX.Element {
  * 工具步骤显示：工具名、安全摘要、状态图标和耗时。
  * 不暴露完整参数、原始输出或内部调试日志。
  */
-function StepRow({ step, isLast = true }: { step: TurnStep; isLast?: boolean }): React.JSX.Element {
+function StepRow({
+  step,
+  isLast = true,
+}: {
+  step: TurnStep
+  isLast?: boolean
+}): React.JSX.Element {
   const durationMs =
     step.completedAt && step.startedAt
-      ? new Date(step.completedAt).getTime() - new Date(step.startedAt).getTime()
+      ? new Date(step.completedAt).getTime() -
+        new Date(step.startedAt).getTime()
       : null
   const durationLabel =
     durationMs && durationMs > 0
@@ -434,7 +476,11 @@ function StepRow({ step, isLast = true }: { step: TurnStep; isLast?: boolean }):
 
   const meta =
     durationLabel ??
-    (step.status === 'running' ? '执行中' : step.status === 'failed' ? '失败' : '已完成')
+    (step.status === 'running'
+      ? '执行中'
+      : step.status === 'failed'
+        ? '失败'
+        : '已完成')
 
   return (
     <div className="flex gap-2">
@@ -443,17 +489,23 @@ function StepRow({ step, isLast = true }: { step: TurnStep; isLast?: boolean }):
         <span className="grid size-3.5 shrink-0 place-items-center">
           <StatusIcon size={13} className={iconClass} aria-label={iconLabel} />
         </span>
-        {!isLast && <span className="mt-1 w-px flex-1 bg-border" aria-hidden="true" />}
+        {!isLast && (
+          <span className="bg-border mt-1 w-px flex-1" aria-hidden="true" />
+        )}
       </div>
 
       {/* Step body：标签行 + 内容行 */}
       <div className="min-w-0 flex-1 pb-2.5">
         <div className="flex items-baseline justify-between gap-2">
           <span className={`text-[10px] ${labelClass}`}>{label}</span>
-          <span className="shrink-0 text-[8px] text-muted-foreground">{meta}</span>
+          <span className="text-muted-foreground shrink-0 text-[8px]">
+            {meta}
+          </span>
         </div>
         {note && (
-          <p className="mt-0.5 text-[10px] leading-[1.5] text-muted-foreground">{note}</p>
+          <p className="text-muted-foreground mt-0.5 text-[10px] leading-[1.5]">
+            {note}
+          </p>
         )}
       </div>
     </div>
@@ -467,32 +519,37 @@ function StepRow({ step, isLast = true }: { step: TurnStep; isLast?: boolean }):
  */
 function FailedFooter({
   entry,
-  onRetry
+  onRetry,
 }: {
   entry: AgentReplyEntry
   onRetry?: () => void
 }): React.JSX.Element {
   const [showDetails, setShowDetails] = useState(false)
-  const errorMessage = entry.attempt?.error?.message ?? '执行失败，已收到的内容保留在上方'
+  const errorMessage =
+    entry.attempt?.error?.message ?? '执行失败，已收到的内容保留在上方'
 
   // 展开失败步骤：展示所有失败的 turn steps
   const failedSteps = entry.turns.flatMap((turn) =>
-    turn.steps.filter((step) => step.status === 'failed')
+    turn.steps.filter((step) => step.status === 'failed'),
   )
 
   return (
     <div className="mt-2 space-y-2">
       {/* 失败摘要 */}
-      <div className="rounded-md bg-destructive-soft/10 px-3 py-2" role="alert">
+      <div className="bg-destructive-soft/10 rounded-md px-3 py-2" role="alert">
         <div className="flex items-start gap-1.5">
           <CircleX
             size={12}
-            className="mt-0.5 shrink-0 text-destructive-soft-foreground"
+            className="text-destructive-soft-foreground mt-0.5 shrink-0"
             aria-hidden="true"
           />
           <div className="min-w-0 flex-1">
-            <p className="text-label font-medium text-destructive-foreground">执行失败</p>
-            <p className="mt-0.5 text-label text-muted-foreground">{errorMessage}</p>
+            <p className="text-label text-destructive-foreground font-medium">
+              执行失败
+            </p>
+            <p className="text-label text-muted-foreground mt-0.5">
+              {errorMessage}
+            </p>
           </div>
         </div>
 
@@ -502,7 +559,7 @@ function FailedFooter({
             <button
               type="button"
               onClick={() => setShowDetails((prev) => !prev)}
-              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[10px] transition-colors"
             >
               {showDetails ? (
                 <ChevronDown size={10} aria-hidden="true" />
@@ -523,7 +580,7 @@ function FailedFooter({
       </div>
 
       {/* 重试操作 */}
-      <div className="rounded-md bg-muted px-3 py-2">
+      <div className="bg-muted rounded-md px-3 py-2">
         <p className="text-caption text-muted-foreground">
           Agent 在产生最终回复前失败。您可以重试本次执行，原始用户请求将被复用。
         </p>
@@ -531,7 +588,7 @@ function FailedFooter({
           <button
             type="button"
             onClick={onRetry}
-            className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-label font-medium text-primary-foreground hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="bg-primary text-label text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring mt-1.5 inline-flex items-center gap-1 rounded-md px-3 py-1 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
             <RefreshCw size={11} aria-hidden="true" />
             重试

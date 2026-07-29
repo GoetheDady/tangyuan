@@ -1,11 +1,14 @@
 import { expect, test } from '@playwright/test'
 
-import { createPreloadApiInitScript, createReadyRuntimeSnapshot } from '../fixtures/preload-mock'
+import {
+  createPreloadApiInitScript,
+  createReadyRuntimeSnapshot,
+} from '../fixtures/preload-mock'
 
 const screenshotOptions = {
   animations: 'disabled' as const,
   caret: 'hide' as const,
-  scale: 'css' as const
+  scale: 'css' as const,
 }
 
 test.describe('ChatPage Pencil 视觉基准', () => {
@@ -25,8 +28,8 @@ test.describe('ChatPage Pencil 视觉基准', () => {
         agents: [
           tangyuan,
           { ...tangyuan, agentId: 'research', displayName: '研究' },
-          { ...tangyuan, agentId: 'code', displayName: '代码' }
-        ]
+          { ...tangyuan, agentId: 'code', displayName: '代码' },
+        ],
       },
       [
         {
@@ -34,22 +37,22 @@ test.describe('ChatPage Pencil 视觉基准', () => {
           sessionId: 'session-1',
           title: '数据库迁移上线评估',
           state: 'running',
-          updatedAt: today.toISOString()
+          updatedAt: today.toISOString(),
         },
         {
           agentId: 'tangyuan',
           sessionId: 'session-2',
           title: '修复登录状态丢失',
           state: 'idle',
-          updatedAt: today.toISOString()
+          updatedAt: today.toISOString(),
         },
         {
           agentId: 'tangyuan',
           sessionId: 'session-3',
           title: '整理用户反馈',
           state: 'completed',
-          updatedAt: earlier.toISOString()
-        }
+          updatedAt: earlier.toISOString(),
+        },
       ],
       [
         {
@@ -57,8 +60,9 @@ test.describe('ChatPage Pencil 视觉基准', () => {
           agentId: 'tangyuan',
           sessionId: 'session-1',
           role: 'user',
-          content: '这个项目的数据库迁移方案评估得怎么样了？我想了解一下目前的进度。',
-          createdAt: today.toISOString()
+          content:
+            '这个项目的数据库迁移方案评估得怎么样了？我想了解一下目前的进度。',
+          createdAt: today.toISOString(),
         },
         {
           messageId: 'agent-message-1',
@@ -67,9 +71,9 @@ test.describe('ChatPage Pencil 视觉基准', () => {
           role: 'agent',
           content:
             '数据库迁移评估进展顺利。全部 12 张表的 schema 差异已经通过检查，回滚脚本也已就绪。建议周五凌晨执行迁移。',
-          createdAt: new Date(today.getTime() + 12_000).toISOString()
-        }
-      ]
+          createdAt: new Date(today.getTime() + 12_000).toISOString(),
+        },
+      ],
     )
 
     await page.addInitScript({ content: initScript })
@@ -78,6 +82,9 @@ test.describe('ChatPage Pencil 视觉基准', () => {
     await expect(page.getByTestId('composer-card')).toBeVisible()
     await page.evaluate(() => document.fonts.ready)
 
-    await expect(page).toHaveScreenshot('chat-page-pencil.png', screenshotOptions)
+    await expect(page).toHaveScreenshot(
+      'chat-page-pencil.png',
+      screenshotOptions,
+    )
   })
 })

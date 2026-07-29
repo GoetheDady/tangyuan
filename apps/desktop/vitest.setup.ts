@@ -8,7 +8,7 @@ import { vi } from 'vitest'
 if (typeof Element !== 'undefined' && !Element.prototype.hasPointerCapture) {
   // @ts-expect-error jsdom 原型补齐
   Element.prototype.hasPointerCapture = vi.fn().mockReturnValue(false) as (
-    pointerId: number
+    pointerId: number,
   ) => boolean
 }
 
@@ -18,7 +18,9 @@ if (typeof Element !== 'undefined' && !Element.prototype.hasPointerCapture) {
  */
 if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
   // @ts-expect-error jsdom 原型补齐
-  Element.prototype.scrollIntoView = vi.fn() as (arg?: boolean | ScrollIntoViewOptions) => void
+  Element.prototype.scrollIntoView = vi.fn() as (
+    arg?: boolean | ScrollIntoViewOptions,
+  ) => void
 }
 
 /**
@@ -53,20 +55,25 @@ function createDomRect(width = 1024, height = 768): DOMRect {
     bottom: height,
     x: 0,
     y: 0,
-    toJSON: () => ({})
+    toJSON: () => ({}),
   }
 }
 
-vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
-  // 对滚动容器返回更大的高度，确保虚拟列表视口足够
-  if (this instanceof HTMLElement) {
-    const cls = this.getAttribute('class') ?? ''
-    if (cls.includes('overflow-y-auto') || cls.includes('overflow-y-scroll')) {
-      return createDomRect(1024, 600)
+vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+  function (this: Element) {
+    // 对滚动容器返回更大的高度，确保虚拟列表视口足够
+    if (this instanceof HTMLElement) {
+      const cls = this.getAttribute('class') ?? ''
+      if (
+        cls.includes('overflow-y-auto') ||
+        cls.includes('overflow-y-scroll')
+      ) {
+        return createDomRect(1024, 600)
+      }
     }
-  }
-  return createDomRect()
-})
+    return createDomRect()
+  },
+)
 
 // mock 只读尺寸属性为可写 getter
 Object.defineProperties(HTMLElement.prototype, {
@@ -74,30 +81,39 @@ Object.defineProperties(HTMLElement.prototype, {
     configurable: true,
     get() {
       const cls = (this as HTMLElement).getAttribute('class') ?? ''
-      if (cls.includes('overflow-y-auto') || cls.includes('overflow-y-scroll')) {
+      if (
+        cls.includes('overflow-y-auto') ||
+        cls.includes('overflow-y-scroll')
+      ) {
         return 600
       }
       return 120
-    }
+    },
   },
   clientHeight: {
     configurable: true,
     get() {
       const cls = (this as HTMLElement).getAttribute('class') ?? ''
-      if (cls.includes('overflow-y-auto') || cls.includes('overflow-y-scroll')) {
+      if (
+        cls.includes('overflow-y-auto') ||
+        cls.includes('overflow-y-scroll')
+      ) {
         return 600
       }
       return 120
-    }
+    },
   },
   scrollHeight: {
     configurable: true,
     get() {
       const cls = (this as HTMLElement).getAttribute('class') ?? ''
-      if (cls.includes('overflow-y-auto') || cls.includes('overflow-y-scroll')) {
+      if (
+        cls.includes('overflow-y-auto') ||
+        cls.includes('overflow-y-scroll')
+      ) {
         return 1200
       }
       return 240
-    }
-  }
+    },
+  },
 })

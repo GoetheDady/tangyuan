@@ -26,7 +26,9 @@ describe('Toaster', () => {
     const toaster = item?.closest('[data-sonner-toaster]')
 
     expect(item).toHaveAttribute('data-type', 'success')
-    expect(item?.querySelector('[data-icon] svg')).toHaveClass('text-success-foreground')
+    expect(item?.querySelector('[data-icon] svg')).toHaveClass(
+      'text-success-foreground',
+    )
     expect(toaster).toHaveAttribute('data-y-position', 'bottom')
     expect(toaster).toHaveAttribute('data-x-position', 'right')
     expect(toaster).toHaveStyle({ '--gap': '8px' })
@@ -37,22 +39,29 @@ describe('Toaster', () => {
     ['info', () => toast.info('需要审批'), 'text-info-foreground'],
     ['success', () => toast.success('操作成功'), 'text-success-foreground'],
     ['warning', () => toast.warning('需要注意'), 'text-warning-foreground'],
-    ['error', () => toast.error('操作失败'), 'text-destructive-soft-foreground'],
-    ['loading', () => toast.loading('正在保存'), 'text-info-foreground']
-  ] as const)('uses shared semantic tokens for %s feedback', async (type, showToast, iconClass) => {
-    render(<Toaster />)
+    [
+      'error',
+      () => toast.error('操作失败'),
+      'text-destructive-soft-foreground',
+    ],
+    ['loading', () => toast.loading('正在保存'), 'text-info-foreground'],
+  ] as const)(
+    'uses shared semantic tokens for %s feedback',
+    async (type, showToast, iconClass) => {
+      render(<Toaster />)
 
-    act(() => {
-      showToast()
-    })
+      act(() => {
+        showToast()
+      })
 
-    const item = (await screen.findByText(/需要审批|操作成功|需要注意|操作失败|正在保存/)).closest(
-      '[data-sonner-toast]'
-    )
+      const item = (
+        await screen.findByText(/需要审批|操作成功|需要注意|操作失败|正在保存/)
+      ).closest('[data-sonner-toast]')
 
-    expect(item).toHaveAttribute('data-type', type)
-    expect(item?.querySelector('[data-icon] svg')).toHaveClass(iconClass)
-  })
+      expect(item).toHaveAttribute('data-type', type)
+      expect(item?.querySelector('[data-icon] svg')).toHaveClass(iconClass)
+    },
+  )
 
   it('supports description, action, cancel and accessible close behavior', async () => {
     const onAction = vi.fn()
@@ -63,7 +72,7 @@ describe('Toaster', () => {
       toast.error('操作失败', {
         description: '请检查网络连接后重试。',
         action: { label: '重试', onClick: onAction },
-        cancel: { label: '取消', onClick: onCancel }
+        cancel: { label: '取消', onClick: onCancel },
       })
     })
 
@@ -85,7 +94,9 @@ describe('Toaster', () => {
       toast.success('可手动关闭通知')
     })
 
-    const item = (await screen.findByText('可手动关闭通知')).closest('[data-sonner-toast]')
+    const item = (await screen.findByText('可手动关闭通知')).closest(
+      '[data-sonner-toast]',
+    )
     act(() => {
       screen.getByRole('button', { name: '关闭通知' }).click()
     })
@@ -102,9 +113,9 @@ describe('Toaster', () => {
       toast.loading('正在保存 Agent 配置', { id: 'save-agent' })
     })
 
-    const loadingItem = (await screen.findByText('正在保存 Agent 配置')).closest(
-      '[data-sonner-toast]'
-    )
+    const loadingItem = (
+      await screen.findByText('正在保存 Agent 配置')
+    ).closest('[data-sonner-toast]')
     expect(loadingItem).toHaveAttribute('data-type', 'loading')
 
     act(() => {
@@ -114,7 +125,10 @@ describe('Toaster', () => {
     expect(await screen.findByText('Agent 配置已保存')).toBeInTheDocument()
     expect(screen.queryByText('正在保存 Agent 配置')).not.toBeInTheDocument()
     expect(document.querySelectorAll('[data-sonner-toast]')).toHaveLength(1)
-    expect(document.querySelector('[data-sonner-toast]')).toHaveAttribute('data-type', 'success')
+    expect(document.querySelector('[data-sonner-toast]')).toHaveAttribute(
+      'data-type',
+      'success',
+    )
   })
 
   it('automatically dismisses notifications after the 4000ms default', async () => {
@@ -138,10 +152,9 @@ describe('Toaster', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1)
     })
-    expect(screen.getByText('自动消失通知').closest('[data-sonner-toast]')).toHaveAttribute(
-      'data-removed',
-      'true'
-    )
+    expect(
+      screen.getByText('自动消失通知').closest('[data-sonner-toast]'),
+    ).toHaveAttribute('data-removed', 'true')
   })
 
   it('shows at most three consecutive notifications at once', async () => {
@@ -154,9 +167,9 @@ describe('Toaster', () => {
     })
 
     await screen.findByText('队列通知 4')
-    const visibleItems = Array.from(document.querySelectorAll('[data-sonner-toast]')).filter(
-      (item) => item.getAttribute('data-visible') === 'true'
-    )
+    const visibleItems = Array.from(
+      document.querySelectorAll('[data-sonner-toast]'),
+    ).filter((item) => item.getAttribute('data-visible') === 'true')
 
     expect(visibleItems).toHaveLength(3)
   })

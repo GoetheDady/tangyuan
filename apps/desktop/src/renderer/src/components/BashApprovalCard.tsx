@@ -1,5 +1,11 @@
 import type { BashApprovalRequest } from '@tangyuan/contracts'
-import { Ban, Check, LoaderCircle, ShieldAlert, ShieldCheck } from 'lucide-react'
+import {
+  Ban,
+  Check,
+  LoaderCircle,
+  ShieldAlert,
+  ShieldCheck,
+} from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
@@ -40,7 +46,7 @@ export function BashApprovalCard({
   approval,
   onApproveOnce,
   onApproveAlways,
-  onReject
+  onReject,
 }: BashApprovalCardProps): React.JSX.Element {
   const [phase, setPhase] = useState<CardPhase>('entering')
   const [activeAction, setActiveAction] = useState<ApprovalAction | null>(null)
@@ -77,7 +83,8 @@ export function BashApprovalCard({
    */
   const executeAction = useCallback(
     async (action: ApprovalAction): Promise<void> => {
-      if (phase === 'submitting' || phase === 'resolved' || phase === 'exiting') return
+      if (phase === 'submitting' || phase === 'resolved' || phase === 'exiting')
+        return
 
       setPhase('submitting')
       setActiveAction(action)
@@ -107,7 +114,7 @@ export function BashApprovalCard({
         setActiveAction(null)
       }
     },
-    [phase, approval.approvalId, onApproveOnce, onApproveAlways, onReject]
+    [phase, approval.approvalId, onApproveOnce, onApproveAlways, onReject],
   )
 
   /**
@@ -125,7 +132,7 @@ export function BashApprovalCard({
         void executeAction('reject')
       }
     },
-    [phase, executeAction]
+    [phase, executeAction],
   )
 
   const isSubmitting = phase === 'submitting'
@@ -140,7 +147,7 @@ export function BashApprovalCard({
         aria-hidden="true"
         data-testid="bash-approval-card"
       >
-        <div className="rounded-lg border bg-card px-4 py-3 opacity-0">
+        <div className="bg-card rounded-lg border px-4 py-3 opacity-0">
           {/* 空壳占位 */}
         </div>
       </div>
@@ -162,7 +169,7 @@ export function BashApprovalCard({
     >
       <div
         ref={cardRef}
-        className={`rounded-lg border shadow-level-1 transition-colors duration-200 ${
+        className={`shadow-level-1 rounded-lg border transition-colors duration-200 ${
           isResolved
             ? 'border-success-border bg-success-soft/30'
             : 'border-warning-border bg-warning-soft/20'
@@ -171,15 +178,15 @@ export function BashApprovalCard({
         tabIndex={phase === 'pending' ? 0 : -1}
       >
         {/* 头部：审批状态标签 */}
-        <div className="flex items-center gap-2 border-b border-warning-border/40 px-4 py-2.5">
+        <div className="border-warning-border/40 flex items-center gap-2 border-b px-4 py-2.5">
           {isResolved ? (
             <>
               <ShieldCheck
                 size={14}
-                className="shrink-0 text-success-foreground"
+                className="text-success-foreground shrink-0"
                 aria-hidden="true"
               />
-              <span className="text-label font-semibold text-success-foreground">
+              <span className="text-label text-success-foreground font-semibold">
                 已处理
               </span>
             </>
@@ -187,10 +194,10 @@ export function BashApprovalCard({
             <>
               <ShieldAlert
                 size={14}
-                className="shrink-0 text-warning-foreground"
+                className="text-warning-foreground shrink-0"
                 aria-hidden="true"
               />
-              <span className="text-label font-semibold text-warning-foreground">
+              <span className="text-label text-warning-foreground font-semibold">
                 待审批
               </span>
               <span className="text-label text-muted-foreground">
@@ -206,13 +213,13 @@ export function BashApprovalCard({
           <div>
             <label
               htmlFor={`approval-command-${approval.approvalId}`}
-              className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+              className="text-muted-foreground mb-1 block text-[10px] font-semibold tracking-wider uppercase"
             >
               待执行命令
             </label>
             <pre
               id={`approval-command-${approval.approvalId}`}
-              className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-mono"
+              className="bg-muted text-mono overflow-x-auto rounded-md px-3 py-2 font-mono"
               tabIndex={0}
               aria-label={`命令：${approval.command}`}
             >
@@ -221,25 +228,28 @@ export function BashApprovalCard({
           </div>
 
           {/* 工作目录 */}
-          <div className="flex items-center gap-1.5 text-label text-muted-foreground">
-            <span className="text-[10px] font-semibold uppercase tracking-wider">
+          <div className="text-label text-muted-foreground flex items-center gap-1.5">
+            <span className="text-[10px] font-semibold tracking-wider uppercase">
               工作目录
             </span>
-            <span className="truncate font-mono" aria-label={`工作目录：${approval.cwd}`}>
+            <span
+              className="truncate font-mono"
+              aria-label={`工作目录：${approval.cwd}`}
+            >
               {approval.cwd}
             </span>
           </div>
 
           {/* 风险说明 */}
           <div
-            className="rounded-md bg-destructive-soft/10 px-3 py-2 text-label text-muted-foreground"
+            className="bg-destructive-soft/10 text-label text-muted-foreground rounded-md px-3 py-2"
             role="alert"
             aria-label={`风险说明：${approval.riskDescription}`}
           >
             <p className="flex items-start gap-1.5">
               <ShieldAlert
                 size={12}
-                className="mt-0.5 shrink-0 text-warning-foreground"
+                className="text-warning-foreground mt-0.5 shrink-0"
                 aria-hidden="true"
               />
               <span>{approval.riskDescription}</span>
@@ -257,7 +267,7 @@ export function BashApprovalCard({
           {/* 错误消息 */}
           {errorMessage && (
             <div
-              className="rounded-md bg-destructive-soft/20 px-3 py-2 text-label text-destructive-foreground"
+              className="bg-destructive-soft/20 text-label text-destructive-foreground rounded-md px-3 py-2"
               role="alert"
             >
               {errorMessage}
@@ -266,14 +276,14 @@ export function BashApprovalCard({
         </div>
 
         {/* 底部操作按钮 */}
-        <div className="flex items-center justify-end gap-2 border-t border-warning-border/40 px-4 py-2.5">
+        <div className="border-warning-border/40 flex items-center justify-end gap-2 border-t px-4 py-2.5">
           {/* 拒绝按钮 */}
           <button
             ref={firstButtonRef}
             type="button"
-            className={`inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`text-label focus-visible:ring-ring inline-flex items-center gap-1 rounded-md border px-3 py-1.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
               isResolved
-                ? 'cursor-not-allowed border-border text-muted-foreground'
+                ? 'border-border text-muted-foreground cursor-not-allowed'
                 : 'border-destructive-border bg-background text-destructive hover:bg-destructive-soft/20'
             }`}
             onClick={() => {
@@ -283,7 +293,11 @@ export function BashApprovalCard({
             aria-label="拒绝此命令执行"
           >
             {isSubmitting && activeAction === 'reject' ? (
-              <LoaderCircle size={12} className="animate-spin" aria-hidden="true" />
+              <LoaderCircle
+                size={12}
+                className="animate-spin"
+                aria-hidden="true"
+              />
             ) : (
               <Ban size={12} aria-hidden="true" />
             )}
@@ -293,9 +307,9 @@ export function BashApprovalCard({
           {/* 始终允许按钮 */}
           <button
             type="button"
-            className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`text-label focus-visible:ring-ring inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
               isResolved
-                ? 'cursor-not-allowed bg-muted text-muted-foreground'
+                ? 'bg-muted text-muted-foreground cursor-not-allowed'
                 : 'bg-secondary text-secondary-foreground hover:bg-split'
             }`}
             onClick={() => {
@@ -305,7 +319,11 @@ export function BashApprovalCard({
             aria-label="始终允许此命令（当前会话中同命令免审）"
           >
             {isSubmitting && activeAction === 'approve-always' ? (
-              <LoaderCircle size={12} className="animate-spin" aria-hidden="true" />
+              <LoaderCircle
+                size={12}
+                className="animate-spin"
+                aria-hidden="true"
+              />
             ) : (
               <ShieldCheck size={12} aria-hidden="true" />
             )}
@@ -315,9 +333,9 @@ export function BashApprovalCard({
           {/* 允许本次按钮 */}
           <button
             type="button"
-            className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`text-label focus-visible:ring-ring inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
               isResolved
-                ? 'cursor-not-allowed bg-muted text-muted-foreground'
+                ? 'bg-muted text-muted-foreground cursor-not-allowed'
                 : 'bg-primary text-primary-foreground hover:bg-primary-hover'
             }`}
             onClick={() => {
@@ -327,7 +345,11 @@ export function BashApprovalCard({
             aria-label="仅允许本次执行此命令"
           >
             {isSubmitting && activeAction === 'approve-once' ? (
-              <LoaderCircle size={12} className="animate-spin" aria-hidden="true" />
+              <LoaderCircle
+                size={12}
+                className="animate-spin"
+                aria-hidden="true"
+              />
             ) : (
               <Check size={12} aria-hidden="true" />
             )}

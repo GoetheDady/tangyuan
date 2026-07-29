@@ -8,7 +8,7 @@ describe('WindowShell', () => {
     render(
       <WindowShell>
         <div>内容</div>
-      </WindowShell>
+      </WindowShell>,
     )
 
     const dragRegion = screen.getByTestId('window-drag-region')
@@ -20,17 +20,20 @@ describe('WindowShell', () => {
     render(
       <WindowShell>
         <div>内容</div>
-      </WindowShell>
+      </WindowShell>,
     )
 
-    expect(screen.getByTestId('window-drag-region')).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByTestId('window-drag-region')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    )
   })
 
   it('在拖拽区下方渲染子内容', () => {
     render(
       <WindowShell>
         <div data-testid="page">页面内容</div>
-      </WindowShell>
+      </WindowShell>,
     )
 
     expect(screen.getByTestId('page')).toHaveTextContent('页面内容')

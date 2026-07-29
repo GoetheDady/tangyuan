@@ -4,7 +4,7 @@ import {
   createPreloadApiInitScript,
   createReadyRuntimeSnapshot,
   createTestMessages,
-  createTestSessions
+  createTestSessions,
 } from '../fixtures/preload-mock'
 
 test.describe('Renderer 基础无障碍', () => {
@@ -14,7 +14,9 @@ test.describe('Renderer 基础无障碍', () => {
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
 
-    await expect(page.getByRole('heading', { name: '配置模型服务' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: '配置模型服务' }),
+    ).toBeVisible()
     await expect(page.getByLabel('Provider')).toBeVisible()
     await expect(page.getByLabel('Model').first()).toBeVisible()
     await expect(page.getByLabel('API Key')).toBeVisible()
@@ -33,7 +35,7 @@ test.describe('Renderer 基础无障碍', () => {
     const initScript = createPreloadApiInitScript(
       createReadyRuntimeSnapshot(),
       createTestSessions(2),
-      createTestMessages()
+      createTestMessages(),
     )
 
     await page.addInitScript({ content: initScript })

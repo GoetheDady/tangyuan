@@ -11,9 +11,13 @@
  * @returns 窗口外壳元素。
  * @throws 此组件不会主动抛出错误。
  */
-export function WindowShell({ children }: { children: React.ReactNode }): React.JSX.Element {
+export function WindowShell({
+  children,
+}: {
+  children: React.ReactNode
+}): React.JSX.Element {
   return (
-    <div className="relative h-screen overflow-hidden bg-background text-foreground">
+    <div className="bg-background text-foreground relative h-screen overflow-hidden">
       <div
         data-testid="window-drag-region"
         aria-hidden="true"

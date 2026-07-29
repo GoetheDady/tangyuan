@@ -1,7 +1,7 @@
 import type {
   AgentSessionSummary,
   SessionLineageActivity,
-  SessionLineageActivityKind
+  SessionLineageActivityKind,
 } from '@tangyuan/contracts'
 import { Archive, ArchiveRestore, Trash2 } from 'lucide-react'
 import { useMemo } from 'react'
@@ -14,7 +14,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle
+  AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 
@@ -22,7 +22,7 @@ const activityKindLabels: Record<SessionLineageActivityKind, string> = {
   running: '运行中',
   queued: '排队中',
   'pending-approval': '待审批',
-  'pending-clarification': '待澄清'
+  'pending-clarification': '待澄清',
 }
 
 export function SessionArchiveButton(props: {
@@ -51,9 +51,12 @@ export function ArchivedSessionList(props: {
   onRecover(session: AgentSessionSummary): void
 }): React.JSX.Element | null {
   const rootSessions = useMemo(() => {
-    const archivedIds = new Set(props.sessions.map((session) => session.sessionId))
+    const archivedIds = new Set(
+      props.sessions.map((session) => session.sessionId),
+    )
     return props.sessions.filter(
-      (session) => !session.forkedFrom || !archivedIds.has(session.forkedFrom.sessionId)
+      (session) =>
+        !session.forkedFrom || !archivedIds.has(session.forkedFrom.sessionId),
     )
   }, [props.sessions])
 
@@ -62,11 +65,11 @@ export function ArchivedSessionList(props: {
   return (
     <section
       aria-labelledby="archived-sessions-heading"
-      className="border-t border-border px-2 py-2"
+      className="border-border border-t px-2 py-2"
     >
       <h3
         id="archived-sessions-heading"
-        className="flex h-5 items-center px-2.5 font-mono text-[8px] font-semibold text-muted-foreground"
+        className="text-muted-foreground flex h-5 items-center px-2.5 font-mono text-[8px] font-semibold"
       >
         已归档
       </h3>
@@ -74,7 +77,7 @@ export function ArchivedSessionList(props: {
         {rootSessions.map((session) => (
           <div
             key={session.sessionId}
-            className="flex h-8 min-w-0 items-center gap-1 rounded-lg px-2.5 text-[11px] text-muted-foreground"
+            className="text-muted-foreground flex h-8 min-w-0 items-center gap-1 rounded-lg px-2.5 text-[11px]"
           >
             <span className="min-w-0 flex-1 truncate">{session.title}</span>
             <Button
@@ -117,15 +120,20 @@ export function SessionArchiveDialog(props: {
             以下会话仍有活动。确认后会先停止这些活动，再归档目标会话及其后代。
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <ul className="space-y-1 text-sm text-foreground">
+        <ul className="text-foreground space-y-1 text-sm">
           {props.activities.map((activity) => (
             <li key={activity.sessionId}>
-              {activity.title}：{activity.kinds.map((kind) => activityKindLabels[kind]).join('、')}
+              {activity.title}：
+              {activity.kinds
+                .map((kind) => activityKindLabels[kind])
+                .join('、')}
             </li>
           ))}
         </ul>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={props.isArchiving}>取消</AlertDialogCancel>
+          <AlertDialogCancel disabled={props.isArchiving}>
+            取消
+          </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={props.isArchiving}
@@ -179,15 +187,20 @@ export function SessionDeleteDialog(props: {
             以下会话仍有活动。确认后会先停止这些活动，再永久删除目标会话及其后代。此操作不可撤销。
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <ul className="space-y-1 text-sm text-foreground">
+        <ul className="text-foreground space-y-1 text-sm">
           {props.activities.map((activity) => (
             <li key={activity.sessionId}>
-              {activity.title}：{activity.kinds.map((kind) => activityKindLabels[kind]).join('、')}
+              {activity.title}：
+              {activity.kinds
+                .map((kind) => activityKindLabels[kind])
+                .join('、')}
             </li>
           ))}
         </ul>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={props.isDeleting}>取消</AlertDialogCancel>
+          <AlertDialogCancel disabled={props.isDeleting}>
+            取消
+          </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={props.isDeleting}

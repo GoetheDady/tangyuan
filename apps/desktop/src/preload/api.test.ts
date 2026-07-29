@@ -3,10 +3,14 @@ import {
   DESKTOP_IPC_CHANNELS,
   type AgentEvent,
   type DesktopIpcChannel,
-  type DesktopIpcResponse
+  type DesktopIpcResponse,
 } from '@tangyuan/contracts'
 import { describe, expect, it } from 'vitest'
-import { createTangyuanPreloadApi, type IpcInvoke, type IpcSubscribe } from './api'
+import {
+  createTangyuanPreloadApi,
+  type IpcInvoke,
+  type IpcSubscribe,
+} from './api'
 
 describe('createTangyuanPreloadApi', () => {
   it('exposes a typed renderer API backed by the allowed IPC channels', async () => {
@@ -16,14 +20,16 @@ describe('createTangyuanPreloadApi', () => {
 
       return undefined as unknown as DesktopIpcResponse<typeof channel>
     }
-    const subscriptions: Array<[typeof DESKTOP_AGENT_EVENT_CHANNEL, AgentEvent['type']]> = []
+    const subscriptions: Array<
+      [typeof DESKTOP_AGENT_EVENT_CHANNEL, AgentEvent['type']]
+    > = []
     const subscribe: IpcSubscribe = (channel, listener) => {
       listener({
         type: 'attempt-started',
         agentId: 'tangyuan',
         sessionId: 'session-1',
         runId: 'run-1',
-        occurredAt: '2026-07-08T00:00:00.000Z'
+        occurredAt: '2026-07-08T00:00:00.000Z',
       })
       subscriptions.push([channel, 'attempt-started'])
 
@@ -79,7 +85,7 @@ describe('createTangyuanPreloadApi', () => {
       'subscribeToAgentEvents',
       'updateAgentConfig',
       'updateSoul',
-      'updateUserProfile'
+      'updateUserProfile',
     ])
 
     await api.getRuntimeSnapshot()
@@ -87,45 +93,63 @@ describe('createTangyuanPreloadApi', () => {
     await api.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
-      apiKey: 'sk-test-secret-7890'
+      apiKey: 'sk-test-secret-7890',
     })
-    await api.cancelRuntimeConfigurationVerification({ verificationId: 'verify-1' })
+    await api.cancelRuntimeConfigurationVerification({
+      verificationId: 'verify-1',
+    })
     await api.listSessions({ agentId: 'agent-2' })
     await api.getLastActiveSession()
-    await api.setLastActiveSession({ agentId: 'tangyuan', sessionId: 'session-1' })
+    await api.setLastActiveSession({
+      agentId: 'tangyuan',
+      sessionId: 'session-1',
+    })
     await api.createSession({ agentId: 'tangyuan', title: '新会话' })
     await api.getTranscript({ agentId: 'tangyuan', sessionId: 'session-1' })
     await api.sendMessage({
       agentId: 'tangyuan',
       sessionId: 'session-1',
-      content: '你好'
+      content: '你好',
     })
     await api.cancelRun({ agentId: 'tangyuan', sessionId: 'session-1' })
     await api.archiveSession({
       agentId: 'tangyuan',
       sessionId: 'session-1',
-      confirmActivityStop: false
+      confirmActivityStop: false,
     })
     await api.recoverSession({ agentId: 'tangyuan', sessionId: 'session-1' })
-    await api.deleteSession({ agentId: 'tangyuan', sessionId: 'session-1', confirmActivityStop: false })
+    await api.deleteSession({
+      agentId: 'tangyuan',
+      sessionId: 'session-1',
+      confirmActivityStop: false,
+    })
     await api.listAgents()
-    await api.updateAgentConfig({ agentId: 'tangyuan', defaultModelId: 'claude-sonnet-4-5' })
-    await api.getSessionModelInfo({ agentId: 'tangyuan', sessionId: 'session-1' })
+    await api.updateAgentConfig({
+      agentId: 'tangyuan',
+      defaultModelId: 'claude-sonnet-4-5',
+    })
+    await api.getSessionModelInfo({
+      agentId: 'tangyuan',
+      sessionId: 'session-1',
+    })
     await api.setSessionModel({
       agentId: 'tangyuan',
       sessionId: 'session-1',
       providerId: 'anthropic',
-      modelId: 'claude-sonnet-4-5'
+      modelId: 'claude-sonnet-4-5',
     })
     await api.setSessionThinkingLevel({
       agentId: 'tangyuan',
       sessionId: 'session-1',
-      level: 'medium'
+      level: 'medium',
     })
     await api.archiveAgent({ agentId: 'agent-1' })
     await api.recoverAgent({ agentId: 'agent-1' })
     await api.reconcileAgentDirectories()
-    await api.claimAgentDirectory({ agentId: 'agent-1', displayName: '测试 Agent' })
+    await api.claimAgentDirectory({
+      agentId: 'agent-1',
+      displayName: '测试 Agent',
+    })
     await api.rebuildTangyuanHome()
     await api.restoreFromBackup()
     await api.resetConfiguration()
@@ -140,14 +164,14 @@ describe('createTangyuanPreloadApi', () => {
       source: 'shared',
       agentId: 'tangyuan',
       skillName: 'test-skill',
-      skillDirPath: '/tmp/test-skill'
+      skillDirPath: '/tmp/test-skill',
     })
     await api.deleteSkill({
       operation: 'delete',
       source: 'agent',
       agentId: 'agent-1',
       targetAgentId: 'agent-1',
-      skillName: 'test-skill'
+      skillName: 'test-skill',
     })
     await api.approveSkillOperation({ approvalId: 'approval-3' })
     await api.rejectSkillOperation({ approvalId: 'approval-4' })
@@ -163,84 +187,100 @@ describe('createTangyuanPreloadApi', () => {
         {
           providerId: 'anthropic',
           modelId: 'claude-sonnet-4-5',
-          apiKey: 'sk-test-secret-7890'
-        }
+          apiKey: 'sk-test-secret-7890',
+        },
       ],
-      [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification, { verificationId: 'verify-1' }],
+      [
+        DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification,
+        { verificationId: 'verify-1' },
+      ],
       [DESKTOP_IPC_CHANNELS.sessionsList, { agentId: 'agent-2' }],
       [DESKTOP_IPC_CHANNELS.sessionsGetLastActive],
       [
         DESKTOP_IPC_CHANNELS.sessionsSetLastActive,
-        { agentId: 'tangyuan', sessionId: 'session-1' }
+        { agentId: 'tangyuan', sessionId: 'session-1' },
       ],
       [
         DESKTOP_IPC_CHANNELS.sessionsCreate,
         {
           agentId: 'tangyuan',
-          title: '新会话'
-        }
+          title: '新会话',
+        },
       ],
       [
         DESKTOP_IPC_CHANNELS.sessionsGetTranscript,
         {
           agentId: 'tangyuan',
-          sessionId: 'session-1'
-        }
+          sessionId: 'session-1',
+        },
       ],
       [
         DESKTOP_IPC_CHANNELS.sessionsSendMessage,
         {
           agentId: 'tangyuan',
           sessionId: 'session-1',
-          content: '你好'
-        }
+          content: '你好',
+        },
       ],
       [
         DESKTOP_IPC_CHANNELS.sessionsCancelRun,
         {
           agentId: 'tangyuan',
-          sessionId: 'session-1'
-        }
+          sessionId: 'session-1',
+        },
       ],
       [
         DESKTOP_IPC_CHANNELS.sessionsArchive,
         {
           agentId: 'tangyuan',
           sessionId: 'session-1',
-          confirmActivityStop: false
-        }
+          confirmActivityStop: false,
+        },
       ],
-      [DESKTOP_IPC_CHANNELS.sessionsRecover, { agentId: 'tangyuan', sessionId: 'session-1' }],
-      [DESKTOP_IPC_CHANNELS.sessionsDelete, { agentId: 'tangyuan', sessionId: 'session-1', confirmActivityStop: false }],
+      [
+        DESKTOP_IPC_CHANNELS.sessionsRecover,
+        { agentId: 'tangyuan', sessionId: 'session-1' },
+      ],
+      [
+        DESKTOP_IPC_CHANNELS.sessionsDelete,
+        {
+          agentId: 'tangyuan',
+          sessionId: 'session-1',
+          confirmActivityStop: false,
+        },
+      ],
       [DESKTOP_IPC_CHANNELS.agentsList],
       [
         DESKTOP_IPC_CHANNELS.agentsUpdateConfig,
-        { agentId: 'tangyuan', defaultModelId: 'claude-sonnet-4-5' }
+        { agentId: 'tangyuan', defaultModelId: 'claude-sonnet-4-5' },
       ],
-      [DESKTOP_IPC_CHANNELS.sessionsGetModelInfo, { agentId: 'tangyuan', sessionId: 'session-1' }],
+      [
+        DESKTOP_IPC_CHANNELS.sessionsGetModelInfo,
+        { agentId: 'tangyuan', sessionId: 'session-1' },
+      ],
       [
         DESKTOP_IPC_CHANNELS.sessionsSetModel,
         {
           agentId: 'tangyuan',
           sessionId: 'session-1',
           providerId: 'anthropic',
-          modelId: 'claude-sonnet-4-5'
-        }
+          modelId: 'claude-sonnet-4-5',
+        },
       ],
       [
         DESKTOP_IPC_CHANNELS.sessionsSetThinkingLevel,
         {
           agentId: 'tangyuan',
           sessionId: 'session-1',
-          level: 'medium'
-        }
+          level: 'medium',
+        },
       ],
       [DESKTOP_IPC_CHANNELS.agentsArchive, { agentId: 'agent-1' }],
       [DESKTOP_IPC_CHANNELS.agentsRecover, { agentId: 'agent-1' }],
       [DESKTOP_IPC_CHANNELS.agentsReconcile],
       [
         DESKTOP_IPC_CHANNELS.agentsClaimDirectory,
-        { agentId: 'agent-1', displayName: '测试 Agent' }
+        { agentId: 'agent-1', displayName: '测试 Agent' },
       ],
       [DESKTOP_IPC_CHANNELS.agentsRebuildTangyuan],
       [DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup],
@@ -258,8 +298,8 @@ describe('createTangyuanPreloadApi', () => {
           source: 'shared',
           agentId: 'tangyuan',
           skillName: 'test-skill',
-          skillDirPath: '/tmp/test-skill'
-        }
+          skillDirPath: '/tmp/test-skill',
+        },
       ],
       [
         DESKTOP_IPC_CHANNELS.skillsDelete,
@@ -268,14 +308,22 @@ describe('createTangyuanPreloadApi', () => {
           source: 'agent',
           agentId: 'agent-1',
           targetAgentId: 'agent-1',
-          skillName: 'test-skill'
-        }
+          skillName: 'test-skill',
+        },
       ],
-      [DESKTOP_IPC_CHANNELS.skillsApproveOperation, { approvalId: 'approval-3' }],
-      [DESKTOP_IPC_CHANNELS.skillsRejectOperation, { approvalId: 'approval-4' }],
+      [
+        DESKTOP_IPC_CHANNELS.skillsApproveOperation,
+        { approvalId: 'approval-3' },
+      ],
+      [
+        DESKTOP_IPC_CHANNELS.skillsRejectOperation,
+        { approvalId: 'approval-4' },
+      ],
       [DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals],
-      [DESKTOP_IPC_CHANNELS.skillsGetInstallRecords]
+      [DESKTOP_IPC_CHANNELS.skillsGetInstallRecords],
     ])
-    expect(subscriptions).toEqual([[DESKTOP_AGENT_EVENT_CHANNEL, 'attempt-started']])
+    expect(subscriptions).toEqual([
+      [DESKTOP_AGENT_EVENT_CHANNEL, 'attempt-started'],
+    ])
   })
 })

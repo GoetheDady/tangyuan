@@ -3,7 +3,7 @@ import {
   createReadyRuntimeSnapshot,
   createMissingConfigSnapshot,
   createTestSessions,
-  createPreloadApiInitScript
+  createPreloadApiInitScript,
 } from '../fixtures/preload-mock'
 
 test.describe('路由导航', () => {
@@ -20,7 +20,9 @@ test.describe('路由导航', () => {
 
     // 用户主动进入设置页时不应被弹回聊天页
     await expect(page).toHaveURL(/#\/console\/providers$/)
-    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: '连接模型服务' }),
+    ).toBeVisible()
   })
 
   test('携带 redirect 参数且 ready 时自动跳回聊天页', async ({ page }) => {
@@ -30,7 +32,9 @@ test.describe('路由导航', () => {
 
     await page.setViewportSize({ width: 900, height: 670 })
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/console/providers?redirect=%2Fchat%2Ftangyuan%2Fsession-1')
+    await page.goto(
+      '/#/console/providers?redirect=%2Fchat%2Ftangyuan%2Fsession-1',
+    )
 
     // 有 redirect 参数且 runtime ready 时自动跳转到聊天页
     await page.waitForSelector('#composer')
@@ -47,7 +51,9 @@ test.describe('路由导航', () => {
     await page.goto('/#/chat/tangyuan/session-1')
 
     // 应被重定向到控制台 Providers 页，且 URL 包含 redirect 参数
-    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: '连接模型服务' }),
+    ).toBeVisible()
     await expect(page).toHaveURL(/\/console\/providers/)
     await expect(page).toHaveURL(/redirect=/) // 包含 redirect 参数
   })
@@ -59,7 +65,9 @@ test.describe('路由导航', () => {
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
 
-    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: '连接模型服务' }),
+    ).toBeVisible()
     await expect(page.getByTestId('setup-provider-select')).toBeVisible()
     await expect(page.getByTestId('setup-api-key-input')).toBeVisible()
     await expect(page.getByTestId('setup-model-select')).toBeVisible()
@@ -72,15 +80,21 @@ test.describe('路由导航', () => {
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/agents')
 
-    await expect(page.getByRole('heading', { name: 'Agent 管理' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'Agent 管理' }),
+    ).toBeVisible()
     // 默认 Agent "汤圆" 始终存在，显示活跃状态
-    await expect(page.getByRole('heading', { name: '汤圆', level: 3 })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: '汤圆', level: 3 }),
+    ).toBeVisible()
     // 默认 Agent "汤圆" 显示 Agent ID 和活跃状态
     await expect(page.getByText('ID：tangyuan')).toBeVisible()
     await expect(page.getByText('活跃')).toBeVisible()
   })
 
-  test('设置页面现有 Separator 保持 1px 全宽 Level 0 布局', async ({ page }) => {
+  test('设置页面现有 Separator 保持 1px 全宽 Level 0 布局', async ({
+    page,
+  }) => {
     const runtime = createMissingConfigSnapshot()
     const initScript = createPreloadApiInitScript(runtime)
 
@@ -97,18 +111,24 @@ test.describe('路由导航', () => {
 
       const layout = await separator.evaluate((element) => {
         const parent = element.parentElement
-        if (!(parent instanceof HTMLElement)) throw new Error('缺少设置页面父容器')
+        if (!(parent instanceof HTMLElement))
+          throw new Error('缺少设置页面父容器')
         const separatorBox = element.getBoundingClientRect()
         const parentBox = parent.getBoundingClientRect()
         return {
           leftInset: separatorBox.left - parentBox.left,
           rightInset: parentBox.right - separatorBox.right,
           overflowX: element.scrollWidth - element.clientWidth,
-          overflowY: element.scrollHeight - element.clientHeight
+          overflowY: element.scrollHeight - element.clientHeight,
         }
       })
 
-      expect(layout).toEqual({ leftInset: 0, rightInset: 0, overflowX: 0, overflowY: 0 })
+      expect(layout).toEqual({
+        leftInset: 0,
+        rightInset: 0,
+        overflowX: 0,
+        overflowY: 0,
+      })
     }
   })
 
@@ -127,16 +147,22 @@ test.describe('路由导航', () => {
     await expect(activeBadge).toHaveCSS('box-shadow', 'none')
   })
 
-  test('直接访问 /#/console/agents/:agentId 渲染 Agent 详情页', async ({ page }) => {
+  test('直接访问 /#/console/agents/:agentId 渲染 Agent 详情页', async ({
+    page,
+  }) => {
     const runtime = createMissingConfigSnapshot()
     const initScript = createPreloadApiInitScript(runtime)
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/agents/test-agent-1')
 
-    await expect(page.getByRole('heading', { name: 'Agent 详情' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'Agent 详情' }),
+    ).toBeVisible()
     await expect(page.getByText('ID: test-agent-1')).toBeVisible()
-    await expect(page.getByRole('link', { name: '返回 Agent 列表' })).toBeVisible()
+    await expect(
+      page.getByRole('link', { name: '返回 Agent 列表' }),
+    ).toBeVisible()
   })
 
   test('Agent 详情页可返回列表页', async ({ page }) => {
@@ -149,7 +175,9 @@ test.describe('路由导航', () => {
     await page.waitForSelector('text=Agent 详情')
     await page.click('text=返回 Agent 列表')
     await expect(page).toHaveURL(/\/console\/agents$/)
-    await expect(page.getByRole('heading', { name: 'Agent 管理' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'Agent 管理' }),
+    ).toBeVisible()
   })
 
   test('刷新后保持在当前 console 页面', async ({ page }) => {
@@ -158,15 +186,21 @@ test.describe('路由导航', () => {
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/console/providers')
-    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: '连接模型服务' }),
+    ).toBeVisible()
 
     // 刷新页面
     await page.reload()
-    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: '连接模型服务' }),
+    ).toBeVisible()
 
     // 刷新后仍在 console providers 页
     await expect(page).toHaveURL(/\/console\/providers/)
-    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: '连接模型服务' }),
+    ).toBeVisible()
   })
 
   test('刷新后保持聊天页', async ({ page }) => {
@@ -194,19 +228,27 @@ test.describe('路由导航', () => {
     await page.addInitScript({ content: initScript })
     // 先访问 agents 页
     await page.goto('/#/console/agents')
-    await expect(page.getByRole('heading', { name: 'Agent 管理' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'Agent 管理' }),
+    ).toBeVisible()
 
     // 再访问 providers 页
     await page.goto('/#/console/providers')
-    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: '连接模型服务' }),
+    ).toBeVisible()
 
     // 后退
     await page.goBack()
-    await expect(page.getByRole('heading', { name: 'Agent 管理' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'Agent 管理' }),
+    ).toBeVisible()
 
     // 前进
     await page.goForward()
-    await expect(page.getByRole('heading', { name: '连接模型服务' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: '连接模型服务' }),
+    ).toBeVisible()
   })
 
   test('设置页面目录对账继续通过全局 Sonner 队列反馈', async ({ page }) => {
@@ -219,7 +261,10 @@ test.describe('路由导航', () => {
 
     const item = page.locator('[data-sonner-toast][data-type="success"]')
     await expect(item).toContainText('目录对账完成，所有 Agent 目录正常')
-    await expect(page.locator('[data-sonner-toaster]')).toHaveAttribute('data-x-position', 'right')
+    await expect(page.locator('[data-sonner-toaster]')).toHaveAttribute(
+      'data-x-position',
+      'right',
+    )
   })
 
   test('调用 openExternalLink API 发送外部链接', async ({ page }) => {

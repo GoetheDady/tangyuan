@@ -7,7 +7,7 @@ import { AssistantMessage } from './AssistantMessage'
 function createMockApi() {
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { openExternalLink: vi.fn().mockResolvedValue(undefined) }
+    value: { openExternalLink: vi.fn().mockResolvedValue(undefined) },
   })
 }
 
@@ -23,10 +23,10 @@ function createEntry(overrides?: Partial<AgentReplyEntry>): AgentReplyEntry {
       runId: 'run-1',
       status: 'running',
       startedAt: '2026-07-21T00:00:00.000Z',
-      completedAt: null
+      completedAt: null,
     },
     turns: [],
-    ...overrides
+    ...overrides,
   }
 }
 
@@ -38,7 +38,7 @@ function createThinkingStep(overrides?: Partial<TurnStep>): TurnStep {
     status: 'running',
     startedAt: '2026-07-21T00:00:01.000Z',
     completedAt: null,
-    ...overrides
+    ...overrides,
   }
 }
 
@@ -50,7 +50,7 @@ function createToolStep(overrides?: Partial<TurnStep>): TurnStep {
     status: 'running',
     startedAt: '2026-07-21T00:00:02.000Z',
     completedAt: null,
-    ...overrides
+    ...overrides,
   }
 }
 
@@ -62,7 +62,7 @@ function createTextStep(overrides?: Partial<TurnStep>): TurnStep {
     status: 'completed',
     startedAt: '2026-07-21T00:00:01.000Z',
     completedAt: '2026-07-21T00:00:02.000Z',
-    ...overrides
+    ...overrides,
   }
 }
 
@@ -74,7 +74,7 @@ function createTurn(overrides?: Partial<RunTurn>): RunTurn {
     status: 'running',
     startedAt: '2026-07-21T00:00:00.000Z',
     completedAt: null,
-    ...overrides
+    ...overrides,
   }
 }
 
@@ -90,27 +90,36 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'running',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: null
+        completedAt: null,
       },
       turns: [
         createTurn({
           steps: [
-            createThinkingStep({ status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' }),
+            createThinkingStep({
+              status: 'completed',
+              completedAt: '2026-07-21T00:00:01.000Z',
+            }),
             createToolStep({
               content: '正在读取文件',
               status: 'completed',
-              completedAt: '2026-07-21T00:00:02.000Z'
-            })
+              completedAt: '2026-07-21T00:00:02.000Z',
+            }),
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:02.000Z'
+          completedAt: '2026-07-21T00:00:02.000Z',
         }),
         createTurn({
           index: 1,
-          steps: [createToolStep({ index: 1, content: '正在搜索', status: 'running' })],
-          status: 'running'
-        })
-      ]
+          steps: [
+            createToolStep({
+              index: 1,
+              content: '正在搜索',
+              status: 'running',
+            }),
+          ],
+          status: 'running',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -130,16 +139,19 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'running',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: null
+        completedAt: null,
       },
       turns: [
         createTurn({
           steps: [
-            createThinkingStep({ status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' })
+            createThinkingStep({
+              status: 'completed',
+              completedAt: '2026-07-21T00:00:01.000Z',
+            }),
           ],
-          status: 'running'
-        })
-      ]
+          status: 'running',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -155,17 +167,20 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'completed',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: '2026-07-21T00:00:05.000Z'
+        completedAt: '2026-07-21T00:00:05.000Z',
       },
       turns: [
         createTurn({
           steps: [
-            createThinkingStep({ status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' })
+            createThinkingStep({
+              status: 'completed',
+              completedAt: '2026-07-21T00:00:01.000Z',
+            }),
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:02.000Z'
-        })
-      ]
+          completedAt: '2026-07-21T00:00:02.000Z',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming={false} />)
@@ -181,7 +196,7 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'completed',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: '2026-07-21T00:00:05.000Z'
+        completedAt: '2026-07-21T00:00:05.000Z',
       },
       turns: [
         createTurn({
@@ -189,13 +204,13 @@ describe('AssistantMessage', () => {
             createThinkingStep({
               content: '分析完成',
               status: 'completed',
-              completedAt: '2026-07-21T00:00:01.000Z'
-            })
+              completedAt: '2026-07-21T00:00:01.000Z',
+            }),
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:01.000Z'
-        })
-      ]
+          completedAt: '2026-07-21T00:00:01.000Z',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming={false} />)
@@ -220,17 +235,20 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'cancelled',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: '2026-07-21T00:00:03.000Z'
+        completedAt: '2026-07-21T00:00:03.000Z',
       },
       turns: [
         createTurn({
           steps: [
-            createThinkingStep({ status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' })
+            createThinkingStep({
+              status: 'completed',
+              completedAt: '2026-07-21T00:00:01.000Z',
+            }),
           ],
           status: 'cancelled',
-          completedAt: '2026-07-21T00:00:03.000Z'
-        })
-      ]
+          completedAt: '2026-07-21T00:00:03.000Z',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming={false} />)
@@ -247,15 +265,20 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'failed',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: '2026-07-21T00:00:01.000Z'
+        completedAt: '2026-07-21T00:00:01.000Z',
       },
       turns: [
         createTurn({
-          steps: [createToolStep({ status: 'failed', completedAt: '2026-07-21T00:00:01.000Z' })],
+          steps: [
+            createToolStep({
+              status: 'failed',
+              completedAt: '2026-07-21T00:00:01.000Z',
+            }),
+          ],
           status: 'failed',
-          completedAt: '2026-07-21T00:00:01.000Z'
-        })
-      ]
+          completedAt: '2026-07-21T00:00:01.000Z',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming={false} />)
@@ -280,7 +303,7 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'running',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: null
+        completedAt: null,
       },
       turns: [
         createTurn({
@@ -288,13 +311,13 @@ describe('AssistantMessage', () => {
             createThinkingStep({
               content: '正在分析数据库 schema...',
               status: 'completed',
-              completedAt: '2026-07-21T00:00:01.000Z'
-            })
+              completedAt: '2026-07-21T00:00:01.000Z',
+            }),
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:01.000Z'
-        })
-      ]
+          completedAt: '2026-07-21T00:00:01.000Z',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -309,9 +332,9 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'running',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: null
+        completedAt: null,
       },
-      turns: [createTurn({ steps: [], status: 'running' })]
+      turns: [createTurn({ steps: [], status: 'running' })],
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -326,17 +349,17 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'running',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: null
+        completedAt: null,
       },
       turns: [
         createTurn({
           steps: [
             createThinkingStep({ index: 0, status: 'running' }),
-            createToolStep({ index: 1, status: 'running' })
+            createToolStep({ index: 1, status: 'running' }),
           ],
-          status: 'running'
-        })
-      ]
+          status: 'running',
+        }),
+      ],
     })
 
     const { container } = render(<AssistantMessage entry={entry} isStreaming />)
@@ -351,7 +374,7 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'running',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: null
+        completedAt: null,
       },
       turns: [
         createTurn({
@@ -363,13 +386,13 @@ describe('AssistantMessage', () => {
               toolName: 'read',
               status: 'completed' as const,
               startedAt: '2026-07-21T00:00:00.000Z',
-              completedAt: '2026-07-21T00:00:01.000Z'
-            }
+              completedAt: '2026-07-21T00:00:01.000Z',
+            },
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:01.000Z'
-        })
-      ]
+          completedAt: '2026-07-21T00:00:01.000Z',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -386,7 +409,7 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'running',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: null
+        completedAt: null,
       },
       turns: [
         createTurn({
@@ -398,13 +421,13 @@ describe('AssistantMessage', () => {
               toolName: 'bash',
               status: 'completed' as const,
               startedAt: '2026-07-21T00:00:00.000Z',
-              completedAt: '2026-07-21T00:00:02.000Z'
-            }
+              completedAt: '2026-07-21T00:00:02.000Z',
+            },
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:02.000Z'
-        })
-      ]
+          completedAt: '2026-07-21T00:00:02.000Z',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -420,7 +443,7 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'running',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: null
+        completedAt: null,
       },
       turns: [
         createTurn({
@@ -432,13 +455,13 @@ describe('AssistantMessage', () => {
               toolName: 'bash',
               status: 'completed' as const,
               startedAt: '2026-07-21T00:00:00.000Z',
-              completedAt: '2026-07-21T00:01:30.000Z'
-            }
+              completedAt: '2026-07-21T00:01:30.000Z',
+            },
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:01:30.000Z'
-        })
-      ]
+          completedAt: '2026-07-21T00:01:30.000Z',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -454,7 +477,7 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'running',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: null
+        completedAt: null,
       },
       turns: [
         createTurn({
@@ -466,13 +489,13 @@ describe('AssistantMessage', () => {
               toolName: 'bash',
               status: 'failed' as const,
               startedAt: '2026-07-21T00:00:00.000Z',
-              completedAt: '2026-07-21T00:00:01.000Z'
-            }
+              completedAt: '2026-07-21T00:00:01.000Z',
+            },
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:01.000Z'
-        })
-      ]
+          completedAt: '2026-07-21T00:00:01.000Z',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -489,7 +512,7 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'running',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: null
+        completedAt: null,
       },
       turns: [
         createTurn({
@@ -501,13 +524,13 @@ describe('AssistantMessage', () => {
               toolName: 'my_tool',
               status: 'completed' as const,
               startedAt: '2026-07-21T00:00:00.000Z',
-              completedAt: '2026-07-21T00:00:01.000Z'
-            }
+              completedAt: '2026-07-21T00:00:01.000Z',
+            },
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:01.000Z'
-        })
-      ]
+          completedAt: '2026-07-21T00:00:01.000Z',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -523,7 +546,7 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'running',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: null
+        completedAt: null,
       },
       turns: [
         createTurn({
@@ -536,11 +559,11 @@ describe('AssistantMessage', () => {
               toolName: 'read',
               status: 'completed' as const,
               startedAt: '2026-07-21T00:00:00.000Z',
-              completedAt: '2026-07-21T00:00:01.000Z'
-            }
+              completedAt: '2026-07-21T00:00:01.000Z',
+            },
           ],
           status: 'completed' as const,
-          completedAt: '2026-07-21T00:00:01.000Z'
+          completedAt: '2026-07-21T00:00:01.000Z',
         }),
         createTurn({
           index: 1,
@@ -552,12 +575,12 @@ describe('AssistantMessage', () => {
               toolName: 'bash',
               status: 'running' as const,
               startedAt: '2026-07-21T00:00:02.000Z',
-              completedAt: null
-            }
+              completedAt: null,
+            },
           ],
-          status: 'running' as const
-        })
-      ]
+          status: 'running' as const,
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -573,57 +596,69 @@ describe('AssistantMessage', () => {
       turns: [
         createTurn({
           steps: [
-            createThinkingStep({ content: '第一回合思考', status: 'completed' }),
+            createThinkingStep({
+              content: '第一回合思考',
+              status: 'completed',
+            }),
             createTextStep({ index: 1, content: '第一回合中间文字' }),
             createToolStep({
               index: 2,
               content: '读取配置',
               toolName: 'read',
               status: 'completed',
-              completedAt: '2026-07-21T00:00:03.000Z'
-            })
+              completedAt: '2026-07-21T00:00:03.000Z',
+            }),
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:03.000Z'
+          completedAt: '2026-07-21T00:00:03.000Z',
         }),
         createTurn({
           index: 1,
           steps: [
-            createThinkingStep({ content: '最后回合思考', status: 'completed' }),
-            createTextStep({ index: 1, content: '最后回合文字' })
+            createThinkingStep({
+              content: '最后回合思考',
+              status: 'completed',
+            }),
+            createTextStep({ index: 1, content: '最后回合文字' }),
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:05.000Z'
-        })
-      ]
+          completedAt: '2026-07-21T00:00:05.000Z',
+        }),
+      ],
     })
 
-    const { rerender } = render(<AssistantMessage entry={streamingEntry} isStreaming />)
+    const { rerender } = render(
+      <AssistantMessage entry={streamingEntry} isStreaming />,
+    )
     const renderedText = document.body.textContent ?? ''
     const positions = [
       '第一回合思考',
       '第一回合中间文字',
       '读取配置',
       '最后回合思考',
-      '最后回合文字'
+      '最后回合文字',
     ].map((content) => renderedText.indexOf(content))
 
-    expect(positions.every((position, index) => index === 0 || position > positions[index - 1])).toBe(
-      true
-    )
+    expect(
+      positions.every(
+        (position, index) => index === 0 || position > positions[index - 1],
+      ),
+    ).toBe(true)
 
     const completedEntry: AgentReplyEntry = {
       ...streamingEntry,
       attempt: {
         ...streamingEntry.attempt!,
         status: 'completed',
-        completedAt: '2026-07-21T00:00:05.000Z'
-      }
+        completedAt: '2026-07-21T00:00:05.000Z',
+      },
     }
     rerender(<AssistantMessage entry={completedEntry} isStreaming={false} />)
 
     expect(screen.getByText('真正的最终答复')).toBeInTheDocument()
-    await waitFor(() => expect(screen.queryByText('FINAL TURN')).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.queryByText('FINAL TURN')).not.toBeInTheDocument(),
+    )
     expect(screen.queryByText('第一回合中间文字')).not.toBeInTheDocument()
     expect(screen.queryByText('最后回合文字')).not.toBeInTheDocument()
   })
@@ -636,14 +671,20 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'running',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: null
+        completedAt: null,
       },
       turns: [
         createTurn({
-          steps: [createToolStep({ content: '执行命令', toolName: 'bash', status: 'running' })],
-          status: 'running'
-        })
-      ]
+          steps: [
+            createToolStep({
+              content: '执行命令',
+              toolName: 'bash',
+              status: 'running',
+            }),
+          ],
+          status: 'running',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming />)
@@ -658,12 +699,14 @@ describe('AssistantMessage', () => {
     const runningEntry = createEntry({
       turns: [
         createTurn({
-          steps: [createToolStep({ content: '执行命令', toolName: 'bash' })]
-        })
-      ]
+          steps: [createToolStep({ content: '执行命令', toolName: 'bash' })],
+        }),
+      ],
     })
 
-    const { rerender } = render(<AssistantMessage entry={runningEntry} isStreaming />)
+    const { rerender } = render(
+      <AssistantMessage entry={runningEntry} isStreaming />,
+    )
     fireEvent.click(screen.getByRole('button', { name: /仍在执行/ }))
 
     const completedEntry = createEntry({
@@ -671,7 +714,7 @@ describe('AssistantMessage', () => {
       attempt: {
         ...runningEntry.attempt!,
         status: 'completed',
-        completedAt: '2026-07-21T00:00:05.000Z'
+        completedAt: '2026-07-21T00:00:05.000Z',
       },
       turns: [
         createTurn({
@@ -680,23 +723,24 @@ describe('AssistantMessage', () => {
               content: '执行命令',
               toolName: 'bash',
               status: 'completed',
-              completedAt: '2026-07-21T00:00:02.000Z'
-            })
+              completedAt: '2026-07-21T00:00:02.000Z',
+            }),
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:05.000Z'
-        })
-      ]
+          completedAt: '2026-07-21T00:00:05.000Z',
+        }),
+      ],
     })
 
     rerender(<AssistantMessage entry={completedEntry} isStreaming={false} />)
 
-    expect(screen.getByRole('button', { name: /已完成执行过程/ })).toHaveAttribute(
-      'aria-expanded',
-      'false'
-    )
+    expect(
+      screen.getByRole('button', { name: /已完成执行过程/ }),
+    ).toHaveAttribute('aria-expanded', 'false')
     expect(screen.getByText('最终答复')).toBeInTheDocument()
-    await waitFor(() => expect(screen.queryByText('FINAL TURN')).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.queryByText('FINAL TURN')).not.toBeInTheDocument(),
+    )
   })
 
   it('collapses when final confirmed without tool calls', () => {
@@ -707,17 +751,20 @@ describe('AssistantMessage', () => {
         runId: 'run-1',
         status: 'completed',
         startedAt: '2026-07-21T00:00:00.000Z',
-        completedAt: '2026-07-21T00:00:05.000Z'
+        completedAt: '2026-07-21T00:00:05.000Z',
       },
       turns: [
         createTurn({
           steps: [
-            createThinkingStep({ status: 'completed', completedAt: '2026-07-21T00:00:01.000Z' })
+            createThinkingStep({
+              status: 'completed',
+              completedAt: '2026-07-21T00:00:01.000Z',
+            }),
           ],
           status: 'completed',
-          completedAt: '2026-07-21T00:00:05.000Z'
-        })
-      ]
+          completedAt: '2026-07-21T00:00:05.000Z',
+        }),
+      ],
     })
 
     render(<AssistantMessage entry={entry} isStreaming={false} />)
@@ -737,7 +784,7 @@ describe('AssistantMessage', () => {
           runId: 'run-1',
           status: 'completed',
           startedAt: '2026-07-21T00:00:00.000Z',
-          completedAt: '2026-07-21T00:00:05.000Z'
+          completedAt: '2026-07-21T00:00:05.000Z',
         },
         turns: [
           createTurn({
@@ -748,11 +795,11 @@ describe('AssistantMessage', () => {
                 content: '读取配置',
                 toolName: 'read',
                 status: 'completed',
-                completedAt: '2026-07-21T00:00:02.000Z'
-              })
+                completedAt: '2026-07-21T00:00:02.000Z',
+              }),
             ],
             status: 'completed',
-            completedAt: '2026-07-21T00:00:02.000Z'
+            completedAt: '2026-07-21T00:00:02.000Z',
           }),
           createTurn({
             index: 1,
@@ -760,19 +807,24 @@ describe('AssistantMessage', () => {
               createThinkingStep({
                 content: '末回合思考',
                 status: 'completed',
-                completedAt: '2026-07-21T00:00:04.000Z'
+                completedAt: '2026-07-21T00:00:04.000Z',
               }),
-              createTextStep({ index: 1, content: '末回合原始文字应被剔除' })
+              createTextStep({ index: 1, content: '末回合原始文字应被剔除' }),
             ],
             status: 'completed',
-            completedAt: '2026-07-21T00:00:05.000Z'
-          })
-        ]
+            completedAt: '2026-07-21T00:00:05.000Z',
+          }),
+        ],
       })
     }
 
     it('shows final reply below even when timeline is expanded, without duplicating it in timeline', async () => {
-      render(<AssistantMessage entry={createCompletedMultiTurnEntry()} isStreaming={false} />)
+      render(
+        <AssistantMessage
+          entry={createCompletedMultiTurnEntry()}
+          isStreaming={false}
+        />,
+      )
 
       // 收起态：最终回复可见，时间线隐藏
       expect(screen.getByText('这是最终答复正文')).toBeInTheDocument()
@@ -780,24 +832,37 @@ describe('AssistantMessage', () => {
 
       // 展开执行过程
       fireEvent.click(screen.getByRole('button', { name: /已完成执行过程/ }))
-      await waitFor(() => expect(screen.getByText('末回合思考')).toBeInTheDocument())
+      await waitFor(() =>
+        expect(screen.getByText('末回合思考')).toBeInTheDocument(),
+      )
 
       // 展开后最终回复仍独立可见（来自 entry.content），且只出现一次
       expect(screen.getAllByText('这是最终答复正文')).toHaveLength(1)
       // 末回合的回复文字步骤从时间线里剔除，不重复展示
-      expect(screen.queryByText('末回合原始文字应被剔除')).not.toBeInTheDocument()
+      expect(
+        screen.queryByText('末回合原始文字应被剔除'),
+      ).not.toBeInTheDocument()
       // 非末回合的中间文字仍保留在时间线里
       expect(screen.getByText('第一回合中间文字')).toBeInTheDocument()
     })
 
     it('keeps final reply visible after collapsing the timeline again', async () => {
-      render(<AssistantMessage entry={createCompletedMultiTurnEntry()} isStreaming={false} />)
+      render(
+        <AssistantMessage
+          entry={createCompletedMultiTurnEntry()}
+          isStreaming={false}
+        />,
+      )
 
       fireEvent.click(screen.getByRole('button', { name: /已完成执行过程/ }))
-      await waitFor(() => expect(screen.getByText('末回合思考')).toBeInTheDocument())
+      await waitFor(() =>
+        expect(screen.getByText('末回合思考')).toBeInTheDocument(),
+      )
 
       fireEvent.click(screen.getByRole('button', { name: /已完成执行过程/ }))
-      await waitFor(() => expect(screen.queryByText('末回合思考')).not.toBeInTheDocument())
+      await waitFor(() =>
+        expect(screen.queryByText('末回合思考')).not.toBeInTheDocument(),
+      )
 
       expect(screen.getByText('这是最终答复正文')).toBeInTheDocument()
     })
@@ -811,7 +876,7 @@ describe('AssistantMessage', () => {
           runId: 'run-1',
           status: 'completed',
           startedAt: '2026-07-21T00:00:00.000Z',
-          completedAt: '2026-07-21T00:00:05.000Z'
+          completedAt: '2026-07-21T00:00:05.000Z',
         },
         turns: [
           createTurn({
@@ -823,19 +888,21 @@ describe('AssistantMessage', () => {
                 content: '读取文件',
                 toolName: 'read',
                 status: 'completed',
-                completedAt: '2026-07-21T00:00:02.000Z'
+                completedAt: '2026-07-21T00:00:02.000Z',
               }),
-              createTextStep({ index: 2, content: '末回合最终回复' })
+              createTextStep({ index: 2, content: '末回合最终回复' }),
             ],
             status: 'completed',
-            completedAt: '2026-07-21T00:00:05.000Z'
-          })
-        ]
+            completedAt: '2026-07-21T00:00:05.000Z',
+          }),
+        ],
       })
 
       render(<AssistantMessage entry={entry} isStreaming={false} />)
       fireEvent.click(screen.getByRole('button', { name: /已完成执行过程/ }))
-      await waitFor(() => expect(screen.getByText('读取文件')).toBeInTheDocument())
+      await waitFor(() =>
+        expect(screen.getByText('读取文件')).toBeInTheDocument(),
+      )
 
       // 末回合开头的中间文字应保留在时间线里
       expect(screen.getByText('末回合开头的中间文字')).toBeInTheDocument()
@@ -872,14 +939,18 @@ describe('AssistantMessage', () => {
         ],
       })
 
-      render(<AssistantMessage entry={entry} isStreaming={false} onRetry={onRetry} />)
+      render(
+        <AssistantMessage
+          entry={entry}
+          isStreaming={false}
+          onRetry={onRetry}
+        />,
+      )
 
       // Should show retry button
       expect(screen.getByText('重试')).toBeInTheDocument()
       // Should show failure detail
-      expect(
-        screen.getByText(/Agent 在产生最终回复前失败/),
-      ).toBeInTheDocument()
+      expect(screen.getByText(/Agent 在产生最终回复前失败/)).toBeInTheDocument()
     })
 
     it('does not show retry button for cancelled attempts', () => {
@@ -933,7 +1004,13 @@ describe('AssistantMessage', () => {
         ],
       })
 
-      render(<AssistantMessage entry={entry} isStreaming={false} onRetry={onRetry} />)
+      render(
+        <AssistantMessage
+          entry={entry}
+          isStreaming={false}
+          onRetry={onRetry}
+        />,
+      )
 
       fireEvent.click(screen.getByText('重试'))
       expect(onRetry).toHaveBeenCalled()
@@ -947,7 +1024,11 @@ describe('AssistantMessage', () => {
           status: 'failed',
           startedAt: '2026-07-21T00:00:00.000Z',
           completedAt: '2026-07-21T00:00:01.000Z',
-          error: { code: 'unknown', message: '工具执行失败', recoverable: true },
+          error: {
+            code: 'unknown',
+            message: '工具执行失败',
+            recoverable: true,
+          },
         },
         turns: [
           createTurn({
@@ -986,7 +1067,11 @@ describe('AssistantMessage', () => {
           status: 'failed',
           startedAt: '2026-07-21T00:00:00.000Z',
           completedAt: '2026-07-21T00:00:01.000Z',
-          error: { code: 'unknown', message: 'API 调用超时，请重试', recoverable: true },
+          error: {
+            code: 'unknown',
+            message: 'API 调用超时，请重试',
+            recoverable: true,
+          },
         },
         turns: [
           createTurn({

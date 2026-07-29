@@ -6,7 +6,7 @@ import type { QuestionClarificationRequest } from '@tangyuan/contracts'
 import { QuestionClarificationCard } from './QuestionClarificationCard'
 
 function createClarification(
-  overrides?: Partial<QuestionClarificationRequest>
+  overrides?: Partial<QuestionClarificationRequest>,
 ): QuestionClarificationRequest {
   return {
     clarificationId: 'clarification-1',
@@ -18,7 +18,7 @@ function createClarification(
     allowCustomAnswer: true,
     status: 'pending',
     createdAt: '2026-07-22T00:00:00.000Z',
-    ...overrides
+    ...overrides,
   }
 }
 
@@ -30,12 +30,10 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
-    expect(
-      screen.getByText('你希望使用哪个数据库？')
-    ).toBeInTheDocument()
+    expect(screen.getByText('你希望使用哪个数据库？')).toBeInTheDocument()
     expect(screen.getByText('PostgreSQL')).toBeInTheDocument()
     expect(screen.getByText('MySQL')).toBeInTheDocument()
     expect(screen.getByText('SQLite')).toBeInTheDocument()
@@ -48,7 +46,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     expect(screen.getByText('待回答')).toBeInTheDocument()
@@ -62,17 +60,17 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     expect(
-      screen.getByRole('radio', { name: '选择：PostgreSQL' })
+      screen.getByRole('radio', { name: '选择：PostgreSQL' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('radio', { name: '选择：MySQL' })
+      screen.getByRole('radio', { name: '选择：MySQL' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('radio', { name: '选择：SQLite' })
+      screen.getByRole('radio', { name: '选择：SQLite' }),
     ).toBeInTheDocument()
   })
 
@@ -86,7 +84,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={onAnswer}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -110,7 +108,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -120,9 +118,7 @@ describe('QuestionClarificationCard', () => {
     const customButton = screen.getByLabelText('输入自定义答案')
     await user.click(customButton)
 
-    expect(
-      screen.getByPlaceholderText('输入你的答案...')
-    ).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('输入你的答案...')).toBeInTheDocument()
   })
 
   it('submits custom answer when typed and submitted', async () => {
@@ -135,7 +131,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={onAnswer}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -168,7 +164,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={onAnswer}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -190,12 +186,10 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
-    expect(
-      screen.queryByLabelText('输入自定义答案')
-    ).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('输入自定义答案')).not.toBeInTheDocument()
   })
 
   it('calls onCancel when cancel button clicked', async () => {
@@ -208,7 +202,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={vi.fn()}
         onCancel={onCancel}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -233,7 +227,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={onAnswer}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -253,9 +247,7 @@ describe('QuestionClarificationCard', () => {
 
   it('shows error message when action fails', async () => {
     const user = userEvent.setup()
-    const onAnswer = vi
-      .fn()
-      .mockRejectedValue(new Error('网络错误，请重试'))
+    const onAnswer = vi.fn().mockRejectedValue(new Error('网络错误，请重试'))
     const clarification = createClarification()
 
     render(
@@ -263,7 +255,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={onAnswer}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -293,7 +285,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={onAnswer}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -319,7 +311,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -327,7 +319,7 @@ describe('QuestionClarificationCard', () => {
     })
 
     const firstOption = screen.getByRole('radio', {
-      name: '选择：PostgreSQL'
+      name: '选择：PostgreSQL',
     })
     expect(document.activeElement).toBe(firstOption)
   })
@@ -342,7 +334,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={vi.fn()}
         onCancel={onCancel}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -367,20 +359,19 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
-    expect(
-      screen.getByRole('region', { name: '问题澄清' })
-    ).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: '问题澄清' })).toBeInTheDocument()
 
-    expect(
-      screen.getByRole('region', { name: '问题澄清' })
-    ).toHaveAttribute('aria-live', 'polite')
+    expect(screen.getByRole('region', { name: '问题澄清' })).toHaveAttribute(
+      'aria-live',
+      'polite',
+    )
 
     // radiogroup for preset options
     expect(
-      screen.getByRole('radiogroup', { name: '回答选项' })
+      screen.getByRole('radiogroup', { name: '回答选项' }),
     ).toBeInTheDocument()
   })
 
@@ -391,11 +382,11 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     expect(
-      screen.getByLabelText('问题：你希望使用哪个数据库？')
+      screen.getByLabelText('问题：你希望使用哪个数据库？'),
     ).toBeInTheDocument()
   })
 
@@ -406,7 +397,7 @@ describe('QuestionClarificationCard', () => {
   it('renders different questions correctly', () => {
     const clarification = createClarification({
       question: '你希望将文件保存在哪个目录？',
-      options: ['/tmp', '/home/user', '/opt']
+      options: ['/tmp', '/home/user', '/opt'],
     })
 
     render(
@@ -414,12 +405,10 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
-    expect(
-      screen.getByText('你希望将文件保存在哪个目录？')
-    ).toBeInTheDocument()
+    expect(screen.getByText('你希望将文件保存在哪个目录？')).toBeInTheDocument()
     expect(screen.getByText('/tmp')).toBeInTheDocument()
     expect(screen.getByText('/home/user')).toBeInTheDocument()
     expect(screen.getByText('/opt')).toBeInTheDocument()
@@ -428,7 +417,7 @@ describe('QuestionClarificationCard', () => {
   it('renders with 2 options (minimum)', () => {
     const clarification = createClarification({
       options: ['是', '否'],
-      allowCustomAnswer: false
+      allowCustomAnswer: false,
     })
 
     render(
@@ -436,19 +425,17 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     expect(screen.getByText('是')).toBeInTheDocument()
     expect(screen.getByText('否')).toBeInTheDocument()
-    expect(
-      screen.queryByLabelText('输入自定义答案')
-    ).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('输入自定义答案')).not.toBeInTheDocument()
   })
 
   it('renders with 5 options (maximum)', () => {
     const clarification = createClarification({
-      options: ['选项A', '选项B', '选项C', '选项D', '选项E']
+      options: ['选项A', '选项B', '选项C', '选项D', '选项E'],
     })
 
     render(
@@ -456,7 +443,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification}
         onAnswer={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     expect(screen.getByText('选项A')).toBeInTheDocument()
@@ -475,12 +462,12 @@ describe('QuestionClarificationCard', () => {
     const clarification1 = createClarification({
       clarificationId: 'cl-1',
       question: '第一个问题？',
-      options: ['答A', '答B']
+      options: ['答A', '答B'],
     })
     const clarification2 = createClarification({
       clarificationId: 'cl-2',
       question: '第二个问题？',
-      options: ['答C', '答D']
+      options: ['答C', '答D'],
     })
 
     const { rerender } = render(
@@ -488,7 +475,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification1}
         onAnswer={onAnswer1}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     await waitFor(() => {
@@ -507,7 +494,7 @@ describe('QuestionClarificationCard', () => {
         clarification={clarification2}
         onAnswer={onAnswer2}
         onCancel={vi.fn()}
-      />
+      />,
     )
 
     // 等待新卡片的入场动画完成

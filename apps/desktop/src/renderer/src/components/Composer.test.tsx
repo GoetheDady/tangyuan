@@ -12,25 +12,35 @@ function createDefaultSessionModelInfo(overrides = {}) {
     thinkingLevel: null,
     supportedThinkingLevels: ['off', 'low', 'medium', 'high'],
     supportsThinking: true,
-    ...overrides
+    ...overrides,
   }
 }
 
 function createDefaultProviders() {
   return [
     { providerId: 'anthropic', displayName: 'Anthropic' },
-    { providerId: 'openai', displayName: 'OpenAI' }
+    { providerId: 'openai', displayName: 'OpenAI' },
   ]
 }
 
 function createDefaultSelectableModels() {
   return [
-    { providerId: 'anthropic', modelId: 'claude-sonnet-4-5', displayName: 'Claude Sonnet 4.5' },
-    { providerId: 'anthropic', modelId: 'claude-opus-4-5', displayName: 'Claude Opus 4.5' }
+    {
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      displayName: 'Claude Sonnet 4.5',
+    },
+    {
+      providerId: 'anthropic',
+      modelId: 'claude-opus-4-5',
+      displayName: 'Claude Opus 4.5',
+    },
   ]
 }
 
-function createDefaultProps(overrides: Partial<ComposerProps> = {}): ComposerProps {
+function createDefaultProps(
+  overrides: Partial<ComposerProps> = {},
+): ComposerProps {
   return {
     value: '',
     onChange: vi.fn(),
@@ -45,7 +55,7 @@ function createDefaultProps(overrides: Partial<ComposerProps> = {}): ComposerPro
     selectableModels: createDefaultSelectableModels(),
     onModelChange: vi.fn(),
     onThinkingLevelChange: vi.fn(),
-    ...overrides
+    ...overrides,
   }
 }
 
@@ -123,12 +133,20 @@ describe('Composer', () => {
     // 使用 fireEvent 直接触发 compositionstart + keydown + compositionend
     fireEvent.compositionStart(textarea)
     // 在组合期间按 Enter 不应该触发 onSubmit
-    fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter', shiftKey: false })
+    fireEvent.keyDown(textarea, {
+      key: 'Enter',
+      code: 'Enter',
+      shiftKey: false,
+    })
     expect(onSubmit).not.toHaveBeenCalled()
 
     fireEvent.compositionEnd(textarea)
     // 组合结束后按 Enter 应该正常触发
-    fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter', shiftKey: false })
+    fireEvent.keyDown(textarea, {
+      key: 'Enter',
+      code: 'Enter',
+      shiftKey: false,
+    })
     expect(onSubmit).toHaveBeenCalled()
   })
 
@@ -162,14 +180,18 @@ describe('Composer', () => {
     render(<Composer {...createDefaultProps({ isRunning: false })} />)
 
     expect(screen.getByRole('button', { name: /发送/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /停止/ })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /停止/ }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows "停止" button when running', () => {
     render(<Composer {...createDefaultProps({ isRunning: true })} />)
 
     expect(screen.getByRole('button', { name: /停止/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /发送/ })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /发送/ }),
+    ).not.toBeInTheDocument()
   })
 
   it('disables send button when text is empty', () => {
@@ -187,7 +209,11 @@ describe('Composer', () => {
   it('calls onCancel when stop button is clicked', async () => {
     const user = userEvent.setup()
     const onCancel = vi.fn()
-    render(<Composer {...createDefaultProps({ isRunning: true, onCancel, value: '草稿' })} />)
+    render(
+      <Composer
+        {...createDefaultProps({ isRunning: true, onCancel, value: '草稿' })}
+      />,
+    )
 
     const stopButton = screen.getByRole('button', { name: /停止/ })
     await user.click(stopButton)
@@ -222,7 +248,11 @@ describe('Composer', () => {
   // ===========================================================================
 
   it('keeps textarea enabled during running for draft editing', () => {
-    render(<Composer {...createDefaultProps({ isRunning: true, value: '草稿内容' })} />)
+    render(
+      <Composer
+        {...createDefaultProps({ isRunning: true, value: '草稿内容' })}
+      />,
+    )
 
     const textarea = screen.getByLabelText('消息')
     expect(textarea).not.toBeDisabled()
@@ -232,7 +262,11 @@ describe('Composer', () => {
   it('does not call onSubmit when Enter is pressed during running', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    render(<Composer {...createDefaultProps({ isRunning: true, value: '你好', onSubmit })} />)
+    render(
+      <Composer
+        {...createDefaultProps({ isRunning: true, value: '你好', onSubmit })}
+      />,
+    )
 
     const textarea = screen.getByLabelText('消息')
     await user.type(textarea, '{Enter}')
@@ -243,7 +277,11 @@ describe('Composer', () => {
   it('does not submit via form submit during running', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    render(<Composer {...createDefaultProps({ isRunning: true, value: '你好', onSubmit })} />)
+    render(
+      <Composer
+        {...createDefaultProps({ isRunning: true, value: '你好', onSubmit })}
+      />,
+    )
 
     const button = screen.getByRole('button', { name: /停止/ })
     await user.click(button)
@@ -254,7 +292,13 @@ describe('Composer', () => {
   it('preserves draft after stopping run', () => {
     const onChange = vi.fn()
     const { rerender } = render(
-      <Composer {...createDefaultProps({ isRunning: true, value: '我的草稿', onChange })} />
+      <Composer
+        {...createDefaultProps({
+          isRunning: true,
+          value: '我的草稿',
+          onChange,
+        })}
+      />,
     )
 
     const textarea = screen.getByLabelText('消息')
@@ -262,7 +306,13 @@ describe('Composer', () => {
 
     // 模拟运行结束：isRunning 变为 false
     rerender(
-      <Composer {...createDefaultProps({ isRunning: false, value: '我的草稿', onChange })} />
+      <Composer
+        {...createDefaultProps({
+          isRunning: false,
+          value: '我的草稿',
+          onChange,
+        })}
+      />,
     )
 
     expect(textarea).toHaveValue('我的草稿')
@@ -290,7 +340,9 @@ describe('Composer', () => {
   })
 
   it('disables send button when disabled prop is true', () => {
-    render(<Composer {...createDefaultProps({ disabled: true, value: '你好' })} />)
+    render(
+      <Composer {...createDefaultProps({ disabled: true, value: '你好' })} />,
+    )
 
     const textarea = screen.getByLabelText('消息')
     expect(textarea).toBeDisabled()
@@ -354,14 +406,16 @@ describe('Composer', () => {
           sessionModelInfo: createDefaultSessionModelInfo({
             supportsThinking: true,
             supportedThinkingLevels: ['off', 'low', 'medium', 'high'],
-            thinkingLevel: 'off'
-          })
+            thinkingLevel: 'off',
+          }),
         })}
-      />
+      />,
     )
 
     expect(screen.getByRole('combobox', { name: '模型' })).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: '思考强度' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('combobox', { name: '思考强度' }),
+    ).toBeInTheDocument()
     expect(screen.getAllByRole('combobox')).toHaveLength(2)
   })
 
@@ -371,10 +425,10 @@ describe('Composer', () => {
         {...createDefaultProps({
           sessionModelInfo: createDefaultSessionModelInfo({
             supportsThinking: false,
-            supportedThinkingLevels: []
-          })
+            supportedThinkingLevels: [],
+          }),
         })}
-      />
+      />,
     )
 
     // Thinking 控件不应该渲染
@@ -387,10 +441,10 @@ describe('Composer', () => {
         {...createDefaultProps({
           sessionModelInfo: createDefaultSessionModelInfo({
             supportsThinking: true,
-            supportedThinkingLevels: []
-          })
+            supportedThinkingLevels: [],
+          }),
         })}
-      />
+      />,
     )
 
     // Thinking 控件不应该渲染（即使 supportsThinking 为 true 但没有 levels）
@@ -406,11 +460,11 @@ describe('Composer', () => {
           sessionModelInfo: createDefaultSessionModelInfo({
             supportsThinking: true,
             supportedThinkingLevels: ['off', 'low', 'medium', 'high'],
-            thinkingLevel: 'off'
+            thinkingLevel: 'off',
           }),
-          onThinkingLevelChange
+          onThinkingLevelChange,
         })}
-      />
+      />,
     )
 
     const thinkingTrigger = screen.getByRole('combobox', { name: '思考强度' })

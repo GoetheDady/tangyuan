@@ -10,16 +10,16 @@ describe('AgentSoulEditor', () => {
       agentId: 'agent-a',
       content: '# 旧灵魂',
       updatedAt: '2026-07-25T00:00:00.000Z',
-      version: 'sha256:old'
+      version: 'sha256:old',
     })
     const updateSoul = vi.fn().mockResolvedValue({
       target: 'soul',
       status: 'updated',
-      version: 'sha256:new'
+      version: 'sha256:new',
     })
     Object.defineProperty(window, 'api', {
       configurable: true,
-      value: { getSoul, updateSoul }
+      value: { getSoul, updateSoul },
     })
 
     render(<AgentSoulEditor agentId="agent-a" editable />)
@@ -33,7 +33,7 @@ describe('AgentSoulEditor', () => {
       expect(updateSoul).toHaveBeenCalledWith({
         agentId: 'agent-a',
         content: '# 新灵魂',
-        expectedVersion: 'sha256:old'
+        expectedVersion: 'sha256:old',
       })
     })
   })
@@ -45,13 +45,13 @@ describe('AgentSoulEditor', () => {
         agentId: 'agent-a',
         content: '# 旧灵魂',
         updatedAt: '2026-07-25T00:00:00.000Z',
-        version: 'sha256:old'
+        version: 'sha256:old',
       })
       .mockResolvedValueOnce({
         agentId: 'agent-a',
         content: '# 其他会话的新灵魂',
         updatedAt: '2026-07-25T00:01:00.000Z',
-        version: 'sha256:current'
+        version: 'sha256:current',
       })
     Object.defineProperty(window, 'api', {
       configurable: true,
@@ -63,25 +63,27 @@ describe('AgentSoulEditor', () => {
           version: 'sha256:current',
           reason: {
             code: 'version-conflict',
-            message: '资料已被其他会话更新，请读取最新内容后重试。'
-          }
-        })
-      }
+            message: '资料已被其他会话更新，请读取最新内容后重试。',
+          },
+        }),
+      },
     })
 
     render(<AgentSoulEditor agentId="agent-a" editable />)
 
     fireEvent.change(await screen.findByLabelText('Agent 灵魂'), {
-      target: { value: '# 冲突修改' }
+      target: { value: '# 冲突修改' },
     })
     fireEvent.click(screen.getByRole('button', { name: '保存 Agent 灵魂' }))
 
     expect(
-      await screen.findByText('资料已被其他会话更新，请读取最新内容后重试。')
+      await screen.findByText('资料已被其他会话更新，请读取最新内容后重试。'),
     ).toBeInTheDocument()
     await waitFor(() => {
       expect(getSoul).toHaveBeenCalledTimes(2)
-      expect(screen.getByLabelText('Agent 灵魂')).toHaveValue('# 其他会话的新灵魂')
+      expect(screen.getByLabelText('Agent 灵魂')).toHaveValue(
+        '# 其他会话的新灵魂',
+      )
     })
   })
 })

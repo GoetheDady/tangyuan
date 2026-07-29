@@ -21,7 +21,7 @@ export default defineConfig({
   projects: [
     {
       name: 'qa-electron',
-      testMatch: '**/*.spec.ts'
-    }
-  ]
+      testMatch: '**/*.spec.ts',
+    },
+  ],
 })

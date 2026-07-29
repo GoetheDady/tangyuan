@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import {
   createDefaultSessionSummary,
   type AgentSessionSummary,
-  type ArchiveSessionRequest
+  type ArchiveSessionRequest,
 } from '@tangyuan/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -13,57 +13,57 @@ import {
   createReadyRuntimeSnapshot,
   createDeferred,
   installDefaultAppApi,
-  resetAppTestEnvironment
+  resetAppTestEnvironment,
 } from './app.test-helpers'
 
 function createSession(
   sessionId: string,
   title: string,
   forkedFrom?: { sessionId: string; entryId: string },
-  archivedAt?: string
+  archivedAt?: string,
 ): AgentSessionSummary {
   return {
     ...createDefaultSessionSummary({
       sessionId,
       title,
-      updatedAt: '2026-07-28T00:00:00.000Z'
+      updatedAt: '2026-07-28T00:00:00.000Z',
     }),
     ...(forkedFrom ? { forkedFrom } : {}),
-    ...(archivedAt ? { archivedAt } : {})
+    ...(archivedAt ? { archivedAt } : {}),
   }
 }
 
 const PARENT = createSession('parent-session', '父会话')
 const CHILD = createSession('child-session', '子会话', {
   sessionId: PARENT.sessionId,
-  entryId: 'source-user'
+  entryId: 'source-user',
 })
 const SIBLING = createSession('sibling-session', '兄弟会话')
 
 function installReadyArchiveApi(
-  listSessions: (includeArchived: boolean) => AgentSessionSummary[]
+  listSessions: (includeArchived: boolean) => AgentSessionSummary[],
 ): void {
   const readyRuntime = createReadyRuntimeSnapshot({
     providerId: 'anthropic',
     modelId: 'claude-sonnet-4-5',
     maskedValue: 'sk-t...7890',
-    profileInitialized: true
+    profileInitialized: true,
   })
   vi.mocked(window.api.getRuntimeSnapshot).mockResolvedValue(readyRuntime)
   vi.mocked(window.api.refreshRuntime).mockResolvedValue(readyRuntime)
   vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
     agentId: 'tangyuan',
     sessionId: PARENT.sessionId,
-    updatedAt: '2026-07-28T00:00:00.000Z'
+    updatedAt: '2026-07-28T00:00:00.000Z',
   })
   vi.mocked(window.api.listSessions).mockImplementation(async (request) =>
-    listSessions(request?.includeArchived === true)
+    listSessions(request?.includeArchived === true),
   )
   vi.mocked(window.api.getTranscript).mockImplementation(async (request) => ({
     agentId: request.agentId,
     sessionId: request.sessionId,
     entries: [],
-    updatedAt: '2026-07-28T00:00:00.000Z'
+    updatedAt: '2026-07-28T00:00:00.000Z',
   }))
 }
 
@@ -81,7 +81,11 @@ describe('App 会话谱系归档与恢复', () => {
       if (!isArchived) return [PARENT, CHILD, SIBLING]
 
       const archivedAt = '2026-07-29T00:00:00.000Z'
-      const allSessions = [{ ...PARENT, archivedAt }, { ...CHILD, archivedAt }, SIBLING]
+      const allSessions = [
+        { ...PARENT, archivedAt },
+        { ...CHILD, archivedAt },
+        SIBLING,
+      ]
       return includeArchived ? allSessions : [SIBLING]
     })
     vi.mocked(window.api.archiveSession).mockImplementation(async () => {
@@ -89,26 +93,34 @@ describe('App 会话谱系归档与恢复', () => {
       return {
         status: 'archived',
         affectedSessionIds: [PARENT.sessionId, CHILD.sessionId],
-        affectedActivities: []
+        affectedActivities: [],
       }
     })
     window.location.hash = '#/chat/tangyuan/parent-session'
 
     render(<App />)
 
-    await user.click(await screen.findByRole('button', { name: '归档当前会话谱系' }))
+    await user.click(
+      await screen.findByRole('button', { name: '归档当前会话谱系' }),
+    )
 
     expect(window.api.archiveSession).toHaveBeenCalledWith({
       agentId: 'tangyuan',
       sessionId: PARENT.sessionId,
-      confirmActivityStop: false
+      confirmActivityStop: false,
     })
     await waitFor(() => {
       expect(window.location.hash).toBe('#/chat/tangyuan')
     })
-    expect(screen.queryByRole('treeitem', { name: /父会话/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('treeitem', { name: /子会话/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('treeitem', { name: /兄弟会话/ })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('treeitem', { name: /父会话/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('treeitem', { name: /子会话/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('treeitem', { name: /兄弟会话/ }),
+    ).toBeInTheDocument()
     expect(screen.getByText('已归档')).toBeInTheDocument()
     expect(screen.getByText('父会话')).toBeInTheDocument()
   })
@@ -118,41 +130,53 @@ describe('App 会话谱系归档与恢复', () => {
     installReadyArchiveApi(() => [PARENT, CHILD, SIBLING])
     vi.mocked(window.api.archiveSession).mockImplementation(
       async (request: ArchiveSessionRequest) => ({
-        status: request.confirmActivityStop ? 'archived' : 'confirmation-required',
+        status: request.confirmActivityStop
+          ? 'archived'
+          : 'confirmation-required',
         affectedSessionIds: [PARENT.sessionId, CHILD.sessionId],
         affectedActivities: [
           {
             sessionId: PARENT.sessionId,
             title: PARENT.title,
-            kinds: ['running', 'pending-approval']
+            kinds: ['running', 'pending-approval'],
           },
           {
             sessionId: CHILD.sessionId,
             title: CHILD.title,
-            kinds: ['queued', 'pending-clarification']
-          }
-        ]
-      })
+            kinds: ['queued', 'pending-clarification'],
+          },
+        ],
+      }),
     )
     window.location.hash = '#/chat/tangyuan/parent-session'
 
     render(<App />)
 
-    await user.click(await screen.findByRole('button', { name: '归档当前会话谱系' }))
-    expect(await screen.findByRole('alertdialog')).toHaveTextContent('父会话：运行中、待审批')
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('子会话：排队中、待澄清')
+    await user.click(
+      await screen.findByRole('button', { name: '归档当前会话谱系' }),
+    )
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+      '父会话：运行中、待审批',
+    )
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(
+      '子会话：排队中、待澄清',
+    )
 
     await user.click(screen.getByRole('button', { name: '取消' }))
     expect(window.api.archiveSession).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('heading', { name: PARENT.title })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: PARENT.title }),
+    ).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '归档当前会话谱系' }))
-    await user.click(await screen.findByRole('button', { name: '停止活动并归档' }))
+    await user.click(
+      await screen.findByRole('button', { name: '停止活动并归档' }),
+    )
 
     expect(window.api.archiveSession).toHaveBeenLastCalledWith({
       agentId: 'tangyuan',
       sessionId: PARENT.sessionId,
-      confirmActivityStop: true
+      confirmActivityStop: true,
     })
   })
 
@@ -164,12 +188,14 @@ describe('App 会话谱系归档与恢复', () => {
       const allSessions = isArchived
         ? [{ ...PARENT, archivedAt }, { ...CHILD, archivedAt }, SIBLING]
         : [PARENT, CHILD, SIBLING]
-      return includeArchived ? allSessions : allSessions.filter((session) => !session.archivedAt)
+      return includeArchived
+        ? allSessions
+        : allSessions.filter((session) => !session.archivedAt)
     })
     vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
       agentId: 'tangyuan',
       sessionId: SIBLING.sessionId,
-      updatedAt: '2026-07-28T00:00:00.000Z'
+      updatedAt: '2026-07-28T00:00:00.000Z',
     })
     vi.mocked(window.api.recoverSession).mockImplementation(async () => {
       isArchived = false
@@ -179,21 +205,27 @@ describe('App 会话谱系归档与恢复', () => {
 
     render(<App />)
 
-    await user.click(await screen.findByRole('button', { name: '恢复「父会话」会话谱系' }))
+    await user.click(
+      await screen.findByRole('button', { name: '恢复「父会话」会话谱系' }),
+    )
 
     expect(window.api.recoverSession).toHaveBeenCalledWith({
       agentId: 'tangyuan',
-      sessionId: PARENT.sessionId
+      sessionId: PARENT.sessionId,
     })
-    expect(await screen.findByRole('treeitem', { name: /父会话/ })).toHaveAttribute(
+    expect(
+      await screen.findByRole('treeitem', { name: /父会话/ }),
+    ).toHaveAttribute('aria-level', '1')
+    expect(screen.getByRole('treeitem', { name: /子会话/ })).toHaveAttribute(
       'aria-level',
-      '1'
+      '2',
     )
-    expect(screen.getByRole('treeitem', { name: /子会话/ })).toHaveAttribute('aria-level', '2')
 
     await user.click(screen.getByRole('treeitem', { name: /子会话/ }))
     expect(await screen.findByText('分叉自「父会话」')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '查看来源消息' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: '查看来源消息' }),
+    ).toBeInTheDocument()
   })
 
   it('归档请求期间切换 Agent 不会用旧 Agent 的结果覆盖当前页面', async () => {
@@ -202,7 +234,7 @@ describe('App 会话谱系归档与恢复', () => {
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       maskedValue: 'sk-t...7890',
-      profileInitialized: true
+      profileInitialized: true,
     })
     readyRuntime.agents.push({
       agentId: 'agent-2',
@@ -212,11 +244,11 @@ describe('App 会话谱系归档与恢复', () => {
       defaultModelId: 'claude-sonnet-4-5',
       homePath: '~/.tangyuan/agents/agent-2',
       archivedAt: null,
-      directoryStatus: 'healthy'
+      directoryStatus: 'healthy',
     })
     const agentSession = {
       ...createSession('agent-session', '研究会话'),
-      agentId: 'agent-2'
+      agentId: 'agent-2',
     }
     const archiveResult = createDeferred<{
       status: 'archived'
@@ -230,7 +262,7 @@ describe('App 会话谱系归档与恢复', () => {
     vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
       agentId: 'tangyuan',
       sessionId: PARENT.sessionId,
-      updatedAt: '2026-07-28T00:00:00.000Z'
+      updatedAt: '2026-07-28T00:00:00.000Z',
     })
     vi.mocked(window.api.listSessions).mockImplementation(async (request) => {
       if (request?.agentId === 'agent-2') return [agentSession]
@@ -243,23 +275,31 @@ describe('App 会话谱系归档与恢复', () => {
       agentId: request.agentId,
       sessionId: request.sessionId,
       entries: [],
-      updatedAt: '2026-07-28T00:00:00.000Z'
+      updatedAt: '2026-07-28T00:00:00.000Z',
     }))
-    vi.mocked(window.api.archiveSession).mockImplementation(async () => archiveResult.promise)
+    vi.mocked(window.api.archiveSession).mockImplementation(
+      async () => archiveResult.promise,
+    )
     window.location.hash = '#/chat/tangyuan/parent-session'
 
     render(<App />)
 
-    await user.click(await screen.findByRole('button', { name: '归档当前会话谱系' }))
-    await user.click(screen.getByRole('button', { name: '切换到 Agent 研究助手' }))
-    expect(await screen.findByRole('heading', { name: '研究助手' })).toBeInTheDocument()
+    await user.click(
+      await screen.findByRole('button', { name: '归档当前会话谱系' }),
+    )
+    await user.click(
+      screen.getByRole('button', { name: '切换到 Agent 研究助手' }),
+    )
+    expect(
+      await screen.findByRole('heading', { name: '研究助手' }),
+    ).toBeInTheDocument()
 
     isArchived = true
     await act(async () => {
       archiveResult.resolve({
         status: 'archived',
         affectedSessionIds: [PARENT.sessionId],
-        affectedActivities: []
+        affectedActivities: [],
       })
       await archiveResult.promise
     })
@@ -267,7 +307,9 @@ describe('App 会话谱系归档与恢复', () => {
     await waitFor(() => {
       expect(window.location.hash).toBe('#/chat/agent-2')
     })
-    expect(screen.getByRole('heading', { name: '研究助手' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: '研究助手' }),
+    ).toBeInTheDocument()
   })
 
   it('切换 Agent 后不会显示旧 Agent 的归档活动确认', async () => {
@@ -276,7 +318,7 @@ describe('App 会话谱系归档与恢复', () => {
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       maskedValue: 'sk-t...7890',
-      profileInitialized: true
+      profileInitialized: true,
     })
     readyRuntime.agents.push({
       agentId: 'agent-2',
@@ -286,11 +328,11 @@ describe('App 会话谱系归档与恢复', () => {
       defaultModelId: 'claude-sonnet-4-5',
       homePath: '~/.tangyuan/agents/agent-2',
       archivedAt: null,
-      directoryStatus: 'healthy'
+      directoryStatus: 'healthy',
     })
     const agentSession = {
       ...createSession('agent-session', '研究会话'),
-      agentId: 'agent-2'
+      agentId: 'agent-2',
     }
     const archiveResult = createDeferred<{
       status: 'confirmation-required'
@@ -300,7 +342,7 @@ describe('App 会话谱系归档与恢复', () => {
           sessionId: string
           title: string
           kinds: ['running']
-        }
+        },
       ]
     }>()
 
@@ -309,25 +351,33 @@ describe('App 会话谱系归档与恢复', () => {
     vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
       agentId: 'tangyuan',
       sessionId: PARENT.sessionId,
-      updatedAt: '2026-07-28T00:00:00.000Z'
+      updatedAt: '2026-07-28T00:00:00.000Z',
     })
     vi.mocked(window.api.listSessions).mockImplementation(async (request) =>
-      request?.agentId === 'agent-2' ? [agentSession] : [PARENT]
+      request?.agentId === 'agent-2' ? [agentSession] : [PARENT],
     )
     vi.mocked(window.api.getTranscript).mockImplementation(async (request) => ({
       agentId: request.agentId,
       sessionId: request.sessionId,
       entries: [],
-      updatedAt: '2026-07-28T00:00:00.000Z'
+      updatedAt: '2026-07-28T00:00:00.000Z',
     }))
-    vi.mocked(window.api.archiveSession).mockImplementation(async () => archiveResult.promise)
+    vi.mocked(window.api.archiveSession).mockImplementation(
+      async () => archiveResult.promise,
+    )
     window.location.hash = '#/chat/tangyuan/parent-session'
 
     render(<App />)
 
-    await user.click(await screen.findByRole('button', { name: '归档当前会话谱系' }))
-    await user.click(screen.getByRole('button', { name: '切换到 Agent 研究助手' }))
-    expect(await screen.findByRole('heading', { name: '研究助手' })).toBeInTheDocument()
+    await user.click(
+      await screen.findByRole('button', { name: '归档当前会话谱系' }),
+    )
+    await user.click(
+      screen.getByRole('button', { name: '切换到 Agent 研究助手' }),
+    )
+    expect(
+      await screen.findByRole('heading', { name: '研究助手' }),
+    ).toBeInTheDocument()
 
     await act(async () => {
       archiveResult.resolve({
@@ -337,9 +387,9 @@ describe('App 会话谱系归档与恢复', () => {
           {
             sessionId: PARENT.sessionId,
             title: PARENT.title,
-            kinds: ['running']
-          }
-        ]
+            kinds: ['running'],
+          },
+        ],
       })
       await archiveResult.promise
     })
@@ -348,6 +398,8 @@ describe('App 会话谱系归档与恢复', () => {
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     })
     expect(window.location.hash).toBe('#/chat/agent-2')
-    expect(screen.getByRole('heading', { name: '研究助手' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: '研究助手' }),
+    ).toBeInTheDocument()
   })
 })

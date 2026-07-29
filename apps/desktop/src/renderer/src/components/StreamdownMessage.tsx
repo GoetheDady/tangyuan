@@ -27,7 +27,7 @@ type StreamdownAnchorProps = React.ClassAttributes<HTMLAnchorElement> &
  */
 export function StreamdownMessage({
   content,
-  isAnimating = false
+  isAnimating = false,
 }: {
   content: string
   isAnimating?: boolean
@@ -63,7 +63,9 @@ function SafeExternalLink(props: StreamdownAnchorProps): React.JSX.Element {
       onClick={(event) => {
         event.preventDefault()
         if (props.href) {
-          window.api.openExternalLink({ url: props.href }).catch(() => undefined)
+          window.api
+            .openExternalLink({ url: props.href })
+            .catch(() => undefined)
         }
       }}
     />

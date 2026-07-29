@@ -9,7 +9,8 @@ const subContentPropsSpy = vi.hoisted(() => vi.fn())
 const subPropsSpy = vi.hoisted(() => vi.fn())
 
 vi.mock('@radix-ui/react-dropdown-menu', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@radix-ui/react-dropdown-menu')>()
+  const actual =
+    await importOriginal<typeof import('@radix-ui/react-dropdown-menu')>()
   const ReactModule = await import('react')
   const Content = ReactModule.forwardRef<
     React.ComponentRef<typeof actual.Content>,
@@ -53,7 +54,7 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
 describe('DropdownMenu', () => {
@@ -83,7 +84,7 @@ describe('DropdownMenu', () => {
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
         </DropdownMenuContent>
-      </DropdownMenu>
+      </DropdownMenu>,
     )
 
     const trigger = screen.getByRole('button', { name: '打开操作菜单' })
@@ -112,24 +113,39 @@ describe('DropdownMenu', () => {
           <DropdownMenuItem>普通操作</DropdownMenuItem>
           <DropdownMenuItem variant="destructive">归档 Agent</DropdownMenuItem>
           <DropdownMenuItem disabled>禁用操作</DropdownMenuItem>
-          <DropdownMenuCheckboxItem checked>显示时间戳</DropdownMenuCheckboxItem>
+          <DropdownMenuCheckboxItem checked>
+            显示时间戳
+          </DropdownMenuCheckboxItem>
           <DropdownMenuRadioGroup value="detailed">
-            <DropdownMenuRadioItem value="compact" onSelect={(event) => event.preventDefault()}>
+            <DropdownMenuRadioItem
+              value="compact"
+              onSelect={(event) => event.preventDefault()}
+            >
               紧凑
             </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="detailed" onSelect={(event) => event.preventDefault()}>
+            <DropdownMenuRadioItem
+              value="detailed"
+              onSelect={(event) => event.preventDefault()}
+            >
               详细
             </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
-      </DropdownMenu>
+      </DropdownMenu>,
     )
 
     const content = screen.getByTestId('dropdown-menu-content')
-    for (const className of ['min-w-32', 'rounded-[6px]', 'p-1', 'shadow-level-2']) {
+    for (const className of [
+      'min-w-32',
+      'rounded-[6px]',
+      'p-1',
+      'shadow-level-2',
+    ]) {
       expect(content.className).toContain(className)
     }
-    expect(contentPropsSpy).toHaveBeenLastCalledWith(expect.objectContaining({ sideOffset: 4 }))
+    expect(contentPropsSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sideOffset: 4 }),
+    )
 
     const regularItem = screen.getByRole('menuitem', { name: '普通操作' })
     for (const className of ['h-8', 'px-2', 'text-sm']) {
@@ -138,15 +154,23 @@ describe('DropdownMenu', () => {
 
     const destructiveItem = screen.getByRole('menuitem', { name: '归档 Agent' })
     expect(destructiveItem).toHaveAttribute('data-variant', 'destructive')
-    expect(destructiveItem.className).toContain('data-[variant=destructive]:text-destructive')
+    expect(destructiveItem.className).toContain(
+      'data-[variant=destructive]:text-destructive',
+    )
 
     const disabledItem = screen.getByRole('menuitem', { name: '禁用操作' })
     expect(disabledItem).toHaveAttribute('data-disabled')
-    expect(disabledItem.className).toContain('data-[disabled]:pointer-events-none')
+    expect(disabledItem.className).toContain(
+      'data-[disabled]:pointer-events-none',
+    )
 
-    const checkbox = screen.getByRole('menuitemcheckbox', { name: '显示时间戳' })
+    const checkbox = screen.getByRole('menuitemcheckbox', {
+      name: '显示时间戳',
+    })
     expect(checkbox).toHaveAttribute('data-state', 'checked')
-    expect(checkbox.querySelector('[data-slot="dropdown-menu-item-indicator"]')).toBeInTheDocument()
+    expect(
+      checkbox.querySelector('[data-slot="dropdown-menu-item-indicator"]'),
+    ).toBeInTheDocument()
 
     const selectedRadio = screen.getByRole('menuitemradio', { name: '详细' })
     expect(selectedRadio).toHaveAttribute('data-state', 'checked')
@@ -174,19 +198,30 @@ describe('DropdownMenu', () => {
           >
             显示时间戳
           </DropdownMenuCheckboxItem>
-          <DropdownMenuRadioGroup defaultValue="compact" onValueChange={onValueChange}>
-            <DropdownMenuRadioItem value="compact" onSelect={(event) => event.preventDefault()}>
+          <DropdownMenuRadioGroup
+            defaultValue="compact"
+            onValueChange={onValueChange}
+          >
+            <DropdownMenuRadioItem
+              value="compact"
+              onSelect={(event) => event.preventDefault()}
+            >
               紧凑
             </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="detailed" onSelect={(event) => event.preventDefault()}>
+            <DropdownMenuRadioItem
+              value="detailed"
+              onSelect={(event) => event.preventDefault()}
+            >
               详细
             </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
-      </DropdownMenu>
+      </DropdownMenu>,
     )
 
-    await user.click(screen.getByRole('menuitemcheckbox', { name: '显示时间戳' }))
+    await user.click(
+      screen.getByRole('menuitemcheckbox', { name: '显示时间戳' }),
+    )
     expect(onCheckedChange).toHaveBeenCalledWith(true)
 
     await user.click(screen.getByRole('menuitem', { name: '禁用操作' }))
@@ -213,13 +248,15 @@ describe('DropdownMenu', () => {
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         </DropdownMenuContent>
-      </DropdownMenu>
+      </DropdownMenu>,
     )
 
-    expect(subPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ defaultOpen: true }))
+    expect(subPropsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ defaultOpen: true }),
+    )
     expect(screen.getByRole('menuitem', { name: '移动到' })).toHaveAttribute(
       'data-slot',
-      'dropdown-menu-sub-trigger'
+      'dropdown-menu-sub-trigger',
     )
 
     uncontrolled.unmount()
@@ -232,19 +269,30 @@ describe('DropdownMenu', () => {
         <DropdownMenuContent>
           <DropdownMenuSub open onOpenChange={onControlledOpenChange}>
             <DropdownMenuSubTrigger>共享到</DropdownMenuSubTrigger>
-            <DropdownMenuSubContent data-testid="controlled-submenu" sideOffset={8}>
+            <DropdownMenuSubContent
+              data-testid="controlled-submenu"
+              sideOffset={8}
+            >
               <DropdownMenuItem>工作空间</DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         </DropdownMenuContent>
-      </DropdownMenu>
+      </DropdownMenu>,
     )
 
     expect(subPropsSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ open: true, onOpenChange: onControlledOpenChange })
+      expect.objectContaining({
+        open: true,
+        onOpenChange: onControlledOpenChange,
+      }),
     )
-    expect(screen.getByTestId('controlled-submenu')).toHaveAttribute('data-level', '2')
-    expect(subContentPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ sideOffset: 8 }))
+    expect(screen.getByTestId('controlled-submenu')).toHaveAttribute(
+      'data-level',
+      '2',
+    )
+    expect(subContentPropsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ sideOffset: 8 }),
+    )
     expect(onControlledOpenChange).toHaveBeenCalledWith(false)
   })
 })

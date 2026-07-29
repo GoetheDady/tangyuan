@@ -25,6 +25,6 @@ export function buildContentSecurityPolicy(rendererUrl?: string): string {
     "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self'"
+    "form-action 'self'",
   ].join('; ')
 }

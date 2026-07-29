@@ -12,7 +12,9 @@ describe('AwaitingResponseIndicator', () => {
 
   it('使用 data-testid 标识', () => {
     render(<AwaitingResponseIndicator />)
-    expect(screen.getByTestId('awaiting-response-indicator')).toBeInTheDocument()
+    expect(
+      screen.getByTestId('awaiting-response-indicator'),
+    ).toBeInTheDocument()
   })
 
   it('标记为 status 角色且 aria-label 正确', () => {

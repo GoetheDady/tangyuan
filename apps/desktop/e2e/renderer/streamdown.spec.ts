@@ -3,7 +3,7 @@ import {
   createReadyRuntimeSnapshot,
   createTestSessions,
   createMarkdownTestMessages,
-  createPreloadApiInitScript
+  createPreloadApiInitScript,
 } from '../fixtures/preload-mock'
 
 test.describe('Streamdown Markdown 渲染', () => {
@@ -62,7 +62,9 @@ test.describe('Streamdown Markdown 渲染', () => {
     await expect(streamdownInUser).toHaveCount(0)
   })
 
-  test('外部链接点击截获并调用 window.api.openExternalLink', async ({ page }) => {
+  test('外部链接点击截获并调用 window.api.openExternalLink', async ({
+    page,
+  }) => {
     // 点击 TypeScript 官网链接
     const link = page.getByText('TypeScript 官网')
     await expect(link).toBeVisible()
@@ -88,10 +90,14 @@ test.describe('Streamdown Markdown 渲染', () => {
         sessionId: 'session-1',
         role: 'agent' as const,
         content: '<script>window.__xssExecuted__ = true</script>',
-        createdAt: new Date().toISOString()
-      }
+        createdAt: new Date().toISOString(),
+      },
     ]
-    const initScript = createPreloadApiInitScript(runtime, sessions, xssMessages)
+    const initScript = createPreloadApiInitScript(
+      runtime,
+      sessions,
+      xssMessages,
+    )
 
     await page.addInitScript({ content: initScript })
     await page.goto('/#/chat/tangyuan')
