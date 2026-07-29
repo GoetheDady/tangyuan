@@ -10,7 +10,7 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -38,8 +38,10 @@ import {
  */
 export function ConsoleProviderPage(): React.JSX.Element {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const redirectTarget = searchParams.get('redirect') ?? '/chat/tangyuan'
+  const isSetupRoute = location.pathname === '/setup'
 
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -114,7 +116,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
     apiKey.trim().length > 0 &&
     Boolean(selectedModelId)
 
-  // 配置已就绪时自动跳转（仅 ChatGuard 强制跳转场景，有 redirect 参数时才执行）
+  // 配置已就绪时自动跳转（仅 /setup 路由下，有 redirect 参数时才执行）
   const initialRedirectAttempted = useRef(false)
   useEffect(() => {
     if (initialRedirectAttempted.current) return
@@ -123,7 +125,8 @@ export function ConsoleProviderPage(): React.JSX.Element {
       !isLoading &&
       !isVerifying &&
       runtime?.status === 'ready' &&
-      wasRedirectedFromGuard
+      wasRedirectedFromGuard &&
+      isSetupRoute
     ) {
       initialRedirectAttempted.current = true
       navigate(redirectTarget, { replace: true })
@@ -135,6 +138,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
     navigate,
     redirectTarget,
     searchParams,
+    isSetupRoute,
   ])
 
   /**
