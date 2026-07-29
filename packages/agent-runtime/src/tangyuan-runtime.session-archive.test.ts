@@ -456,8 +456,14 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     await vi.waitFor(async () => {
       await expect(runtime.listSessions()).resolves.toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ sessionId: target.sessionId, state: 'queued' }),
-          expect.objectContaining({ sessionId: sibling.sessionId, state: 'queued' }),
+          expect.objectContaining({
+            sessionId: target.sessionId,
+            state: 'queued',
+          }),
+          expect.objectContaining({
+            sessionId: sibling.sessionId,
+            state: 'queued',
+          }),
         ]),
       )
     })
@@ -541,9 +547,7 @@ describe('TangyuanRuntime 会话谱系永久删除', () => {
     ).resolves.toMatchObject({
       status: 'confirmation-required',
       affectedSessionIds: ['parent', 'child'],
-      affectedActivities: [
-        { sessionId: 'child', kinds: ['running'] },
-      ],
+      affectedActivities: [{ sessionId: 'child', kinds: ['running'] }],
     })
     expect(sessionDriver.deleteSessions).not.toHaveBeenCalled()
   })
@@ -633,14 +637,12 @@ describe('TangyuanRuntime 祖先谱系完整性检查', () => {
     ])
     // 让 grandparent 的 transcript 读取失败
     const originalGetTranscript = sessionDriver.getTranscript
-    sessionDriver.getTranscript = vi.fn(
-      async (request) => {
-        if (request.sessionId === 'grandparent') {
-          throw new Error('文件损坏')
-        }
-        return originalGetTranscript(request)
-      },
-    )
+    sessionDriver.getTranscript = vi.fn(async (request) => {
+      if (request.sessionId === 'grandparent') {
+        throw new Error('文件损坏')
+      }
+      return originalGetTranscript(request)
+    })
     const runtime = createTangyuanRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(createSnapshot()),
       sessionDriver,

@@ -24,30 +24,30 @@ pnpm build:linux # 产出 AppImage/snap/deb
 
 ## 安全配置
 
-| 安全措施 | 状态 |
-|----------|------|
-| Renderer sandbox | `sandbox: true` |
-| Context isolation | `contextIsolation: true` |
-| Node integration | `nodeIntegration: false` |
-| Content Security Policy | `default-src 'self'`，禁止 `unsafe-eval`、远程脚本 |
-| API Key 加密 | Electron `safeStorage` 加密保存 |
-| 加密降级防护 | `isEncryptionAvailable()` 检查，不可用时拒绝保存 |
-| Preload API | 仅通过 `contextBridge.exposeInMainWorld` 暴露类型化 API |
-| IPC 输入验证 | Main 进程 Zod schema 二次校验所有 Renderer 请求 |
-| 外部链接 | URL 协议白名单（仅 http/https），系统浏览器打开 |
-| 原始 HTML | Renderer 不执行，Markdown 转义处理 |
+| 安全措施                | 状态                                                    |
+| ----------------------- | ------------------------------------------------------- |
+| Renderer sandbox        | `sandbox: true`                                         |
+| Context isolation       | `contextIsolation: true`                                |
+| Node integration        | `nodeIntegration: false`                                |
+| Content Security Policy | `default-src 'self'`，禁止 `unsafe-eval`、远程脚本      |
+| API Key 加密            | Electron `safeStorage` 加密保存                         |
+| 加密降级防护            | `isEncryptionAvailable()` 检查，不可用时拒绝保存        |
+| Preload API             | 仅通过 `contextBridge.exposeInMainWorld` 暴露类型化 API |
+| IPC 输入验证            | Main 进程 Zod schema 二次校验所有 Renderer 请求         |
+| 外部链接                | URL 协议白名单（仅 http/https），系统浏览器打开         |
+| 原始 HTML               | Renderer 不执行，Markdown 转义处理                      |
 
 ## 质量门禁（全部通过）
 
-| 门禁 | 命令 | 状态 |
-|------|------|------|
-| Lint | `pnpm lint` | ✅ 0 errors |
-| TypeCheck | `pnpm typecheck` | ✅ 全部通过 |
-| Unit/Component 测试 | `pnpm test` | ✅ 7 files, 192 tests |
-| Playwright Chromium | `pnpm test:e2e:renderer` | ✅ 51/51 |
-| Playwright Electron | `pnpm test:e2e:electron` | ✅ 8/8 |
-| macOS 构建 | `pnpm build:mac:dir` | ✅ `.app` 产出 |
-| macOS Smoke Test | `pnpm smoke:packaged:mac` | ✅ 配置页到达、Agent Home 创建 |
+| 门禁                | 命令                      | 状态                           |
+| ------------------- | ------------------------- | ------------------------------ |
+| Lint                | `pnpm lint`               | ✅ 0 errors                    |
+| TypeCheck           | `pnpm typecheck`          | ✅ 全部通过                    |
+| Unit/Component 测试 | `pnpm test`               | ✅ 7 files, 192 tests          |
+| Playwright Chromium | `pnpm test:e2e:renderer`  | ✅ 51/51                       |
+| Playwright Electron | `pnpm test:e2e:electron`  | ✅ 8/8                         |
+| macOS 构建          | `pnpm build:mac:dir`      | ✅ `.app` 产出                 |
+| macOS Smoke Test    | `pnpm smoke:packaged:mac` | ✅ 配置页到达、Agent Home 创建 |
 
 ## 发布历史
 

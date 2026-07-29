@@ -61,8 +61,10 @@ import type { LastActiveSessionStore } from './last-active-session-store'
 export abstract class TangyuanRuntimeOrchestrator {
   protected static readonly MAX_CONCURRENT_RUNS = 4
   protected readonly sessionDriver: AgentSessionDriver
-  protected readonly lastActiveSessionStore:
-    Pick<LastActiveSessionStore, 'read' | 'write' | 'clear'>
+  protected readonly lastActiveSessionStore: Pick<
+    LastActiveSessionStore,
+    'read' | 'write' | 'clear'
+  >
   protected readonly listeners = new Set<AgentEventListener>()
   protected readonly activeRunIds = new Map<string, string>()
   protected readonly sessionArchiveCoordinator = new SessionArchiveCoordinator()
@@ -137,10 +139,7 @@ export abstract class TangyuanRuntimeOrchestrator {
       }
       // 当 run 因任何原因结束（取消/失败/完成）时，自动清理
       // 该 session 的待审批请求，防止审批卡片在 UI 中堆积。
-      if (
-        event.type === 'turn-cancelled' ||
-        event.type === 'turn-failed'
-      ) {
+      if (event.type === 'turn-cancelled' || event.type === 'turn-failed') {
         this.rejectSessionPendingApprovals(event.sessionId)
       } else if (
         event.type === 'run-state-changed' &&

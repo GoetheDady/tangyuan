@@ -3,7 +3,9 @@ import type { RuntimeSnapshot } from '@tangyuan/contracts'
 import type { RuntimeResourceDriver } from './index'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
 
-function makeSnapshot(status: RuntimeSnapshot['status'] = 'ready'): RuntimeSnapshot {
+function makeSnapshot(
+  status: RuntimeSnapshot['status'] = 'ready',
+): RuntimeSnapshot {
   return { status } as RuntimeSnapshot
 }
 
@@ -49,9 +51,9 @@ describe('RuntimeSnapshotStore', () => {
 
   it('saveConfiguration 缺少能力时抛错', async () => {
     const store = new RuntimeSnapshotStore({ runtimeDriver: createDriver() })
-    await expect(
-      store.saveConfiguration({} as never),
-    ).rejects.toThrow('不支持保存配置')
+    await expect(store.saveConfiguration({} as never)).rejects.toThrow(
+      '不支持保存配置',
+    )
   })
 
   it('saveConfiguration 保存后缓存被写入', async () => {

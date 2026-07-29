@@ -44,7 +44,11 @@ beforeEach(async () => {
     fsRoot: dir,
     userDataPath: dir,
   })
-  store = new ConfigStore({ layout, encryptionAdapter: fakeAdapter, now: () => 'now' })
+  store = new ConfigStore({
+    layout,
+    encryptionAdapter: fakeAdapter,
+    now: () => 'now',
+  })
 })
 
 afterEach(async () => {

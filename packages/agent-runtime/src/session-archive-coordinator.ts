@@ -25,7 +25,10 @@ export class SessionArchiveCoordinator {
     }
   }
 
-  async trackFork<T>(sourceSessionId: string, pendingFork: Promise<T>): Promise<T> {
+  async trackFork<T>(
+    sourceSessionId: string,
+    pendingFork: Promise<T>,
+  ): Promise<T> {
     const pendingForSource =
       this.pendingForksBySourceSession.get(sourceSessionId) ?? new Set()
     pendingForSource.add(pendingFork)

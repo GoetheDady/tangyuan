@@ -1,5 +1,13 @@
 import { constants as fsConstants } from 'node:fs'
-import { access, copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import {
+  access,
+  copyFile,
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from 'node:fs/promises'
 import { dirname } from 'node:path'
 import {
   migrateConfigV1ToV2,
@@ -16,10 +24,7 @@ import {
 } from '@tangyuan/contracts'
 import type { DirectoryLayout } from './directory-layout'
 import { AgentRuntimeError } from './errors'
-import {
-  createDefaultInternalConfig,
-  extractAgentRuntimeConfig,
-} from './utils'
+import { createDefaultInternalConfig, extractAgentRuntimeConfig } from './utils'
 
 /**
  * 读取配置的结果，含内容、完整性状态和是否存在备份。

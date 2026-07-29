@@ -52,7 +52,9 @@ describe('MessageStore.appendDelta', () => {
   })
 
   it('消息不存在时抛错', () => {
-    expect(() => makeStore().appendDelta('nope', 'x')).toThrow(AgentRuntimeError)
+    expect(() => makeStore().appendDelta('nope', 'x')).toThrow(
+      AgentRuntimeError,
+    )
   })
 })
 

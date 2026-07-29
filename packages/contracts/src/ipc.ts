@@ -47,7 +47,10 @@ import {
   lastActiveSessionSchema,
   setLastActiveSessionRequestSchema,
 } from './schemas'
-import type { LastActiveSession, SetLastActiveSessionRequest } from './last-active-session'
+import type {
+  LastActiveSession,
+  SetLastActiveSessionRequest,
+} from './last-active-session'
 import type {
   ArchiveSessionRequest,
   ArchiveSessionResult,
@@ -269,7 +272,8 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsRecover]: recoverSessionRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsDelete]: deleteSessionRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: z.undefined(),
-  [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: setLastActiveSessionRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]:
+    setLastActiveSessionRequestSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -479,8 +483,10 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsArchive]: archiveSessionResultSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRecover]: z.array(agentSessionSummarySchema),
   [DESKTOP_IPC_CHANNELS.sessionsDelete]: deleteSessionResultSchema,
-  [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: lastActiveSessionSchema.nullable(),
-  [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: lastActiveSessionSchema.nullable(),
+  [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]:
+    lastActiveSessionSchema.nullable(),
+  [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]:
+    lastActiveSessionSchema.nullable(),
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -929,7 +935,9 @@ export interface DesktopPreloadApi {
    * @returns 更新后的最后激活会话记录；会话不可用时返回 null。
    * @throws 当 Agent 不存在或读取失败时，Promise 会 reject。
    */
-  setLastActiveSession(request: SetLastActiveSessionRequest): Promise<LastActiveSession | null>
+  setLastActiveSession(
+    request: SetLastActiveSessionRequest,
+  ): Promise<LastActiveSession | null>
 
   /**
    * 读取所有待回答的澄清问题。

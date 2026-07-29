@@ -55,8 +55,7 @@ export function validateFilePath(
   // 共享用户画像及历史备份 → 引导使用 update_user_profile
   if (
     pathSegments.includes('profile') &&
-    (pathSegments.includes('user.md') ||
-      pathSegments.includes('user.history'))
+    (pathSegments.includes('user.md') || pathSegments.includes('user.history'))
   ) {
     return {
       allowed: false,

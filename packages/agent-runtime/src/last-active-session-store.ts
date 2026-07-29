@@ -1,6 +1,9 @@
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { lastActiveSessionSchema, type LastActiveSession } from '@tangyuan/contracts'
+import {
+  lastActiveSessionSchema,
+  type LastActiveSession,
+} from '@tangyuan/contracts'
 import type { DirectoryLayout } from './directory-layout'
 
 /**
@@ -49,7 +52,9 @@ export class LastActiveSessionStore {
    * @returns 写入后的记录。
    * @throws 当目录创建或文件写入失败时，Promise 会 reject。
    */
-  async write(record: Omit<LastActiveSession, 'updatedAt'>): Promise<LastActiveSession> {
+  async write(
+    record: Omit<LastActiveSession, 'updatedAt'>,
+  ): Promise<LastActiveSession> {
     const path = this.layout.lastActiveSession()
     const payload: LastActiveSession = {
       agentId: record.agentId,

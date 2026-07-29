@@ -1,4 +1,7 @@
-import type { AgentSessionSummary, LastActiveSession } from '@tangyuan/contracts'
+import type {
+  AgentSessionSummary,
+  LastActiveSession,
+} from '@tangyuan/contracts'
 import { describe, expect, it, vi } from 'vitest'
 import { createTangyuanRuntimeForTesting } from './TangyuanRuntime'
 import {
@@ -99,7 +102,9 @@ describe('TangyuanRuntime · 最后激活会话', () => {
       },
     })
 
-    await expect(runtime.getLastActiveSession()).resolves.toEqual(fallbackRecord)
+    await expect(runtime.getLastActiveSession()).resolves.toEqual(
+      fallbackRecord,
+    )
   })
 
   it('记录指向损坏会话时回退到默认 Agent 的最近可读会话', async () => {
@@ -126,7 +131,9 @@ describe('TangyuanRuntime · 最后激活会话', () => {
     ]
     const sessionDriver = createSessionDriver(sessionsWithOlderFallback)
     sessionDriver.listSessions = vi.fn(async ({ agentId }) =>
-      sessionsWithOlderFallback.filter((session) => session.agentId === agentId),
+      sessionsWithOlderFallback.filter(
+        (session) => session.agentId === agentId,
+      ),
     )
     sessionDriver.getTranscript = vi.fn(async ({ agentId, sessionId }) => {
       if (sessionId === 'fork-session' || sessionId === 'default-recent') {
@@ -155,7 +162,9 @@ describe('TangyuanRuntime · 最后激活会话', () => {
       },
     })
 
-    await expect(runtime.getLastActiveSession()).resolves.toEqual(fallbackRecord)
+    await expect(runtime.getLastActiveSession()).resolves.toEqual(
+      fallbackRecord,
+    )
     expect(sessionDriver.getTranscript).toHaveBeenCalledWith({
       agentId: 'tangyuan',
       sessionId: 'default-older',
@@ -196,7 +205,9 @@ describe('TangyuanRuntime · 最后激活会话', () => {
       },
     })
 
-    await expect(runtime.getLastActiveSession()).resolves.toEqual(fallbackRecord)
+    await expect(runtime.getLastActiveSession()).resolves.toEqual(
+      fallbackRecord,
+    )
   })
 
   it('目标分叉会话可用时更新最后激活记录', async () => {

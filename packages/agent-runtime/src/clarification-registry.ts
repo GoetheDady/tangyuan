@@ -37,9 +37,7 @@ export class ClarificationRegistry {
    * @param request - 待回答的澄清请求。
    * @returns 用户回答或取消时 resolve `{ answer }`（取消时为空串）。
    */
-  register(
-    request: QuestionClarificationRequest,
-  ): Promise<{ answer: string }> {
+  register(request: QuestionClarificationRequest): Promise<{ answer: string }> {
     return new Promise<{ answer: string }>((resolve) => {
       this.pending.set(request.clarificationId, { request, resolve })
 

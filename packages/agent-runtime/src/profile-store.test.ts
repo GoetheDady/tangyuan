@@ -62,7 +62,11 @@ describe('ProfileStore.ensureDefaultAgentHome', () => {
 
   it('soul.md 与 user.md 均有内容时标记已初始化', async () => {
     await store.ensureDefaultAgentHome()
-    await writeFile(join(layout.agentHome(), 'soul.md'), '# 汤圆\n有内容', 'utf8')
+    await writeFile(
+      join(layout.agentHome(), 'soul.md'),
+      '# 汤圆\n有内容',
+      'utf8',
+    )
     await mkdir(layout.sharedProfile(), { recursive: true })
     await writeFile(layout.userProfile(), '# 用户\n有内容', 'utf8')
 
@@ -107,13 +111,20 @@ describe('ProfileStore.writeSoul', () => {
     const historyFiles = await readdir(layout.soulHistory('agent-a'))
     expect(historyFiles).toHaveLength(1)
     expect(
-      await readFile(join(layout.soulHistory('agent-a'), historyFiles[0]!), 'utf8'),
+      await readFile(
+        join(layout.soulHistory('agent-a'), historyFiles[0]!),
+        'utf8',
+      ),
     ).toBe('旧内容')
   })
 
   it('内容无变化时不写文件且不创建备份', async () => {
     const initial = await store.readSoul('agent-a')
-    const created = await store.writeSoul('agent-a', '相同内容', initial.version)
+    const created = await store.writeSoul(
+      'agent-a',
+      '相同内容',
+      initial.version,
+    )
 
     const outcome = await store.writeSoul(
       'agent-a',
@@ -178,7 +189,9 @@ describe('ProfileStore.writeSoul', () => {
       store.writeSoul('agent-a', '并发版本 B', initial.version),
     ])
 
-    expect(outcomes.filter((outcome) => outcome.result.status === 'updated')).toHaveLength(1)
+    expect(
+      outcomes.filter((outcome) => outcome.result.status === 'updated'),
+    ).toHaveLength(1)
     expect(outcomes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -195,7 +208,9 @@ describe('ProfileStore.writeSoul', () => {
   it('检测到敏感凭据时拒绝整次更新', async () => {
     const config: InternalRuntimeConfig = {
       schemaVersion: 2,
-      providers: { openai: { apiKey: 'sk-secret-123456789', updatedAt: 'now' } },
+      providers: {
+        openai: { apiKey: 'sk-secret-123456789', updatedAt: 'now' },
+      },
       agents: {
         tangyuan: {
           displayName: '汤圆',
@@ -225,9 +240,7 @@ describe('ProfileStore.writeSoul', () => {
       status: 'rejected',
       reason: { code: 'sensitive-content' },
     })
-    expect(await readFile(layout.soul('tangyuan'), 'utf8')).toBe(
-      '安全的旧内容',
-    )
+    expect(await readFile(layout.soul('tangyuan'), 'utf8')).toBe('安全的旧内容')
     expect(await readdir(layout.soulHistory('tangyuan'))).toEqual([])
   })
 

@@ -8,9 +8,7 @@ type SdkToolResults = AssembleRunTurnInput['toolResults']
 /**
  * 构造一个最小可用的 SDK AssistantMessage，仅关心 content 块顺序。
  */
-function createMessage(
-  content: SdkMessage['content'],
-): SdkMessage {
+function createMessage(content: SdkMessage['content']): SdkMessage {
   return {
     role: 'assistant',
     content,

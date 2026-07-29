@@ -33,9 +33,7 @@ describe('DirectoryLayout · agent home 派生路径', () => {
   })
 
   it('soul 与 soul 历史位于 agent home 下', () => {
-    expect(layout.soul('foo')).toBe(
-      '/home/tester/.tangyuan/agents/foo/soul.md',
-    )
+    expect(layout.soul('foo')).toBe('/home/tester/.tangyuan/agents/foo/soul.md')
     expect(layout.soulHistory('foo')).toBe(
       '/home/tester/.tangyuan/agents/foo/soul.history',
     )
@@ -49,9 +47,7 @@ describe('DirectoryLayout · 共享目录派生路径', () => {
 
   it('共享 profile 目录与 user 文件、历史目录', () => {
     expect(layout.sharedProfile()).toBe('/home/tester/.tangyuan/profile')
-    expect(layout.userProfile()).toBe(
-      '/home/tester/.tangyuan/profile/user.md',
-    )
+    expect(layout.userProfile()).toBe('/home/tester/.tangyuan/profile/user.md')
     expect(layout.userHistory()).toBe(
       '/home/tester/.tangyuan/profile/user.history',
     )

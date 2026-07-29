@@ -8,7 +8,11 @@ const createReadToolDefinition = vi.fn((_cwd: string) => ({
   name: 'read',
   label: 'read',
   description: 'Read file',
-  parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+  parameters: {
+    type: 'object',
+    properties: { path: { type: 'string' } },
+    required: ['path'],
+  },
   async execute() {
     return { content: [{ type: 'text', text: 'content' }], details: undefined }
   },
@@ -169,7 +173,11 @@ describe('RealPiSdkGateway write/edit path protection', () => {
   const mockToolApprovalGateway = {
     requestBashApproval: vi.fn(),
     validateFilePath: vi.fn(
-      (_params: { agentId: string; path: string; operation: string }): {
+      (_params: {
+        agentId: string
+        path: string
+        operation: string
+      }): {
         allowed: boolean
         reason?: string
       } => {
@@ -274,7 +282,8 @@ describe('RealPiSdkGateway write/edit path protection', () => {
   it('write 工具拒绝受保护的 soul.md 路径', async () => {
     mockToolApprovalGateway.validateFilePath.mockReturnValueOnce({
       allowed: false,
-      reason: '不允许写入 Agent 灵魂文件：/home/soul.md。请使用 update_soul 工具修改 Agent 灵魂。',
+      reason:
+        '不允许写入 Agent 灵魂文件：/home/soul.md。请使用 update_soul 工具修改 Agent 灵魂。',
     } as { allowed: boolean; reason?: string })
 
     createAgentSession.mockResolvedValueOnce({
@@ -298,7 +307,9 @@ describe('RealPiSdkGateway write/edit path protection', () => {
         ) => Promise<{ content: Array<{ type: string; text: string }> }>
       }>
     }
-    const writeTool = options.customTools.find((tool) => tool.name === 'write_file')
+    const writeTool = options.customTools.find(
+      (tool) => tool.name === 'write_file',
+    )
     expect(writeTool).toBeDefined()
 
     const result = await writeTool!.execute('call-1', {
@@ -312,7 +323,8 @@ describe('RealPiSdkGateway write/edit path protection', () => {
   it('edit 工具拒绝受保护的 user.md 路径', async () => {
     mockToolApprovalGateway.validateFilePath.mockReturnValueOnce({
       allowed: false,
-      reason: '不允许编辑共享用户画像文件：/home/profile/user.md。请使用 update_user_profile 工具修改用户画像。',
+      reason:
+        '不允许编辑共享用户画像文件：/home/profile/user.md。请使用 update_user_profile 工具修改用户画像。',
     } as { allowed: boolean; reason?: string })
 
     createAgentSession.mockResolvedValueOnce({
@@ -336,7 +348,9 @@ describe('RealPiSdkGateway write/edit path protection', () => {
         ) => Promise<{ content: Array<{ type: string; text: string }> }>
       }>
     }
-    const editTool = options.customTools.find((tool) => tool.name === 'edit_file')
+    const editTool = options.customTools.find(
+      (tool) => tool.name === 'edit_file',
+    )
     expect(editTool).toBeDefined()
 
     const result = await editTool!.execute('call-1', {
@@ -374,7 +388,9 @@ describe('RealPiSdkGateway write/edit path protection', () => {
         ) => Promise<{ content: Array<{ type: string; text: string }> }>
       }>
     }
-    const writeTool = options.customTools.find((tool) => tool.name === 'write_file')
+    const writeTool = options.customTools.find(
+      (tool) => tool.name === 'write_file',
+    )
     expect(writeTool).toBeDefined()
 
     mockToolApprovalGateway.validateFilePath.mockReturnValueOnce({
@@ -427,7 +443,9 @@ describe('RealPiSdkGateway write/edit path protection', () => {
         ) => Promise<{ content: Array<{ type: string; text: string }> }>
       }>
     }
-    const editTool = options.customTools.find((tool) => tool.name === 'edit_file')
+    const editTool = options.customTools.find(
+      (tool) => tool.name === 'edit_file',
+    )
     expect(editTool).toBeDefined()
 
     mockToolApprovalGateway.validateFilePath.mockReturnValueOnce({
@@ -480,7 +498,9 @@ describe('RealPiSdkGateway write/edit path protection', () => {
         ) => Promise<{ content: Array<{ type: string; text: string }> }>
       }>
     }
-    const editTool = options.customTools.find((tool) => tool.name === 'edit_file')
+    const editTool = options.customTools.find(
+      (tool) => tool.name === 'edit_file',
+    )
     expect(editTool).toBeDefined()
 
     mockToolApprovalGateway.validateFilePath.mockReturnValueOnce({
@@ -505,7 +525,11 @@ describe('RealPiSdkGateway 审批与路径拒绝不产生副作用', () => {
   const mockToolApprovalGateway = {
     requestBashApproval: vi.fn(),
     validateFilePath: vi.fn(
-      (_params: { agentId: string; path: string; operation: string }): {
+      (_params: {
+        agentId: string
+        path: string
+        operation: string
+      }): {
         allowed: boolean
         reason?: string
       } => {
