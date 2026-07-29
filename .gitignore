@@ -26,6 +26,7 @@ test-results/
 playwright-report/
 e2e/renderer/*.png
 e2e/renderer/*.webm
+apps/desktop/qa/*.png
 
 # Caches
 .eslintcache
