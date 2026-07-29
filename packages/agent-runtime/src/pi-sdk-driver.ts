@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- PiSdkDriver 已从公共 barrel 拆出，后续按独立职责继续演进 */
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type {

@@ -8,6 +8,7 @@ import {
   ModelRegistry,
   SessionManager,
   createAgentSession,
+  type ToolDefinition,
 } from '@earendil-works/pi-coding-agent'
 import {
   createProtectedTools,
@@ -48,9 +49,14 @@ describe('生产接线级回归 — 原生危险工具被显式排除', () => {
           sessionId: 'test-session',
           cwd: '/tmp',
         },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 回归测试容许
         (_cwd: string) =>
-          ({ name: 'read', parameters: {}, async execute() { return { content: [], details: undefined } } }) as any,
+          ({
+            name: 'read',
+            parameters: {},
+            async execute() {
+              return { content: [], details: undefined }
+            },
+          }) as unknown as ToolDefinition,
       ),
       excludeTools: [...NATIVE_DANGEROUS_TOOL_NAMES],
     })
