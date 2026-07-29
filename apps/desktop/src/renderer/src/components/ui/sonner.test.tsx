@@ -5,13 +5,33 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Toaster } from '@/components/ui/sonner'
 
+// sonner 内部的 TIME_BEFORE_UNMOUNT 为 200ms，但未对外导出，只能在此复刻。
+// 留出余量，避免上游微调该值后测试又开始泄漏定时器。
+const TIME_BEFORE_UNMOUNT = 300
+
 describe('Toaster', () => {
-  afterEach(() => {
+  afterEach(async () => {
     act(() => {
       toast.dismiss()
     })
+
+    // sonner 的 deleteToast 用裸 setTimeout(TIME_BEFORE_UNMOUNT) 延迟卸载，
+    // 该定时器不挂在 effect cleanup 上，cleanup() 清不掉。若不排干，它会在
+    // jsdom 环境销毁后触发 setToasts，抛出 "window is not defined" 的
+    // unhandled error —— 用例全过但 vitest 仍以 1 退出。本机通常赶在销毁前
+    // 跑完所以看不到，CI 上更慢就会暴露。
+    if (vi.isFakeTimers()) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(TIME_BEFORE_UNMOUNT)
+      })
+      vi.useRealTimers()
+    } else {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, TIME_BEFORE_UNMOUNT))
+      })
+    }
+
     cleanup()
-    vi.useRealTimers()
   })
 
   it('keeps direct Sonner calls in the themed bottom-right queue', async () => {
