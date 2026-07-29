@@ -21,6 +21,7 @@ import {
 import { toast } from 'sonner'
 
 import { Toaster } from '@/components/ui/sonner'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { WindowShell } from '@/components/WindowShell'
 import { ChatGuard, LoadingScreen } from '@/pages/ChatPage'
 import { ConsoleProviderPage } from '@/pages/ConsoleProviderPage'
@@ -99,10 +100,12 @@ export interface DesktopWorkbenchContext
 function App(): React.JSX.Element {
   return (
     <HashRouter>
-      <WindowShell>
-        <RendererRoutes />
-      </WindowShell>
-      <Toaster />
+      <TooltipProvider>
+        <WindowShell>
+          <RendererRoutes />
+        </WindowShell>
+        <Toaster />
+      </TooltipProvider>
     </HashRouter>
   )
 }
