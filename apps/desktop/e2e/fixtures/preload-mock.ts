@@ -165,9 +165,14 @@ export function createPreloadApiInitScript(
         refreshRuntime: async () => data.runtime,
         saveRuntimeConfiguration: async () => data.runtime,
         cancelRuntimeConfigurationVerification: async () => data.runtime,
-        listSessions: async (request) => request
-          ? data.sessions.filter((session) => session.agentId === request.agentId)
-          : data.sessions,
+        listSessions: async (request) => {
+          const agentSessions = request
+            ? data.sessions.filter((session) => session.agentId === request.agentId)
+            : data.sessions;
+          return request?.includeArchived
+            ? agentSessions
+            : agentSessions.filter((session) => session.archivedAt === undefined);
+        },
         getLastActiveSession: async () => data.lastActiveSession,
         setLastActiveSession: async (request) => {
           data.lastActiveSession = { ...request, updatedAt: new Date().toISOString() };
@@ -208,6 +213,80 @@ export function createPreloadApiInitScript(
             updatedAt: new Date().toISOString()
           };
           return { ...session, state: 'cancelled', updatedAt: new Date().toISOString() };
+        },
+        archiveSession: async (request) => {
+          const root = data.sessions.find(
+            (session) => session.agentId === request.agentId && session.sessionId === request.sessionId
+          );
+          if (!root) throw new Error('找不到要归档的会话。');
+
+          const subtree = [root];
+          const visited = new Set([root.sessionId]);
+          for (let index = 0; index < subtree.length; index += 1) {
+            const parent = subtree[index];
+            for (const session of data.sessions) {
+              if (
+                session.agentId === request.agentId &&
+                session.forkedFrom?.sessionId === parent.sessionId &&
+                !visited.has(session.sessionId)
+              ) {
+                visited.add(session.sessionId);
+                subtree.push(session);
+              }
+            }
+          }
+
+          const affectedActivities = subtree.flatMap((session) => {
+            const kinds = [];
+            if (session.state === 'running') kinds.push('running');
+            if (session.state === 'queued') kinds.push('queued');
+            return kinds.length > 0
+              ? [{ sessionId: session.sessionId, title: session.title, kinds }]
+              : [];
+          });
+          const affectedSessionIds = subtree.map((session) => session.sessionId);
+
+          if (affectedActivities.length > 0 && !request.confirmActivityStop) {
+            return { status: 'confirmation-required', affectedSessionIds, affectedActivities };
+          }
+
+          const archivedAt = new Date().toISOString();
+          data.sessions = data.sessions.map((session) =>
+            visited.has(session.sessionId)
+              ? { ...session, state: 'cancelled', archivedAt, updatedAt: archivedAt }
+              : session
+          );
+          return { status: 'archived', affectedSessionIds, affectedActivities };
+        },
+        recoverSession: async (request) => {
+          const root = data.sessions.find(
+            (session) => session.agentId === request.agentId && session.sessionId === request.sessionId
+          );
+          if (!root) throw new Error('找不到要恢复的会话。');
+
+          const affectedIds = new Set([root.sessionId]);
+          for (let index = 0; index < data.sessions.length; index += 1) {
+            let changed = false;
+            for (const session of data.sessions) {
+              if (
+                session.agentId === request.agentId &&
+                session.forkedFrom &&
+                affectedIds.has(session.forkedFrom.sessionId) &&
+                !affectedIds.has(session.sessionId)
+              ) {
+                affectedIds.add(session.sessionId);
+                changed = true;
+              }
+            }
+            if (!changed) break;
+          }
+
+          data.sessions = data.sessions.map((session) => {
+            if (!affectedIds.has(session.sessionId)) return session;
+            const { archivedAt: _archivedAt, ...recovered } = session;
+            return recovered;
+          });
+          return data.sessions.filter((session) => affectedIds.has(session.sessionId));
         },
         subscribeToAgentEvents: (listener) => {
           eventListener = listener;

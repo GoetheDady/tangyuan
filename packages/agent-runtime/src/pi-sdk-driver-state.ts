@@ -506,6 +506,14 @@ export abstract class PiSdkDriverState {
       })
     }
 
+    if (session.archivedAt !== undefined) {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `会话 ${sessionId} 已归档，请先恢复后再打开。`,
+        recoverable: true,
+      })
+    }
+
     return session
   }
 

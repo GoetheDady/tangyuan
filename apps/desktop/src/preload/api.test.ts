@@ -36,6 +36,7 @@ describe('createTangyuanPreloadApi', () => {
       'approveBash',
       'approveSkillOperation',
       'archiveAgent',
+      'archiveSession',
       'cancelClarification',
       'cancelRun',
       'cancelRuntimeConfigurationVerification',
@@ -62,6 +63,7 @@ describe('createTangyuanPreloadApi', () => {
       'rebuildTangyuanHome',
       'reconcileAgentDirectories',
       'recoverAgent',
+      'recoverSession',
       'refreshRuntime',
       'rejectBash',
       'rejectSkillOperation',
@@ -98,6 +100,12 @@ describe('createTangyuanPreloadApi', () => {
       content: '你好'
     })
     await api.cancelRun({ agentId: 'tangyuan', sessionId: 'session-1' })
+    await api.archiveSession({
+      agentId: 'tangyuan',
+      sessionId: 'session-1',
+      confirmActivityStop: false
+    })
+    await api.recoverSession({ agentId: 'tangyuan', sessionId: 'session-1' })
     await api.listAgents()
     await api.updateAgentConfig({ agentId: 'tangyuan', defaultModelId: 'claude-sonnet-4-5' })
     await api.getSessionModelInfo({ agentId: 'tangyuan', sessionId: 'session-1' })
@@ -192,6 +200,15 @@ describe('createTangyuanPreloadApi', () => {
           sessionId: 'session-1'
         }
       ],
+      [
+        DESKTOP_IPC_CHANNELS.sessionsArchive,
+        {
+          agentId: 'tangyuan',
+          sessionId: 'session-1',
+          confirmActivityStop: false
+        }
+      ],
+      [DESKTOP_IPC_CHANNELS.sessionsRecover, { agentId: 'tangyuan', sessionId: 'session-1' }],
       [DESKTOP_IPC_CHANNELS.agentsList],
       [
         DESKTOP_IPC_CHANNELS.agentsUpdateConfig,

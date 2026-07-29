@@ -42,9 +42,8 @@ describe('App independent session fork', () => {
     window.location.hash = '#/chat/tangyuan/parent-session'
     vi.mocked(window.api.getRuntimeSnapshot).mockResolvedValue(readyRuntime)
     vi.mocked(window.api.refreshRuntime).mockResolvedValue(readyRuntime)
-    vi.mocked(window.api.listSessions)
-      .mockResolvedValueOnce([parent])
-      .mockResolvedValueOnce([parent, child])
+    let sessions = [parent]
+    vi.mocked(window.api.listSessions).mockImplementation(async () => sessions)
     vi.mocked(window.api.getTranscript).mockImplementation(async (request) => ({
       sessionId: request.sessionId,
       agentId: 'tangyuan',
@@ -95,7 +94,10 @@ describe('App independent session fork', () => {
             ],
       updatedAt: '2026-07-28T00:01:00.000Z'
     }))
-    vi.mocked(window.api.forkSession).mockResolvedValue(child)
+    vi.mocked(window.api.forkSession).mockImplementation(async () => {
+      sessions = [parent, child]
+      return child
+    })
 
     render(<App />)
 

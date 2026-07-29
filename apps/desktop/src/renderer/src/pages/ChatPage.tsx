@@ -16,10 +16,16 @@ import { toast } from 'sonner'
 import { BashApprovalCard } from '@/components/BashApprovalCard'
 import { ForkSourceNotice } from '@/components/ForkSourceNotice'
 import { QuestionClarificationCard } from '@/components/QuestionClarificationCard'
+import {
+  ArchivedSessionList,
+  SessionArchiveButton,
+  SessionArchiveDialog
+} from '@/components/SessionArchiveControls'
 import { SessionLineageTree } from '@/components/SessionLineageTree'
 import { Button } from '@/components/ui/button'
 import { Composer } from '@/components/Composer'
 import { TranscriptMessages } from '@/components/TranscriptMessages'
+import { useSessionArchive } from '@/hooks/useSessionArchive'
 
 interface DesktopWorkbenchState {
   runtime: RuntimeSnapshot | null
@@ -223,6 +229,23 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
     selectedSession?.state === 'queued'
   const selectedTranscript =
     context.transcript?.sessionId === selectedSession?.sessionId ? context.transcript : null
+  const sessionArchive = useSessionArchive({
+    agentId: activeAgentId,
+    selectedSession,
+    onSessionsChange: context.setSessions,
+    onArchived: (target, result) => {
+      const affectedIds = new Set(result.affectedSessionIds)
+      context.setPendingApprovals((current) =>
+        current.filter((approval) => !affectedIds.has(approval.sessionId))
+      )
+      context.setPendingClarifications((current) =>
+        current.filter((clarification) => !affectedIds.has(clarification.sessionId))
+      )
+      context.setSelectedSessionId(null)
+      context.setTranscript(null)
+      navigate(`/chat/${target.agentId}`, { replace: true })
+    }
+  })
   const parentSession = useMemo(() => {
     const parentSessionId = selectedSession?.forkedFrom?.sessionId
     if (!parentSessionId) return null
@@ -626,6 +649,13 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
                 </div>
               )}
             </div>
+            <ArchivedSessionList
+              sessions={sessionArchive.archivedSessions}
+              recoveringSessionId={sessionArchive.recoveringSessionId}
+              onRecover={(session) => {
+                void sessionArchive.recoverSession(session)
+              }}
+            />
           </section>
         </aside>
 
@@ -637,9 +667,17 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
             data-testid="chat-header"
             className="flex h-12 shrink-0 items-center border-b border-border px-[18px]"
           >
-            <h2 className="truncate text-section-heading font-semibold">
+            <h2 className="min-w-0 flex-1 truncate text-section-heading font-semibold">
               {selectedSession?.title ?? '新对话'}
             </h2>
+            {selectedSession && (
+              <SessionArchiveButton
+                disabled={sessionArchive.isArchiving}
+                onArchive={() => {
+                  void sessionArchive.archiveSelectedSession(false)
+                }}
+              />
+            )}
           </header>
 
           <div className="flex min-h-0 flex-1 flex-col px-4">
@@ -755,6 +793,14 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
           </footer>
         </section>
       </div>
+      <SessionArchiveDialog
+        activities={sessionArchive.archivePreview?.affectedActivities ?? []}
+        isArchiving={sessionArchive.isArchiving}
+        onCancel={sessionArchive.cancelArchive}
+        onConfirm={() => {
+          void sessionArchive.archiveSelectedSession(true)
+        }}
+      />
     </main>
   )
 }

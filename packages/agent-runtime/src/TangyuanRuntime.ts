@@ -1,7 +1,10 @@
 import { TangyuanRuntimeOrchestrator } from './tangyuan-runtime-orchestrator'
 import type { TangyuanRuntimeDependencies } from './tangyuan-runtime-dependencies'
+import { collectSessionSubtree } from './session-archive-coordinator'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
+  type ArchiveSessionRequest,
+  type ArchiveSessionResult,
   type AgentSessionSummary,
   type AgentSummary,
   type CancelConfigurationVerificationRequest,
@@ -12,11 +15,14 @@ import {
   type GetSessionModelInfoRequest,
   type LastActiveSession,
   type ProfileUpdateResult,
+  type RecoverSessionRequest,
   type RetryRunRequest,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
   type SendMessageRequest,
   type SessionModelInfo,
+  type SessionLineageActivity,
+  type SessionLineageActivityKind,
   type SetSessionModelRequest,
   type SetSessionThinkingLevelRequest,
   type SetLastActiveSessionRequest,
@@ -108,21 +114,24 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
    */
   async listSessions(
     agentId: string = TANGYUAN_DEFAULT_AGENT_ID,
+    includeArchived = false,
   ): Promise<AgentSessionSummary[]> {
     const driverSessions = await this.sessionDriver.listSessions({
       agentId,
+      ...(includeArchived ? { includeArchived: true } : {}),
     })
+    const sessions = driverSessions.map((session) => ({
+      ...session,
+      state: this.activeRunIds.has(session.sessionId)
+        ? ('running' as const)
+        : this.runQueue.some((q) => q.request.sessionId === session.sessionId)
+          ? ('queued' as const)
+          : session.state,
+    }))
     this.sessionCache.replace(
-      driverSessions.map((session) => ({
-        ...session,
-        state: this.activeRunIds.has(session.sessionId)
-          ? 'running'
-          : this.runQueue.some((q) => q.request.sessionId === session.sessionId)
-            ? 'queued'
-            : session.state,
-      })),
+      sessions.filter((session) => session.archivedAt === undefined),
     )
-    return this.sessionCache.list()
+    return includeArchived ? sessions : this.sessionCache.list()
   }
 
   /**
@@ -521,6 +530,15 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
   async getTranscript(
     request: GetSessionMessagesRequest,
   ): Promise<TranscriptSnapshot> {
+    let session = this.sessionCache.find(request.sessionId)
+    if (session?.agentId !== request.agentId) {
+      await this.listSessions(request.agentId)
+      session = this.sessionCache.find(request.sessionId)
+    }
+    if (session?.agentId !== request.agentId) {
+      throw new Error(`找不到会话 ${request.sessionId}，或该会话已归档。`)
+    }
+
     // 优先使用 TranscriptEmitter 缓存的快照（含 turns/steps）
     const cached = this.transcriptEmitter.getSnapshot(request.sessionId)
     if (cached) {
@@ -549,14 +567,20 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
    * @throws 当运行时缺少配置、会话不存在或 AgentSessionDriver 发送失败时，Promise 会 reject。
    */
   async sendMessage(request: SendMessageRequest): Promise<TranscriptSnapshot> {
+    this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
     await this.assertRuntimeReady()
+
+    this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
 
     const session =
       this.sessionCache.find(request.sessionId) ??
       (await this.findSession(request.sessionId))
 
+    this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
+
     if (
       this.activeRunIds.has(request.sessionId) ||
+      this.isRunStarting(request.sessionId) ||
       session?.state === 'running'
     ) {
       throw new Error('当前会话正在运行，请等待完成或先取消本次响应。')
@@ -568,11 +592,16 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
     }
 
     // 达到并发上限时入队
-    if (this.activeRunIds.size >= DefaultTangyuanRuntime.MAX_CONCURRENT_RUNS) {
+    if (!this.hasRunCapacity()) {
       return this.enqueueRun(request)
     }
 
-    await this.sessionDriver.sendMessage(request)
+    this.beginRunStart(request.sessionId)
+    try {
+      await this.sessionDriver.sendMessage(request)
+    } finally {
+      this.completeRunStart(request.sessionId)
+    }
 
     return this.getTranscript({
       agentId: request.agentId,
@@ -592,7 +621,14 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
       throw new Error('当前运行时不支持重试消息。')
     }
 
-    await this.sessionDriver.retryMessage(request)
+    this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
+
+    this.beginRunStart(request.sessionId)
+    try {
+      await this.sessionDriver.retryMessage(request)
+    } finally {
+      this.completeRunStart(request.sessionId)
+    }
 
     return this.getTranscript({
       agentId: request.agentId,
@@ -612,7 +648,155 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
       throw new Error('当前运行时不支持分叉会话。')
     }
 
-    return this.sessionDriver.forkSession(request)
+    this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
+    const pendingFork = this.sessionDriver.forkSession(request)
+    return this.sessionArchiveCoordinator.trackFork(request.sessionId, pendingFork)
+  }
+
+  /**
+   * 可恢复地归档目标会话及其全部后代。
+   *
+   * 活动子树在用户确认前只返回影响预览；确认后会等待每个会话完成取消，
+   * 再一次性写入整棵子树的归档状态。
+   */
+  async archiveSession(
+    request: ArchiveSessionRequest,
+  ): Promise<ArchiveSessionResult> {
+    const archiveLease = this.sessionArchiveCoordinator.acquire(request.sessionId)
+
+    try {
+      let sessions = await this.listSessions(request.agentId, true)
+      let subtree = collectSessionSubtree(
+        sessions,
+        request.agentId,
+        request.sessionId,
+      )
+
+      while (true) {
+        archiveLease.lock(subtree.map((session) => session.sessionId))
+        await archiveLease.waitForPendingForks(
+          subtree.map((session) => session.sessionId),
+        )
+        sessions = await this.listSessions(request.agentId, true)
+        const refreshedSubtree = collectSessionSubtree(
+          sessions,
+          request.agentId,
+          request.sessionId,
+        )
+        const hasUnlockedDescendant = refreshedSubtree.some(
+          (session) => !archiveLease.owns(session.sessionId),
+        )
+        subtree = refreshedSubtree
+        if (!hasUnlockedDescendant) break
+      }
+
+      const affectedActivities = this.collectSessionActivities(subtree)
+      const affectedSessionIds = subtree.map((session) => session.sessionId)
+
+      if (affectedActivities.length > 0 && !request.confirmActivityStop) {
+        return {
+          status: 'confirmation-required',
+          affectedSessionIds,
+          affectedActivities,
+        }
+      }
+
+      await Promise.all(
+        affectedSessionIds.map((sessionId) => this.waitForRunStart(sessionId)),
+      )
+      const currentSessions = await this.listSessions(request.agentId, true)
+      const currentSubtree = collectSessionSubtree(
+        currentSessions,
+        request.agentId,
+        request.sessionId,
+      )
+      const currentActivities = this.collectSessionActivities(currentSubtree)
+      const orderedActivities = [...currentActivities].sort(
+        (left, right) =>
+          Number(right.kinds.includes('queued')) -
+          Number(left.kinds.includes('queued')),
+      )
+      for (const activity of orderedActivities) {
+        await this.cancelRun({
+          agentId: request.agentId,
+          sessionId: activity.sessionId,
+        })
+      }
+
+      if (!this.sessionDriver.setSessionsArchived) {
+        throw new Error('当前运行时不支持归档会话。')
+      }
+
+      await this.sessionDriver.setSessionsArchived(
+        affectedSessionIds,
+        new Date().toISOString(),
+      )
+      await this.listSessions(request.agentId)
+
+      return {
+        status: 'archived',
+        affectedSessionIds,
+        affectedActivities,
+      }
+    } finally {
+      archiveLease.release()
+      this.dequeueNext()
+    }
+  }
+
+  /** 恢复目标会话及其全部后代。 */
+  async recoverSession(
+    request: RecoverSessionRequest,
+  ): Promise<AgentSessionSummary[]> {
+    const sessions = await this.listSessions(request.agentId, true)
+    const subtree = collectSessionSubtree(
+      sessions,
+      request.agentId,
+      request.sessionId,
+    )
+
+    if (!this.sessionDriver.setSessionsArchived) {
+      throw new Error('当前运行时不支持恢复会话。')
+    }
+
+    const recovered = await this.sessionDriver.setSessionsArchived(
+      subtree.map((session) => session.sessionId),
+      null,
+    )
+    await this.listSessions(request.agentId)
+    return recovered
+  }
+
+  /** 汇总子树中需要在归档前停止的运行、队列和对话动作。 */
+  private collectSessionActivities(
+    sessions: readonly AgentSessionSummary[],
+  ): SessionLineageActivity[] {
+    const approvalSessionIds = new Set(
+      this.getPendingApprovals().map((approval) => approval.sessionId),
+    )
+    const clarificationSessionIds = new Set(
+      this.getPendingClarifications().map(
+        (clarification) => clarification.sessionId,
+      ),
+    )
+
+    return sessions.flatMap((session) => {
+      const kinds: SessionLineageActivityKind[] = []
+      if (session.state === 'running' || this.isRunStarting(session.sessionId)) {
+        kinds.push('running')
+      }
+      if (session.state === 'queued') kinds.push('queued')
+      if (approvalSessionIds.has(session.sessionId)) {
+        kinds.push('pending-approval')
+      }
+      if (clarificationSessionIds.has(session.sessionId)) {
+        kinds.push('pending-clarification')
+      }
+
+      return kinds.length > 0
+        ? [{ sessionId: session.sessionId, title: session.title, kinds }]
+        : []
+    })
   }
 
   /**
@@ -661,7 +845,7 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
 
     await this.sessionDriver.cancelRun(request)
     this.activeRunIds.delete(request.sessionId)
-    await this.listSessions()
+    await this.listSessions(request.agentId)
     const session = this.sessionCache.find(request.sessionId)
 
     if (!session) {
@@ -704,6 +888,8 @@ export type TangyuanRuntime = Pick<
   | 'sendMessage'
   | 'retryMessage'
   | 'forkSession'
+  | 'archiveSession'
+  | 'recoverSession'
   | 'cancelRun'
   | 'subscribe'
   | 'cancelAllActiveRuns'

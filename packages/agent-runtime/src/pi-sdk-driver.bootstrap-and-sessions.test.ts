@@ -297,6 +297,39 @@ describe('PiSdkDriver', () => {
       stat(join(userDataPath, 'sessions/index.json.tmp')),
     ).rejects.toMatchObject({ code: 'ENOENT' })
   })
+  it('rejects opening an archived session until the session is recovered', async () => {
+    const gateway = createPiSdkGateway()
+    const { driver } = await createDriver({ gateway })
+
+    await driver.saveConfiguration({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'sk-test-secret-7890',
+    })
+    const session = await driver.createSession({
+      agentId: 'tangyuan',
+      title: '可恢复会话',
+    })
+
+    await driver.setSessionsArchived(
+      [session.sessionId],
+      '2026-07-08T01:00:00.000Z',
+    )
+    await expect(
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).rejects.toMatchObject({ code: 'session-not-found' })
+
+    await driver.setSessionsArchived([session.sessionId], null)
+    await expect(
+      driver.getTranscript({
+        agentId: 'tangyuan',
+        sessionId: session.sessionId,
+      }),
+    ).resolves.toMatchObject({ sessionId: session.sessionId })
+  })
   it('updates the session index summary after a completed reply', async () => {
     const gateway = createPiSdkGateway()
     const { driver, userDataPath } = await createDriver({ gateway })

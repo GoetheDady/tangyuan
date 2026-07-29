@@ -3,11 +3,15 @@ import {
   CURRENT_SCHEMA_VERSION,
   DESKTOP_IPC_CHANNELS,
   TANGYUAN_DEFAULT_AGENT_ID,
+  archiveSessionRequestSchema,
+  archiveSessionResultSchema,
+  agentSessionSummarySchema,
   agentEventSchema,
   applyTranscriptDelta,
   createAgentProfileStatus,
   createSessionRequestSchema,
   listSessionsRequestSchema,
+  recoverSessionRequestSchema,
   forkSessionRequestSchema,
   createDefaultSessionSummary,
   createRuntimeSnapshot,
@@ -32,7 +36,58 @@ describe('contracts schemas', () => {
     expect(listSessionsRequestSchema.parse({ agentId: 'agent-2' })).toEqual({
       agentId: 'agent-2',
     })
+    expect(
+      listSessionsRequestSchema.parse({
+        agentId: 'agent-2',
+        includeArchived: true,
+      }),
+    ).toEqual({
+      agentId: 'agent-2',
+      includeArchived: true,
+    })
     expect(() => listSessionsRequestSchema.parse({ agentId: '' })).toThrow()
+  })
+
+  it('preserves the archive timestamp on archived session summaries', () => {
+    expect(
+      agentSessionSummarySchema.parse({
+        agentId: 'agent-2',
+        sessionId: 'session-1',
+        title: '已归档会话',
+        state: 'completed',
+        updatedAt: '2026-07-29T02:00:00.000Z',
+        archivedAt: '2026-07-29T03:00:00.000Z',
+      }),
+    ).toMatchObject({ archivedAt: '2026-07-29T03:00:00.000Z' })
+  })
+
+  it('validates session lineage archive and recovery payloads', () => {
+    expect(
+      archiveSessionRequestSchema.parse({
+        agentId: 'agent-2',
+        sessionId: 'session-1',
+        confirmActivityStop: false,
+      }),
+    ).toMatchObject({ confirmActivityStop: false })
+    expect(
+      recoverSessionRequestSchema.parse({
+        agentId: 'agent-2',
+        sessionId: 'session-1',
+      }),
+    ).toEqual({ agentId: 'agent-2', sessionId: 'session-1' })
+    expect(
+      archiveSessionResultSchema.parse({
+        status: 'confirmation-required',
+        affectedSessionIds: ['session-1', 'session-2'],
+        affectedActivities: [
+          {
+            sessionId: 'session-2',
+            title: '子会话',
+            kinds: ['running', 'pending-clarification'],
+          },
+        ],
+      }),
+    ).toMatchObject({ status: 'confirmation-required' })
   })
 
   it('accepts serializable Agent events and rejects malformed event payloads', () => {
@@ -356,6 +411,8 @@ describe('DESKTOP_IPC_CHANNELS', () => {
       sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
       sessionsRetryMessage: 'tangyuan:sessions:retry-message',
       sessionsFork: 'tangyuan:sessions:fork',
+      sessionsArchive: 'tangyuan:sessions:archive',
+      sessionsRecover: 'tangyuan:sessions:recover',
       sessionsGetLastActive: 'tangyuan:sessions:get-last-active',
       sessionsSetLastActive: 'tangyuan:sessions:set-last-active',
       agentsArchive: 'tangyuan:agents:archive',

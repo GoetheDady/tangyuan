@@ -16,6 +16,7 @@ import { AgentManager } from './agent-manager'
 import { SkillService } from './skill-service'
 import { IdentityService } from './identity-service'
 import { SessionModelService } from './session-model-service'
+import { SessionArchiveCoordinator } from './session-archive-coordinator'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
@@ -64,6 +65,11 @@ export abstract class TangyuanRuntimeOrchestrator {
     Pick<LastActiveSessionStore, 'read' | 'write' | 'clear'>
   protected readonly listeners = new Set<AgentEventListener>()
   protected readonly activeRunIds = new Map<string, string>()
+  protected readonly sessionArchiveCoordinator = new SessionArchiveCoordinator()
+  private readonly pendingRunStarts = new Map<
+    string,
+    { promise: Promise<void>; resolve(): void }
+  >()
   protected readonly transcriptEmitter: TranscriptEmitter
   protected readonly snapshotStore: RuntimeSnapshotStore
   protected readonly agentManager: AgentManager
@@ -431,6 +437,7 @@ export abstract class TangyuanRuntimeOrchestrator {
     }
 
     if (driverEvent.type === 'attempt-started') {
+      this.completeRunStart(driverEvent.sessionId)
       this.activeRunIds.set(driverEvent.sessionId, driverEvent.runId)
       this.upsertSessionState(
         driverEvent.sessionId,
@@ -587,7 +594,15 @@ export abstract class TangyuanRuntimeOrchestrator {
    * @throws 此方法不会主动抛出错误。
    */
   protected dequeueNext(): void {
-    const queued = this.runQueue.shift()
+    if (!this.hasRunCapacity()) return
+
+    const queueIndex = this.runQueue.findIndex(
+      (candidate) =>
+        !this.sessionArchiveCoordinator.isArchiving(
+          candidate.request.sessionId,
+        ),
+    )
+    const [queued] = queueIndex >= 0 ? this.runQueue.splice(queueIndex, 1) : []
     if (!queued) {
       return
     }
@@ -604,6 +619,7 @@ export abstract class TangyuanRuntimeOrchestrator {
     })
     this.upsertSessionState(request.sessionId, 'running', now)
 
+    this.beginRunStart(request.sessionId)
     this.sessionDriver
       .sendMessage(request)
       .then(async () =>
@@ -615,6 +631,47 @@ export abstract class TangyuanRuntimeOrchestrator {
         ),
       )
       .catch(reject)
+      .finally(() => {
+        this.completeRunStart(request.sessionId)
+      })
+  }
+
+  /** 标记一次消息运行已进入 Driver 启动阶段。 */
+  protected beginRunStart(sessionId: string): void {
+    if (this.pendingRunStarts.has(sessionId)) return
+
+    let resolve!: () => void
+    const promise = new Promise<void>((innerResolve) => {
+      resolve = innerResolve
+    })
+    this.pendingRunStarts.set(sessionId, { promise, resolve })
+  }
+
+  /** 标记 Driver 已经可以取消该运行，或启动已经结束。 */
+  protected completeRunStart(sessionId: string): void {
+    const pending = this.pendingRunStarts.get(sessionId)
+    if (!pending) return
+
+    this.pendingRunStarts.delete(sessionId)
+    pending.resolve()
+  }
+
+  /** 等待尚在 Driver 初始化阶段的运行进入可取消状态。 */
+  protected async waitForRunStart(sessionId: string): Promise<void> {
+    await this.pendingRunStarts.get(sessionId)?.promise
+  }
+
+  /** 判断会话是否正在进入 Driver 运行态。 */
+  protected isRunStarting(sessionId: string): boolean {
+    return this.pendingRunStarts.has(sessionId)
+  }
+
+  /** 判断全局运行槽是否仍可接纳一个正在启动或运行中的会话。 */
+  protected hasRunCapacity(): boolean {
+    return (
+      this.activeRunIds.size + this.pendingRunStarts.size <
+      TangyuanRuntimeOrchestrator.MAX_CONCURRENT_RUNS
+    )
   }
 
   /**

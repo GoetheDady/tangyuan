@@ -164,6 +164,9 @@ export class SessionIndexStore {
         // 保留旧扩展数据，不存在则使用默认值
         lastMessagePreview: oldEntry?.lastMessagePreview ?? '',
         status: oldEntry?.status ?? 'idle',
+        ...(oldEntry?.archivedAt !== undefined
+          ? { archivedAt: oldEntry.archivedAt }
+          : {}),
         ...(forkedFrom !== undefined ? { forkedFrom } : {}),
       })
     }
@@ -228,6 +231,9 @@ export class SessionIndexStore {
       title: entry.title,
       state: entry.status,
       updatedAt: entry.updatedAt,
+      ...(entry.archivedAt !== undefined
+        ? { archivedAt: entry.archivedAt }
+        : {}),
       ...(entry.forkedFrom !== undefined
         ? { forkedFrom: entry.forkedFrom }
         : {}),
@@ -285,11 +291,19 @@ export class SessionIndexStore {
    * 列出指定 Agent 的会话摘要，按更新时间倒序。
    *
    * @param agentId - Agent 标识。
+   * @param includeArchived - 是否包含已归档会话。
    * @returns 该 Agent 的会话摘要列表。
    */
-  listSummaries(agentId: string): AgentSessionSummary[] {
+  listSummaries(
+    agentId: string,
+    includeArchived = false,
+  ): AgentSessionSummary[] {
     return [...this.sessions.values()]
-      .filter((session) => session.agentId === agentId)
+      .filter(
+        (session) =>
+          session.agentId === agentId &&
+          (includeArchived || session.archivedAt === undefined),
+      )
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
   }
 
@@ -370,6 +384,41 @@ export class SessionIndexStore {
     await this.write()
 
     return nextEntry
+  }
+
+  /**
+   * 一次性更新一组会话的归档状态并原子写盘。
+   *
+   * @param sessionIds - 要更新的会话标识。
+   * @param archivedAt - 归档时间；传入 null 表示恢复。
+   * @returns 更新后的会话摘要。
+   * @throws 任一会话不存在或索引写入失败时，Promise 会 reject。
+   */
+  async setArchived(
+    sessionIds: readonly string[],
+    archivedAt: string | null,
+  ): Promise<AgentSessionSummary[]> {
+    const entries = sessionIds.map((sessionId) => this.getEntry(sessionId))
+
+    for (const entry of entries) {
+      const nextEntry: PersistedSessionIndexEntry = {
+        ...entry,
+        ...(archivedAt === null ? {} : { archivedAt }),
+      }
+
+      if (archivedAt === null) {
+        delete nextEntry.archivedAt
+      }
+
+      this.sessionIndex.set(entry.sessionId, nextEntry)
+      this.sessions.set(entry.sessionId, this.toSummary(nextEntry))
+    }
+
+    await this.write()
+    return sessionIds.flatMap((sessionId) => {
+      const summary = this.sessions.get(sessionId)
+      return summary ? [summary] : []
+    })
   }
 
   /**
@@ -471,6 +520,8 @@ export class SessionIndexStore {
       : undefined
     const thinkingLevel =
       typeof entry.thinkingLevel === 'string' ? entry.thinkingLevel : undefined
+    const archivedAt =
+      typeof entry.archivedAt === 'string' ? entry.archivedAt : undefined
 
     return [
       {
@@ -485,6 +536,7 @@ export class SessionIndexStore {
         agentId: entry.agentId,
         lastMessagePreview: entry.lastMessagePreview,
         status: entry.status,
+        ...(archivedAt !== undefined ? { archivedAt } : {}),
         ...(attempts !== undefined ? { attempts } : {}),
         ...(forkedFrom !== undefined ? { forkedFrom } : {}),
       },

@@ -265,6 +265,8 @@ test.describe('Electron 窗口', () => {
     expect(apiKeys).toContain('subscribeToAgentEvents')
     expect(apiKeys).toContain('openExternalLink')
     expect(apiKeys).toContain('forkSession')
+    expect(apiKeys).toContain('archiveSession')
+    expect(apiKeys).toContain('recoverSession')
   })
 
   test('调用 forkSession 在会话不存在时被 Runtime 拒绝', async () => {
@@ -405,6 +407,60 @@ test.describe('真实 Electron 启动恢复', () => {
         modelId: SESSION_MODEL_ID,
         thinkingLevel: 'high'
       })
+
+      const archiveRoundTrip = await firstLaunch.window.evaluate(
+        async ({ agentId, parentSessionId, childSessionId }) => {
+          const archived = await window.api.archiveSession({
+            agentId,
+            sessionId: parentSessionId,
+            confirmActivityStop: false
+          })
+          const visibleAfterArchive = await window.api.listSessions({ agentId })
+          const allAfterArchive = await window.api.listSessions({
+            agentId,
+            includeArchived: true
+          })
+          const recovered = await window.api.recoverSession({
+            agentId,
+            sessionId: parentSessionId
+          })
+          const childTranscript = await window.api.getTranscript({
+            agentId,
+            sessionId: childSessionId
+          })
+          return {
+            archived,
+            visibleAfterArchive,
+            allAfterArchive,
+            recovered,
+            childTranscript
+          }
+        },
+        {
+          agentId: 'tangyuan',
+          parentSessionId: PARENT_SESSION_ID,
+          childSessionId: CHILD_SESSION_ID
+        }
+      )
+      expect(archiveRoundTrip.archived).toMatchObject({
+        status: 'archived',
+        affectedSessionIds: [PARENT_SESSION_ID, CHILD_SESSION_ID]
+      })
+      expect(archiveRoundTrip.visibleAfterArchive).toEqual([])
+      expect(archiveRoundTrip.allAfterArchive).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            sessionId: PARENT_SESSION_ID,
+            archivedAt: expect.any(String)
+          }),
+          expect.objectContaining({
+            sessionId: CHILD_SESSION_ID,
+            archivedAt: expect.any(String)
+          })
+        ])
+      )
+      expect(archiveRoundTrip.recovered).toHaveLength(2)
+      expect(archiveRoundTrip.childTranscript.sessionId).toBe(CHILD_SESSION_ID)
 
       await runningApp.close()
       runningApp = null

@@ -5,6 +5,7 @@ import {
   type AnswerClarificationRequest,
   type ApproveBashRequest,
   type ArchiveAgentRequest,
+  type ArchiveSessionRequest,
   type CancelClarificationRequest,
   type CancelRunRequest,
   type ClaimAgentDirectoryRequest,
@@ -21,6 +22,7 @@ import {
   type ListSessionsRequest,
   type OpenExternalLinkRequest,
   type RecoverAgentRequest,
+  type RecoverSessionRequest,
   type RejectBashRequest,
   type RetryRunRequest,
   type RuntimeConfiguration,
@@ -104,6 +106,12 @@ export function createTangyuanPreloadApi(
     },
     forkSession: async (request: ForkSessionRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsFork, request)
+    },
+    archiveSession: async (request: ArchiveSessionRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsArchive, request)
+    },
+    recoverSession: async (request: RecoverSessionRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsRecover, request)
     },
     subscribeToAgentEvents: (listener: AgentEventListener) => {
       return subscribe(DESKTOP_AGENT_EVENT_CHANNEL, listener)

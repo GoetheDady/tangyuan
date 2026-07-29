@@ -136,6 +136,47 @@ describe('SessionIndexStore.updateEntry / write / load 往返', () => {
   })
 })
 
+describe('SessionIndexStore 会话归档', () => {
+  it('整批归档后从日常列表隐藏，重载后仍可显式读取', async () => {
+    const store = await makeStore()
+    store.addSession(makeEntry({ sessionId: 'parent', title: '父会话' }))
+    store.addSession(
+      makeEntry({
+        sessionId: 'child',
+        title: '子会话',
+        forkedFrom: { sessionId: 'parent', entryId: 'source-message' },
+      }),
+    )
+    store.addSession(makeEntry({ sessionId: 'sibling', title: '兄弟会话' }))
+
+    await store.setArchived(['parent', 'child'], '2026-07-29T03:00:00.000Z')
+
+    expect(store.listSummaries('tangyuan')).toEqual([
+      expect.objectContaining({ sessionId: 'sibling' }),
+    ])
+    expect(store.listSummaries('tangyuan', true)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sessionId: 'parent',
+          archivedAt: '2026-07-29T03:00:00.000Z',
+        }),
+        expect.objectContaining({
+          sessionId: 'child',
+          archivedAt: '2026-07-29T03:00:00.000Z',
+        }),
+        expect.objectContaining({ sessionId: 'sibling' }),
+      ]),
+    )
+
+    const reloadedStore = await makeStore()
+    await reloadedStore.load()
+    expect(reloadedStore.listSummaries('tangyuan')).toHaveLength(1)
+    expect(reloadedStore.getSummary('child')).toMatchObject({
+      archivedAt: '2026-07-29T03:00:00.000Z',
+    })
+  })
+})
+
 describe('SessionIndexStore.upsertAttempt', () => {
   it('新增与更新 attempt，超过 20 条时截断', async () => {
     const store = await makeStore()
