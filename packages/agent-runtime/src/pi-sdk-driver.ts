@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- PiSdkDriver 已从公共 barrel 拆出，后续按独立职责继续演进 */
-import { mkdir } from 'node:fs/promises'
+import { mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type {
   PersistedAttemptEntry,
@@ -160,6 +160,27 @@ export class PiSdkDriver
   ): Promise<AgentSessionSummary[]> {
     await this.sessionIndexStore.load()
     return this.sessionIndexStore.setArchived(sessionIds, archivedAt)
+  }
+
+  /** 永久删除 Pi session 文件并移除索引条目。 */
+  async deleteSessions(sessionIds: readonly string[]): Promise<void> {
+    await this.sessionIndexStore.load()
+
+    for (const sessionId of sessionIds) {
+      const entry = this.sessionIndexStore.getEntryOrNull(sessionId)
+      if (entry) {
+        await rm(entry.sdkSessionFile, { force: true })
+      }
+      const handle = this.sessionHandles.get(sessionId)
+      if (handle) {
+        this.sessionHandles.delete(sessionId)
+        handle.dispose()
+      }
+      this.transcriptCache.delete(sessionId)
+      this.activeRunIds.delete(sessionId)
+    }
+
+    await this.sessionIndexStore.deleteSessions(sessionIds)
   }
 
   /**

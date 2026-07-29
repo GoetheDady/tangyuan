@@ -42,6 +42,7 @@ describe('createTangyuanPreloadApi', () => {
       'cancelRuntimeConfigurationVerification',
       'claimAgentDirectory',
       'createSession',
+      'deleteSession',
       'deleteSkill',
       'forkSession',
       'getLastActiveSession',
@@ -106,6 +107,7 @@ describe('createTangyuanPreloadApi', () => {
       confirmActivityStop: false
     })
     await api.recoverSession({ agentId: 'tangyuan', sessionId: 'session-1' })
+    await api.deleteSession({ agentId: 'tangyuan', sessionId: 'session-1', confirmActivityStop: false })
     await api.listAgents()
     await api.updateAgentConfig({ agentId: 'tangyuan', defaultModelId: 'claude-sonnet-4-5' })
     await api.getSessionModelInfo({ agentId: 'tangyuan', sessionId: 'session-1' })
@@ -209,6 +211,7 @@ describe('createTangyuanPreloadApi', () => {
         }
       ],
       [DESKTOP_IPC_CHANNELS.sessionsRecover, { agentId: 'tangyuan', sessionId: 'session-1' }],
+      [DESKTOP_IPC_CHANNELS.sessionsDelete, { agentId: 'tangyuan', sessionId: 'session-1', confirmActivityStop: false }],
       [DESKTOP_IPC_CHANNELS.agentsList],
       [
         DESKTOP_IPC_CHANNELS.agentsUpdateConfig,

@@ -242,6 +242,8 @@ export interface AgentSessionSummary {
   archivedAt?: string
   /** 分叉来源信息；为根会话（非分叉）时省略。 */
   forkedFrom?: ForkSource
+  /** 谱系不可用：任一祖先 Pi JSONL 缺失或损坏时为 true。 */
+  lineageUnavailable?: boolean
 }
 
 /**

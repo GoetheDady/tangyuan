@@ -454,6 +454,15 @@ export interface AgentSessionDriver {
   ): Promise<AgentSessionSummary[]>
 
   /**
+   * 永久删除一组会话的 Pi session 文件和索引条目。
+   *
+   * @param sessionIds - 要删除的会话标识。
+   * @returns 无返回值。
+   * @throws 当文件删除或索引写入失败时，Promise 会 reject。
+   */
+  deleteSessions?(sessionIds: readonly string[]): Promise<void>
+
+  /**
    * 创建一个新的 Agent 会话。
    *
    * @param request - 新会话所属 Agent 和标题。

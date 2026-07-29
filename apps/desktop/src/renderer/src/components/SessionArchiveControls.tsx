@@ -3,7 +3,7 @@ import type {
   SessionLineageActivity,
   SessionLineageActivityKind
 } from '@tangyuan/contracts'
-import { Archive, ArchiveRestore } from 'lucide-react'
+import { Archive, ArchiveRestore, Trash2 } from 'lucide-react'
 import { useMemo } from 'react'
 
 import {
@@ -132,6 +132,68 @@ export function SessionArchiveDialog(props: {
             onClick={props.onConfirm}
           >
             停止活动并归档
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
+export function SessionDeleteButton(props: {
+  disabled: boolean
+  onDelete(): void
+}): React.JSX.Element {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      className="window-no-drag relative z-50"
+      aria-label="永久删除当前会话谱系"
+      title="永久删除当前会话谱系"
+      disabled={props.disabled}
+      onClick={props.onDelete}
+    >
+      <Trash2 aria-hidden="true" />
+    </Button>
+  )
+}
+
+export function SessionDeleteDialog(props: {
+  activities: readonly SessionLineageActivity[]
+  isDeleting: boolean
+  onCancel(): void
+  onConfirm(): void
+}): React.JSX.Element {
+  return (
+    <AlertDialog
+      open={props.activities.length > 0}
+      onOpenChange={(open) => {
+        if (!open) props.onCancel()
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>停止活动并永久删除会话谱系？</AlertDialogTitle>
+          <AlertDialogDescription>
+            以下会话仍有活动。确认后会先停止这些活动，再永久删除目标会话及其后代。此操作不可撤销。
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <ul className="space-y-1 text-sm text-foreground">
+          {props.activities.map((activity) => (
+            <li key={activity.sessionId}>
+              {activity.title}：{activity.kinds.map((kind) => activityKindLabels[kind]).join('、')}
+            </li>
+          ))}
+        </ul>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={props.isDeleting}>取消</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={props.isDeleting}
+            onClick={props.onConfirm}
+          >
+            停止活动并永久删除
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -5,6 +5,8 @@ import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type ArchiveSessionRequest,
   type ArchiveSessionResult,
+  type DeleteSessionRequest,
+  type DeleteSessionResult,
   type AgentSessionSummary,
   type AgentSummary,
   type CancelConfigurationVerificationRequest,
@@ -128,6 +130,45 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
           ? ('queued' as const)
           : session.state,
     }))
+    // 对非归档会话检查祖先谱系完整性
+    if (!includeArchived) {
+      const sessionsById = new Map(
+        sessions.map((s) => [s.sessionId, s]),
+      )
+      const lineageCache = new Map<string, boolean>()
+
+      for (const session of sessions) {
+        if (!session.forkedFrom?.sessionId) continue
+
+        let ancestorId: string | undefined = session.forkedFrom.sessionId
+        const visited = new Set<string>()
+
+        while (ancestorId && !visited.has(ancestorId)) {
+          visited.add(ancestorId)
+          if (!lineageCache.has(ancestorId)) {
+            const ancestor = sessionsById.get(ancestorId)
+            if (!ancestor) {
+              lineageCache.set(ancestorId, false)
+            } else {
+              try {
+                await this.sessionDriver.getTranscript({
+                  agentId: ancestor.agentId,
+                  sessionId: ancestor.sessionId,
+                })
+                lineageCache.set(ancestorId, true)
+              } catch {
+                lineageCache.set(ancestorId, false)
+              }
+            }
+          }
+          if (!lineageCache.get(ancestorId)) {
+            session.lineageUnavailable = true
+            break
+          }
+          ancestorId = sessionsById.get(ancestorId)?.forkedFrom?.sessionId
+        }
+      }
+    }
     this.sessionCache.replace(
       sessions.filter((session) => session.archivedAt === undefined),
     )
@@ -539,6 +580,8 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
       throw new Error(`找不到会话 ${request.sessionId}，或该会话已归档。`)
     }
 
+    if (session) this.assertLineageAvailable(session)
+
     // 优先使用 TranscriptEmitter 缓存的快照（含 turns/steps）
     const cached = this.transcriptEmitter.getSnapshot(request.sessionId)
     if (cached) {
@@ -577,6 +620,8 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
       (await this.findSession(request.sessionId))
 
     this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
+
+    if (session) this.assertLineageAvailable(session)
 
     if (
       this.activeRunIds.has(request.sessionId) ||
@@ -623,6 +668,9 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
 
     this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
 
+    const retrySession = this.sessionCache.find(request.sessionId)
+    if (retrySession) this.assertLineageAvailable(retrySession)
+
     this.beginRunStart(request.sessionId)
     try {
       await this.sessionDriver.retryMessage(request)
@@ -649,6 +697,8 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
     }
 
     this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
+    const forkSourceSession = this.sessionCache.find(request.sessionId)
+    if (forkSourceSession) this.assertLineageAvailable(forkSourceSession)
     const pendingFork = this.sessionDriver.forkSession(request)
     return this.sessionArchiveCoordinator.trackFork(request.sessionId, pendingFork)
   }
@@ -767,6 +817,105 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
     return recovered
   }
 
+  /** 永久删除目标会话及其全部后代。 */
+  async deleteSession(
+    request: DeleteSessionRequest,
+  ): Promise<DeleteSessionResult> {
+    const archiveLease = this.sessionArchiveCoordinator.acquire(
+      request.sessionId,
+    )
+
+    try {
+      let sessions = await this.listSessions(request.agentId, true)
+      let subtree = collectSessionSubtree(
+        sessions,
+        request.agentId,
+        request.sessionId,
+      )
+
+      while (true) {
+        archiveLease.lock(subtree.map((session) => session.sessionId))
+        await archiveLease.waitForPendingForks(
+          subtree.map((session) => session.sessionId),
+        )
+        sessions = await this.listSessions(request.agentId, true)
+        const refreshedSubtree = collectSessionSubtree(
+          sessions,
+          request.agentId,
+          request.sessionId,
+        )
+        const hasUnlockedDescendant = refreshedSubtree.some(
+          (session) => !archiveLease.owns(session.sessionId),
+        )
+        subtree = refreshedSubtree
+        if (!hasUnlockedDescendant) break
+      }
+
+      const affectedActivities = this.collectSessionActivities(subtree)
+      const affectedSessionIds = subtree.map((session) => session.sessionId)
+
+      if (affectedActivities.length > 0 && !request.confirmActivityStop) {
+        return {
+          status: 'confirmation-required',
+          affectedSessionIds,
+          affectedActivities,
+        }
+      }
+
+      await Promise.all(
+        affectedSessionIds.map((sessionId) =>
+          this.waitForRunStart(sessionId),
+        ),
+      )
+      const currentSessions = await this.listSessions(request.agentId, true)
+      const currentSubtree = collectSessionSubtree(
+        currentSessions,
+        request.agentId,
+        request.sessionId,
+      )
+      const currentActivities = this.collectSessionActivities(currentSubtree)
+      const orderedActivities = [...currentActivities].sort(
+        (left, right) =>
+          Number(right.kinds.includes('queued')) -
+          Number(left.kinds.includes('queued')),
+      )
+      for (const activity of orderedActivities) {
+        await this.cancelRun({
+          agentId: request.agentId,
+          sessionId: activity.sessionId,
+        })
+      }
+
+      if (!this.sessionDriver.deleteSessions) {
+        throw new Error('当前运行时不支持永久删除会话。')
+      }
+
+      await this.sessionDriver.deleteSessions(affectedSessionIds)
+
+      const lastActive = await this.lastActiveSessionStore.read()
+      if (
+        lastActive &&
+        affectedSessionIds.includes(lastActive.sessionId)
+      ) {
+        await this.lastActiveSessionStore.clear()
+      }
+
+      for (const id of affectedSessionIds) {
+        this.sessionCache.remove(id)
+        this.activeRunIds.delete(id)
+      }
+
+      return {
+        status: 'deleted',
+        affectedSessionIds,
+        affectedActivities,
+      }
+    } finally {
+      archiveLease.release()
+      this.dequeueNext()
+    }
+  }
+
   /** 汇总子树中需要在归档前停止的运行、队列和对话动作。 */
   private collectSessionActivities(
     sessions: readonly AgentSessionSummary[],
@@ -797,6 +946,15 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
         ? [{ sessionId: session.sessionId, title: session.title, kinds }]
         : []
     })
+  }
+
+  /** 断言会话谱系可用，不可用时抛出错误阻断操作。 */
+  private assertLineageAvailable(session: AgentSessionSummary): void {
+    if (session.lineageUnavailable) {
+      throw new Error(
+        '该会话的祖先 Pi 会话文件已丢失或损坏，无法操作。请尝试恢复或重新创建。',
+      )
+    }
   }
 
   /**
@@ -890,6 +1048,7 @@ export type TangyuanRuntime = Pick<
   | 'forkSession'
   | 'archiveSession'
   | 'recoverSession'
+  | 'deleteSession'
   | 'cancelRun'
   | 'subscribe'
   | 'cancelAllActiveRuns'

@@ -69,4 +69,15 @@ export class SessionCache {
         : session,
     )
   }
+
+  /**
+   * 从缓存中移除指定会话。
+   *
+   * @param sessionId - 需要移除的会话标识。
+   */
+  remove(sessionId: string): void {
+    this.sessions = this.sessions.filter(
+      (session) => session.sessionId !== sessionId,
+    )
+  }
 }

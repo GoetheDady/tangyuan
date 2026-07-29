@@ -173,6 +173,7 @@ export const agentSessionSummarySchema = z.strictObject({
       entryId: nonEmptyIdentifierSchema,
     })
     .optional(),
+  lineageUnavailable: z.boolean().optional(),
 })
 
 /**
@@ -209,6 +210,20 @@ export const sessionLineageActivitySchema = z.strictObject({
 /** 校验会话谱系归档结果。 */
 export const archiveSessionResultSchema = z.strictObject({
   status: z.enum(['confirmation-required', 'archived']),
+  affectedSessionIds: z.array(nonEmptyIdentifierSchema),
+  affectedActivities: z.array(sessionLineageActivitySchema),
+})
+
+/** 校验会话谱系永久删除请求。 */
+export const deleteSessionRequestSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+  confirmActivityStop: z.boolean(),
+})
+
+/** 校验会话谱系永久删除结果。 */
+export const deleteSessionResultSchema = z.strictObject({
+  status: z.enum(['confirmation-required', 'deleted']),
   affectedSessionIds: z.array(nonEmptyIdentifierSchema),
   affectedActivities: z.array(sessionLineageActivitySchema),
 })
