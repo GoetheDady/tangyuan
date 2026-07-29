@@ -30,7 +30,7 @@ export function ForkSourceNotice({
   return (
     <div
       data-testid="fork-source-notice"
-      className="border-border text-caption text-muted-foreground mx-auto flex w-full max-w-[720px] items-center gap-2 border-b px-1 py-2"
+      className="border-border text-caption text-muted-foreground mx-auto flex w-full max-w-[720px] items-center gap-2 border-b px-5 py-2"
     >
       <GitBranch size={13} aria-hidden="true" className="shrink-0" />
       <span className="min-w-0 flex-1 truncate">

@@ -450,108 +450,110 @@ export function TranscriptMessages({
   return (
     <div
       ref={scrollRef}
-      className="mx-auto h-full w-full max-w-[720px] overflow-x-hidden overflow-y-auto"
+      className="h-full w-full overflow-x-hidden overflow-y-auto"
       data-testid="message-scroll-area"
     >
-      <div
-        className="relative w-full"
-        style={{ height: `${virtualizer.getTotalSize()}px` }}
-      >
-        {virtualizer.getVirtualItems().map((virtualItem) => {
-          const item = renderItems[virtualItem.index]
-          if (!item) return null
+      <div className="mx-auto w-full max-w-[720px] px-4">
+        <div
+          className="relative w-full"
+          style={{ height: `${virtualizer.getTotalSize()}px` }}
+        >
+          {virtualizer.getVirtualItems().map((virtualItem) => {
+            const item = renderItems[virtualItem.index]
+            if (!item) return null
 
-          return (
-            <div
-              key={virtualItem.key}
-              data-index={virtualItem.index}
-              ref={virtualizer.measureElement}
-              className="absolute top-0 left-0 w-full"
-              style={{
-                transform: `translateY(${virtualItem.start}px)`,
-              }}
-            >
-              {item.type === 'compaction' ? (
-                <CompactionIndicator timestamp={item.timestamp} />
-              ) : item.type === 'awaiting' ? (
-                <AwaitingResponseIndicator />
-              ) : item.type === 'user-message' ? (
-                <div className="py-2.5">
-                  <article className="flex flex-col items-end">
-                    <div
-                      data-testid={
-                        item.messageId === forkSourceMessageId
-                          ? 'fork-source-message'
-                          : undefined
-                      }
-                      className={`peer bg-secondary text-body text-secondary-foreground flex max-w-[360px] min-w-0 flex-col gap-1.5 rounded-[16px_16px_4px_16px] px-4 py-3 ${
-                        item.messageId === forkSourceMessageId
-                          ? 'ring-ring/60 ring-2'
-                          : ''
-                      }`}
-                    >
-                      <UserMessage content={item.content} />
-                    </div>
-                    <footer className="mt-1 flex h-6 items-center gap-1 opacity-0 transition-opacity peer-hover:opacity-100 focus-within:opacity-100 hover:opacity-100">
-                      <time
-                        dateTime={item.createdAt}
-                        className="text-muted-foreground font-mono text-[10px] leading-none"
+            return (
+              <div
+                key={virtualItem.key}
+                data-index={virtualItem.index}
+                ref={virtualizer.measureElement}
+                className="absolute top-0 left-0 w-full"
+                style={{
+                  transform: `translateY(${virtualItem.start}px)`,
+                }}
+              >
+                {item.type === 'compaction' ? (
+                  <CompactionIndicator timestamp={item.timestamp} />
+                ) : item.type === 'awaiting' ? (
+                  <AwaitingResponseIndicator />
+                ) : item.type === 'user-message' ? (
+                  <div className="py-2.5">
+                    <article className="flex flex-col items-end">
+                      <div
+                        data-testid={
+                          item.messageId === forkSourceMessageId
+                            ? 'fork-source-message'
+                            : undefined
+                        }
+                        className={`peer bg-secondary text-body text-secondary-foreground flex max-w-[360px] min-w-0 flex-col gap-1.5 rounded-[16px_16px_4px_16px] px-4 py-3 ${
+                          item.messageId === forkSourceMessageId
+                            ? 'ring-ring/60 ring-2'
+                            : ''
+                        }`}
                       >
-                        {formatMessageTime(item.createdAt)}
-                      </time>
-                      {onFork ? (
-                        <button
-                          type="button"
-                          aria-label="从此处分叉"
-                          title="从此处分叉"
-                          className="window-no-drag text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/50 flex size-6 items-center justify-center rounded-md transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            onFork(item.messageId)
-                          }}
+                        <UserMessage content={item.content} />
+                      </div>
+                      <footer className="mt-1 flex h-6 items-center gap-1 opacity-0 transition-opacity peer-hover:opacity-100 focus-within:opacity-100 hover:opacity-100">
+                        <time
+                          dateTime={item.createdAt}
+                          className="text-muted-foreground font-mono text-[10px] leading-none"
                         >
-                          <GitBranchPlus size={14} aria-hidden="true" />
-                        </button>
-                      ) : null}
-                    </footer>
-                  </article>
-                </div>
-              ) : item.type === 'assistant-message' ? (
-                <div className="py-2.5">
-                  <AssistantMessage
-                    entry={item.entry}
-                    isStreaming={item.isLastAgent}
-                    onRetry={
-                      onRetry
-                        ? () => {
-                            // Use inReplyTo if available, otherwise find the preceding user message
-                            let userMessageId = item.entry.inReplyTo
-                            if (!userMessageId && transcript) {
-                              const entryIndex = item.entry.index
-                              for (let i = entryIndex - 1; i >= 0; i--) {
-                                const prevEntry = transcript.entries[i]
-                                if (
-                                  prevEntry &&
-                                  prevEntry.kind === 'user-message'
-                                ) {
-                                  userMessageId = prevEntry.messageId
-                                  break
+                          {formatMessageTime(item.createdAt)}
+                        </time>
+                        {onFork ? (
+                          <button
+                            type="button"
+                            aria-label="从此处分叉"
+                            title="从此处分叉"
+                            className="window-no-drag text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/50 flex size-6 items-center justify-center rounded-md transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              onFork(item.messageId)
+                            }}
+                          >
+                            <GitBranchPlus size={14} aria-hidden="true" />
+                          </button>
+                        ) : null}
+                      </footer>
+                    </article>
+                  </div>
+                ) : item.type === 'assistant-message' ? (
+                  <div className="py-2.5">
+                    <AssistantMessage
+                      entry={item.entry}
+                      isStreaming={item.isLastAgent}
+                      onRetry={
+                        onRetry
+                          ? () => {
+                              // Use inReplyTo if available, otherwise find the preceding user message
+                              let userMessageId = item.entry.inReplyTo
+                              if (!userMessageId && transcript) {
+                                const entryIndex = item.entry.index
+                                for (let i = entryIndex - 1; i >= 0; i--) {
+                                  const prevEntry = transcript.entries[i]
+                                  if (
+                                    prevEntry &&
+                                    prevEntry.kind === 'user-message'
+                                  ) {
+                                    userMessageId = prevEntry.messageId
+                                    break
+                                  }
                                 }
                               }
+                              if (userMessageId) {
+                                onRetry(userMessageId)
+                              }
                             }
-                            if (userMessageId) {
-                              onRetry(userMessageId)
-                            }
-                          }
-                        : undefined
-                    }
-                    onToggleStart={() => handleToggleStart(item.renderIndex)}
-                  />
-                </div>
-              ) : null}
-            </div>
-          )
-        })}
+                          : undefined
+                      }
+                      onToggleStart={() => handleToggleStart(item.renderIndex)}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

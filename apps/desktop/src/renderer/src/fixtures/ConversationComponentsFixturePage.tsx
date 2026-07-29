@@ -439,7 +439,7 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
             className="bg-card shadow-level-0 overflow-hidden rounded-xl border"
             data-testid="integrated-chat"
           >
-            <div className="h-[620px] min-h-0 px-6 py-5">
+            <div className="h-[620px] min-h-0 py-5">
               <TranscriptMessages
                 transcript={integratedTranscript}
                 isStreaming
@@ -659,7 +659,7 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
           description="48 个结构化条目、代码块和压缩提示，固定高度内滚动。"
         >
           <div
-            className="bg-card h-[720px] min-h-0 overflow-hidden rounded-xl border px-5 py-4"
+            className="bg-card h-[720px] min-h-0 overflow-hidden rounded-xl border py-4"
             data-testid="long-history"
           >
             <TranscriptMessages

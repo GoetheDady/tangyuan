@@ -101,6 +101,41 @@ test.describe('长消息布局', () => {
     expect(['auto', 'scroll']).toContain(overflowY)
   })
 
+  test('滚动容器占满会话区宽度，滚动条贴在最右侧', async ({ page }) => {
+    const runtime = createReadyRuntimeSnapshot()
+    const sessions = createTestSessions(1)
+    const longMessage = createLongTestMessage()
+    const initScript = createPreloadApiInitScript(runtime, sessions, [
+      longMessage,
+    ])
+
+    await page.addInitScript({ content: initScript })
+    await page.goto('/#/chat/tangyuan')
+    await page.waitForSelector('[data-testid="message-scroll-area"]')
+
+    const chatMainBox = await page
+      .locator('[data-testid="chat-main"]')
+      .boundingBox()
+    const messageAreaBox = await page
+      .locator('[data-testid="message-scroll-area"]')
+      .boundingBox()
+
+    expect(chatMainBox).not.toBeNull()
+    expect(messageAreaBox).not.toBeNull()
+
+    if (chatMainBox && messageAreaBox) {
+      // 滚动容器与会话区同宽，滚动条才会落在会话区右边缘
+      expect(Math.abs(messageAreaBox.width - chatMainBox.width)).toBeLessThan(1)
+      expect(
+        Math.abs(
+          messageAreaBox.x +
+            messageAreaBox.width -
+            (chatMainBox.x + chatMainBox.width),
+        ),
+      ).toBeLessThan(1)
+    }
+  })
+
   test('长消息内容正确渲染', async ({ page }) => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
