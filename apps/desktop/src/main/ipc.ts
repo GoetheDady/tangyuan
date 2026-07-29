@@ -164,6 +164,14 @@ export function registerDesktopAppIpc(
       )
     )
   })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsDelete, async (_event, payload) => {
+    return parseDesktopIpcResponse(
+      DESKTOP_IPC_CHANNELS.sessionsDelete,
+      await runtime.deleteSession(
+        parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsDelete, payload)
+      )
+    )
+  })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsGetLastActive, async (_event, payload) => {
     parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsGetLastActive, payload)
     return parseDesktopIpcResponse(

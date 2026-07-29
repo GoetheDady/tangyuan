@@ -471,3 +471,319 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     expect(sessionDriver.sendMessage).not.toHaveBeenCalled()
   })
 })
+
+describe('TangyuanRuntime 会话谱系永久删除', () => {
+  it('确认后级联删除目标及全部后代，不影响兄弟', async () => {
+    const parent = createSession('parent')
+    const child = createSession('child', {
+      sessionId: 'parent',
+      entryId: 'parent-source',
+    })
+    const grandchild = createSession('grandchild', {
+      sessionId: 'child',
+      entryId: 'child-source',
+    })
+    const sibling = createSession('sibling')
+    const sessionDriver = createArchiveDriver([
+      parent,
+      child,
+      grandchild,
+      sibling,
+    ])
+    sessionDriver.deleteSessions = vi.fn(async () => {
+      // 模拟删除后会话不再出现在列表中
+    })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver: createRuntimeDriver(createSnapshot()),
+      sessionDriver,
+    })
+
+    await expect(
+      runtime.deleteSession({
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: parent.sessionId,
+        confirmActivityStop: false,
+      }),
+    ).resolves.toMatchObject({
+      status: 'deleted',
+      affectedSessionIds: ['parent', 'child', 'grandchild'],
+      affectedActivities: [],
+    })
+    expect(sessionDriver.deleteSessions).toHaveBeenCalledWith([
+      'parent',
+      'child',
+      'grandchild',
+    ])
+  })
+
+  it('未确认时返回 confirmation-required', async () => {
+    const parent = createSession('parent')
+    const child = {
+      ...createSession('child', {
+        sessionId: 'parent',
+        entryId: 'parent-source',
+      }),
+      state: 'running' as const,
+    }
+    const sessionDriver = createArchiveDriver([parent, child])
+    sessionDriver.deleteSessions = vi.fn()
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver: createRuntimeDriver(createSnapshot()),
+      sessionDriver,
+    })
+
+    await expect(
+      runtime.deleteSession({
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: parent.sessionId,
+        confirmActivityStop: false,
+      }),
+    ).resolves.toMatchObject({
+      status: 'confirmation-required',
+      affectedSessionIds: ['parent', 'child'],
+      affectedActivities: [
+        { sessionId: 'child', kinds: ['running'] },
+      ],
+    })
+    expect(sessionDriver.deleteSessions).not.toHaveBeenCalled()
+  })
+
+  it('确认后停止活动再删除', async () => {
+    const session = {
+      ...createSession('session'),
+      state: 'running' as const,
+    }
+    const sessionDriver = createArchiveDriver([session])
+    sessionDriver.deleteSessions = vi.fn()
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver: createRuntimeDriver(createSnapshot()),
+      sessionDriver,
+    })
+
+    await expect(
+      runtime.deleteSession({
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: session.sessionId,
+        confirmActivityStop: true,
+      }),
+    ).resolves.toMatchObject({ status: 'deleted' })
+    expect(sessionDriver.cancelRun).toHaveBeenCalledWith({
+      agentId: session.agentId,
+      sessionId: session.sessionId,
+    })
+    expect(sessionDriver.deleteSessions).toHaveBeenCalled()
+  })
+
+  it('删除后不会留下可打开的后代', async () => {
+    const parent = createSession('parent')
+    const child = createSession('child', {
+      sessionId: 'parent',
+      entryId: 'parent-source',
+    })
+    const sessionDriver = createArchiveDriver([parent, child])
+    let deleted = false
+    sessionDriver.deleteSessions = vi.fn(async () => {
+      deleted = true
+    })
+    sessionDriver.listSessions = vi.fn(async (request) => {
+      if (deleted) return []
+      return [parent, child].filter(
+        (s) =>
+          s.agentId === request.agentId &&
+          (request.includeArchived || s.archivedAt === undefined),
+      )
+    })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver: createRuntimeDriver(createSnapshot()),
+      sessionDriver,
+    })
+
+    await runtime.deleteSession({
+      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      sessionId: parent.sessionId,
+      confirmActivityStop: false,
+    })
+
+    await expect(
+      runtime.getTranscript({
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: child.sessionId,
+      }),
+    ).rejects.toThrow(/找不到会话/)
+  })
+})
+
+describe('TangyuanRuntime 祖先谱系完整性检查', () => {
+  it('祖先 transcript 不可读时后代标记为 lineageUnavailable', async () => {
+    const grandparent = createSession('grandparent')
+    const parent = createSession('parent', {
+      sessionId: 'grandparent',
+      entryId: 'gp-source',
+    })
+    const child = createSession('child', {
+      sessionId: 'parent',
+      entryId: 'parent-source',
+    })
+    const sibling = createSession('sibling')
+    const sessionDriver = createArchiveDriver([
+      grandparent,
+      parent,
+      child,
+      sibling,
+    ])
+    // 让 grandparent 的 transcript 读取失败
+    const originalGetTranscript = sessionDriver.getTranscript
+    sessionDriver.getTranscript = vi.fn(
+      async (request) => {
+        if (request.sessionId === 'grandparent') {
+          throw new Error('文件损坏')
+        }
+        return originalGetTranscript(request)
+      },
+    )
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver: createRuntimeDriver(createSnapshot()),
+      sessionDriver,
+    })
+
+    const sessions = await runtime.listSessions()
+    const childResult = sessions.find((s) => s.sessionId === 'child')
+    const parentResult = sessions.find((s) => s.sessionId === 'parent')
+    const siblingResult = sessions.find((s) => s.sessionId === 'sibling')
+
+    expect(childResult?.lineageUnavailable).toBe(true)
+    expect(parentResult?.lineageUnavailable).toBe(true)
+    // grandparent 和 sibling 不受影响
+    expect(siblingResult?.lineageUnavailable).toBeUndefined()
+    const gpResult = sessions.find((s) => s.sessionId === 'grandparent')
+    expect(gpResult?.lineageUnavailable).toBeUndefined()
+  })
+
+  it('谱系不可用会话拒绝 sendMessage', async () => {
+    const parent = createSession('parent')
+    const child = createSession('child', {
+      sessionId: 'parent',
+      entryId: 'parent-source',
+    })
+    const sessionDriver = createArchiveDriver([parent, child])
+    sessionDriver.getTranscript = vi.fn(async (request) => {
+      if (request.sessionId === 'parent') {
+        throw new Error('文件损坏')
+      }
+      return {
+        sessionId: request.sessionId,
+        agentId: request.agentId,
+        entries: [],
+        updatedAt: '2026-07-29T00:00:00.000Z',
+      }
+    })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver: createRuntimeDriver(
+        createSnapshot({
+          providerId: 'anthropic',
+          modelId: 'claude-sonnet-4-5',
+          maskedValue: 'sk-t...7890',
+        }),
+      ),
+      sessionDriver,
+    })
+
+    // 先列出会话以设置 lineageUnavailable
+    await runtime.listSessions()
+
+    await expect(
+      runtime.sendMessage({
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: child.sessionId,
+        content: 'test',
+      }),
+    ).rejects.toThrow(/祖先.*丢失或损坏/)
+  })
+
+  it('谱系不可用会话拒绝 getTranscript', async () => {
+    const parent = createSession('parent')
+    const child = createSession('child', {
+      sessionId: 'parent',
+      entryId: 'parent-source',
+    })
+    const sessionDriver = createArchiveDriver([parent, child])
+    sessionDriver.getTranscript = vi.fn(async (request) => {
+      if (request.sessionId === 'parent') {
+        throw new Error('文件损坏')
+      }
+      return {
+        sessionId: request.sessionId,
+        agentId: request.agentId,
+        entries: [],
+        updatedAt: '2026-07-29T00:00:00.000Z',
+      }
+    })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver: createRuntimeDriver(createSnapshot()),
+      sessionDriver,
+    })
+
+    await runtime.listSessions()
+
+    await expect(
+      runtime.getTranscript({
+        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        sessionId: child.sessionId,
+      }),
+    ).rejects.toThrow(/祖先.*丢失或损坏/)
+  })
+
+  it('父链恢复后后代恢复可用', async () => {
+    const parent = createSession('parent')
+    const child = createSession('child', {
+      sessionId: 'parent',
+      entryId: 'parent-source',
+    })
+    const sessionDriver = createArchiveDriver([parent, child])
+    let parentBroken = true
+    sessionDriver.getTranscript = vi.fn(async (request) => {
+      if (request.sessionId === 'parent' && parentBroken) {
+        throw new Error('文件损坏')
+      }
+      return {
+        sessionId: request.sessionId,
+        agentId: request.agentId,
+        entries: [],
+        updatedAt: '2026-07-29T00:00:00.000Z',
+      }
+    })
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver: createRuntimeDriver(createSnapshot()),
+      sessionDriver,
+    })
+
+    // 第一次：父链损坏，后代不可用
+    const brokenSessions = await runtime.listSessions()
+    const brokenChild = brokenSessions.find((s) => s.sessionId === 'child')
+    expect(brokenChild?.lineageUnavailable).toBe(true)
+
+    // 恢复父链
+    parentBroken = false
+
+    // 第二次：父链恢复，后代可用
+    const restoredSessions = await runtime.listSessions()
+    const restoredChild = restoredSessions.find((s) => s.sessionId === 'child')
+    expect(restoredChild?.lineageUnavailable).toBeUndefined()
+  })
+
+  it('无分叉来源的会话不检查谱系', async () => {
+    const session = createSession('root')
+    const sessionDriver = createArchiveDriver([session])
+    // getTranscript 不应被调用（根会话无祖先）
+    const runtime = createTangyuanRuntimeForTesting({
+      runtimeDriver: createRuntimeDriver(createSnapshot()),
+      sessionDriver,
+    })
+
+    const sessions = await runtime.listSessions()
+    const root = sessions.find((s) => s.sessionId === 'root')
+    expect(root?.lineageUnavailable).toBeUndefined()
+    // getTranscript 不应因 lineage 检查而被调用
+    expect(sessionDriver.getTranscript).not.toHaveBeenCalled()
+  })
+})

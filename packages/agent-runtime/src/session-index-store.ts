@@ -422,6 +422,23 @@ export class SessionIndexStore {
   }
 
   /**
+   * 从内存索引和摘要缓存中永久删除一组会话并原子写盘。
+   * Pi session 文件的物理删除由调用方负责。
+   *
+   * @param sessionIds - 要删除的会话标识。
+   * @returns 无返回值。
+   * @throws 当索引写入失败时，Promise 会 reject。
+   */
+  async deleteSessions(sessionIds: readonly string[]): Promise<void> {
+    for (const sessionId of sessionIds) {
+      this.sessionIndex.delete(sessionId)
+      this.sessions.delete(sessionId)
+    }
+
+    await this.write()
+  }
+
+  /**
    * 在会话索引中新增或更新一条执行尝试记录（最多保留最近 20 条）。
    *
    * @param sessionId - 所属会话标识。

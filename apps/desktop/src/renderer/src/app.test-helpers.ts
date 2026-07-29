@@ -78,6 +78,7 @@ export function installDefaultAppApi(): void {
       affectedActivities: []
     }),
     recoverSession: vi.fn().mockResolvedValue([]),
+    deleteSession: vi.fn(),
     cancelRun: vi.fn().mockResolvedValue(
       createDefaultSessionSummary({
         sessionId: 'welcome',

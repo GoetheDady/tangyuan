@@ -19,7 +19,9 @@ import { QuestionClarificationCard } from '@/components/QuestionClarificationCar
 import {
   ArchivedSessionList,
   SessionArchiveButton,
-  SessionArchiveDialog
+  SessionArchiveDialog,
+  SessionDeleteButton,
+  SessionDeleteDialog
 } from '@/components/SessionArchiveControls'
 import { SessionLineageTree } from '@/components/SessionLineageTree'
 import { Button } from '@/components/ui/button'
@@ -244,7 +246,19 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
       context.setSelectedSessionId(null)
       context.setTranscript(null)
       navigate(`/chat/${target.agentId}`, { replace: true })
-    }
+    },
+    onDeleted: (target, result) => {
+      const affectedIds = new Set(result.affectedSessionIds)
+      context.setPendingApprovals((current) =>
+        current.filter((approval) => !affectedIds.has(approval.sessionId))
+      )
+      context.setPendingClarifications((current) =>
+        current.filter((clarification) => !affectedIds.has(clarification.sessionId))
+      )
+      context.setSelectedSessionId(null)
+      context.setTranscript(null)
+      navigate(`/chat/${target.agentId}`, { replace: true })
+    },
   })
   const parentSession = useMemo(() => {
     const parentSessionId = selectedSession?.forkedFrom?.sessionId
@@ -671,12 +685,20 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
               {selectedSession?.title ?? '新对话'}
             </h2>
             {selectedSession && (
-              <SessionArchiveButton
-                disabled={sessionArchive.isArchiving}
-                onArchive={() => {
-                  void sessionArchive.archiveSelectedSession(false)
-                }}
-              />
+              <>
+                <SessionArchiveButton
+                  disabled={sessionArchive.isArchiving}
+                  onArchive={() => {
+                    void sessionArchive.archiveSelectedSession(false)
+                  }}
+                />
+                <SessionDeleteButton
+                  disabled={sessionArchive.isDeleting}
+                  onDelete={() => {
+                    void sessionArchive.deleteSelectedSession(false)
+                  }}
+                />
+              </>
             )}
           </header>
 
@@ -799,6 +821,14 @@ function ChatPage(props: { context: DesktopWorkbenchContext }): React.JSX.Elemen
         onCancel={sessionArchive.cancelArchive}
         onConfirm={() => {
           void sessionArchive.archiveSelectedSession(true)
+        }}
+      />
+      <SessionDeleteDialog
+        activities={sessionArchive.deletePreview?.affectedActivities ?? []}
+        isDeleting={sessionArchive.isDeleting}
+        onCancel={sessionArchive.cancelDelete}
+        onConfirm={() => {
+          void sessionArchive.deleteSelectedSession(true)
         }}
       />
     </main>

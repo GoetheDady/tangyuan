@@ -1,4 +1,8 @@
-import type { AgentSessionSummary, ArchiveSessionResult } from '@tangyuan/contracts'
+import type {
+  AgentSessionSummary,
+  ArchiveSessionResult,
+  DeleteSessionResult,
+} from '@tangyuan/contracts'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -7,16 +11,21 @@ interface UseSessionArchiveOptions {
   selectedSession: AgentSessionSummary | null
   onSessionsChange(sessions: AgentSessionSummary[]): void
   onArchived(target: AgentSessionSummary, result: ArchiveSessionResult): void
+  onDeleted(target: AgentSessionSummary, result: DeleteSessionResult): void
 }
 
 export function useSessionArchive(options: UseSessionArchiveOptions): {
   archivedSessions: AgentSessionSummary[]
   archivePreview: ArchiveSessionResult | null
+  deletePreview: DeleteSessionResult | null
   isArchiving: boolean
+  isDeleting: boolean
   recoveringSessionId: string | null
   archiveSelectedSession(confirmActivityStop: boolean): Promise<void>
+  deleteSelectedSession(confirmActivityStop: boolean): Promise<void>
   recoverSession(session: AgentSessionSummary): Promise<void>
   cancelArchive(): void
+  cancelDelete(): void
 } {
   const [archivedSessionState, setArchivedSessionState] = useState<{
     agentId: string
@@ -24,7 +33,10 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
   }>({ agentId: options.agentId, sessions: [] })
   const [archiveTarget, setArchiveTarget] = useState<AgentSessionSummary | null>(null)
   const [archivePreview, setArchivePreview] = useState<ArchiveSessionResult | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<AgentSessionSummary | null>(null)
+  const [deletePreview, setDeletePreview] = useState<DeleteSessionResult | null>(null)
   const [isArchiving, setIsArchiving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [recoveringSessionId, setRecoveringSessionId] = useState<string | null>(null)
   const activeAgentIdRef = useRef(options.agentId)
   const archivedSessions =
@@ -131,16 +143,61 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
     }
   }
 
+  async function deleteSelectedSession(confirmActivityStop: boolean): Promise<void> {
+    const target = confirmActivityStop ? deleteTarget : options.selectedSession
+    if (!target) return
+
+    setDeleteTarget(target)
+    setIsDeleting(true)
+
+    try {
+      const result = await window.api.deleteSession({
+        agentId: target.agentId,
+        sessionId: target.sessionId,
+        confirmActivityStop,
+      })
+
+      if (result.status === 'confirmation-required') {
+        if (activeAgentIdRef.current !== target.agentId) {
+          setDeleteTarget(null)
+          setDeletePreview(null)
+          return
+        }
+        setDeletePreview(result)
+        return
+      }
+
+      const isTargetAgentActive = await refreshSessionLists(target.agentId)
+      if (isTargetAgentActive) {
+        options.onDeleted(target, result)
+      }
+      setDeleteTarget(null)
+      setDeletePreview(null)
+      toast.success('已永久删除会话谱系')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : '删除会话谱系失败')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   return {
     archivedSessions,
     archivePreview,
+    deletePreview,
     isArchiving,
+    isDeleting,
     recoveringSessionId,
     archiveSelectedSession,
+    deleteSelectedSession,
     recoverSession,
     cancelArchive: () => {
       setArchiveTarget(null)
       setArchivePreview(null)
-    }
+    },
+    cancelDelete: () => {
+      setDeleteTarget(null)
+      setDeletePreview(null)
+    },
   }
 }

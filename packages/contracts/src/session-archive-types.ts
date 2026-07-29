@@ -31,3 +31,18 @@ export interface ArchiveSessionResult {
   affectedSessionIds: string[]
   affectedActivities: SessionLineageActivity[]
 }
+
+/** 永久删除会话谱系的请求。 */
+export interface DeleteSessionRequest {
+  agentId: AgentId
+  sessionId: string
+  /** 用户是否已经确认停止子树中的全部活动。 */
+  confirmActivityStop: boolean
+}
+
+/** 永久删除会话谱系的结果。 */
+export interface DeleteSessionResult {
+  status: 'confirmation-required' | 'deleted'
+  affectedSessionIds: string[]
+  affectedActivities: SessionLineageActivity[]
+}

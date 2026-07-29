@@ -68,6 +68,7 @@ describe('registerDesktopAppIpc', () => {
         affectedActivities: []
       }),
       recoverSession: vi.fn().mockResolvedValue([session]),
+      deleteSession: vi.fn(),
       cancelRun: vi.fn().mockResolvedValue(session),
       subscribe: vi.fn(),
       cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined),
@@ -174,7 +175,7 @@ describe('registerDesktopAppIpc', () => {
 
     registerDesktopAppIpc(ipcMain, runtime, broadcastAgentEvent, openExternalLink)
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(46)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(47)
     expect(broadcastAgentEvent).toHaveBeenCalledWith(createAttemptStartedEvent())
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeGetSnapshot)(null, undefined)
@@ -409,6 +410,7 @@ describe('registerDesktopAppIpc', () => {
       forkSession: vi.fn(),
       archiveSession: vi.fn(),
       recoverSession: vi.fn(),
+      deleteSession: vi.fn(),
       cancelRun: vi.fn(),
       subscribe: vi.fn(),
       cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined),
@@ -534,6 +536,7 @@ describe('registerDesktopAppIpc', () => {
       forkSession: vi.fn(),
       archiveSession: vi.fn(),
       recoverSession: vi.fn(),
+      deleteSession: vi.fn(),
       cancelRun: vi.fn(),
       subscribe: vi.fn(),
       cancelAllActiveRuns: vi.fn(),

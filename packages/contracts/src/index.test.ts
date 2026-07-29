@@ -413,6 +413,7 @@ describe('DESKTOP_IPC_CHANNELS', () => {
       sessionsFork: 'tangyuan:sessions:fork',
       sessionsArchive: 'tangyuan:sessions:archive',
       sessionsRecover: 'tangyuan:sessions:recover',
+      sessionsDelete: 'tangyuan:sessions:delete',
       sessionsGetLastActive: 'tangyuan:sessions:get-last-active',
       sessionsSetLastActive: 'tangyuan:sessions:set-last-active',
       agentsArchive: 'tangyuan:agents:archive',

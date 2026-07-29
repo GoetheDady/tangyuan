@@ -5,6 +5,8 @@ import {
   approveBashRequestSchema,
   archiveSessionRequestSchema,
   archiveSessionResultSchema,
+  deleteSessionRequestSchema,
+  deleteSessionResultSchema,
   archiveAgentRequestSchema,
   cancelClarificationRequestSchema,
   cancelConfigurationVerificationRequestSchema,
@@ -49,6 +51,8 @@ import type { LastActiveSession, SetLastActiveSessionRequest } from './last-acti
 import type {
   ArchiveSessionRequest,
   ArchiveSessionResult,
+  DeleteSessionRequest,
+  DeleteSessionResult,
   RecoverSessionRequest,
 } from './session-archive-types'
 import type {
@@ -142,6 +146,7 @@ export const DESKTOP_IPC_CHANNELS = {
   sessionsFork: 'tangyuan:sessions:fork',
   sessionsArchive: 'tangyuan:sessions:archive',
   sessionsRecover: 'tangyuan:sessions:recover',
+  sessionsDelete: 'tangyuan:sessions:delete',
   sessionsGetLastActive: 'tangyuan:sessions:get-last-active',
   sessionsSetLastActive: 'tangyuan:sessions:set-last-active',
 } as const
@@ -205,6 +210,7 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.sessionsFork]: ForkSessionRequest
   [DESKTOP_IPC_CHANNELS.sessionsArchive]: ArchiveSessionRequest
   [DESKTOP_IPC_CHANNELS.sessionsRecover]: RecoverSessionRequest
+  [DESKTOP_IPC_CHANNELS.sessionsDelete]: DeleteSessionRequest
   [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: SetLastActiveSessionRequest
 }
@@ -261,6 +267,7 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsFork]: forkSessionRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsArchive]: archiveSessionRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRecover]: recoverSessionRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsDelete]: deleteSessionRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: setLastActiveSessionRequestSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
@@ -333,6 +340,7 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsFork]: AgentSessionSummary
   [DESKTOP_IPC_CHANNELS.sessionsArchive]: ArchiveSessionResult
   [DESKTOP_IPC_CHANNELS.sessionsRecover]: AgentSessionSummary[]
+  [DESKTOP_IPC_CHANNELS.sessionsDelete]: DeleteSessionResult
   [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: LastActiveSession | null
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: LastActiveSession | null
 }
@@ -470,6 +478,7 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsFork]: agentSessionSummarySchema,
   [DESKTOP_IPC_CHANNELS.sessionsArchive]: archiveSessionResultSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRecover]: z.array(agentSessionSummarySchema),
+  [DESKTOP_IPC_CHANNELS.sessionsDelete]: deleteSessionResultSchema,
   [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: lastActiveSessionSchema.nullable(),
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: lastActiveSessionSchema.nullable(),
 } satisfies Record<DesktopIpcChannel, z.ZodType>
@@ -621,6 +630,9 @@ export interface DesktopPreloadApi {
 
   /** 恢复目标会话及其全部后代。 */
   recoverSession(request: RecoverSessionRequest): Promise<AgentSessionSummary[]>
+
+  /** 永久删除目标会话及其全部后代，活动子树需要显式确认。 */
+  deleteSession(request: DeleteSessionRequest): Promise<DeleteSessionResult>
 
   /**
    * 订阅 Main 进程转发的 Agent 标准事件。
