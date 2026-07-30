@@ -5,7 +5,7 @@ import type {
   SkillOperationParams,
   SkillSummary,
 } from '@tangyuan/contracts'
-import type { AgentSessionDriver } from '../pi-sdk-driver-contracts'
+import type { AgentSessionDriver } from '../driver'
 import { SkillApprovalRegistry } from './skill-approval-registry'
 
 /**

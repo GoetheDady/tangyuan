@@ -1,13 +1,13 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { RealPiSdkGateway } from './gateway'
-import { ConfigStore, DirectoryLayout } from './core'
-import { AgentRegistry } from './agent'
-import { SkillStore } from './skill'
-import { ProfileStore } from './profile'
-import { SessionIndexStore } from './session/session-index-store'
-import { MessageStore } from './session/message-store'
-import { AgentRuntimeError, sanitizeErrorMessage } from './core'
+import { RealPiSdkGateway } from '../gateway'
+import { ConfigStore, DirectoryLayout } from '../core'
+import { AgentRegistry } from '../agent'
+import { SkillStore } from '../skill'
+import { ProfileStore } from '../profile'
+import { SessionIndexStore } from '../session/session-index-store'
+import { MessageStore } from '../session/message-store'
+import { AgentRuntimeError, sanitizeErrorMessage } from '../core'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentEvent,

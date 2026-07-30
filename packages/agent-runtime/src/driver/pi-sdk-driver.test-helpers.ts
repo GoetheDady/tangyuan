@@ -1,9 +1,12 @@
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { TranscriptEntry, TranscriptSnapshot } from '@tangyuan/contracts'
+import type {
+  ConfigEncryptionAdapter,
+  TranscriptEntry,
+  TranscriptSnapshot,
+} from '@tangyuan/contracts'
 import {
-  type ConfigEncryptionAdapter,
   type InternalMessage,
   PiSdkDriver,
   type PiSdkCreateSessionRequest,
@@ -16,7 +19,7 @@ import {
   type PiSdkVerificationRequest,
 } from './index'
 
-export { createDeferred } from './test-deferred'
+export { createDeferred } from '../test-deferred'
 
 const tempDirs: string[] = []
 

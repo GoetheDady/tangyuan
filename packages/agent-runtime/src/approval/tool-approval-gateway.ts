@@ -2,7 +2,7 @@ import type {
   BashApprovalRequest,
   QuestionClarificationRequest,
 } from '@tangyuan/contracts'
-import type { ToolApprovalGateway } from '../pi-sdk-driver-contracts'
+import type { ToolApprovalGateway } from '../driver'
 import type { BashApprovalRegistry } from './bash-approval-registry'
 import type { ClarificationRegistry } from './clarification-registry'
 import { validateFilePath } from '../core'

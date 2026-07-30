@@ -5,7 +5,7 @@ import type {
   AgentSessionDriver,
   DriverEvent,
   ToolApprovalGateway,
-} from './pi-sdk-driver-contracts'
+} from './driver'
 import { TranscriptEmitter } from './session/transcript-emitter'
 import {
   BashApprovalRegistry,

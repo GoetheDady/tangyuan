@@ -1,10 +1,9 @@
 import { readFile, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import type { AgentEvent, TranscriptSnapshot } from '@tangyuan/contracts'
 import {
-  type AgentEvent,
   type InternalMessage,
-  type TranscriptSnapshot,
   PiSdkDriver,
   type PiSdkPromptOptions,
 } from './index'

@@ -3,8 +3,8 @@ import { dirname } from 'node:path'
 import type {
   PersistedAttemptEntry,
   PersistedSessionIndexEntry,
-} from './session/session-index-store'
-import { AgentRuntimeError } from './core'
+} from '../session/session-index-store'
+import { AgentRuntimeError } from '../core'
 import {
   isAbortError,
   mapPiSdkStreamEventToActivity,
@@ -14,7 +14,7 @@ import {
   buildInternalConfigForProviderSave,
   buildInternalConfigForProviderDelete,
   createMessagePreview,
-} from './core'
+} from '../core'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentId,
@@ -201,7 +201,9 @@ export class PiSdkDriver
     return this.readRuntimeSnapshot()
   }
 
-  async deleteProvider(request: DeleteProviderRequest): Promise<RuntimeSnapshot> {
+  async deleteProvider(
+    request: DeleteProviderRequest,
+  ): Promise<RuntimeSnapshot> {
     const readResult = await this.configStore.read()
     const internalConfig = buildInternalConfigForProviderDelete(
       readResult.config,

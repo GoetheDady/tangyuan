@@ -2,7 +2,7 @@ import type {
   TurnStartEvent as PiSdkTurnStartEvent,
   TurnEndEvent as PiSdkTurnEndEvent,
 } from '@earendil-works/pi-coding-agent'
-import type { PersistedAttemptEntry } from './session/session-index-types'
+import type { PersistedAttemptEntry } from '../session/session-index-types'
 import type {
   AgentConfig,
   AgentEvent,
@@ -438,13 +438,13 @@ export type {
   PersistedAttemptEntry,
   PersistedSessionIndexEntry,
   PersistedSessionIndex,
-} from './session/session-index-types'
+} from '../session/session-index-types'
 
 /**
  * 创建 AgentRuntimeError 时使用的输入与错误类（定义见 errors.ts）。
  */
-export type { AgentRuntimeErrorInput } from './core'
-export { AgentRuntimeError } from './core'
+export type { AgentRuntimeErrorInput } from '../core'
+export { AgentRuntimeError } from '../core'
 
 /**
  * 定义 Agent 会话 Driver 需要实现的能力。

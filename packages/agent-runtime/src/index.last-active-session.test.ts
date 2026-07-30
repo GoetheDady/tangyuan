@@ -6,7 +6,7 @@ import { createTangyuanRuntime } from './index'
 import {
   createFakeEncryptionAdapter,
   createPiSdkGateway,
-} from './pi-sdk-driver.test-helpers'
+} from './driver/pi-sdk-driver.test-helpers'
 
 let rootPath: string | null = null
 

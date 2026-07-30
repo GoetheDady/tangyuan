@@ -6,7 +6,7 @@ import {
   type AgentSessionSummary,
 } from '@tangyuan/contracts'
 import type { ConfigStore, DirectoryLayout } from '../core'
-import type { PiSdkGateway } from '../pi-sdk-driver-contracts'
+import type { PiSdkGateway } from '../driver'
 import { AgentRuntimeError } from '../core'
 import {
   extractAgentRuntimeConfig,

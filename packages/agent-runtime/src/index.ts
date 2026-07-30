@@ -6,11 +6,8 @@ import {
 } from './tangyuan-runtime'
 import { DirectoryLayout } from './core'
 import { LastActiveSessionStore } from './session/last-active-session-store'
-import { PiSdkDriver } from './pi-sdk-driver'
-import type {
-  PiSdkDriverOptions,
-  ToolApprovalGateway,
-} from './pi-sdk-driver-contracts'
+import { PiSdkDriver } from './driver'
+import type { PiSdkDriverOptions, ToolApprovalGateway } from './driver'
 
 export {
   TANGYUAN_DEFAULT_AGENT_ID,
@@ -48,7 +45,7 @@ export {
 } from '@tangyuan/contracts'
 export { createTangyuanRuntimeForTesting } from './tangyuan-runtime'
 export type { TangyuanRuntime } from './tangyuan-runtime'
-export { PiSdkDriver } from './pi-sdk-driver'
+export { PiSdkDriver } from './driver'
 
 /**
  * 创建 Electron Main 使用的默认 TangyuanRuntime。
@@ -105,7 +102,7 @@ export function createTangyuanRuntime(
   return runtime
 }
 
-export * from './pi-sdk-driver-contracts'
+export * from './driver'
 export * from './gateway'
 export * from './agent'
 export * from './approval'

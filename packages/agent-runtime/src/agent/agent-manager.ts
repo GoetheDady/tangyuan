@@ -3,7 +3,7 @@ import type {
   UnclaimedDirectory,
   UpdateAgentConfigRequest,
 } from '@tangyuan/contracts'
-import type { AgentSessionDriver } from '../pi-sdk-driver-contracts'
+import type { AgentSessionDriver } from '../driver'
 import type { RuntimeSnapshotStore } from '../runtime-snapshot-store'
 
 /**

@@ -15,7 +15,7 @@ import {
   type PiSdkSessionHandle,
   type PiSdkStoredSession,
   type PiSdkVerificationRequest,
-} from './pi-sdk-driver-contracts'
+} from './driver'
 import {
   buildTranscriptSnapshotFromSdkEntries,
   isForkSource,

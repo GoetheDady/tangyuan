@@ -1,7 +1,7 @@
 import { rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { type AgentEvent, type TranscriptSnapshot } from './index'
+import type { AgentEvent, TranscriptSnapshot } from '@tangyuan/contracts'
 import {
   cleanupTempDirs,
   createDriver,

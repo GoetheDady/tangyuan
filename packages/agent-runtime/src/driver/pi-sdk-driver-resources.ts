@@ -2,7 +2,7 @@ import {
   AgentRuntimeError,
   extractAgentRuntimeConfig,
   getMtimeIso,
-} from './core'
+} from '../core'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   createAgentProfileStatus,

@@ -1,7 +1,4 @@
-import type {
-  AgentSessionDriver,
-  RuntimeResourceDriver,
-} from './pi-sdk-driver-contracts'
+import type { AgentSessionDriver, RuntimeResourceDriver } from './driver'
 import type { LastActiveSessionStore } from './session/last-active-session-store'
 
 /**

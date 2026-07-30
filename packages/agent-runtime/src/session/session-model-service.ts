@@ -4,7 +4,7 @@ import type {
   SetSessionModelRequest,
   SetSessionThinkingLevelRequest,
 } from '@tangyuan/contracts'
-import type { AgentSessionDriver } from '../pi-sdk-driver-contracts'
+import type { AgentSessionDriver } from '../driver'
 
 /**
  * 创建 SessionModelService 所需的依赖。

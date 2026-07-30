@@ -11,7 +11,7 @@ import {
   createDeferred,
   createDriver,
   createPiSdkGateway,
-} from './pi-sdk-driver.test-helpers'
+} from './driver/pi-sdk-driver.test-helpers'
 
 afterEach(cleanupTempDirs)
 

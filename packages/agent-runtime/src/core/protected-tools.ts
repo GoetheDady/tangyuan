@@ -1,7 +1,7 @@
 import { dirname, resolve as pathResolve } from 'node:path'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
-import type { ToolApprovalGateway } from '../pi-sdk-driver-contracts'
+import type { ToolApprovalGateway } from '../driver'
 import { describeBashRisk } from './utils'
 
 /**
