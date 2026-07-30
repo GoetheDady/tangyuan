@@ -4,7 +4,7 @@ import {
   lastActiveSessionSchema,
   type LastActiveSession,
 } from '@tangyuan/contracts'
-import type { DirectoryLayout } from './directory-layout'
+import type { DirectoryLayout } from './core'
 
 /**
  * 创建 LastActiveSessionStore 所需的依赖。

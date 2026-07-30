@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { afterEach, describe, expect, it } from 'vitest'
 import { RealPiSdkGateway } from './gateway'
-import { stringifyPiSdkMessageContent } from './utils'
+import { stringifyPiSdkMessageContent } from './core'
 
 const tempDirs: string[] = []
 

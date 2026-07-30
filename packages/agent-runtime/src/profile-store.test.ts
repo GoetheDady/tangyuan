@@ -13,8 +13,7 @@ import type {
   ConfigEncryptionAdapter,
   InternalRuntimeConfig,
 } from '@tangyuan/contracts'
-import { DirectoryLayout } from './directory-layout'
-import { ConfigStore } from './config-store'
+import { ConfigStore, DirectoryLayout } from './core'
 import { ProfileStore } from './profile-store'
 
 const fakeAdapter: ConfigEncryptionAdapter = {

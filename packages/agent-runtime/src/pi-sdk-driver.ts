@@ -4,7 +4,7 @@ import type {
   PersistedAttemptEntry,
   PersistedSessionIndexEntry,
 } from './session-index-store'
-import { AgentRuntimeError } from './errors'
+import { AgentRuntimeError } from './core'
 import {
   isAbortError,
   mapPiSdkStreamEventToActivity,
@@ -14,7 +14,7 @@ import {
   buildInternalConfigForProviderSave,
   buildInternalConfigForProviderDelete,
   createMessagePreview,
-} from './utils'
+} from './core'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentId,

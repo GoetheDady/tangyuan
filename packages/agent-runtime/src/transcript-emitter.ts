@@ -10,7 +10,7 @@ import {
   type TurnStep,
 } from '@tangyuan/contracts'
 import { assembleRunTurn } from './run-turn-assembly'
-import { createToolStepSummary } from './utils'
+import { createToolStepSummary } from './core'
 
 /**
  * turn 追踪状态。

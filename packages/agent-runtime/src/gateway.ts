@@ -20,7 +20,7 @@ import {
   buildTranscriptSnapshotFromSdkEntries,
   isForkSource,
   normalizePiSdkSessionEvent,
-} from './utils'
+} from './core'
 
 /** 汤圆写入分叉会话 Pi JSONL 的来源记录 custom entry 类型。 */
 const TANGYUAN_FORK_SOURCE_ENTRY_TYPE = 'tangyuan:fork-source'
@@ -32,7 +32,7 @@ import {
   createProtectedTools,
   NATIVE_DANGEROUS_TOOL_NAMES,
   toSdkCustomTools,
-} from './protected-tools'
+} from './core'
 
 export class RealPiSdkGateway implements PiSdkGateway {
   /**

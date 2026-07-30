@@ -9,14 +9,13 @@ import {
   type InternalRuntimeConfig,
   type UnclaimedDirectory,
 } from '@tangyuan/contracts'
-import type { DirectoryLayout } from './directory-layout'
-import type { ConfigStore } from './config-store'
-import { AgentRuntimeError } from './errors'
+import type { ConfigStore, DirectoryLayout } from './core'
+import { AgentRuntimeError } from './core'
 import {
   createDefaultInternalConfig,
   extractAgentRuntimeConfig,
   pathExists,
-} from './utils'
+} from './core'
 
 /**
  * 创建 AgentRegistry 所需的依赖。

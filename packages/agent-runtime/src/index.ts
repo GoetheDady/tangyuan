@@ -4,7 +4,7 @@ import {
   createTangyuanRuntimeForTesting,
   type TangyuanRuntime,
 } from './tangyuan-runtime'
-import { DirectoryLayout } from './directory-layout'
+import { DirectoryLayout } from './core'
 import { LastActiveSessionStore } from './last-active-session-store'
 import { PiSdkDriver } from './pi-sdk-driver'
 import type {
@@ -107,5 +107,5 @@ export function createTangyuanRuntime(
 
 export * from './pi-sdk-driver-contracts'
 export * from './gateway'
-export * from './utils'
+export * from './core'
 export * from './run-turn-assembly'

@@ -14,7 +14,7 @@ import {
   createProtectedTools,
   NATIVE_DANGEROUS_TOOL_NAMES,
   PROTECTED_TOOL_NAMES,
-} from './protected-tools'
+} from './core'
 
 describe('生产接线级回归 — 原生危险工具被显式排除', () => {
   function createMockGateway() {

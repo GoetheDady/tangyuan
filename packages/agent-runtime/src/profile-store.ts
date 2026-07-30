@@ -15,8 +15,7 @@ import {
   type SoulContent,
   type UserProfileContent,
 } from '@tangyuan/contracts'
-import type { DirectoryLayout } from './directory-layout'
-import type { ConfigStore } from './config-store'
+import type { ConfigStore, DirectoryLayout } from './core'
 import {
   extractAgentRuntimeConfig,
   fileHasContent,
@@ -24,7 +23,7 @@ import {
   pathExists,
   readDirectoryFileSet,
   safeReadFile,
-} from './utils'
+} from './core'
 
 /** 追加到系统提示词的 profile 上下文标题。 */
 const PROFILE_CONTEXT_HEADER = '汤圆长期上下文'

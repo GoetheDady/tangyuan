@@ -427,8 +427,8 @@ export type {
 /**
  * 创建 AgentRuntimeError 时使用的输入与错误类（定义见 errors.ts）。
  */
-export type { AgentRuntimeErrorInput } from './errors'
-export { AgentRuntimeError } from './errors'
+export type { AgentRuntimeErrorInput } from './core'
+export { AgentRuntimeError } from './core'
 
 /**
  * 定义 Agent 会话 Driver 需要实现的能力。

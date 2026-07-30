@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assembleRunTurn } from './run-turn-assembly'
+import { assembleRunTurn } from '../run-turn-assembly'
 import {
   createToolStepSummary,
   buildTranscriptSnapshotFromSdkEntries,
