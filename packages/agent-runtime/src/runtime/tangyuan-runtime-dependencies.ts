@@ -1,5 +1,5 @@
-import type { AgentSessionDriver, RuntimeResourceDriver } from './driver'
-import type { LastActiveSessionStore } from './session/last-active-session-store'
+import type { AgentSessionDriver, RuntimeResourceDriver } from '../driver'
+import type { LastActiveSessionStore } from '../session/last-active-session-store'
 
 /**
  * 创建 TangyuanRuntime 时需要注入的内部 Driver。

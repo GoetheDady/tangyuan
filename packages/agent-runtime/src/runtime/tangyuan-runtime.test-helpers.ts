@@ -4,7 +4,7 @@ import type {
   AgentEventListener,
   AgentSessionDriver,
   RuntimeResourceDriver,
-} from './index'
+} from '../index'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
@@ -13,7 +13,7 @@ import {
 } from '@tangyuan/contracts'
 import { vi } from 'vitest'
 
-export { createDeferred } from './test-deferred'
+export { createDeferred } from '../test-deferred'
 
 /**
  * 创建用于 Runtime 单元测试的运行时快照。

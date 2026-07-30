@@ -1,4 +1,4 @@
-import { type AgentEvent } from './index'
+import { type AgentEvent } from '../index'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   agentEventSchema,

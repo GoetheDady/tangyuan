@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { RealPiSdkGateway } from '../gateway'
+import { RealPiSdkGateway } from '../runtime/gateway'
 import { ConfigStore, DirectoryLayout } from '../core'
 import { AgentRegistry } from '../agent'
 import { SkillStore } from '../skill'

@@ -5,19 +5,19 @@ import type {
   AgentSessionDriver,
   DriverEvent,
   ToolApprovalGateway,
-} from './driver'
-import { TranscriptEmitter } from './session/transcript-emitter'
+} from '../driver'
+import { TranscriptEmitter } from '../session/transcript-emitter'
 import {
   BashApprovalRegistry,
   ClarificationRegistry,
   createToolApprovalGateway,
-} from './approval'
-import { SessionCache } from './session/session-cache'
+} from '../approval'
+import { SessionCache } from '../session/session-cache'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
-import { AgentManager, IdentityService } from './agent'
-import { SkillService } from './skill'
-import { SessionModelService } from './session/session-model-service'
-import { SessionArchiveCoordinator } from './session/session-archive-coordinator'
+import { AgentManager, IdentityService } from '../agent'
+import { SkillService } from '../skill'
+import { SessionModelService } from '../session/session-model-service'
+import { SessionArchiveCoordinator } from '../session/session-archive-coordinator'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
@@ -59,7 +59,7 @@ function isInternalDriverEvent(event: AgentEvent | DriverEvent): boolean {
 }
 
 import type { TangyuanRuntimeDependencies } from './tangyuan-runtime-dependencies'
-import type { LastActiveSessionStore } from './session/last-active-session-store'
+import type { LastActiveSessionStore } from '../session/last-active-session-store'
 
 export abstract class TangyuanRuntimeOrchestrator {
   protected static readonly MAX_CONCURRENT_RUNS = 4
@@ -424,7 +424,7 @@ export abstract class TangyuanRuntimeOrchestrator {
    */
   protected applyAgentEvent(event: AgentEvent): void {
     // Cast to DriverEvent for internal handlers that process old event types
-    const driverEvent = event as import('./index').DriverEvent
+    const driverEvent = event as DriverEvent
 
     if (driverEvent.type === 'session-created') {
       this.upsertSession(driverEvent.session)

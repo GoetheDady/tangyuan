@@ -4,7 +4,7 @@ import type {
   UpdateAgentConfigRequest,
 } from '@tangyuan/contracts'
 import type { AgentSessionDriver } from '../driver'
-import type { RuntimeSnapshotStore } from '../runtime-snapshot-store'
+import type { RuntimeSnapshotStore } from '../runtime/runtime-snapshot-store'
 
 /**
  * 创建 AgentManager 所需的依赖。

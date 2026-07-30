@@ -42,7 +42,7 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
 import type {
   PiSdkCreateSessionRequest,
   PiSdkOpenSessionRequest,
-} from './driver'
+} from '../driver'
 import { RealPiSdkGateway } from './gateway'
 
 describe('RealPiSdkGateway profile tools', () => {

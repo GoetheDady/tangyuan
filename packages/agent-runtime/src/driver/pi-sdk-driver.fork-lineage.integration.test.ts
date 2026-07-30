@@ -2,7 +2,7 @@ import { rm, unlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { afterEach, describe, expect, it } from 'vitest'
-import { RealPiSdkGateway } from '../gateway'
+import { RealPiSdkGateway } from '../runtime/gateway'
 import type {
   PiSdkGateway,
   PiSdkSessionHandle,
