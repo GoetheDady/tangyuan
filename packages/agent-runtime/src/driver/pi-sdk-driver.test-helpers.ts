@@ -19,7 +19,7 @@ import {
   type PiSdkVerificationRequest,
 } from './index'
 
-export { createDeferred } from '../test-deferred'
+export { createDeferred } from '../test-utils'
 
 const tempDirs: string[] = []
 

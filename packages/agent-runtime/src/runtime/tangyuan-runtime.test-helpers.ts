@@ -13,7 +13,7 @@ import {
 } from '@tangyuan/contracts'
 import { vi } from 'vitest'
 
-export { createDeferred } from '../test-deferred'
+export { createDeferred } from '../test-utils'
 
 /**
  * 创建用于 Runtime 单元测试的运行时快照。

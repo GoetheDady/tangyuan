@@ -3,9 +3,9 @@ import { join } from 'node:path'
 import {
   createTangyuanRuntimeForTesting,
   type TangyuanRuntime,
-} from './runtime/tangyuan-runtime'
+} from './runtime'
 import { DirectoryLayout } from './core'
-import { LastActiveSessionStore } from './session/last-active-session-store'
+import { LastActiveSessionStore } from './session'
 import { PiSdkDriver } from './driver'
 import type { PiSdkDriverOptions, ToolApprovalGateway } from './driver'
 
@@ -43,8 +43,8 @@ export {
   type UserMessageEntry,
   type AgentReplyEntry,
 } from '@tangyuan/contracts'
-export { createTangyuanRuntimeForTesting } from './runtime/tangyuan-runtime'
-export type { TangyuanRuntime } from './runtime/tangyuan-runtime'
+export { createTangyuanRuntimeForTesting } from './runtime'
+export type { TangyuanRuntime } from './runtime'
 export { PiSdkDriver } from './driver'
 
 /**
@@ -102,11 +102,11 @@ export function createTangyuanRuntime(
   return runtime
 }
 
-export * from './driver'
-export * from './runtime/gateway'
 export * from './agent'
 export * from './approval'
 export * from './core'
+export * from './driver'
 export * from './profile'
+export * from './runtime'
+export * from './session'
 export * from './skill'
-export * from './session/run-turn-assembly'
