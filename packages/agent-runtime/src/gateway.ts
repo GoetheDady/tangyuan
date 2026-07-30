@@ -24,10 +24,7 @@ import {
 
 /** 汤圆写入分叉会话 Pi JSONL 的来源记录 custom entry 类型。 */
 const TANGYUAN_FORK_SOURCE_ENTRY_TYPE = 'tangyuan:fork-source'
-import {
-  createUpdateSoulTool,
-  createUpdateUserProfileTool,
-} from './profile-tools'
+import { createUpdateSoulTool, createUpdateUserProfileTool } from './profile'
 import {
   createProtectedTools,
   NATIVE_DANGEROUS_TOOL_NAMES,

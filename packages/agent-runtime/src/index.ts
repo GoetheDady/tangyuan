@@ -108,4 +108,5 @@ export function createTangyuanRuntime(
 export * from './pi-sdk-driver-contracts'
 export * from './gateway'
 export * from './core'
+export * from './profile'
 export * from './session/run-turn-assembly'
