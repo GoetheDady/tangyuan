@@ -3,8 +3,8 @@ import type {
   SoulContent,
   UserProfileContent,
 } from '@tangyuan/contracts'
-import type { AgentSessionDriver } from './pi-sdk-driver-contracts'
-import type { RuntimeSnapshotStore } from './runtime-snapshot-store'
+import type { AgentSessionDriver } from '../pi-sdk-driver-contracts'
+import type { RuntimeSnapshotStore } from '../runtime-snapshot-store'
 
 /**
  * 创建 IdentityService 所需的依赖。

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentSessionDriver } from './index'
-import type { RuntimeSnapshotStore } from './runtime-snapshot-store'
+import type { AgentSessionDriver } from '../index'
+import type { RuntimeSnapshotStore } from '../runtime-snapshot-store'
 import { AgentManager } from './agent-manager'
 
 function createSnapshotStore(): RuntimeSnapshotStore & {

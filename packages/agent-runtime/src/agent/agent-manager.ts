@@ -3,8 +3,8 @@ import type {
   UnclaimedDirectory,
   UpdateAgentConfigRequest,
 } from '@tangyuan/contracts'
-import type { AgentSessionDriver } from './pi-sdk-driver-contracts'
-import type { RuntimeSnapshotStore } from './runtime-snapshot-store'
+import type { AgentSessionDriver } from '../pi-sdk-driver-contracts'
+import type { RuntimeSnapshotStore } from '../runtime-snapshot-store'
 
 /**
  * 创建 AgentManager 所需的依赖。

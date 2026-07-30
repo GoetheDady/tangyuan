@@ -3,9 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AgentEvent, ConfigEncryptionAdapter } from '@tangyuan/contracts'
-import { ConfigStore, DirectoryLayout } from './core'
+import { ConfigStore, DirectoryLayout } from '../core'
 import { AgentRegistry } from './agent-registry'
-import { AgentRuntimeError } from './core'
+import { AgentRuntimeError } from '../core'
 
 const fakeAdapter: ConfigEncryptionAdapter = {
   encrypt: async (p) => `enc:${Buffer.from(p, 'utf8').toString('base64')}`,
