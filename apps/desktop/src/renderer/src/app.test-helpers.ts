@@ -19,6 +19,8 @@ export function installDefaultAppApi(): void {
         maskedValue: 'sk-t...7890',
       }),
     ),
+    saveProvider: vi.fn().mockResolvedValue(runtime),
+    deleteProvider: vi.fn().mockResolvedValue(runtime),
     cancelRuntimeConfigurationVerification: vi.fn().mockResolvedValue(runtime),
     listSessions: vi.fn().mockResolvedValue([
       createDefaultSessionSummary({

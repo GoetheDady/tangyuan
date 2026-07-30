@@ -397,6 +397,8 @@ describe('DESKTOP_IPC_CHANNELS', () => {
         'tangyuan:runtime:cancel-configuration-verification',
       runtimeRestoreFromBackup: 'tangyuan:runtime:restore-from-backup',
       runtimeResetConfiguration: 'tangyuan:runtime:reset-configuration',
+      runtimeSaveProvider: 'tangyuan:runtime:save-provider',
+      runtimeDeleteProvider: 'tangyuan:runtime:delete-provider',
       sessionsList: 'tangyuan:sessions:list',
       sessionsCreate: 'tangyuan:sessions:create',
       sessionsSendMessage: 'tangyuan:sessions:send-message',

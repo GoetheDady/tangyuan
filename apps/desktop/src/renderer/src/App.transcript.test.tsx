@@ -34,6 +34,8 @@ describe('App', () => {
         getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
         refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
+        saveProvider: vi.fn().mockResolvedValue(readyRuntime),
+        deleteProvider: vi.fn().mockResolvedValue(readyRuntime),
         cancelRuntimeConfigurationVerification: vi
           .fn()
           .mockResolvedValue(readyRuntime),
@@ -211,6 +213,8 @@ describe('App', () => {
         getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
         refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
+        saveProvider: vi.fn().mockResolvedValue(readyRuntime),
+        deleteProvider: vi.fn().mockResolvedValue(readyRuntime),
         cancelRuntimeConfigurationVerification: vi
           .fn()
           .mockResolvedValue(readyRuntime),
@@ -327,6 +331,8 @@ describe('App', () => {
         getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
         refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
+        saveProvider: vi.fn().mockResolvedValue(readyRuntime),
+        deleteProvider: vi.fn().mockResolvedValue(readyRuntime),
         cancelRuntimeConfigurationVerification: vi
           .fn()
           .mockResolvedValue(readyRuntime),
@@ -465,6 +471,8 @@ describe('App', () => {
         getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
         refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
+        saveProvider: vi.fn().mockResolvedValue(readyRuntime),
+        deleteProvider: vi.fn().mockResolvedValue(readyRuntime),
         cancelRuntimeConfigurationVerification: vi
           .fn()
           .mockResolvedValue(readyRuntime),
@@ -696,6 +704,8 @@ describe('App', () => {
         getRuntimeSnapshot: vi.fn().mockResolvedValue(readyRuntime),
         refreshRuntime: vi.fn().mockResolvedValue(readyRuntime),
         saveRuntimeConfiguration: vi.fn().mockResolvedValue(readyRuntime),
+        saveProvider: vi.fn().mockResolvedValue(readyRuntime),
+        deleteProvider: vi.fn().mockResolvedValue(readyRuntime),
         cancelRuntimeConfigurationVerification: vi
           .fn()
           .mockResolvedValue(readyRuntime),

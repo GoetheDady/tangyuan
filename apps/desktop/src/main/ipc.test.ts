@@ -38,6 +38,8 @@ describe('registerDesktopAppIpc', () => {
       getRuntimeSnapshot: vi.fn().mockResolvedValue(snapshot),
       refreshRuntime: vi.fn().mockResolvedValue(snapshot),
       saveRuntimeConfiguration: vi.fn().mockResolvedValue(snapshot),
+      saveProvider: vi.fn().mockResolvedValue(snapshot),
+      deleteProvider: vi.fn().mockResolvedValue(snapshot),
       cancelRuntimeConfigurationVerification: vi
         .fn()
         .mockResolvedValue(snapshot),
@@ -217,6 +219,24 @@ describe('registerDesktopAppIpc', () => {
         verificationId: 'verify-1',
       }),
     ).resolves.toEqual(snapshot)
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeSaveProvider)(null, {
+        providerId: 'anthropic',
+        apiKey: 'sk-test-secret-7890',
+      }),
+    ).resolves.toEqual(snapshot)
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.runtimeDeleteProvider)(null, {
+        providerId: 'anthropic',
+      }),
+    ).resolves.toEqual(snapshot)
+    expect(runtime.saveProvider).toHaveBeenCalledWith({
+      providerId: 'anthropic',
+      apiKey: 'sk-test-secret-7890',
+    })
+    expect(runtime.deleteProvider).toHaveBeenCalledWith({
+      providerId: 'anthropic',
+    })
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsList)(null, {
         agentId: 'agent-2',
@@ -426,6 +446,8 @@ describe('registerDesktopAppIpc', () => {
       getRuntimeSnapshot: vi.fn().mockResolvedValue(snapshot),
       refreshRuntime: vi.fn().mockResolvedValue(snapshot),
       saveRuntimeConfiguration: vi.fn().mockResolvedValue(snapshot),
+      saveProvider: vi.fn().mockResolvedValue(snapshot),
+      deleteProvider: vi.fn().mockResolvedValue(snapshot),
       cancelRuntimeConfigurationVerification: vi
         .fn()
         .mockResolvedValue(snapshot),

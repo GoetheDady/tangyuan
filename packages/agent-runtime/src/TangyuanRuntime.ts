@@ -1046,6 +1046,8 @@ export type TangyuanRuntime = Pick<
   | 'getRuntimeSnapshot'
   | 'refreshRuntime'
   | 'saveRuntimeConfiguration'
+  | 'saveProvider'
+  | 'deleteProvider'
   | 'cancelRuntimeConfigurationVerification'
   | 'restoreFromBackup'
   | 'resetConfiguration'
