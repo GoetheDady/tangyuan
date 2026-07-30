@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentEvent, SkillOperationParams } from '@tangyuan/contracts'
-import type { AgentSessionDriver } from './index'
+import type { AgentSessionDriver } from '../index'
 import { SkillService } from './skill-service'
 
 const DEFAULT_AGENT = 'tangyuan'

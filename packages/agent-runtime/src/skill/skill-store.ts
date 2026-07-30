@@ -20,7 +20,7 @@ import {
   type SkillOperationParams,
   type SkillSummary,
 } from '@tangyuan/contracts'
-import type { DirectoryLayout } from './core'
+import type { DirectoryLayout } from '../core'
 
 /**
  * Pi SDK ResourceLoader 解析出的 Skill 结构（mapSkillsToSummaries 输入）。

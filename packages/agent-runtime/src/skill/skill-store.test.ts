@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SkillOperationParams } from '@tangyuan/contracts'
-import { DirectoryLayout } from './core'
+import { DirectoryLayout } from '../core'
 import { SkillStore } from './skill-store'
 
 // mock 重型 Pi SDK ResourceLoader：安装/删除后 install 会调 list*，
