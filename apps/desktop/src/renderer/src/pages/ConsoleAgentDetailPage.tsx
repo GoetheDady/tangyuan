@@ -118,10 +118,11 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
       })
   }, [agentId])
 
-  // 列出所有已知 Provider（Console 中允许从所有已知 Provider 中选择）
   const configuredProviders = useMemo<ProviderDescriptor[]>(() => {
     if (!runtime) return []
-    return runtime.providers
+    return runtime.providers.filter(
+      (p) => runtime.configuredProviders[p.providerId]?.configured === true,
+    )
   }, [runtime])
 
   // 根据选中的 Provider 过滤可用模型

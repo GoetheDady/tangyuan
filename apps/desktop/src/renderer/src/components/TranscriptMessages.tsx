@@ -348,20 +348,21 @@ export function TranscriptMessages({
     }
   }, [renderItems.length, virtualizer])
 
-  // 流式模式下最后一条消息内容增长时，若用户在底部则保持跟随
-  const lastItem =
-    renderItems.length > 0 ? renderItems[renderItems.length - 1] : null
-  const lastMessageContent =
-    lastItem?.type === 'user-message'
-      ? lastItem.content.length
-      : lastItem?.type === 'assistant-message'
-        ? lastItem.entry.content.length
-        : 0
+  // 流式输出期间以 rAF 直接跟随容器底部：读取 DOM 实时 scrollHeight，
+  // 避免 scrollToIndex 依赖 virtualizer 过期测量值导致的逐帧抖动。
   useEffect(() => {
-    if (isStreaming && isAtBottomRef.current && renderItems.length > 0) {
-      virtualizer.scrollToIndex(renderItems.length - 1, { align: 'end' })
+    if (!isStreaming) return
+    let rafId: number
+    const tick = (): void => {
+      const el = scrollRef.current
+      if (el && isAtBottomRef.current) {
+        el.scrollTop = el.scrollHeight - el.clientHeight
+      }
+      rafId = requestAnimationFrame(tick)
     }
-  }, [lastMessageContent]) // eslint-disable-line react-hooks/exhaustive-deps
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [isStreaming])
 
   // 展开/收起执行历史时保持阅读位置
   // 当总高度变化时（ResizeObserver 触发测量更新），检查是否需要调整滚动位置
@@ -450,7 +451,7 @@ export function TranscriptMessages({
   return (
     <div
       ref={scrollRef}
-      className="h-full w-full overflow-x-hidden overflow-y-auto"
+      className="h-full w-full overflow-x-hidden overflow-y-auto [overflow-anchor:none]"
       data-testid="message-scroll-area"
     >
       <div className="mx-auto w-full max-w-[720px] px-4">

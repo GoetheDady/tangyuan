@@ -425,6 +425,34 @@ export function buildInternalConfigForSave(
 }
 
 /**
+ * 把单个 Provider 凭据合并进内部配置，不更新 Agent 默认模型，供保存到磁盘。
+ */
+export function buildInternalConfigForProviderSave(
+  existing: InternalRuntimeConfig | null,
+  providerId: string,
+  apiKey: string,
+  now: string,
+): InternalRuntimeConfig {
+  const config = existing ?? createDefaultInternalConfig()
+  config.providers[providerId] = { apiKey, updatedAt: now }
+  config.schemaVersion = 2
+  return config
+}
+
+/**
+ * 从内部配置移除指定 Provider 凭据，供删除操作持久化到磁盘。
+ */
+export function buildInternalConfigForProviderDelete(
+  existing: InternalRuntimeConfig | null,
+  providerId: string,
+): InternalRuntimeConfig {
+  const config = existing ?? createDefaultInternalConfig()
+  delete config.providers[providerId]
+  config.schemaVersion = 2
+  return config
+}
+
+/**
  * 从内部配置提取指定 Agent 的运行时配置。
  *
  * @param config - 内部配置。

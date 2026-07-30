@@ -715,6 +715,21 @@ export const runtimeConfigurationSchema = z.strictObject({
 })
 
 /**
+ * 校验保存单个 Provider 配置请求。
+ */
+export const providerConfigurationSchema = z.strictObject({
+  providerId: nonEmptyIdentifierSchema,
+  apiKey: z.string().refine((apiKey) => apiKey.trim().length > 0),
+})
+
+/**
+ * 校验删除单个 Provider 配置请求。
+ */
+export const deleteProviderRequestSchema = z.strictObject({
+  providerId: nonEmptyIdentifierSchema,
+})
+
+/**
  * 校验取消配置验证请求。
  */
 export const cancelConfigurationVerificationRequestSchema = z.strictObject({

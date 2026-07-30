@@ -712,6 +712,21 @@ export interface RuntimeConfiguration {
 }
 
 /**
+ * 描述保存单个 Provider 配置时传入的 Provider 标识和凭据。
+ */
+export interface ProviderConfiguration {
+  providerId: string
+  apiKey: string
+}
+
+/**
+ * 描述删除单个 Provider 配置时传入的请求。
+ */
+export interface DeleteProviderRequest {
+  providerId: string
+}
+
+/**
  * 描述取消配置验证时传给 Main 进程的请求。
  */
 export interface CancelConfigurationVerificationRequest {

@@ -183,7 +183,7 @@ describe('registerDesktopAppIpc', () => {
       openExternalLink,
     )
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(47)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(49)
     expect(broadcastAgentEvent).toHaveBeenCalledWith(
       createAttemptStartedEvent(),
     )

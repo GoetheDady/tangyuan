@@ -14,6 +14,7 @@ import type {
   CancelConfigurationVerificationRequest,
   CancelRunRequest,
   ConfigEncryptionAdapter,
+  DeleteProviderRequest,
   CreateSessionRequest,
   GetSessionMessagesRequest,
   ForkSource,
@@ -21,6 +22,7 @@ import type {
   ListSessionsRequest,
   ModelDescriptor,
   ProfileUpdateResult,
+  ProviderConfiguration,
   ProviderDescriptor,
   RuntimeConfiguration,
   RuntimeSnapshot,
@@ -819,6 +821,24 @@ export interface RuntimeResourceDriver {
    * @throws 当文件删除失败时，Promise 会 reject。
    */
   resetConfiguration?(): Promise<void>
+
+  /**
+   * 验证并保存单个 Provider 凭据，不改变 Agent 的默认模型。
+   *
+   * @param config - Provider 标识和 API Key。
+   * @returns 保存后的 RuntimeSnapshot。
+   * @throws 当 SDK 验证失败或配置无法保存时，Promise 会 reject。
+   */
+  saveProvider?(config: ProviderConfiguration): Promise<RuntimeSnapshot>
+
+  /**
+   * 删除单个 Provider 的凭据配置。
+   *
+   * @param request - 要删除的 Provider 标识。
+   * @returns 删除后的 RuntimeSnapshot。
+   * @throws 当配置无法读取或写入时，Promise 会 reject。
+   */
+  deleteProvider?(request: DeleteProviderRequest): Promise<RuntimeSnapshot>
 }
 
 /**

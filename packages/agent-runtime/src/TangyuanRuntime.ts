@@ -12,11 +12,13 @@ import {
   type CancelConfigurationVerificationRequest,
   type CancelRunRequest,
   type CreateSessionRequest,
+  type DeleteProviderRequest,
   type ForkSessionRequest,
   type GetSessionMessagesRequest,
   type GetSessionModelInfoRequest,
   type LastActiveSession,
   type ProfileUpdateResult,
+  type ProviderConfiguration,
   type RecoverSessionRequest,
   type RetryRunRequest,
   type RuntimeConfiguration,
@@ -72,6 +74,16 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
     configuration: RuntimeConfiguration,
   ): Promise<RuntimeSnapshot> {
     return this.snapshotStore.saveConfiguration(configuration)
+  }
+
+  async saveProvider(config: ProviderConfiguration): Promise<RuntimeSnapshot> {
+    return this.snapshotStore.saveProvider(config)
+  }
+
+  async deleteProvider(
+    request: DeleteProviderRequest,
+  ): Promise<RuntimeSnapshot> {
+    return this.snapshotStore.deleteProvider(request)
   }
 
   /**

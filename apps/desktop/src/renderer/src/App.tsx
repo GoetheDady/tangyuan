@@ -9,7 +9,7 @@ import type {
   TranscriptSnapshot,
 } from '@tangyuan/contracts'
 import { applyTranscriptDelta } from '@tangyuan/contracts'
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import {
   HashRouter,
   Navigate,
@@ -170,6 +170,11 @@ function DesktopRoutes(): React.JSX.Element {
     QuestionClarificationRequest[]
   >([])
   const alwaysAllowedCommandsRef = useRef<Map<string, Set<string>>>(new Map())
+  // 把每帧内到达的多个 transcript-delta 合并为一次 setTranscript 调用，避免每个 token 都触发 re-render
+  const pendingDeltaEventsRef = useRef<
+    Extract<AgentEvent, { type: 'transcript-delta' }>[]
+  >([])
+  const transcriptFlushRafRef = useRef<number | null>(null)
 
   useEffect(() => {
     selectedSessionIdRef.current = selectedSessionId
@@ -264,7 +269,7 @@ function DesktopRoutes(): React.JSX.Element {
   }, [navigate])
 
   useEffect(() => {
-    return window.api.subscribeToAgentEvents((event) => {
+    const unsubscribe = window.api.subscribeToAgentEvents((event) => {
       if (event.type === 'agent-created') {
         setAgents((currentAgents) => {
           const exists = currentAgents.some(
@@ -387,10 +392,29 @@ function DesktopRoutes(): React.JSX.Element {
         event.type === 'transcript-delta' &&
         event.sessionId === selectedSessionId
       ) {
-        setTranscript((current) => {
-          if (!current || current.sessionId !== event.sessionId) return current
-          return applyTranscriptDelta(current, event.delta)
-        })
+        pendingDeltaEventsRef.current.push(event)
+        if (transcriptFlushRafRef.current === null) {
+          transcriptFlushRafRef.current = requestAnimationFrame(() => {
+            transcriptFlushRafRef.current = null
+            const events = pendingDeltaEventsRef.current.splice(0)
+            if (events.length === 0) return
+            const firstEvent = events[0]!
+            setTranscript((current) => {
+              if (current && current.sessionId !== firstEvent.sessionId)
+                return current
+              let snapshot: TranscriptSnapshot = current ?? {
+                sessionId: firstEvent.sessionId,
+                agentId: firstEvent.agentId,
+                entries: [],
+                updatedAt: new Date().toISOString(),
+              }
+              for (const ev of events) {
+                snapshot = applyTranscriptDelta(snapshot, ev.delta)
+              }
+              return snapshot
+            })
+          })
+        }
       }
 
       if (
@@ -401,7 +425,39 @@ function DesktopRoutes(): React.JSX.Element {
         setIsSendingMessage(false)
       }
     })
+    return () => {
+      unsubscribe()
+      if (transcriptFlushRafRef.current !== null) {
+        cancelAnimationFrame(transcriptFlushRafRef.current)
+        transcriptFlushRafRef.current = null
+      }
+      pendingDeltaEventsRef.current = []
+    }
   }, [selectedSessionId])
+
+  const handleConfigurationSaved = useCallback(
+    async (nextRuntime: RuntimeSnapshot): Promise<void> => {
+      const nextAgents = nextRuntime.agents ?? [
+        {
+          agentId: nextRuntime.activeAgent.agentId,
+          displayName: nextRuntime.activeAgent.displayName,
+          status: 'active' as const,
+          defaultProviderId: nextRuntime.settings.selectedProviderId,
+          defaultModelId: nextRuntime.settings.selectedModelId,
+          homePath: nextRuntime.activeAgent.homePath,
+          archivedAt: null,
+        },
+      ]
+      setRuntime(nextRuntime)
+      setAgents(nextAgents)
+      const { sessions, activeSession, transcript } =
+        await loadSessionsForReadyRuntime(window.api, nextRuntime)
+      setSessions(sessions)
+      setSelectedSessionId(activeSession.sessionId)
+      setTranscript(transcript)
+    },
+    [],
+  )
 
   return (
     <Routes>
@@ -423,7 +479,12 @@ function DesktopRoutes(): React.JSX.Element {
         path="/chat/:agentId?/:sessionId?"
         element={<ChatGuard context={context} />}
       />
-      <Route path="/setup" element={<ConsoleProviderPage />} />
+      <Route
+        path="/setup"
+        element={
+          <ConsoleProviderPage onConfigurationSaved={handleConfigurationSaved} />
+        }
+      />
       <Route path="/settings" element={<SettingsLayout />}>
         <Route index element={<Navigate to="providers" replace />} />
         <Route path="providers" element={<SettingsProviderPage />} />
@@ -578,6 +639,73 @@ function getAgentEventRunState(
 }
 
 /**
+ * 在运行时就绪后加载会话数据：优先恢复上次激活的会话，无则新建。
+ *
+ * @param api - Preload 暴露给 Renderer 的桌面 API。
+ * @param runtime - 状态为 ready 的运行时快照。
+ * @returns 会话列表、激活会话和 transcript 快照。
+ * @throws 当任一 Preload API 请求失败时，Promise 会 reject。
+ */
+async function loadSessionsForReadyRuntime(
+  api: DesktopPreloadApi,
+  runtime: RuntimeSnapshot,
+): Promise<{
+  sessions: AgentSessionSummary[]
+  activeSession: AgentSessionSummary
+  transcript: TranscriptSnapshot | null
+}> {
+  const lastActiveSession = await api.getLastActiveSession()
+  const activeAgentId =
+    lastActiveSession?.agentId ?? runtime.activeAgent.agentId
+  let nextSessions = await api.listSessions({ agentId: activeAgentId })
+  let activeSession: AgentSessionSummary | null = null
+  let transcript: TranscriptSnapshot | null = null
+
+  if (lastActiveSession) {
+    activeSession =
+      nextSessions.find(
+        (session) => session.sessionId === lastActiveSession.sessionId,
+      ) ??
+      nextSessions[0] ??
+      null
+    transcript = activeSession
+      ? await api.getTranscript({
+          agentId: activeSession.agentId,
+          sessionId: activeSession.sessionId,
+        })
+      : null
+  }
+
+  if (!activeSession) {
+    activeSession = await api.createSession({
+      agentId: activeAgentId,
+      title: runtime.activeAgent.profile.bootstrapRequired
+        ? 'Bootstrap 初始化'
+        : '新会话',
+    })
+    nextSessions = [
+      activeSession,
+      ...nextSessions.filter(
+        (session) => session.sessionId !== activeSession!.sessionId,
+      ),
+    ]
+    transcript = await api.getTranscript({
+      agentId: activeSession.agentId,
+      sessionId: activeSession.sessionId,
+    })
+  }
+
+  if (!lastActiveSession) {
+    await api.setLastActiveSession({
+      agentId: activeSession.agentId,
+      sessionId: activeSession.sessionId,
+    })
+  }
+
+  return { sessions: nextSessions, activeSession, transcript }
+}
+
+/**
  * 并行读取 Renderer 首屏需要的运行时和会话数据。
  *
  * @param api - Preload 暴露给 Renderer 的桌面 API。
@@ -614,55 +742,9 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
     }
   }
 
-  const lastActiveSession = await api.getLastActiveSession()
-  const activeAgentId =
-    lastActiveSession?.agentId ?? runtime.activeAgent.agentId
-  let nextSessions = await api.listSessions({ agentId: activeAgentId })
-  let activeSession: AgentSessionSummary | null = null
-  let transcript: TranscriptSnapshot | null = null
-
-  if (lastActiveSession) {
-    activeSession =
-      nextSessions.find(
-        (session) => session.sessionId === lastActiveSession.sessionId,
-      ) ??
-      nextSessions[0] ??
-      null
-    transcript = activeSession
-      ? await api.getTranscript({
-          agentId: activeSession.agentId,
-          sessionId: activeSession.sessionId,
-        })
-      : null
-  }
-
-  if (!activeSession) {
-    activeSession = await api.createSession({
-      agentId: activeAgentId,
-      title: runtime.activeAgent.profile.bootstrapRequired
-        ? 'Bootstrap 初始化'
-        : '新会话',
-    })
-    nextSessions = [
-      activeSession,
-      ...nextSessions.filter(
-        (session) => session.sessionId !== activeSession?.sessionId,
-      ),
-    ]
-    transcript = await api.getTranscript({
-      agentId: activeSession.agentId,
-      sessionId: activeSession.sessionId,
-    })
-  }
-
-  if (!lastActiveSession) {
-    await api.setLastActiveSession({
-      agentId: activeSession.agentId,
-      sessionId: activeSession.sessionId,
-    })
-  }
-
-  return { runtime, agents, sessions: nextSessions, activeSession, transcript }
+  const { sessions, activeSession, transcript } =
+    await loadSessionsForReadyRuntime(api, runtime)
+  return { runtime, agents, sessions, activeSession, transcript }
 }
 
 export default App

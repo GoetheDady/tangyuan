@@ -11,6 +11,8 @@ import {
   sanitizeErrorMessage,
   normalizeRuntimeConfiguration,
   buildInternalConfigForSave,
+  buildInternalConfigForProviderSave,
+  buildInternalConfigForProviderDelete,
   createMessagePreview,
 } from './utils'
 import {
@@ -20,9 +22,11 @@ import {
   type CancelConfigurationVerificationRequest,
   type CancelRunRequest,
   type CreateSessionRequest,
+  type DeleteProviderRequest,
   type ForkSessionRequest,
   type GetSessionMessagesRequest,
   type ListSessionsRequest,
+  type ProviderConfiguration,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
   type SendMessageRequest,
@@ -131,6 +135,79 @@ export class PiSdkDriver
     this.configurationVerificationController?.abort()
     this.configurationVerificationController = null
 
+    return this.readRuntimeSnapshot()
+  }
+
+  async saveProvider(config: ProviderConfiguration): Promise<RuntimeSnapshot> {
+    const providerId = config.providerId.trim()
+    const apiKey = config.apiKey.trim()
+
+    if (!providerId || !apiKey) {
+      throw new AgentRuntimeError({
+        code: 'configuration-missing',
+        message: '请填写 Provider（模型服务）和 API Key（接口密钥）。',
+        recoverable: true,
+      })
+    }
+
+    const resources = await this.gateway.listProvidersAndModels()
+    const firstModel = resources.models.find((m) => m.providerId === providerId)
+    if (!firstModel) {
+      throw new AgentRuntimeError({
+        code: 'configuration-missing',
+        message: `未找到 Provider "${providerId}" 的可用模型。`,
+        recoverable: true,
+      })
+    }
+
+    const controller = new AbortController()
+    this.configurationVerificationController = controller
+
+    try {
+      await this.gateway.verifyConfiguration({
+        providerId,
+        modelId: firstModel.modelId,
+        apiKey,
+        prompt: CONFIGURATION_VERIFICATION_PROMPT,
+        signal: controller.signal,
+      })
+    } catch (error) {
+      if (isAbortError(error) || controller.signal.aborted) {
+        throw new AgentRuntimeError({
+          code: 'run-cancelled',
+          message: '已取消配置验证。',
+          recoverable: true,
+        })
+      }
+      throw new AgentRuntimeError({
+        code: 'provider-verification-failed',
+        message: `配置验证失败：${sanitizeErrorMessage(error, apiKey)}`,
+        recoverable: true,
+      })
+    } finally {
+      if (this.configurationVerificationController === controller) {
+        this.configurationVerificationController = null
+      }
+    }
+
+    const readResult = await this.configStore.read()
+    const internalConfig = buildInternalConfigForProviderSave(
+      readResult.config,
+      providerId,
+      apiKey,
+      this.now(),
+    )
+    await this.configStore.write(internalConfig)
+    return this.readRuntimeSnapshot()
+  }
+
+  async deleteProvider(request: DeleteProviderRequest): Promise<RuntimeSnapshot> {
+    const readResult = await this.configStore.read()
+    const internalConfig = buildInternalConfigForProviderDelete(
+      readResult.config,
+      request.providerId,
+    )
+    await this.configStore.write(internalConfig)
     return this.readRuntimeSnapshot()
   }
 

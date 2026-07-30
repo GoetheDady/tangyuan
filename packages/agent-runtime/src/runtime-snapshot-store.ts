@@ -1,5 +1,7 @@
 import type {
   CancelConfigurationVerificationRequest,
+  DeleteProviderRequest,
+  ProviderConfiguration,
   RuntimeConfiguration,
   RuntimeSnapshot,
 } from '@tangyuan/contracts'
@@ -122,5 +124,25 @@ export class RuntimeSnapshotStore {
 
     await this.runtimeDriver.resetConfiguration()
     return this.reload()
+  }
+
+  async saveProvider(config: ProviderConfiguration): Promise<RuntimeSnapshot> {
+    if (!this.runtimeDriver.saveProvider) {
+      throw new Error('当前运行时不支持保存 Provider。')
+    }
+
+    this.snapshot = await this.runtimeDriver.saveProvider(config)
+    return this.snapshot
+  }
+
+  async deleteProvider(
+    request: DeleteProviderRequest,
+  ): Promise<RuntimeSnapshot> {
+    if (!this.runtimeDriver.deleteProvider) {
+      throw new Error('当前运行时不支持删除 Provider。')
+    }
+
+    this.snapshot = await this.runtimeDriver.deleteProvider(request)
+    return this.snapshot
   }
 }

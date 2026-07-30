@@ -28,6 +28,8 @@ import {
   type RetryRunRequest,
   type RuntimeConfiguration,
   type CancelConfigurationVerificationRequest,
+  type ProviderConfiguration,
+  type DeleteProviderRequest,
   type SendMessageRequest,
   type SetSessionModelRequest,
   type SetSessionThinkingLevelRequest,
@@ -86,6 +88,12 @@ export function createTangyuanPreloadApi(
         DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification,
         request,
       )
+    },
+    saveProvider: async (config: ProviderConfiguration) => {
+      return invoke(DESKTOP_IPC_CHANNELS.runtimeSaveProvider, config)
+    },
+    deleteProvider: async (request: DeleteProviderRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.runtimeDeleteProvider, request)
     },
     listSessions: async (request?: ListSessionsRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsList, request)

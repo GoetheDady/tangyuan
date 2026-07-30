@@ -26,6 +26,8 @@ import {
   rejectBashRequestSchema,
   retryRunRequestSchema,
   runtimeConfigurationSchema,
+  providerConfigurationSchema,
+  deleteProviderRequestSchema,
   runtimeSnapshotSchema,
   sendMessageRequestSchema,
   sessionModelInfoSchema,
@@ -71,6 +73,7 @@ import type {
   CancelRunRequest,
   ClaimAgentDirectoryRequest,
   CreateSessionRequest,
+  DeleteProviderRequest,
   GetSessionMessagesRequest,
   GetSessionModelInfoRequest,
   GetSoulRequest,
@@ -78,6 +81,7 @@ import type {
   ListSessionsRequest,
   OpenExternalLinkRequest,
   ProfileUpdateResult,
+  ProviderConfiguration,
   QuestionClarificationRequest,
   RecoverAgentRequest,
   RejectBashRequest,
@@ -110,6 +114,8 @@ export const DESKTOP_IPC_CHANNELS = {
     'tangyuan:runtime:cancel-configuration-verification',
   runtimeRestoreFromBackup: 'tangyuan:runtime:restore-from-backup',
   runtimeResetConfiguration: 'tangyuan:runtime:reset-configuration',
+  runtimeSaveProvider: 'tangyuan:runtime:save-provider',
+  runtimeDeleteProvider: 'tangyuan:runtime:delete-provider',
   sessionsList: 'tangyuan:sessions:list',
   sessionsCreate: 'tangyuan:sessions:create',
   sessionsSendMessage: 'tangyuan:sessions:send-message',
@@ -175,6 +181,8 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification]: CancelConfigurationVerificationRequest
   [DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup]: undefined
   [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: undefined
+  [DESKTOP_IPC_CHANNELS.runtimeSaveProvider]: ProviderConfiguration
+  [DESKTOP_IPC_CHANNELS.runtimeDeleteProvider]: DeleteProviderRequest
   [DESKTOP_IPC_CHANNELS.sessionsList]: ListSessionsRequest | undefined
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: CreateSessionRequest
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: SendMessageRequest
@@ -229,6 +237,8 @@ export const desktopIpcRequestSchemas = {
     cancelConfigurationVerificationRequestSchema,
   [DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: z.undefined(),
+  [DESKTOP_IPC_CHANNELS.runtimeSaveProvider]: providerConfigurationSchema,
+  [DESKTOP_IPC_CHANNELS.runtimeDeleteProvider]: deleteProviderRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsList]: listSessionsRequestSchema.optional(),
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: createSessionRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: sendMessageRequestSchema,
@@ -303,6 +313,8 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.runtimeCancelConfigurationVerification]: RuntimeSnapshot
   [DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup]: RuntimeSnapshot
   [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: RuntimeSnapshot
+  [DESKTOP_IPC_CHANNELS.runtimeSaveProvider]: RuntimeSnapshot
+  [DESKTOP_IPC_CHANNELS.runtimeDeleteProvider]: RuntimeSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsList]: AgentSessionSummary[]
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: AgentSessionSummary
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: TranscriptSnapshot
@@ -360,6 +372,8 @@ export const desktopIpcResponseSchemas = {
     runtimeSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.runtimeRestoreFromBackup]: runtimeSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.runtimeResetConfiguration]: runtimeSnapshotSchema,
+  [DESKTOP_IPC_CHANNELS.runtimeSaveProvider]: runtimeSnapshotSchema,
+  [DESKTOP_IPC_CHANNELS.runtimeDeleteProvider]: runtimeSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsList]: z.array(agentSessionSummarySchema),
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: agentSessionSummarySchema,
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: transcriptSnapshotSchema,
@@ -556,6 +570,24 @@ export interface DesktopPreloadApi {
   saveRuntimeConfiguration(
     configuration: RuntimeConfiguration,
   ): Promise<RuntimeSnapshot>
+
+  /**
+   * 验证并保存单个 Provider 的凭据，不改变 Agent 的默认模型。
+   *
+   * @param config - Provider 标识和 API Key。
+   * @returns 保存后的 RuntimeSnapshot。
+   * @throws 当 Main 进程验证失败或保存失败时，Promise 会 reject。
+   */
+  saveProvider(config: ProviderConfiguration): Promise<RuntimeSnapshot>
+
+  /**
+   * 删除单个 Provider 的凭据配置。
+   *
+   * @param request - 要删除的 Provider 标识。
+   * @returns 删除后的 RuntimeSnapshot。
+   * @throws 当 Main 进程无法删除时，Promise 会 reject。
+   */
+  deleteProvider(request: DeleteProviderRequest): Promise<RuntimeSnapshot>
 
   /**
    * 取消正在进行的配置验证。

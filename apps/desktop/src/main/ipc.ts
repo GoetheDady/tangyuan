@@ -110,6 +110,34 @@ export function registerDesktopAppIpc(
       )
     },
   )
+  ipcMain.handle(
+    DESKTOP_IPC_CHANNELS.runtimeSaveProvider,
+    async (_event, payload) => {
+      return parseDesktopIpcResponse(
+        DESKTOP_IPC_CHANNELS.runtimeSaveProvider,
+        await runtime.saveProvider(
+          parseDesktopIpcRequest(
+            DESKTOP_IPC_CHANNELS.runtimeSaveProvider,
+            payload,
+          ),
+        ),
+      )
+    },
+  )
+  ipcMain.handle(
+    DESKTOP_IPC_CHANNELS.runtimeDeleteProvider,
+    async (_event, payload) => {
+      return parseDesktopIpcResponse(
+        DESKTOP_IPC_CHANNELS.runtimeDeleteProvider,
+        await runtime.deleteProvider(
+          parseDesktopIpcRequest(
+            DESKTOP_IPC_CHANNELS.runtimeDeleteProvider,
+            payload,
+          ),
+        ),
+      )
+    },
+  )
   ipcMain.handle(DESKTOP_IPC_CHANNELS.sessionsList, async (_event, payload) => {
     const request = parseDesktopIpcRequest(
       DESKTOP_IPC_CHANNELS.sessionsList,

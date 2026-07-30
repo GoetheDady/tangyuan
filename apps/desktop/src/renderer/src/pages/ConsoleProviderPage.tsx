@@ -36,7 +36,9 @@ import {
  * @returns 初始化配置页面。
  * @throws 此组件不会主动抛出错误；保存错误会通过 toast 反馈。
  */
-export function ConsoleProviderPage(): React.JSX.Element {
+export function ConsoleProviderPage(props: {
+  onConfigurationSaved?: (runtime: RuntimeSnapshot) => Promise<void>
+}): React.JSX.Element {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
@@ -194,8 +196,7 @@ export function ConsoleProviderPage(): React.JSX.Element {
       setVerificationError(null)
       toast.success('配置已保存')
 
-      // 如果是首次 profile 初始化，创建 bootstrap 会话
-      await openBootstrapSessionIfRequired(nextRuntime)
+      await props.onConfigurationSaved?.(nextRuntime)
       navigate(redirectTarget, { replace: true })
     } catch (error) {
       setVerificationError(
@@ -600,31 +601,4 @@ export function ConsoleProviderPage(): React.JSX.Element {
   )
 }
 
-/**
- * 在首次 profile 尚未初始化时创建并选中 bootstrap 会话。
- *
- * @param nextRuntime - 保存配置后得到的最新运行时快照。
- * @returns 无返回值。
- * @throws Preload API 错误会透传给调用方。
- */
-async function openBootstrapSessionIfRequired(
-  nextRuntime: RuntimeSnapshot,
-): Promise<void> {
-  if (
-    nextRuntime.status !== 'ready' ||
-    !nextRuntime.activeAgent.profile.bootstrapRequired
-  ) {
-    return
-  }
 
-  const existingSessions = await window.api.listSessions()
-
-  if (existingSessions.length) {
-    return
-  }
-
-  await window.api.createSession({
-    agentId: nextRuntime.activeAgent.agentId,
-    title: 'Bootstrap 初始化',
-  })
-}

@@ -193,14 +193,14 @@ function ChatPage(props: {
       })
   }, [sessionId, context.selectedSessionId, activeAgentId])
 
-  // 根据 runtime 中的模型数据计算 selectableModels
   const selectableModels = useMemo<ModelDescriptor[]>(() => {
-    if (!context.runtime || !sessionModelInfo) return []
+    const runtime = context.runtime
+    if (!runtime) return []
 
-    return context.runtime.models.filter(
-      (model) => model.providerId === sessionModelInfo.providerId,
+    return runtime.models.filter(
+      (model) => runtime.configuredProviders[model.providerId]?.configured === true,
     )
-  }, [context.runtime, sessionModelInfo])
+  }, [context.runtime])
 
   async function handleSessionModelChange(
     providerId: string,
