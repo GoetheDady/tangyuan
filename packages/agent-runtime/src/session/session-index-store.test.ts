@@ -6,13 +6,13 @@ import type {
   ConfigEncryptionAdapter,
   InternalRuntimeConfig,
 } from '@tangyuan/contracts'
-import { ConfigStore, DirectoryLayout } from './core'
+import { ConfigStore, DirectoryLayout } from '../core'
 import {
   SessionIndexStore,
   type PersistedSessionIndexEntry,
 } from './session-index-store'
-import type { PiSdkGateway } from './index'
-import { AgentRuntimeError } from './core'
+import type { PiSdkGateway } from '../index'
+import { AgentRuntimeError } from '../core'
 
 const fakeAdapter: ConfigEncryptionAdapter = {
   encrypt: async (p) => `enc:${Buffer.from(p, 'utf8').toString('base64')}`,

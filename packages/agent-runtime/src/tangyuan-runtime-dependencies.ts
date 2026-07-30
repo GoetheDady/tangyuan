@@ -2,7 +2,7 @@ import type {
   AgentSessionDriver,
   RuntimeResourceDriver,
 } from './pi-sdk-driver-contracts'
-import type { LastActiveSessionStore } from './last-active-session-store'
+import type { LastActiveSessionStore } from './session/last-active-session-store'
 
 /**
  * 创建 TangyuanRuntime 时需要注入的内部 Driver。

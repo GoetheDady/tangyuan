@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assembleRunTurn } from '../run-turn-assembly'
+import { assembleRunTurn } from '../session/run-turn-assembly'
 import {
   createToolStepSummary,
   buildTranscriptSnapshotFromSdkEntries,
@@ -162,6 +162,94 @@ describe('normalizePiSdkSessionEvent turn events', () => {
 
   it('ignores turn_end without a valid message', () => {
     expect(normalizePiSdkSessionEvent({ type: 'turn_end' })).toEqual([])
+  })
+})
+
+describe('normalizePiSdkSessionEvent compaction events', () => {
+  it('translates compaction_end (non-aborted) into compaction-ended', () => {
+    expect(
+      normalizePiSdkSessionEvent({
+        type: 'compaction_end',
+        aborted: false,
+        reason: 'threshold',
+        result: {},
+        willRetry: false,
+      }),
+    ).toEqual([{ type: 'compaction-ended', reason: 'threshold' }])
+  })
+
+  it('maps manual and overflow reasons correctly', () => {
+    expect(
+      normalizePiSdkSessionEvent({
+        type: 'compaction_end',
+        aborted: false,
+        reason: 'manual',
+      }),
+    ).toEqual([{ type: 'compaction-ended', reason: 'manual' }])
+    expect(
+      normalizePiSdkSessionEvent({
+        type: 'compaction_end',
+        aborted: false,
+        reason: 'overflow',
+      }),
+    ).toEqual([{ type: 'compaction-ended', reason: 'overflow' }])
+  })
+
+  it('ignores compaction_end when aborted is true', () => {
+    expect(
+      normalizePiSdkSessionEvent({
+        type: 'compaction_end',
+        aborted: true,
+        reason: 'threshold',
+      }),
+    ).toEqual([])
+  })
+
+  it('ignores compaction_end when reason is missing', () => {
+    expect(
+      normalizePiSdkSessionEvent({ type: 'compaction_end', aborted: false }),
+    ).toEqual([])
+  })
+})
+
+describe('normalizePiSdkSessionEvent auto-retry events', () => {
+  it('translates auto_retry_start into auto-retry-started', () => {
+    expect(
+      normalizePiSdkSessionEvent({
+        type: 'auto_retry_start',
+        attempt: 1,
+        maxAttempts: 3,
+        delayMs: 1000,
+        errorMessage: 'overloaded',
+      }),
+    ).toEqual([{ type: 'auto-retry-started', attempt: 1, maxAttempts: 3 }])
+  })
+
+  it('translates auto_retry_end (success) into auto-retry-ended', () => {
+    expect(
+      normalizePiSdkSessionEvent({
+        type: 'auto_retry_end',
+        success: true,
+        attempt: 1,
+      }),
+    ).toEqual([{ type: 'auto-retry-ended', success: true }])
+  })
+
+  it('translates auto_retry_end (failure) into auto-retry-ended', () => {
+    expect(
+      normalizePiSdkSessionEvent({
+        type: 'auto_retry_end',
+        success: false,
+        attempt: 3,
+        finalError: 'still overloaded',
+      }),
+    ).toEqual([{ type: 'auto-retry-ended', success: false }])
+  })
+
+  it('ignores auto_retry_start when attempt or maxAttempts is not a number', () => {
+    expect(
+      normalizePiSdkSessionEvent({ type: 'auto_retry_start', attempt: 'bad' }),
+    ).toEqual([])
   })
 })
 

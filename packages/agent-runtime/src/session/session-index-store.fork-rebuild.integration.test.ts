@@ -4,8 +4,8 @@ import { join } from 'node:path'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ConfigEncryptionAdapter } from '@tangyuan/contracts'
-import { ConfigStore, DirectoryLayout } from './core'
-import { RealPiSdkGateway } from './gateway'
+import { ConfigStore, DirectoryLayout } from '../core'
+import { RealPiSdkGateway } from '../gateway'
 import { SessionIndexStore } from './session-index-store'
 
 const fakeAdapter: ConfigEncryptionAdapter = {

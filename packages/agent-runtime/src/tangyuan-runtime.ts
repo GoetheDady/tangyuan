@@ -1,6 +1,6 @@
 import { TangyuanRuntimeOrchestrator } from './tangyuan-runtime-orchestrator'
 import type { TangyuanRuntimeDependencies } from './tangyuan-runtime-dependencies'
-import { collectSessionSubtree } from './session-archive-coordinator'
+import { collectSessionSubtree } from './session/session-archive-coordinator'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type ArchiveSessionRequest,

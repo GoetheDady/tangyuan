@@ -5,8 +5,8 @@ import { ConfigStore, DirectoryLayout } from './core'
 import { AgentRegistry } from './agent-registry'
 import { SkillStore } from './skill-store'
 import { ProfileStore } from './profile-store'
-import { SessionIndexStore } from './session-index-store'
-import { MessageStore } from './message-store'
+import { SessionIndexStore } from './session/session-index-store'
+import { MessageStore } from './session/message-store'
 import { AgentRuntimeError, sanitizeErrorMessage } from './core'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MessageStore } from './message-store'
-import { AgentRuntimeError } from './core'
+import { AgentRuntimeError } from '../core'
 
 function makeStore(): MessageStore {
   return new MessageStore({ now: () => '2026-01-01T00:00:00.000Z' })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { DriverEvent } from './index'
+import type { DriverEvent } from '../index'
 import { TranscriptEmitter } from './transcript-emitter'
 import {
   transcriptSnapshotSchema,
@@ -811,5 +811,149 @@ describe('TranscriptEmitter tool step handling', () => {
       expect(agentEntry.turns[2]!.steps[0]!.kind).toBe('text')
       expect(agentEntry.turns[2]!.steps[0]!.content).toBe('回复内容')
     }
+  })
+})
+
+describe('TranscriptEmitter compaction and auto-retry', () => {
+  function createEmitter() {
+    const events: DriverEvent[] = []
+    const emitter = new TranscriptEmitter((e) => events.push(e))
+    return {
+      emitter,
+      events,
+      getSnapshot: (sessionId: string) => emitter.getSnapshot(sessionId),
+    }
+  }
+
+  function emitAttemptStarted(
+    emitter: TranscriptEmitter,
+    agentId: string,
+    sessionId: string,
+    runId: string,
+  ) {
+    const event: Extract<DriverEvent, { type: 'attempt-started' }> = {
+      type: 'attempt-started',
+      agentId,
+      sessionId,
+      runId,
+      occurredAt: new Date().toISOString(),
+    }
+    emitter.startAttemptForRun(event)
+    emitter.initializeTurnStateForRun(event)
+  }
+
+  function emitMessageAppended(
+    emitter: TranscriptEmitter,
+    agentId: string,
+    sessionId: string,
+    messageId: string,
+  ) {
+    const event: Extract<DriverEvent, { type: 'message-appended' }> = {
+      type: 'message-appended',
+      agentId,
+      message: {
+        messageId,
+        agentId,
+        sessionId,
+        role: 'agent',
+        content: '',
+        createdAt: new Date().toISOString(),
+      },
+      occurredAt: new Date().toISOString(),
+    }
+    emitter.emitTranscriptDeltaForMessageAppended(event)
+  }
+
+  it('appendCompactionEntry 在 transcript 中插入 compaction 条目', () => {
+    const { emitter, getSnapshot } = createEmitter()
+
+    // 先建一个 user message 条目（index 0）
+    emitter.emitTranscriptDeltaForMessageAppended({
+      type: 'message-appended',
+      agentId: 'tangyuan',
+      message: {
+        messageId: 'user-1',
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        role: 'user',
+        content: '你好',
+        createdAt: new Date().toISOString(),
+      },
+      occurredAt: new Date().toISOString(),
+    })
+
+    // 触发 compaction
+    emitter.appendCompactionEntry({
+      type: 'compaction-detected',
+      agentId: 'tangyuan',
+      sessionId: 'session-1',
+      runId: 'run-1',
+      occurredAt: '2026-07-30T10:00:00.000Z',
+    })
+
+    const snapshot = getSnapshot('session-1')
+    expect(snapshot?.entries).toHaveLength(2)
+    const compactionEntry = snapshot?.entries[1]
+    expect(compactionEntry?.kind).toBe('compaction')
+    if (compactionEntry?.kind === 'compaction') {
+      expect(compactionEntry.index).toBe(1)
+      expect(compactionEntry.timestamp).toBe('2026-07-30T10:00:00.000Z')
+    }
+  })
+
+  it('updateAttemptRetryCount 更新 attempt 的 retryCount 并发出 attempt-status-changed delta', () => {
+    const { emitter, events, getSnapshot } = createEmitter()
+
+    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1')
+
+    emitter.updateAttemptRetryCount({
+      type: 'auto-retry-progress',
+      agentId: 'tangyuan',
+      sessionId: 'session-1',
+      runId: 'run-1',
+      retryCount: 1,
+      maxAttempts: 3,
+      occurredAt: new Date().toISOString(),
+    })
+
+    // transcript-delta 中应有 attempt-status-changed
+    const attemptDelta = events.find(
+      (e) =>
+        e.type === 'transcript-delta' &&
+        e.delta.type === 'attempt-status-changed',
+    )
+    expect(attemptDelta).toBeDefined()
+    if (
+      attemptDelta?.type === 'transcript-delta' &&
+      attemptDelta.delta.type === 'attempt-status-changed'
+    ) {
+      expect(attemptDelta.delta.attempt.retryCount).toBe(1)
+      expect(attemptDelta.delta.attempt.status).toBe('running')
+    }
+
+    // snapshot 中 agent-reply 的 attempt 应该反映 retryCount
+    const snapshot = getSnapshot('session-1')
+    const agentEntry = snapshot?.entries[0]
+    if (agentEntry?.kind === 'agent-reply') {
+      expect(agentEntry.attempt?.retryCount).toBe(1)
+    }
+  })
+
+  it('updateAttemptRetryCount 当 attempt 或 turnState 不存在时静默忽略', () => {
+    const { emitter } = createEmitter()
+
+    // 没有 attempt-started，直接调用不应抛出
+    expect(() => {
+      emitter.updateAttemptRetryCount({
+        type: 'auto-retry-progress',
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        runId: 'run-nonexistent',
+        retryCount: 1,
+        maxAttempts: 3,
+        occurredAt: new Date().toISOString(),
+      })
+    }).not.toThrow()
   })
 })

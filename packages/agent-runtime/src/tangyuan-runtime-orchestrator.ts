@@ -6,17 +6,17 @@ import type {
   DriverEvent,
   ToolApprovalGateway,
 } from './pi-sdk-driver-contracts'
-import { TranscriptEmitter } from './transcript-emitter'
+import { TranscriptEmitter } from './session/transcript-emitter'
 import { BashApprovalRegistry } from './bash-approval-registry'
 import { ClarificationRegistry } from './clarification-registry'
-import { SessionCache } from './session-cache'
+import { SessionCache } from './session/session-cache'
 import { createToolApprovalGateway } from './tool-approval-gateway'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
 import { AgentManager } from './agent-manager'
 import { SkillService } from './skill-service'
 import { IdentityService } from './identity-service'
-import { SessionModelService } from './session-model-service'
-import { SessionArchiveCoordinator } from './session-archive-coordinator'
+import { SessionModelService } from './session/session-model-service'
+import { SessionArchiveCoordinator } from './session/session-archive-coordinator'
 import {
   TANGYUAN_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
@@ -43,6 +43,8 @@ const INTERNAL_DRIVER_EVENT_TYPES = new Set([
   'activity-updated',
   'turn-started',
   'turn-ended',
+  'compaction-detected',
+  'auto-retry-progress',
 ])
 
 /**
@@ -56,7 +58,7 @@ function isInternalDriverEvent(event: AgentEvent | DriverEvent): boolean {
 }
 
 import type { TangyuanRuntimeDependencies } from './tangyuan-runtime-dependencies'
-import type { LastActiveSessionStore } from './last-active-session-store'
+import type { LastActiveSessionStore } from './session/last-active-session-store'
 
 export abstract class TangyuanRuntimeOrchestrator {
   protected static readonly MAX_CONCURRENT_RUNS = 4
@@ -482,6 +484,16 @@ export abstract class TangyuanRuntimeOrchestrator {
 
     if (driverEvent.type === 'turn-ended') {
       this.transcriptEmitter.endTurn(driverEvent)
+      return
+    }
+
+    if (driverEvent.type === 'compaction-detected') {
+      this.transcriptEmitter.appendCompactionEntry(driverEvent)
+      return
+    }
+
+    if (driverEvent.type === 'auto-retry-progress') {
+      this.transcriptEmitter.updateAttemptRetryCount(driverEvent)
       return
     }
 

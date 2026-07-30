@@ -3,7 +3,7 @@ import { dirname } from 'node:path'
 import type {
   PersistedAttemptEntry,
   PersistedSessionIndexEntry,
-} from './session-index-store'
+} from './session/session-index-store'
 import { AgentRuntimeError } from './core'
 import {
   isAbortError,
@@ -767,6 +767,7 @@ export class PiSdkDriver
       agentMessage,
     } = input
     const inReplyToPatch = input.inReplyTo ? { inReplyTo: input.inReplyTo } : {}
+    let retryCount = 0
     try {
       let accumulatedReply = ''
       let turnIndex = 0
@@ -856,6 +857,36 @@ export class PiSdkDriver
             return
           }
 
+          if (event.type === 'compaction-ended') {
+            this.emit({
+              type: 'compaction-detected',
+              agentId,
+              sessionId,
+              runId,
+              occurredAt: this.now(),
+            })
+            return
+          }
+
+          if (event.type === 'auto-retry-started') {
+            retryCount = event.attempt
+            announceAgentEntry()
+            this.emit({
+              type: 'auto-retry-progress',
+              agentId,
+              sessionId,
+              runId,
+              retryCount: event.attempt,
+              maxAttempts: event.maxAttempts,
+              occurredAt: this.now(),
+            })
+            return
+          }
+
+          if (event.type === 'auto-retry-ended') {
+            return
+          }
+
           // tool-started / tool-completed / tool-failed
           announceAgentEntry()
           this.emit({
@@ -879,6 +910,7 @@ export class PiSdkDriver
           startedAt: this.now(),
           completedAt: this.now(),
           ...inReplyToPatch,
+          ...(retryCount > 0 ? { retryCount } : {}),
         })
         this.updateSessionState(session.sessionId, 'cancelled')
         await this.sessionIndexStore.updateEntry(session.sessionId, {
@@ -932,6 +964,7 @@ export class PiSdkDriver
         startedAt: this.now(),
         completedAt: this.now(),
         ...inReplyToPatch,
+        ...(retryCount > 0 ? { retryCount } : {}),
       })
       this.updateSessionState(session.sessionId, 'completed')
       await this.sessionIndexStore.updateEntry(session.sessionId, {
@@ -950,6 +983,7 @@ export class PiSdkDriver
           startedAt: this.now(),
           completedAt: this.now(),
           ...inReplyToPatch,
+          ...(retryCount > 0 ? { retryCount } : {}),
         })
         this.updateSessionState(session.sessionId, 'cancelled')
         await this.sessionIndexStore.updateEntry(session.sessionId, {
@@ -981,6 +1015,7 @@ export class PiSdkDriver
         completedAt: this.now(),
         error: runtimeError,
         ...inReplyToPatch,
+        ...(retryCount > 0 ? { retryCount } : {}),
       })
       this.updateSessionState(session.sessionId, 'failed')
       await this.sessionIndexStore.updateEntry(session.sessionId, {

@@ -1,4 +1,4 @@
-import type { AgentEventListener, DriverEvent } from './pi-sdk-driver-contracts'
+import type { AgentEventListener, DriverEvent } from '../pi-sdk-driver-contracts'
 import {
   applyTranscriptDelta,
   type AgentReplyEntry,
@@ -10,7 +10,7 @@ import {
   type TurnStep,
 } from '@tangyuan/contracts'
 import { assembleRunTurn } from './run-turn-assembly'
-import { createToolStepSummary } from './core'
+import { createToolStepSummary } from '../core'
 
 /**
  * turn 追踪状态。
@@ -628,6 +628,60 @@ export class TranscriptEmitter {
       lastIndex = index
     }
     return lastIndex
+  }
+
+  /**
+   * 为 compaction-detected 事件在 transcript 中追加压缩提示条目。
+   *
+   * @param event - compaction-detected 内部事件。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  appendCompactionEntry(
+    event: Extract<DriverEvent, { type: 'compaction-detected' }>,
+  ): void {
+    const { agentId, sessionId, occurredAt } = event
+    const nextIndex = this.sessionNextIndex.get(sessionId) ?? 0
+
+    const delta: TranscriptDelta = {
+      type: 'entry-appended',
+      entry: {
+        kind: 'compaction',
+        index: nextIndex,
+        timestamp: occurredAt,
+      },
+    }
+    this.emitTranscriptDeltaEvent(agentId, sessionId, delta)
+    this.sessionNextIndex.set(sessionId, nextIndex + 1)
+  }
+
+  /**
+   * 为 auto-retry-progress 事件更新 ExecutionAttempt 的重试计数，
+   * 并向 Renderer 发出 attempt-status-changed delta。
+   *
+   * @param event - auto-retry-progress 内部事件。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  updateAttemptRetryCount(
+    event: Extract<DriverEvent, { type: 'auto-retry-progress' }>,
+  ): void {
+    const { agentId, sessionId, runId, retryCount } = event
+    const attempt = this.runToAttempt.get(runId)
+    if (!attempt) return
+
+    const updatedAttempt: ExecutionAttempt = { ...attempt, retryCount }
+    this.runToAttempt.set(runId, updatedAttempt)
+
+    const turnState = this.turnStateByRun.get(runId)
+    if (!turnState) return
+
+    const delta: TranscriptDelta = {
+      type: 'attempt-status-changed',
+      index: turnState.entryIndex,
+      attempt: updatedAttempt,
+    }
+    this.emitTranscriptDeltaEvent(agentId, sessionId, delta)
   }
 
   /**

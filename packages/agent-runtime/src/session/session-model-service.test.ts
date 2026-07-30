@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentSessionDriver } from './index'
+import type { AgentSessionDriver } from '../index'
 import { SessionModelService } from './session-model-service'
 
 function createService(driver: Partial<AgentSessionDriver>) {

@@ -1,6 +1,6 @@
 import type { AgentId } from '@tangyuan/contracts'
-import type { InternalMessage } from './pi-sdk-driver-contracts'
-import { AgentRuntimeError } from './core'
+import type { InternalMessage } from '../pi-sdk-driver-contracts'
+import { AgentRuntimeError } from '../core'
 
 /**
  * 创建 MessageStore 所需的依赖。

@@ -13,7 +13,7 @@ export {
   buildTranscriptWithAttempts,
   mapPiSdkSessionEntryToTranscriptEntries,
   stringifyPiSdkMessageContent,
-} from '../session-transcript'
+} from '../session/session-transcript'
 export { createToolStepSummary } from './tool-step-summary'
 
 /**
@@ -257,6 +257,38 @@ export function normalizePiSdkSessionEvent(event: unknown): PiSdkStreamEvent[] {
         ...(toolCallId !== undefined ? { toolCallId } : {}),
       },
     ]
+  }
+
+  if (
+    event.type === 'compaction_end' &&
+    event.aborted === false &&
+    typeof event.reason === 'string'
+  ) {
+    const reason =
+      event.reason === 'manual'
+        ? ('manual' as const)
+        : event.reason === 'threshold'
+          ? ('threshold' as const)
+          : ('overflow' as const)
+    return [{ type: 'compaction-ended' as const, reason }]
+  }
+
+  if (
+    event.type === 'auto_retry_start' &&
+    typeof event.attempt === 'number' &&
+    typeof event.maxAttempts === 'number'
+  ) {
+    return [
+      {
+        type: 'auto-retry-started' as const,
+        attempt: event.attempt,
+        maxAttempts: event.maxAttempts,
+      },
+    ]
+  }
+
+  if (event.type === 'auto_retry_end' && typeof event.success === 'boolean') {
+    return [{ type: 'auto-retry-ended' as const, success: event.success }]
   }
 
   return []

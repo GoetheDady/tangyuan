@@ -2,7 +2,7 @@ import type {
   TurnStartEvent as PiSdkTurnStartEvent,
   TurnEndEvent as PiSdkTurnEndEvent,
 } from '@earendil-works/pi-coding-agent'
-import type { PersistedAttemptEntry } from './session-index-types'
+import type { PersistedAttemptEntry } from './session/session-index-types'
 import type {
   AgentConfig,
   AgentEvent,
@@ -236,6 +236,22 @@ export type PiSdkStreamEvent =
       message: Extract<PiSdkTurnEndEvent['message'], { role: 'assistant' }>
       toolResults: PiSdkTurnEndEvent['toolResults']
     }
+  | {
+      // SDK 原生 `compaction_end`（未中止）：会话上下文已被压缩。
+      type: 'compaction-ended'
+      reason: 'manual' | 'threshold' | 'overflow'
+    }
+  | {
+      // SDK 原生 `auto_retry_start`：API 错误触发自动重试开始。
+      type: 'auto-retry-started'
+      attempt: number
+      maxAttempts: number
+    }
+  | {
+      // SDK 原生 `auto_retry_end`：自动重试结束（成功或耗尽）。
+      type: 'auto-retry-ended'
+      success: boolean
+    }
 
 /**
  * 描述 Pi SDK prompt 调用时可接收的事件回调。
@@ -422,7 +438,7 @@ export type {
   PersistedAttemptEntry,
   PersistedSessionIndexEntry,
   PersistedSessionIndex,
-} from './session-index-types'
+} from './session/session-index-types'
 
 /**
  * 创建 AgentRuntimeError 时使用的输入与错误类（定义见 errors.ts）。
@@ -938,5 +954,25 @@ export type DriverEvent =
       turnIndex: PiSdkTurnEndEvent['turnIndex']
       message: Extract<PiSdkTurnEndEvent['message'], { role: 'assistant' }>
       toolResults: PiSdkTurnEndEvent['toolResults']
+      occurredAt: string
+    }
+  | {
+      // 对应 SDK 原生 `compaction_end`（未中止）：会话上下文已完成压缩。
+      // 仅 Runtime 内部使用，不跨 IPC 暴露给 Renderer。
+      type: 'compaction-detected'
+      agentId: string
+      sessionId: string
+      runId: string
+      occurredAt: string
+    }
+  | {
+      // 对应 SDK 原生 `auto_retry_start`：自动重试进度更新。
+      // 仅 Runtime 内部使用，不跨 IPC 暴露给 Renderer。
+      type: 'auto-retry-progress'
+      agentId: string
+      sessionId: string
+      runId: string
+      retryCount: number
+      maxAttempts: number
       occurredAt: string
     }
