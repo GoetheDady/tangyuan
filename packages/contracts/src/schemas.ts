@@ -26,6 +26,7 @@ export const executionAttemptSchema = z.strictObject({
       recoverable: z.boolean(),
     })
     .optional(),
+  retryCount: z.number().int().min(0).optional(),
 })
 
 /**

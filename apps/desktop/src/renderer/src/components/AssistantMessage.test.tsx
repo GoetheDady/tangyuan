@@ -160,6 +160,51 @@ describe('AssistantMessage', () => {
     expect(screen.getByText(/尚未确认/)).toBeInTheDocument()
   })
 
+  it('shows the current automatic retry count while running', () => {
+    const entry = createEntry({
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'running',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: null,
+        retryCount: 2,
+      },
+      turns: [],
+    })
+
+    render(<AssistantMessage entry={entry} isStreaming />)
+
+    expect(screen.getByTestId('retry-result')).toHaveTextContent(
+      '正在重试（第 2 次）',
+    )
+  })
+
+  it('shows the total automatic retry count after the run ends', () => {
+    const entry = createEntry({
+      attempt: {
+        attemptId: 'run-1',
+        runId: 'run-1',
+        status: 'completed',
+        startedAt: '2026-07-21T00:00:00.000Z',
+        completedAt: '2026-07-21T00:00:05.000Z',
+        retryCount: 2,
+      },
+      turns: [
+        createTurn({
+          status: 'completed',
+          completedAt: '2026-07-21T00:00:05.000Z',
+        }),
+      ],
+    })
+
+    render(<AssistantMessage entry={entry} isStreaming={false} />)
+
+    expect(screen.getByTestId('retry-result')).toHaveTextContent(
+      '自动重试了 2 次',
+    )
+  })
+
   it('shows completed disclosure when run is done', () => {
     const entry = createEntry({
       attempt: {

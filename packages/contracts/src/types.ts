@@ -34,6 +34,8 @@ export interface ExecutionAttempt {
   completedAt: string | null
   /** 失败或取消时的错误信息；成功和运行中时为 undefined。 */
   error?: AgentRuntimeErrorPayload
+  /** SDK 层自动重试次数；未发生重试时为 undefined。 */
+  retryCount?: number
 }
 
 /**

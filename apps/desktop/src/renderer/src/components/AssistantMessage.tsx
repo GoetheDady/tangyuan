@@ -174,6 +174,19 @@ export function AssistantMessage({
   }, [entry.turns])
 
   const hasTurns = entry.turns.length > 0
+  const retryCount = entry.attempt?.retryCount ?? 0
+  const retryIndicator =
+    retryCount > 0 ? (
+      <div
+        className="text-caption text-muted-foreground px-1"
+        role="status"
+        data-testid="retry-result"
+      >
+        {entry.attempt?.status === 'running'
+          ? `正在重试（第 ${retryCount} 次）`
+          : `自动重试了 ${retryCount} 次`}
+      </div>
+    ) : null
 
   // 完成态下时间线剔除末回合文字步骤（去重）；其他态原样展示全部步骤。
   const timelineTurns =
@@ -185,7 +198,8 @@ export function AssistantMessage({
   if (!hasTurns) {
     return (
       <article className="flex justify-start" aria-busy={isStreaming}>
-        <div className="bg-background text-body text-foreground w-full max-w-[640px] min-w-0 rounded-[7px] p-3.5">
+        <div className="bg-background text-body text-foreground flex w-full max-w-[640px] min-w-0 flex-col gap-2.5 rounded-[7px] p-3.5">
+          {retryIndicator}
           <StreamdownMessage
             content={entry.content}
             isAnimating={isStreaming}
@@ -208,6 +222,8 @@ export function AssistantMessage({
           durationText={durationText}
           attemptStatus={entry.attempt?.status ?? 'running'}
         />
+
+        {retryIndicator}
 
         {/* Expanded Timeline */}
         <AnimatePresence initial={false}>

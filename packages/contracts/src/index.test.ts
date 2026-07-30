@@ -15,6 +15,7 @@ import {
   forkSessionRequestSchema,
   createDefaultSessionSummary,
   createRuntimeSnapshot,
+  executionAttemptSchema,
   migrateConfigV1ToV2,
   persistedConfigurationV2Schema,
   runTurnSchema,
@@ -722,6 +723,28 @@ describe('Skill schemas', () => {
         updatedAt: '2026-07-17T00:00:00.000Z',
         status: 'removed',
       }),
+    ).toThrow()
+  })
+})
+
+describe('execution attempt schema', () => {
+  const attempt = {
+    attemptId: 'attempt-1',
+    runId: 'run-1',
+    status: 'running' as const,
+    startedAt: '2026-07-21T00:00:00.000Z',
+    completedAt: null,
+  }
+
+  it('accepts a non-negative integer retry count', () => {
+    expect(
+      executionAttemptSchema.parse({ ...attempt, retryCount: 2 }),
+    ).toMatchObject({ retryCount: 2 })
+  })
+
+  it.each([-1, 1.5])('rejects invalid retry count %s', (retryCount) => {
+    expect(() =>
+      executionAttemptSchema.parse({ ...attempt, retryCount }),
     ).toThrow()
   })
 })
