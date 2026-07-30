@@ -4,7 +4,7 @@ import {
   agentEventSchema,
 } from '@tangyuan/contracts'
 import { describe, expect, it } from 'vitest'
-import { createTangyuanRuntimeForTesting } from './TangyuanRuntime'
+import { createTangyuanRuntimeForTesting } from './tangyuan-runtime'
 import {
   createReadySnapshot,
   createRuntimeDriver,

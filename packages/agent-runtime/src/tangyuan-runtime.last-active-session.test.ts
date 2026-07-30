@@ -3,7 +3,7 @@ import type {
   LastActiveSession,
 } from '@tangyuan/contracts'
 import { describe, expect, it, vi } from 'vitest'
-import { createTangyuanRuntimeForTesting } from './TangyuanRuntime'
+import { createTangyuanRuntimeForTesting } from './tangyuan-runtime'
 import {
   createRuntimeDriver,
   createSessionDriver,

@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import {
   createTangyuanRuntimeForTesting,
   type TangyuanRuntime,
-} from './TangyuanRuntime'
+} from './tangyuan-runtime'
 import { DirectoryLayout } from './directory-layout'
 import { LastActiveSessionStore } from './last-active-session-store'
 import { PiSdkDriver } from './pi-sdk-driver'
@@ -46,8 +46,8 @@ export {
   type UserMessageEntry,
   type AgentReplyEntry,
 } from '@tangyuan/contracts'
-export { createTangyuanRuntimeForTesting } from './TangyuanRuntime'
-export type { TangyuanRuntime } from './TangyuanRuntime'
+export { createTangyuanRuntimeForTesting } from './tangyuan-runtime'
+export type { TangyuanRuntime } from './tangyuan-runtime'
 export { PiSdkDriver } from './pi-sdk-driver'
 
 /**
