@@ -1,5 +1,5 @@
 import { ArrowLeft, Bot, Settings2 } from 'lucide-react'
-import { useRef } from 'react'
+import { useState } from 'react'
 import { Link, NavLink, Outlet, useSearchParams } from 'react-router'
 
 /**
@@ -9,7 +9,9 @@ import { Link, NavLink, Outlet, useSearchParams } from 'react-router'
  */
 export function SettingsLayout(): React.JSX.Element {
   const [searchParams] = useSearchParams()
-  const redirectRef = useRef(searchParams.get('redirect') ?? '/chat/tangyuan')
+  const [redirectTarget] = useState(
+    () => searchParams.get('redirect') ?? '/chat/tangyuan',
+  )
 
   return (
     <div className="flex h-full">
@@ -18,14 +20,14 @@ export function SettingsLayout(): React.JSX.Element {
         <div className="h-9" aria-hidden="true" />
 
         <Link
-          to={redirectRef.current}
-          className="window-no-drag flex h-9 items-center gap-2 rounded-lg px-2 text-sm transition-colors hover:bg-soft"
+          to={redirectTarget}
+          className="window-no-drag hover:bg-soft flex h-9 items-center gap-2 rounded-lg px-2 text-sm transition-colors"
         >
           <ArrowLeft size={15} aria-hidden="true" />
           返回聊天
         </Link>
 
-        <p className="px-2 font-mono text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="text-muted-foreground px-2 font-mono text-[8px] font-semibold tracking-wide uppercase">
           设置
         </p>
 
@@ -52,7 +54,7 @@ export function SettingsLayout(): React.JSX.Element {
 
         <div className="flex-1" />
 
-        <p className="px-2 font-mono text-[8px] text-disabled">汤圆 0.1.0</p>
+        <p className="text-disabled px-2 font-mono text-[8px]">汤圆 0.1.0</p>
       </aside>
 
       <div className="bg-background flex-1 overflow-y-auto px-[72px] py-[52px]">
