@@ -108,6 +108,7 @@ export function createTangyuanRuntime(
 export * from './pi-sdk-driver-contracts'
 export * from './gateway'
 export * from './agent'
+export * from './approval'
 export * from './core'
 export * from './profile'
 export * from './skill'

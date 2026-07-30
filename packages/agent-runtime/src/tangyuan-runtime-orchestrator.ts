@@ -7,10 +7,12 @@ import type {
   ToolApprovalGateway,
 } from './pi-sdk-driver-contracts'
 import { TranscriptEmitter } from './session/transcript-emitter'
-import { BashApprovalRegistry } from './bash-approval-registry'
-import { ClarificationRegistry } from './clarification-registry'
+import {
+  BashApprovalRegistry,
+  ClarificationRegistry,
+  createToolApprovalGateway,
+} from './approval'
 import { SessionCache } from './session/session-cache'
-import { createToolApprovalGateway } from './tool-approval-gateway'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
 import { AgentManager, IdentityService } from './agent'
 import { SkillService } from './skill'

@@ -2,10 +2,10 @@ import type {
   BashApprovalRequest,
   QuestionClarificationRequest,
 } from '@tangyuan/contracts'
-import type { ToolApprovalGateway } from './pi-sdk-driver-contracts'
+import type { ToolApprovalGateway } from '../pi-sdk-driver-contracts'
 import type { BashApprovalRegistry } from './bash-approval-registry'
 import type { ClarificationRegistry } from './clarification-registry'
-import { validateFilePath } from './core'
+import { validateFilePath } from '../core'
 
 /**
  * 创建 ToolApprovalGateway 所需的依赖。
