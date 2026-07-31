@@ -316,18 +316,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
   const selectedTranscript =
     transcript?.sessionId === selectedSession?.sessionId ? transcript : null
 
-  const setSessions = (
-    targetAgentId: string,
-    value:
-      | AgentSessionSummary[]
-      | ((currentValue: AgentSessionSummary[]) => AgentSessionSummary[]),
-  ): void => {
-    const current = store.getState().sessionsByAgentId[targetAgentId] ?? []
-    replaceAgentSessions(
-      targetAgentId,
-      typeof value === 'function' ? value(current) : value,
-    )
-  }
+
   const setIsSendingMessage = (value: boolean): void => {
     if (!sessionId) return
     if (value) beginSending(sessionId)
@@ -343,7 +332,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     agentId: activeAgentId,
     selectedSession,
     onSessionsChange: (nextSessions) => {
-      setSessions(activeAgentId, nextSessions)
+      replaceAgentSessions(activeAgentId, nextSessions)
     },
     onArchived: (target, result) => {
       clearSessionRequestsForSessions(result.affectedSessionIds)
@@ -444,7 +433,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
         content,
       })
       openTranscript(nextTranscript)
-      setSessions(
+      replaceAgentSessions(
         selectedSession.agentId,
         await window.api.listSessions({ agentId: selectedSession.agentId }),
       )
@@ -480,7 +469,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
         userMessageId,
       })
       openTranscript(nextTranscript)
-      setSessions(
+      replaceAgentSessions(
         selectedSession.agentId,
         await window.api.listSessions({ agentId: selectedSession.agentId }),
       )
@@ -524,7 +513,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
           sessionId: childSession.sessionId,
         }),
       ])
-      setSessions(childSession.agentId, nextSessions)
+      replaceAgentSessions(childSession.agentId, nextSessions)
       openTranscript(childTranscript)
       updateComposerDraft(sourceMessageContent)
       navigate(`/chat/${activeAgentId}/${childSession.sessionId}`, {
@@ -558,7 +547,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
       })
       finishSending(selectedSession.sessionId)
       // 刷新 sessions 以同步取消后的状态，避免仅依赖异步推送事件
-      setSessions(
+      replaceAgentSessions(
         selectedSession.agentId,
         await window.api.listSessions({ agentId: selectedSession.agentId }),
       )
