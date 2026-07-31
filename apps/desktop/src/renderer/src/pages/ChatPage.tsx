@@ -28,6 +28,10 @@ import { Button } from '@/components/ui/button'
 import { Composer } from '@/components/Composer'
 import { TranscriptMessages } from '@/components/TranscriptMessages'
 import { useSessionArchive } from '@/hooks/useSessionArchive'
+import {
+  clearPendingApprovalsForSessions,
+  clearPendingClarificationsForSessions,
+} from '@/lib/agent-event-state'
 
 interface DesktopWorkbenchState {
   runtime: RuntimeSnapshot | null
@@ -273,13 +277,13 @@ function ChatPage(props: {
     selectedSession,
     onSessionsChange: context.setSessions,
     onArchived: (target, result) => {
-      const affectedIds = new Set(result.affectedSessionIds)
       context.setPendingApprovals((current) =>
-        current.filter((approval) => !affectedIds.has(approval.sessionId)),
+        clearPendingApprovalsForSessions(current, result.affectedSessionIds),
       )
       context.setPendingClarifications((current) =>
-        current.filter(
-          (clarification) => !affectedIds.has(clarification.sessionId),
+        clearPendingClarificationsForSessions(
+          current,
+          result.affectedSessionIds,
         ),
       )
       context.setSelectedSessionId(null)
@@ -287,13 +291,13 @@ function ChatPage(props: {
       navigate(`/chat/${target.agentId}`, { replace: true })
     },
     onDeleted: (target, result) => {
-      const affectedIds = new Set(result.affectedSessionIds)
       context.setPendingApprovals((current) =>
-        current.filter((approval) => !affectedIds.has(approval.sessionId)),
+        clearPendingApprovalsForSessions(current, result.affectedSessionIds),
       )
       context.setPendingClarifications((current) =>
-        current.filter(
-          (clarification) => !affectedIds.has(clarification.sessionId),
+        clearPendingClarificationsForSessions(
+          current,
+          result.affectedSessionIds,
         ),
       )
       context.setSelectedSessionId(null)

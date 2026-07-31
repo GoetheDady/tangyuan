@@ -23,6 +23,15 @@ import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { WindowShell } from '@/components/WindowShell'
+import {
+  getAgentEventSessionId,
+  mergeAgentEventIntoSessions,
+} from '@/lib/agent-event-session-state'
+import {
+  mergeAgentEventIntoAgents,
+  mergeAgentEventIntoPendingApprovals,
+  mergeAgentEventIntoPendingClarifications,
+} from '@/lib/agent-event-state'
 import { ChatGuard, LoadingScreen } from '@/pages/ChatPage'
 import { ConsoleProviderPage } from '@/pages/ConsoleProviderPage'
 import { ConsoleAgentListPage } from '@/pages/ConsoleAgentListPage'
@@ -271,26 +280,16 @@ function DesktopRoutes(): React.JSX.Element {
   useEffect(() => {
     const unsubscribe = window.api.subscribeToAgentEvents((event) => {
       if (event.type === 'agent-created') {
-        setAgents((currentAgents) => {
-          const exists = currentAgents.some(
-            (agent) => agent.agentId === event.agent.agentId,
-          )
-          if (exists) {
-            return currentAgents.map((agent) =>
-              agent.agentId === event.agent.agentId ? event.agent : agent,
-            )
-          }
-          return [...currentAgents, event.agent]
-        })
+        setAgents((currentAgents) =>
+          mergeAgentEventIntoAgents(currentAgents, event),
+        )
         toast.success(`已创建 Agent「${event.agent.displayName}」`)
         return
       }
 
       if (event.type === 'agent-archived') {
         setAgents((currentAgents) =>
-          currentAgents.map((agent) =>
-            agent.agentId === event.agent.agentId ? event.agent : agent,
-          ),
+          mergeAgentEventIntoAgents(currentAgents, event),
         )
         toast.success(`已归档 Agent「${event.agent.displayName}」`)
         return
@@ -298,9 +297,7 @@ function DesktopRoutes(): React.JSX.Element {
 
       if (event.type === 'agent-recovered') {
         setAgents((currentAgents) =>
-          currentAgents.map((agent) =>
-            agent.agentId === event.agent.agentId ? event.agent : agent,
-          ),
+          mergeAgentEventIntoAgents(currentAgents, event),
         )
         toast.success(`已恢复 Agent「${event.agent.displayName}」`)
         return
@@ -308,9 +305,7 @@ function DesktopRoutes(): React.JSX.Element {
 
       if (event.type === 'agent-config-updated') {
         setAgents((currentAgents) =>
-          currentAgents.map((agent) =>
-            agent.agentId === event.agent.agentId ? event.agent : agent,
-          ),
+          mergeAgentEventIntoAgents(currentAgents, event),
         )
         return
       }
@@ -338,7 +333,9 @@ function DesktopRoutes(): React.JSX.Element {
           void window.api.approveBash({ approvalId: event.approval.approvalId })
           return
         }
-        setPendingApprovals((current) => [...current, event.approval])
+        setPendingApprovals((current) =>
+          mergeAgentEventIntoPendingApprovals(current, event),
+        )
         toast.info(
           `Bash 命令需要审批：${event.approval.command.slice(0, 60)}...`,
         )
@@ -347,7 +344,7 @@ function DesktopRoutes(): React.JSX.Element {
 
       if (event.type === 'approval-resolved') {
         setPendingApprovals((current) =>
-          current.filter((a) => a.approvalId !== event.approvalId),
+          mergeAgentEventIntoPendingApprovals(current, event),
         )
         if (event.status === 'approved') {
           toast.success('已批准 Bash 命令执行')
@@ -358,7 +355,9 @@ function DesktopRoutes(): React.JSX.Element {
       }
 
       if (event.type === 'clarification-required') {
-        setPendingClarifications((current) => [...current, event.clarification])
+        setPendingClarifications((current) =>
+          mergeAgentEventIntoPendingClarifications(current, event),
+        )
         toast.info(
           `Agent 需要更多信息：${event.clarification.question.slice(0, 60)}...`,
         )
@@ -367,7 +366,7 @@ function DesktopRoutes(): React.JSX.Element {
 
       if (event.type === 'clarification-resolved') {
         setPendingClarifications((current) =>
-          current.filter((c) => c.clarificationId !== event.clarificationId),
+          mergeAgentEventIntoPendingClarifications(current, event),
         )
         if (event.status === 'answered') {
           toast.success(`已回答：${event.answer}`)
@@ -377,7 +376,9 @@ function DesktopRoutes(): React.JSX.Element {
         return
       }
 
-      applyAgentEventToSessions(event, setSessions)
+      setSessions((currentSessions) =>
+        mergeAgentEventIntoSessions(currentSessions, event),
+      )
 
       const eventSessionId = getAgentEventSessionId(event)
       if (!eventSessionId || eventSessionId !== selectedSessionId) {
@@ -538,104 +539,6 @@ function StartupRedirect(props: {
   }
 
   return <Navigate to="/setup" replace />
-}
-
-type StateSetter<T> = (value: T | ((currentValue: T) => T)) => void
-
-/**
- * 把 Agent 标准事件归并到会话列表状态。
- *
- * @param event - Main 推送的标准 Agent 事件。
- * @param setSessions - React 会话状态 setter。
- * @returns 无返回值。
- * @throws 此方法不会主动抛出错误。
- */
-function applyAgentEventToSessions(
-  event: AgentEvent,
-  setSessions: StateSetter<AgentSessionSummary[]>,
-): void {
-  if (event.type === 'session-created') {
-    setSessions((currentSessions) => [
-      event.session,
-      ...currentSessions.filter(
-        (session) => session.sessionId !== event.session.sessionId,
-      ),
-    ])
-    return
-  }
-
-  const sessionId = getAgentEventSessionId(event)
-  const nextState = getAgentEventRunState(event)
-
-  if (!sessionId || !nextState) {
-    return
-  }
-
-  setSessions((currentSessions) =>
-    currentSessions.map((session) =>
-      session.sessionId === sessionId
-        ? { ...session, state: nextState, updatedAt: event.occurredAt }
-        : session,
-    ),
-  )
-}
-
-/**
- * 从 Agent 事件中读取所属会话标识。
- *
- * @param event - 标准 Agent 事件。
- * @returns 有会话归属时返回 sessionId，否则返回 null。
- * @throws 此方法不会主动抛出错误。
- */
-function getAgentEventSessionId(event: AgentEvent): string | null {
-  if (event.type === 'session-created') {
-    return event.session.sessionId
-  }
-
-  if (
-    event.type === 'attempt-started' ||
-    event.type === 'turn-cancelled' ||
-    event.type === 'turn-failed' ||
-    event.type === 'run-state-changed' ||
-    event.type === 'approval-required' ||
-    event.type === 'approval-resolved' ||
-    event.type === 'clarification-required' ||
-    event.type === 'clarification-resolved' ||
-    event.type === 'transcript-delta'
-  ) {
-    return event.sessionId
-  }
-
-  return null
-}
-
-/**
- * 从 Agent 事件中读取会话的新运行状态。
- *
- * @param event - 标准 Agent 事件。
- * @returns 可用于会话摘要的新状态；无状态变化时返回 null。
- * @throws 此方法不会主动抛出错误。
- */
-function getAgentEventRunState(
-  event: AgentEvent,
-): 'idle' | 'queued' | 'running' | 'completed' | 'cancelled' | 'failed' | null {
-  if (event.type === 'attempt-started') {
-    return 'running'
-  }
-
-  if (event.type === 'turn-cancelled') {
-    return 'cancelled'
-  }
-
-  if (event.type === 'turn-failed') {
-    return 'failed'
-  }
-
-  if (event.type === 'run-state-changed') {
-    return event.state
-  }
-
-  return null
 }
 
 /**
