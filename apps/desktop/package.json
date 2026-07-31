@@ -54,7 +54,8 @@
     "motion": "^12.42.2",
     "react-router": "^8.1.0",
     "streamdown": "^2.5.0",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
