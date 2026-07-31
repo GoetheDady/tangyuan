@@ -119,6 +119,8 @@ describe('createWorkbenchStore', () => {
       runtime: null,
       agents: [],
       sessionsByAgentId: {},
+      activeAgentId: null,
+      activeSessionId: null,
       transcriptsBySessionId: {},
       sendingBySessionId: {},
       pendingApprovalsBySessionId: {},
@@ -136,7 +138,38 @@ describe('createWorkbenchStore', () => {
     expect(first).not.toHaveProperty('setState')
   })
 
-  it('装载 Main Runtime 快照并同步 Agent 摘要', () => {
+  it('通过一个语义 action 原子装载启动工作台快照', () => {
+    const store = createWorkbenchStore()
+    const runtime = createRuntime()
+    const session = createSession('researcher', 'session-1')
+    const transcript = createTranscript('researcher', 'session-1')
+    let notifications = 0
+    const unsubscribe = store.subscribe(() => {
+      notifications += 1
+    })
+
+    store.getState().loadWorkbenchSnapshot({
+      runtime,
+      agents: [TANGYUAN, RESEARCHER],
+      sessions: [session],
+      activeSession: session,
+      transcript,
+    })
+
+    expect(store.getState()).toMatchObject({
+      runtime,
+      agents: [TANGYUAN, RESEARCHER],
+      sessionsByAgentId: { researcher: [session] },
+      activeAgentId: 'researcher',
+      activeSessionId: 'session-1',
+      transcriptsBySessionId: { 'session-1': transcript },
+      isInitializing: true,
+    })
+    expect(notifications).toBe(1)
+    unsubscribe()
+  })
+
+  it('装载 Runtime 刷新快照并同步 Agent 摘要', () => {
     const store = createWorkbenchStore()
     const runtime = createRuntime()
 

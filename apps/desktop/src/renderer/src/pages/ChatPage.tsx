@@ -28,10 +28,6 @@ import { Button } from '@/components/ui/button'
 import { Composer } from '@/components/Composer'
 import { TranscriptMessages } from '@/components/TranscriptMessages'
 import { useSessionArchive } from '@/hooks/useSessionArchive'
-import {
-  clearPendingApprovalsForSessions,
-  clearPendingClarificationsForSessions,
-} from '@/lib/agent-event-state'
 
 interface DesktopWorkbenchState {
   runtime: RuntimeSnapshot | null
@@ -47,10 +43,6 @@ interface DesktopWorkbenchState {
 }
 
 interface DesktopWorkbenchAction {
-  setRuntime(value: RuntimeSnapshot | null): void
-  setAgents(
-    value: AgentSummary[] | ((currentValue: AgentSummary[]) => AgentSummary[]),
-  ): void
   setSessions(
     value:
       | AgentSessionSummary[]
@@ -61,20 +53,9 @@ interface DesktopWorkbenchAction {
   ): void
   setTranscript(value: TranscriptSnapshot | null): void
   setComposerText(value: string): void
-  setIsLoading(value: boolean): void
   setIsSendingMessage(value: boolean): void
-  setPendingApprovals(
-    value:
-      | BashApprovalRequest[]
-      | ((currentValue: BashApprovalRequest[]) => BashApprovalRequest[]),
-  ): void
-  setPendingClarifications(
-    value:
-      | QuestionClarificationRequest[]
-      | ((
-          currentValue: QuestionClarificationRequest[],
-        ) => QuestionClarificationRequest[]),
-  ): void
+  selectAgent(agentId: string): void
+  clearSessionRequestsForSessions(sessionIds: string[]): void
   /** 将命令加入当前会话的"始终允许"列表。 */
   addAlwaysAllowedCommand(sessionId: string, command: string): void
 }
@@ -202,7 +183,8 @@ function ChatPage(props: {
     if (!runtime) return []
 
     return runtime.models.filter(
-      (model) => runtime.configuredProviders[model.providerId]?.configured === true,
+      (model) =>
+        runtime.configuredProviders[model.providerId]?.configured === true,
     )
   }, [context.runtime])
 
@@ -277,29 +259,13 @@ function ChatPage(props: {
     selectedSession,
     onSessionsChange: context.setSessions,
     onArchived: (target, result) => {
-      context.setPendingApprovals((current) =>
-        clearPendingApprovalsForSessions(current, result.affectedSessionIds),
-      )
-      context.setPendingClarifications((current) =>
-        clearPendingClarificationsForSessions(
-          current,
-          result.affectedSessionIds,
-        ),
-      )
+      context.clearSessionRequestsForSessions(result.affectedSessionIds)
       context.setSelectedSessionId(null)
       context.setTranscript(null)
       navigate(`/chat/${target.agentId}`, { replace: true })
     },
     onDeleted: (target, result) => {
-      context.setPendingApprovals((current) =>
-        clearPendingApprovalsForSessions(current, result.affectedSessionIds),
-      )
-      context.setPendingClarifications((current) =>
-        clearPendingClarificationsForSessions(
-          current,
-          result.affectedSessionIds,
-        ),
-      )
+      context.clearSessionRequestsForSessions(result.affectedSessionIds)
       context.setSelectedSessionId(null)
       context.setTranscript(null)
       navigate(`/chat/${target.agentId}`, { replace: true })
@@ -632,8 +598,7 @@ function ChatPage(props: {
    */
   async function handleAgentChange(nextAgentId: string): Promise<void> {
     navigate(`/chat/${nextAgentId}`, { replace: true })
-    context.setSelectedSessionId(null)
-    context.setTranscript(null)
+    context.selectAgent(nextAgentId)
 
     try {
       const sessions = await window.api.listSessions({ agentId: nextAgentId })
@@ -693,7 +658,9 @@ function ChatPage(props: {
               title="设置"
               className="window-no-drag text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:ring-ring/50 grid size-9 shrink-0 place-items-center rounded-[10px] transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
               onClick={() => {
-                navigate(`/settings/providers?redirect=${encodeURIComponent(location.pathname)}`)
+                navigate(
+                  `/settings/providers?redirect=${encodeURIComponent(location.pathname)}`,
+                )
               }}
             >
               <Settings size={16} aria-hidden="true" />

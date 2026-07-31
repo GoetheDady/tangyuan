@@ -24,6 +24,8 @@ export interface WorkbenchState {
   runtime: RuntimeSnapshot | null
   agents: AgentSummary[]
   sessionsByAgentId: Record<string, AgentSessionSummary[]>
+  activeAgentId: string | null
+  activeSessionId: string | null
   transcriptsBySessionId: Record<string, TranscriptSnapshot>
   sendingBySessionId: Record<string, boolean>
   pendingApprovalsBySessionId: Record<string, BashApprovalRequest[]>
@@ -36,9 +38,20 @@ export interface WorkbenchState {
   alwaysAllowedCommandsBySessionId: Record<string, string[]>
 }
 
+export interface WorkbenchSnapshot {
+  runtime: RuntimeSnapshot
+  agents: AgentSummary[]
+  sessions: AgentSessionSummary[]
+  activeSession: AgentSessionSummary | null
+  transcript: TranscriptSnapshot | null
+}
+
 export interface WorkbenchActions {
+  loadWorkbenchSnapshot(snapshot: WorkbenchSnapshot): void
   loadRuntimeSnapshot(snapshot: RuntimeSnapshot): void
   replaceAgentSessions(agentId: string, sessions: AgentSessionSummary[]): void
+  selectAgent(agentId: string): void
+  selectSession(agentId: string, sessionId: string | null): void
   applyAgentEvent(event: AgentEvent): void
   openTranscript(transcript: TranscriptSnapshot): void
   clearTranscript(sessionId: string): void
@@ -66,6 +79,8 @@ function createInitialState(): WorkbenchState {
     runtime: null,
     agents: [],
     sessionsByAgentId: {},
+    activeAgentId: null,
+    activeSessionId: null,
     transcriptsBySessionId: {},
     sendingBySessionId: {},
     pendingApprovalsBySessionId: {},
@@ -81,6 +96,27 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
   const store = createStore<WorkbenchStore>()((set) => ({
     ...createInitialState(),
 
+    loadWorkbenchSnapshot: ({
+      runtime,
+      agents,
+      sessions,
+      activeSession,
+      transcript,
+    }) => {
+      const activeAgentId =
+        activeSession?.agentId ?? runtime.activeAgent.agentId
+      set({
+        runtime,
+        agents,
+        sessionsByAgentId: { [activeAgentId]: sessions },
+        activeAgentId,
+        activeSessionId: activeSession?.sessionId ?? null,
+        transcriptsBySessionId: transcript
+          ? { [transcript.sessionId]: transcript }
+          : {},
+      })
+    },
+
     loadRuntimeSnapshot: (runtime) => {
       set({ runtime, agents: runtime.agents })
     },
@@ -92,6 +128,14 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
           [agentId]: sessions,
         },
       }))
+    },
+
+    selectAgent: (activeAgentId) => {
+      set({ activeAgentId, activeSessionId: null })
+    },
+
+    selectSession: (activeAgentId, activeSessionId) => {
+      set({ activeAgentId, activeSessionId })
     },
 
     applyAgentEvent: (event) => {

@@ -19,25 +19,22 @@ import {
   useNavigate,
 } from 'react-router'
 import { toast } from 'sonner'
+import { useStore } from 'zustand'
 
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { WindowShell } from '@/components/WindowShell'
-import {
-  getAgentEventSessionId,
-  mergeAgentEventIntoSessions,
-} from '@/lib/agent-event-session-state'
-import {
-  mergeAgentEventIntoAgents,
-  mergeAgentEventIntoPendingApprovals,
-  mergeAgentEventIntoPendingClarifications,
-} from '@/lib/agent-event-state'
+import { getAgentEventSessionId } from '@/lib/agent-event-session-state'
 import { ChatGuard, LoadingScreen } from '@/pages/ChatPage'
 import { ConsoleProviderPage } from '@/pages/ConsoleProviderPage'
 import { ConsoleAgentListPage } from '@/pages/ConsoleAgentListPage'
 import { ConsoleAgentDetailPage } from '@/pages/ConsoleAgentDetailPage'
 import { SettingsLayout } from '@/pages/SettingsLayout'
 import { SettingsProviderPage } from '@/pages/SettingsProviderPage'
+import {
+  createWorkbenchStore,
+  type WorkbenchStoreApi,
+} from '@/stores/workbench-store'
 
 const componentFixturesEnabled =
   import.meta.env.DEV || import.meta.env.MODE === 'test'
@@ -65,10 +62,6 @@ interface DesktopWorkbenchState {
 }
 
 interface DesktopWorkbenchAction {
-  setRuntime(value: RuntimeSnapshot | null): void
-  setAgents(
-    value: AgentSummary[] | ((currentValue: AgentSummary[]) => AgentSummary[]),
-  ): void
   setSessions(
     value:
       | AgentSessionSummary[]
@@ -79,20 +72,9 @@ interface DesktopWorkbenchAction {
   ): void
   setTranscript(value: TranscriptSnapshot | null): void
   setComposerText(value: string): void
-  setIsLoading(value: boolean): void
   setIsSendingMessage(value: boolean): void
-  setPendingApprovals(
-    value:
-      | BashApprovalRequest[]
-      | ((currentValue: BashApprovalRequest[]) => BashApprovalRequest[]),
-  ): void
-  setPendingClarifications(
-    value:
-      | QuestionClarificationRequest[]
-      | ((
-          currentValue: QuestionClarificationRequest[],
-        ) => QuestionClarificationRequest[]),
-  ): void
+  selectAgent(agentId: string): void
+  clearSessionRequestsForSessions(sessionIds: string[]): void
   /** 将命令加入当前会话的"始终允许"列表。 */
   addAlwaysAllowedCommand(sessionId: string, command: string): void
 }
@@ -161,33 +143,36 @@ function FixtureAwareRendererRoutes(): React.JSX.Element {
  */
 function DesktopRoutes(): React.JSX.Element {
   const navigate = useNavigate()
-  const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null)
-  const [agents, setAgents] = useState<AgentSummary[]>([])
-  const [sessions, setSessions] = useState<AgentSessionSummary[]>([])
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
-    null,
-  )
-  const selectedSessionIdRef = useRef<string | null>(null)
-  const [transcript, setTranscript] = useState<TranscriptSnapshot | null>(null)
-  const [composerText, setComposerText] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSendingMessage, setIsSendingMessage] = useState(false)
-  const [pendingApprovals, setPendingApprovals] = useState<
-    BashApprovalRequest[]
-  >([])
-  const [pendingClarifications, setPendingClarifications] = useState<
-    QuestionClarificationRequest[]
-  >([])
-  const alwaysAllowedCommandsRef = useRef<Map<string, Set<string>>>(new Map())
+  const [workbenchStore] = useState<WorkbenchStoreApi>(createWorkbenchStore)
+  const workbench = useStore(workbenchStore)
+  const {
+    runtime,
+    agents,
+    activeAgentId,
+    activeSessionId: selectedSessionId,
+    composerDraft: composerText,
+    isInitializing: isLoading,
+  } = workbench
+  const sessions = activeAgentId
+    ? (workbench.sessionsByAgentId[activeAgentId] ?? [])
+    : []
+  const transcript = selectedSessionId
+    ? (workbench.transcriptsBySessionId[selectedSessionId] ?? null)
+    : null
+  const isSendingMessage = selectedSessionId
+    ? (workbench.sendingBySessionId[selectedSessionId] ?? false)
+    : false
+  const pendingApprovals = Object.values(
+    workbench.pendingApprovalsBySessionId,
+  ).flat()
+  const pendingClarifications = Object.values(
+    workbench.pendingClarificationsBySessionId,
+  ).flat()
   // 把每帧内到达的多个 transcript-delta 合并为一次 setTranscript 调用，避免每个 token 都触发 re-render
   const pendingDeltaEventsRef = useRef<
     Extract<AgentEvent, { type: 'transcript-delta' }>[]
   >([])
   const transcriptFlushRafRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    selectedSessionIdRef.current = selectedSessionId
-  }, [selectedSessionId])
 
   /**
    * 将命令加入指定会话的"始终允许"列表，后续同命令自动免审。
@@ -197,12 +182,50 @@ function DesktopRoutes(): React.JSX.Element {
    * @returns 无返回值。
    */
   function addAlwaysAllowedCommand(sessionId: string, command: string): void {
-    const sessionCommands = alwaysAllowedCommandsRef.current.get(sessionId)
-    if (sessionCommands) {
-      sessionCommands.add(command)
-    } else {
-      alwaysAllowedCommandsRef.current.set(sessionId, new Set([command]))
+    workbench.allowCommandForProcess(sessionId, command)
+  }
+
+  // 临时兼容适配层：仅把 ChatPage 的旧调用形态映射为 store 语义 action；
+  // 当聊天页在后续迁移中直接使用 selector/action 后应整体删除。
+  const setSessions: DesktopWorkbenchAction['setSessions'] = (value) => {
+    const agentId = workbenchStore.getState().activeAgentId
+    if (!agentId) return
+    const currentSessions =
+      workbenchStore.getState().sessionsByAgentId[agentId] ?? []
+    workbenchStore
+      .getState()
+      .replaceAgentSessions(
+        agentId,
+        typeof value === 'function' ? value(currentSessions) : value,
+      )
+  }
+  const setSelectedSessionId: DesktopWorkbenchAction['setSelectedSessionId'] = (
+    value,
+  ) => {
+    const state = workbenchStore.getState()
+    const agentId = state.activeAgentId ?? state.runtime?.activeAgent.agentId
+    if (!agentId) return
+    state.selectSession(
+      agentId,
+      typeof value === 'function' ? value(state.activeSessionId) : value,
+    )
+  }
+  const setTranscript = (value: TranscriptSnapshot | null): void => {
+    const currentSessionId = workbenchStore.getState().activeSessionId
+    if (value) {
+      workbenchStore.getState().openTranscript(value)
+    } else if (currentSessionId) {
+      workbenchStore.getState().clearTranscript(currentSessionId)
     }
+  }
+  const setComposerText = (value: string): void => {
+    workbenchStore.getState().updateComposerDraft(value)
+  }
+  const setIsSendingMessage = (value: boolean): void => {
+    const state = workbenchStore.getState()
+    if (!state.activeSessionId) return
+    if (value) state.beginSending(state.activeSessionId)
+    else state.finishSending(state.activeSessionId)
   }
 
   const context: DesktopWorkbenchContext = {
@@ -216,16 +239,17 @@ function DesktopRoutes(): React.JSX.Element {
     isSendingMessage,
     pendingApprovals,
     pendingClarifications,
-    setRuntime,
-    setAgents,
     setSessions,
     setSelectedSessionId,
     setTranscript,
     setComposerText,
-    setIsLoading,
     setIsSendingMessage,
-    setPendingApprovals,
-    setPendingClarifications,
+    selectAgent: workbench.selectAgent,
+    clearSessionRequestsForSessions: (sessionIds) => {
+      for (const sessionId of sessionIds) {
+        workbenchStore.getState().clearSessionRequests(sessionId)
+      }
+    },
     addAlwaysAllowedCommand,
   }
 
@@ -233,27 +257,10 @@ function DesktopRoutes(): React.JSX.Element {
     let isMounted = true
 
     void loadDesktopWorkbench(window.api)
-      .then((workbench) => {
+      .then((snapshot) => {
         if (!isMounted) return
 
-        setRuntime(workbench.runtime)
-        setAgents(workbench.agents)
-        setSessions(workbench.sessions)
-        setSelectedSessionId(
-          (currentSessionId) =>
-            currentSessionId ?? workbench.activeSession?.sessionId ?? null,
-        )
-        setTranscript((currentTranscript) => {
-          const activeSessionId = selectedSessionIdRef.current
-          if (
-            activeSessionId &&
-            workbench.transcript &&
-            workbench.transcript.sessionId !== activeSessionId
-          ) {
-            return currentTranscript
-          }
-          return workbench.transcript
-        })
+        workbenchStore.getState().loadWorkbenchSnapshot(snapshot)
 
         // 启动重定向由 StartupRedirect 组件在根路由 '/' 上处理。
         // 此处不再从任意路由无条件跳转，以保留用户直接访问的深层控制台 URI。
@@ -268,45 +275,39 @@ function DesktopRoutes(): React.JSX.Element {
       })
       .finally(() => {
         if (isMounted) {
-          setIsLoading(false)
+          workbenchStore.getState().finishInitialization()
         }
       })
 
     return () => {
       isMounted = false
     }
-  }, [navigate])
+    // 启动快照只装载一次；路由变化不得重新覆盖用户已经选择的会话。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workbenchStore])
 
   useEffect(() => {
     const unsubscribe = window.api.subscribeToAgentEvents((event) => {
       if (event.type === 'agent-created') {
-        setAgents((currentAgents) =>
-          mergeAgentEventIntoAgents(currentAgents, event),
-        )
+        workbenchStore.getState().applyAgentEvent(event)
         toast.success(`已创建 Agent「${event.agent.displayName}」`)
         return
       }
 
       if (event.type === 'agent-archived') {
-        setAgents((currentAgents) =>
-          mergeAgentEventIntoAgents(currentAgents, event),
-        )
+        workbenchStore.getState().applyAgentEvent(event)
         toast.success(`已归档 Agent「${event.agent.displayName}」`)
         return
       }
 
       if (event.type === 'agent-recovered') {
-        setAgents((currentAgents) =>
-          mergeAgentEventIntoAgents(currentAgents, event),
-        )
+        workbenchStore.getState().applyAgentEvent(event)
         toast.success(`已恢复 Agent「${event.agent.displayName}」`)
         return
       }
 
       if (event.type === 'agent-config-updated') {
-        setAgents((currentAgents) =>
-          mergeAgentEventIntoAgents(currentAgents, event),
-        )
+        workbenchStore.getState().applyAgentEvent(event)
         return
       }
 
@@ -314,7 +315,7 @@ function DesktopRoutes(): React.JSX.Element {
         void window.api
           .refreshRuntime()
           .then((nextRuntime) => {
-            setRuntime(nextRuntime)
+            workbenchStore.getState().loadRuntimeSnapshot(nextRuntime)
           })
           .catch((error: unknown) => {
             toast.error(
@@ -325,17 +326,16 @@ function DesktopRoutes(): React.JSX.Element {
 
       if (event.type === 'approval-required') {
         // 检查是否已"始终允许"此会话中的此命令
-        const sessionCommands = alwaysAllowedCommandsRef.current.get(
-          event.sessionId,
-        )
-        if (sessionCommands?.has(event.approval.command)) {
+        const sessionCommands =
+          workbenchStore.getState().alwaysAllowedCommandsBySessionId[
+            event.sessionId
+          ] ?? []
+        if (sessionCommands.includes(event.approval.command)) {
           // 自动批准，不展示审批卡片
           void window.api.approveBash({ approvalId: event.approval.approvalId })
           return
         }
-        setPendingApprovals((current) =>
-          mergeAgentEventIntoPendingApprovals(current, event),
-        )
+        workbenchStore.getState().applyAgentEvent(event)
         toast.info(
           `Bash 命令需要审批：${event.approval.command.slice(0, 60)}...`,
         )
@@ -343,9 +343,7 @@ function DesktopRoutes(): React.JSX.Element {
       }
 
       if (event.type === 'approval-resolved') {
-        setPendingApprovals((current) =>
-          mergeAgentEventIntoPendingApprovals(current, event),
-        )
+        workbenchStore.getState().applyAgentEvent(event)
         if (event.status === 'approved') {
           toast.success('已批准 Bash 命令执行')
         } else {
@@ -355,9 +353,7 @@ function DesktopRoutes(): React.JSX.Element {
       }
 
       if (event.type === 'clarification-required') {
-        setPendingClarifications((current) =>
-          mergeAgentEventIntoPendingClarifications(current, event),
-        )
+        workbenchStore.getState().applyAgentEvent(event)
         toast.info(
           `Agent 需要更多信息：${event.clarification.question.slice(0, 60)}...`,
         )
@@ -365,9 +361,7 @@ function DesktopRoutes(): React.JSX.Element {
       }
 
       if (event.type === 'clarification-resolved') {
-        setPendingClarifications((current) =>
-          mergeAgentEventIntoPendingClarifications(current, event),
-        )
+        workbenchStore.getState().applyAgentEvent(event)
         if (event.status === 'answered') {
           toast.success(`已回答：${event.answer}`)
         } else {
@@ -376,9 +370,9 @@ function DesktopRoutes(): React.JSX.Element {
         return
       }
 
-      setSessions((currentSessions) =>
-        mergeAgentEventIntoSessions(currentSessions, event),
-      )
+      if (event.type !== 'transcript-delta') {
+        workbenchStore.getState().applyAgentEvent(event)
+      }
 
       const eventSessionId = getAgentEventSessionId(event)
       if (!eventSessionId || eventSessionId !== selectedSessionId) {
@@ -400,20 +394,24 @@ function DesktopRoutes(): React.JSX.Element {
             const events = pendingDeltaEventsRef.current.splice(0)
             if (events.length === 0) return
             const firstEvent = events[0]!
-            setTranscript((current) => {
-              if (current && current.sessionId !== firstEvent.sessionId)
-                return current
-              let snapshot: TranscriptSnapshot = current ?? {
-                sessionId: firstEvent.sessionId,
-                agentId: firstEvent.agentId,
-                entries: [],
-                updatedAt: new Date().toISOString(),
-              }
-              for (const ev of events) {
-                snapshot = applyTranscriptDelta(snapshot, ev.delta)
-              }
-              return snapshot
-            })
+            const state = workbenchStore.getState()
+            const current = state.transcriptsBySessionId[firstEvent.sessionId]
+            if (
+              state.activeSessionId !== firstEvent.sessionId ||
+              (current && current.sessionId !== firstEvent.sessionId)
+            ) {
+              return
+            }
+            let snapshot: TranscriptSnapshot = current ?? {
+              sessionId: firstEvent.sessionId,
+              agentId: firstEvent.agentId,
+              entries: [],
+              updatedAt: new Date().toISOString(),
+            }
+            for (const ev of events) {
+              snapshot = applyTranscriptDelta(snapshot, ev.delta)
+            }
+            state.openTranscript(snapshot)
           })
         }
       }
@@ -423,7 +421,7 @@ function DesktopRoutes(): React.JSX.Element {
         event.type === 'turn-failed' ||
         (event.type === 'run-state-changed' && event.state !== 'running')
       ) {
-        setIsSendingMessage(false)
+        workbenchStore.getState().finishSending(event.sessionId)
       }
     })
     return () => {
@@ -434,30 +432,21 @@ function DesktopRoutes(): React.JSX.Element {
       }
       pendingDeltaEventsRef.current = []
     }
-  }, [selectedSessionId])
+  }, [selectedSessionId, workbenchStore])
 
   const handleConfigurationSaved = useCallback(
     async (nextRuntime: RuntimeSnapshot): Promise<void> => {
-      const nextAgents = nextRuntime.agents ?? [
-        {
-          agentId: nextRuntime.activeAgent.agentId,
-          displayName: nextRuntime.activeAgent.displayName,
-          status: 'active' as const,
-          defaultProviderId: nextRuntime.settings.selectedProviderId,
-          defaultModelId: nextRuntime.settings.selectedModelId,
-          homePath: nextRuntime.activeAgent.homePath,
-          archivedAt: null,
-        },
-      ]
-      setRuntime(nextRuntime)
-      setAgents(nextAgents)
       const { sessions, activeSession, transcript } =
         await loadSessionsForReadyRuntime(window.api, nextRuntime)
-      setSessions(sessions)
-      setSelectedSessionId(activeSession.sessionId)
-      setTranscript(transcript)
+      workbenchStore.getState().loadWorkbenchSnapshot({
+        runtime: nextRuntime,
+        agents: nextRuntime.agents,
+        sessions,
+        activeSession,
+        transcript,
+      })
     },
-    [],
+    [workbenchStore],
   )
 
   return (
@@ -483,7 +472,9 @@ function DesktopRoutes(): React.JSX.Element {
       <Route
         path="/setup"
         element={
-          <ConsoleProviderPage onConfigurationSaved={handleConfigurationSaved} />
+          <ConsoleProviderPage
+            onConfigurationSaved={handleConfigurationSaved}
+          />
         }
       />
       <Route path="/settings" element={<SettingsLayout />}>
@@ -623,17 +614,7 @@ async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   transcript: TranscriptSnapshot | null
 }> {
   const runtime = await api.getRuntimeSnapshot()
-  const agents = runtime.agents ?? [
-    {
-      agentId: runtime.activeAgent.agentId,
-      displayName: runtime.activeAgent.displayName,
-      status: 'active' as const,
-      defaultProviderId: runtime.settings.selectedProviderId,
-      defaultModelId: runtime.settings.selectedModelId,
-      homePath: runtime.activeAgent.homePath,
-      archivedAt: null,
-    },
-  ]
+  const agents = runtime.agents
 
   if (runtime.status !== 'ready') {
     return {
