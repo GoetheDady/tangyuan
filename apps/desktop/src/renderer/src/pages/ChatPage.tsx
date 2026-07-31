@@ -142,9 +142,9 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
         EMPTY_CLARIFICATIONS)
       : EMPTY_CLARIFICATIONS,
   )
-  const pendingApprovalsBySessionId = useStore(
+  const pendingApprovalSessionIds = useStore(
     store,
-    (state) => state.pendingApprovalsBySessionId,
+    (state) => state.pendingApprovalSessionIds,
   )
 
   const activeAgent = useMemo(
@@ -315,7 +315,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     selectedSession?.state === 'queued'
   const selectedTranscript =
     transcript?.sessionId === selectedSession?.sessionId ? transcript : null
-
 
   const setIsSendingMessage = (value: boolean): void => {
     if (!sessionId) return
@@ -588,15 +587,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
 
     return groups.filter((group) => group.sessions.length > 0)
   }, [sessions])
-
-  const pendingApprovalSessionIds = useMemo(
-    () =>
-      Object.values(pendingApprovalsBySessionId)
-        .flat()
-        .filter((approval) => approval.status === 'pending')
-        .map((approval) => approval.sessionId),
-    [pendingApprovalsBySessionId],
-  )
 
   /**
    * 选中侧边栏的会话并同步路由。

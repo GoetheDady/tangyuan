@@ -23,6 +23,8 @@ import {
 export interface WorkbenchState {
   runtime: RuntimeSnapshot | null
   agents: AgentSummary[]
+  /** 启动时恢复的最后激活会话，只用于初始路由重定向。 */
+  activeSession: AgentSessionSummary | null
   sessionsByAgentId: Record<string, AgentSessionSummary[]>
   transcriptsBySessionId: Record<string, TranscriptSnapshot>
   sendingBySessionId: Record<string, boolean>
@@ -34,19 +36,13 @@ export interface WorkbenchState {
   composerDraft: string
   isInitializing: boolean
   alwaysAllowedCommandsBySessionId: Record<string, string[]>
-}
-
-export interface WorkbenchSnapshot {
-  runtime: RuntimeSnapshot
-  agents: AgentSummary[]
-  sessions: AgentSessionSummary[]
-  activeSession: AgentSessionSummary | null
-  transcript: TranscriptSnapshot | null
+  /** 有 pending 审批的会话 ID 列表，由 approval 变更自动派生。 */
+  pendingApprovalSessionIds: string[]
 }
 
 export interface WorkbenchActions {
-  loadWorkbenchSnapshot(snapshot: WorkbenchSnapshot): void
   loadRuntimeSnapshot(snapshot: RuntimeSnapshot): void
+  setActiveSession(session: AgentSessionSummary | null): void
   replaceAgentSessions(agentId: string, sessions: AgentSessionSummary[]): void
   applyAgentEvent(event: AgentEvent): void
   applyTranscriptEvents(
@@ -77,6 +73,7 @@ function createInitialState(): WorkbenchState {
   return {
     runtime: null,
     agents: [],
+    activeSession: null,
     sessionsByAgentId: {},
     transcriptsBySessionId: {},
     sendingBySessionId: {},
@@ -85,6 +82,7 @@ function createInitialState(): WorkbenchState {
     composerDraft: '',
     isInitializing: true,
     alwaysAllowedCommandsBySessionId: {},
+    pendingApprovalSessionIds: [],
   }
 }
 
@@ -93,27 +91,12 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
   const store = createStore<WorkbenchStore>()((set) => ({
     ...createInitialState(),
 
-    loadWorkbenchSnapshot: ({
-      runtime,
-      agents,
-      sessions,
-      activeSession,
-      transcript,
-    }) => {
-      const activeAgentId =
-        activeSession?.agentId ?? runtime.activeAgent.agentId
-      set({
-        runtime,
-        agents,
-        sessionsByAgentId: { [activeAgentId]: sessions },
-        transcriptsBySessionId: transcript
-          ? { [transcript.sessionId]: transcript }
-          : {},
-      })
-    },
-
     loadRuntimeSnapshot: (runtime) => {
       set({ runtime, agents: runtime.agents })
+    },
+
+    setActiveSession: (session) => {
+      set({ activeSession: session })
     },
 
     replaceAgentSessions: (agentId, sessions) => {
@@ -194,6 +177,16 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
         }
 
         if (
+          event.type === 'approval-required' ||
+          event.type === 'approval-resolved'
+        ) {
+          partial.pendingApprovalSessionIds = computePendingApprovalSessionIds(
+            partial.pendingApprovalsBySessionId ??
+              state.pendingApprovalsBySessionId,
+          )
+        }
+
+        if (
           event.type === 'turn-cancelled' ||
           event.type === 'turn-failed' ||
           (event.type === 'run-state-changed' && event.state !== 'running')
@@ -266,23 +259,31 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
     },
 
     addPendingApproval: (approval) => {
-      set((state) => ({
-        pendingApprovalsBySessionId: appendSessionValue(
+      set((state) => {
+        const next = appendSessionValue(
           state.pendingApprovalsBySessionId,
           approval.sessionId,
           approval,
-        ),
-      }))
+        )
+        return {
+          pendingApprovalsBySessionId: next,
+          pendingApprovalSessionIds: computePendingApprovalSessionIds(next),
+        }
+      })
     },
 
     resolvePendingApproval: (sessionId, approvalId) => {
-      set((state) => ({
-        pendingApprovalsBySessionId: removeSessionValue(
+      set((state) => {
+        const next = removeSessionValue(
           state.pendingApprovalsBySessionId,
           sessionId,
           (approval) => approval.approvalId === approvalId,
-        ),
-      }))
+        )
+        return {
+          pendingApprovalsBySessionId: next,
+          pendingApprovalSessionIds: computePendingApprovalSessionIds(next),
+        }
+      })
     },
 
     addPendingClarification: (clarification) => {
@@ -306,16 +307,21 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
     },
 
     clearSessionRequests: (sessionId) => {
-      set((state) => ({
-        pendingApprovalsBySessionId: {
+      set((state) => {
+        const nextApprovals = {
           ...state.pendingApprovalsBySessionId,
           [sessionId]: [],
-        },
-        pendingClarificationsBySessionId: {
-          ...state.pendingClarificationsBySessionId,
-          [sessionId]: [],
-        },
-      }))
+        }
+        return {
+          pendingApprovalsBySessionId: nextApprovals,
+          pendingApprovalSessionIds:
+            computePendingApprovalSessionIds(nextApprovals),
+          pendingClarificationsBySessionId: {
+            ...state.pendingClarificationsBySessionId,
+            [sessionId]: [],
+          },
+        }
+      })
     },
 
     updateComposerDraft: (composerDraft) => {
@@ -381,4 +387,18 @@ function omitKey<T>(values: Record<string, T>, key: string): Record<string, T> {
   const remaining = { ...values }
   delete remaining[key]
   return remaining
+}
+
+/**
+ * 从审批列表中提取有 pending 状态的会话 ID 列表。
+ *
+ * @param approvalsBySessionId - 按 session 分组的审批请求。
+ * @returns 有 pending 审批的会话 ID 数组。
+ */
+function computePendingApprovalSessionIds(
+  approvalsBySessionId: Record<string, BashApprovalRequest[]>,
+): string[] {
+  return Object.entries(approvalsBySessionId)
+    .filter(([, approvals]) => approvals.some((a) => a.status === 'pending'))
+    .map(([sessionId]) => sessionId)
 }

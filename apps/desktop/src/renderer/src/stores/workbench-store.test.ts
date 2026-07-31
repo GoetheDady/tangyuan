@@ -125,6 +125,8 @@ describe('createWorkbenchStore', () => {
       pendingClarificationsBySessionId: {},
       composerDraft: '',
       isInitializing: true,
+      activeSession: null,
+      pendingApprovalSessionIds: [],
       alwaysAllowedCommandsBySessionId: {},
     })
 
@@ -138,33 +140,38 @@ describe('createWorkbenchStore', () => {
     expect(first).not.toHaveProperty('setState')
   })
 
-  it('通过一个语义 action 原子装载启动工作台快照', () => {
+  it('通过多个语义 action 装载启动工作台数据', () => {
     const store = createWorkbenchStore()
     const runtime = createRuntime()
     const session = createSession('researcher', 'session-1')
     const transcript = createTranscript('researcher', 'session-1')
-    let notifications = 0
-    const unsubscribe = store.subscribe(() => {
-      notifications += 1
-    })
 
-    store.getState().loadWorkbenchSnapshot({
-      runtime,
-      agents: [TANGYUAN, RESEARCHER],
-      sessions: [session],
-      activeSession: session,
-      transcript,
-    })
+    store.getState().loadRuntimeSnapshot(runtime)
+    store.getState().setActiveSession(session)
+    store.getState().replaceAgentSessions('researcher', [session])
+    store.getState().openTranscript(transcript)
 
     expect(store.getState()).toMatchObject({
       runtime,
       agents: [TANGYUAN, RESEARCHER],
+      activeSession: session,
       sessionsByAgentId: { researcher: [session] },
       transcriptsBySessionId: { 'session-1': transcript },
       isInitializing: true,
     })
-    expect(notifications).toBe(1)
-    unsubscribe()
+  })
+
+  it('设置和清除启动时激活会话', () => {
+    const store = createWorkbenchStore()
+    const session = createSession('tangyuan', 'session-1')
+
+    expect(store.getState().activeSession).toBeNull()
+
+    store.getState().setActiveSession(session)
+    expect(store.getState().activeSession).toBe(session)
+
+    store.getState().setActiveSession(null)
+    expect(store.getState().activeSession).toBeNull()
   })
 
   it('装载 Runtime 刷新快照并同步 Agent 摘要', () => {
@@ -335,6 +342,7 @@ describe('createWorkbenchStore', () => {
     expect(store.getState().pendingClarificationsBySessionId).toEqual({
       'session-1': [firstClarification],
     })
+    expect(store.getState().pendingApprovalSessionIds).toEqual(['session-2'])
   })
 
   it('按 session 打开、更新和清理 transcript', () => {
@@ -397,6 +405,7 @@ describe('createWorkbenchStore', () => {
       'session-1': [firstClarification],
       'session-2': [],
     })
+    expect(store.getState().pendingApprovalSessionIds).toEqual([])
   })
 
   it('composer 草稿和进程内始终允许命令只通过语义 action 修改', () => {

@@ -106,10 +106,6 @@ function FixtureAwareRendererRoutes(): React.JSX.Element {
 function DesktopRoutes(): React.JSX.Element {
   const navigate = useNavigate()
   const [workbenchStore] = useState<WorkbenchStoreApi>(createWorkbenchStore)
-  const [startupSession, setStartupSession] =
-    useState<AgentSessionSummary | null>(null)
-  const runtime = useStore(workbenchStore, (state) => state.runtime)
-  const isLoading = useStore(workbenchStore, (state) => state.isInitializing)
 
   useEffect(() => {
     let isMounted = true
@@ -118,8 +114,16 @@ function DesktopRoutes(): React.JSX.Element {
       .then((snapshot) => {
         if (!isMounted) return
 
-        workbenchStore.getState().loadWorkbenchSnapshot(snapshot)
-        setStartupSession(snapshot.activeSession)
+        const store = workbenchStore.getState()
+        store.loadRuntimeSnapshot(snapshot.runtime)
+        store.setActiveSession(snapshot.activeSession)
+        const activeAgentId =
+          snapshot.activeSession?.agentId ??
+          snapshot.runtime.activeAgent.agentId
+        store.replaceAgentSessions(activeAgentId, snapshot.sessions)
+        if (snapshot.transcript) {
+          store.openTranscript(snapshot.transcript)
+        }
 
         // 启动重定向由 StartupRedirect 组件在根路由 '/' 上处理。
         // 此处不再从任意路由无条件跳转，以保留用户直接访问的深层控制台 URI。
@@ -169,30 +173,22 @@ function DesktopRoutes(): React.JSX.Element {
     async (nextRuntime: RuntimeSnapshot): Promise<void> => {
       const { sessions, activeSession, transcript } =
         await loadSessionsForReadyRuntime(window.api, nextRuntime)
-      workbenchStore.getState().loadWorkbenchSnapshot({
-        runtime: nextRuntime,
-        agents: nextRuntime.agents,
-        sessions,
-        activeSession,
-        transcript,
-      })
-      setStartupSession(activeSession)
+      const store = workbenchStore.getState()
+      store.loadRuntimeSnapshot(nextRuntime)
+      store.setActiveSession(activeSession)
+      const activeAgentId =
+        activeSession?.agentId ?? nextRuntime.activeAgent.agentId
+      store.replaceAgentSessions(activeAgentId, sessions)
+      if (transcript) {
+        store.openTranscript(transcript)
+      }
     },
     [workbenchStore],
   )
 
   return (
     <Routes>
-      <Route
-        path="/"
-        element={
-          <StartupRedirect
-            runtime={runtime}
-            activeSession={startupSession}
-            isLoading={isLoading}
-          />
-        }
-      />
+      <Route path="/" element={<StartupRedirect store={workbenchStore} />} />
       <Route
         path="/chat/:agentId?/:sessionId?"
         element={<ChatGuard store={workbenchStore} />}
@@ -231,25 +227,27 @@ function DesktopRoutes(): React.JSX.Element {
 /**
  * 根据运行时状态把启动入口重定向到聊天页或控制台页。
  *
- * @param props - 当前运行时和加载状态。
+ * @param props - 工作台 store。
  * @returns 加载态或 Navigate 路由元素。
  * @throws 此组件不会主动抛出错误。
  */
 function StartupRedirect(props: {
-  runtime: RuntimeSnapshot | null
-  activeSession: AgentSessionSummary | null
-  isLoading: boolean
+  store: WorkbenchStoreApi
 }): React.JSX.Element {
-  if (props.isLoading) {
+  const runtime = useStore(props.store, (state) => state.runtime)
+  const isLoading = useStore(props.store, (state) => state.isInitializing)
+  const activeSession = useStore(props.store, (state) => state.activeSession)
+
+  if (isLoading) {
     return <LoadingScreen />
   }
 
-  if (props.runtime?.status === 'ready') {
+  if (runtime?.status === 'ready') {
     return (
       <Navigate
         to={
-          props.activeSession
-            ? `/chat/${props.activeSession.agentId}/${props.activeSession.sessionId}`
+          activeSession
+            ? `/chat/${activeSession.agentId}/${activeSession.sessionId}`
             : '/chat/tangyuan'
         }
         replace
