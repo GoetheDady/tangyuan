@@ -53,6 +53,9 @@ export interface WorkbenchActions {
   selectAgent(agentId: string): void
   selectSession(agentId: string, sessionId: string | null): void
   applyAgentEvent(event: AgentEvent): void
+  applyTranscriptEvents(
+    events: Extract<AgentEvent, { type: 'transcript-delta' }>[],
+  ): void
   openTranscript(transcript: TranscriptSnapshot): void
   clearTranscript(sessionId: string): void
   beginSending(sessionId: string): void
@@ -218,6 +221,27 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
         }
 
         return partial
+      })
+    },
+
+    applyTranscriptEvents: (events) => {
+      set((state) => {
+        const transcriptsBySessionId = { ...state.transcriptsBySessionId }
+
+        for (const event of events) {
+          const currentTranscript = transcriptsBySessionId[event.sessionId] ?? {
+            agentId: event.agentId,
+            sessionId: event.sessionId,
+            entries: [],
+            updatedAt: event.occurredAt,
+          }
+          transcriptsBySessionId[event.sessionId] = applyTranscriptDelta(
+            currentTranscript,
+            event.delta,
+          )
+        }
+
+        return { transcriptsBySessionId }
       })
     },
 

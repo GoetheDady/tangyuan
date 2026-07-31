@@ -1,5 +1,4 @@
 import type {
-  AgentEvent,
   AgentSessionSummary,
   AgentSummary,
   BashApprovalRequest,
@@ -8,8 +7,7 @@ import type {
   RuntimeSnapshot,
   TranscriptSnapshot,
 } from '@tangyuan/contracts'
-import { applyTranscriptDelta } from '@tangyuan/contracts'
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import {
   HashRouter,
   Navigate,
@@ -24,7 +22,7 @@ import { useStore } from 'zustand'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { WindowShell } from '@/components/WindowShell'
-import { getAgentEventSessionId } from '@/lib/agent-event-session-state'
+import { createAgentEventBridge } from '@/lib/agent-event-bridge'
 import { ChatGuard, LoadingScreen } from '@/pages/ChatPage'
 import { ConsoleProviderPage } from '@/pages/ConsoleProviderPage'
 import { ConsoleAgentListPage } from '@/pages/ConsoleAgentListPage'
@@ -168,11 +166,6 @@ function DesktopRoutes(): React.JSX.Element {
   const pendingClarifications = Object.values(
     workbench.pendingClarificationsBySessionId,
   ).flat()
-  // 把每帧内到达的多个 transcript-delta 合并为一次 setTranscript 调用，避免每个 token 都触发 re-render
-  const pendingDeltaEventsRef = useRef<
-    Extract<AgentEvent, { type: 'transcript-delta' }>[]
-  >([])
-  const transcriptFlushRafRef = useRef<number | null>(null)
 
   /**
    * 将命令加入指定会话的"始终允许"列表，后续同命令自动免审。
@@ -287,152 +280,20 @@ function DesktopRoutes(): React.JSX.Element {
   }, [workbenchStore])
 
   useEffect(() => {
-    const unsubscribe = window.api.subscribeToAgentEvents((event) => {
-      if (event.type === 'agent-created') {
-        workbenchStore.getState().applyAgentEvent(event)
-        toast.success(`已创建 Agent「${event.agent.displayName}」`)
-        return
-      }
-
-      if (event.type === 'agent-archived') {
-        workbenchStore.getState().applyAgentEvent(event)
-        toast.success(`已归档 Agent「${event.agent.displayName}」`)
-        return
-      }
-
-      if (event.type === 'agent-recovered') {
-        workbenchStore.getState().applyAgentEvent(event)
-        toast.success(`已恢复 Agent「${event.agent.displayName}」`)
-        return
-      }
-
-      if (event.type === 'agent-config-updated') {
-        workbenchStore.getState().applyAgentEvent(event)
-        return
-      }
-
-      if (event.type === 'profile-updated') {
-        void window.api
-          .refreshRuntime()
-          .then((nextRuntime) => {
-            workbenchStore.getState().loadRuntimeSnapshot(nextRuntime)
-          })
-          .catch((error: unknown) => {
-            toast.error(
-              error instanceof Error ? error.message : '刷新 Profile 状态失败',
-            )
-          })
-      }
-
-      if (event.type === 'approval-required') {
-        // 检查是否已"始终允许"此会话中的此命令
-        const sessionCommands =
-          workbenchStore.getState().alwaysAllowedCommandsBySessionId[
-            event.sessionId
-          ] ?? []
-        if (sessionCommands.includes(event.approval.command)) {
-          // 自动批准，不展示审批卡片
-          void window.api.approveBash({ approvalId: event.approval.approvalId })
-          return
-        }
-        workbenchStore.getState().applyAgentEvent(event)
-        toast.info(
-          `Bash 命令需要审批：${event.approval.command.slice(0, 60)}...`,
-        )
-        return
-      }
-
-      if (event.type === 'approval-resolved') {
-        workbenchStore.getState().applyAgentEvent(event)
-        if (event.status === 'approved') {
-          toast.success('已批准 Bash 命令执行')
-        } else {
-          toast.info('已拒绝 Bash 命令执行')
-        }
-        return
-      }
-
-      if (event.type === 'clarification-required') {
-        workbenchStore.getState().applyAgentEvent(event)
-        toast.info(
-          `Agent 需要更多信息：${event.clarification.question.slice(0, 60)}...`,
-        )
-        return
-      }
-
-      if (event.type === 'clarification-resolved') {
-        workbenchStore.getState().applyAgentEvent(event)
-        if (event.status === 'answered') {
-          toast.success(`已回答：${event.answer}`)
-        } else {
-          toast.info('已取消澄清')
-        }
-        return
-      }
-
-      if (event.type !== 'transcript-delta') {
-        workbenchStore.getState().applyAgentEvent(event)
-      }
-
-      const eventSessionId = getAgentEventSessionId(event)
-      if (!eventSessionId || eventSessionId !== selectedSessionId) {
-        return
-      }
-
-      if (event.type === 'turn-failed') {
-        toast.error(event.error.message)
-      }
-
-      if (
-        event.type === 'transcript-delta' &&
-        event.sessionId === selectedSessionId
-      ) {
-        pendingDeltaEventsRef.current.push(event)
-        if (transcriptFlushRafRef.current === null) {
-          transcriptFlushRafRef.current = requestAnimationFrame(() => {
-            transcriptFlushRafRef.current = null
-            const events = pendingDeltaEventsRef.current.splice(0)
-            if (events.length === 0) return
-            const firstEvent = events[0]!
-            const state = workbenchStore.getState()
-            const current = state.transcriptsBySessionId[firstEvent.sessionId]
-            if (
-              state.activeSessionId !== firstEvent.sessionId ||
-              (current && current.sessionId !== firstEvent.sessionId)
-            ) {
-              return
-            }
-            let snapshot: TranscriptSnapshot = current ?? {
-              sessionId: firstEvent.sessionId,
-              agentId: firstEvent.agentId,
-              entries: [],
-              updatedAt: new Date().toISOString(),
-            }
-            for (const ev of events) {
-              snapshot = applyTranscriptDelta(snapshot, ev.delta)
-            }
-            state.openTranscript(snapshot)
-          })
-        }
-      }
-
-      if (
-        event.type === 'turn-cancelled' ||
-        event.type === 'turn-failed' ||
-        (event.type === 'run-state-changed' && event.state !== 'running')
-      ) {
-        workbenchStore.getState().finishSending(event.sessionId)
-      }
+    const bridge = createAgentEventBridge({
+      store: workbenchStore,
+      api: window.api,
+      notifications: toast,
+      frames: {
+        request: (callback) => requestAnimationFrame(callback),
+        cancel: (frameId) => cancelAnimationFrame(frameId),
+      },
     })
+
     return () => {
-      unsubscribe()
-      if (transcriptFlushRafRef.current !== null) {
-        cancelAnimationFrame(transcriptFlushRafRef.current)
-        transcriptFlushRafRef.current = null
-      }
-      pendingDeltaEventsRef.current = []
+      bridge.dispose()
     }
-  }, [selectedSessionId, workbenchStore])
+  }, [workbenchStore])
 
   const handleConfigurationSaved = useCallback(
     async (nextRuntime: RuntimeSnapshot): Promise<void> => {

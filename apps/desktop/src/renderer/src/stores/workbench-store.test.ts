@@ -198,6 +198,67 @@ describe('createWorkbenchStore', () => {
     })
   })
 
+  it('在一个 action 中按顺序批量归并多个 session 的 transcript delta', () => {
+    const store = createWorkbenchStore()
+    let notifications = 0
+    store.subscribe(() => {
+      notifications += 1
+    })
+
+    store.getState().applyTranscriptEvents([
+      {
+        type: 'transcript-delta',
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        delta: {
+          type: 'entry-appended',
+          entry: {
+            kind: 'agent-reply',
+            index: 0,
+            messageId: 'reply-1',
+            content: '你',
+            createdAt: NOW,
+            attempt: null,
+            turns: [],
+          },
+        },
+        occurredAt: NOW,
+      },
+      {
+        type: 'transcript-delta',
+        agentId: 'researcher',
+        sessionId: 'session-2',
+        delta: {
+          type: 'entry-appended',
+          entry: {
+            kind: 'user-message',
+            index: 0,
+            messageId: 'message-2',
+            content: '独立会话',
+            createdAt: NOW,
+          },
+        },
+        occurredAt: NOW,
+      },
+      {
+        type: 'transcript-delta',
+        agentId: 'tangyuan',
+        sessionId: 'session-1',
+        delta: { type: 'delta-appended', index: 0, delta: '好' },
+        occurredAt: NOW,
+      },
+    ])
+
+    expect(notifications).toBe(1)
+    expect(store.getState().transcriptsBySessionId).toMatchObject({
+      'session-1': { agentId: 'tangyuan', entries: [{ content: '你好' }] },
+      'session-2': {
+        agentId: 'researcher',
+        entries: [{ content: '独立会话' }],
+      },
+    })
+  })
+
   it('按事件所属 Agent 归并 session 和 Agent 摘要', () => {
     const store = createWorkbenchStore()
     const firstSession = createSession('tangyuan', 'session-1')
