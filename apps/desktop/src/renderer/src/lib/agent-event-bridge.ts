@@ -23,6 +23,8 @@ export interface AgentEventBridgeDependencies {
   api: AgentEventBridgeApi
   notifications: AgentEventNotifications
   frames: AgentEventFrameScheduler
+  /** 返回当前 URL 路由显示的会话标识；无会话时返回 null。 */
+  getActiveSessionId?(): string | null
 }
 
 export interface AgentEventBridge {
@@ -41,6 +43,7 @@ export function createAgentEventBridge({
   api,
   notifications,
   frames,
+  getActiveSessionId = () => null,
 }: AgentEventBridgeDependencies): AgentEventBridge {
   let pendingDeltaEvents: TranscriptDeltaEvent[] = []
   let pendingFrameId: number | null = null
@@ -150,7 +153,7 @@ export function createAgentEventBridge({
 
     if (
       event.type === 'turn-failed' &&
-      event.sessionId === store.getState().activeSessionId
+      event.sessionId === getActiveSessionId()
     ) {
       notifications.error(event.error.message)
     }

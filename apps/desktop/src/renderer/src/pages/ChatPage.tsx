@@ -4,14 +4,13 @@ import type {
   BashApprovalRequest,
   ModelDescriptor,
   QuestionClarificationRequest,
-  RuntimeSnapshot,
   SessionModelInfo,
-  TranscriptSnapshot,
 } from '@tangyuan/contracts'
 import { MessageSquarePlus, Settings } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
+import { useStore } from 'zustand'
 
 import { BashApprovalCard } from '@/components/BashApprovalCard'
 import { ForkSourceNotice } from '@/components/ForkSourceNotice'
@@ -28,40 +27,12 @@ import { Button } from '@/components/ui/button'
 import { Composer } from '@/components/Composer'
 import { TranscriptMessages } from '@/components/TranscriptMessages'
 import { useSessionArchive } from '@/hooks/useSessionArchive'
+import type { WorkbenchStoreApi } from '@/stores/workbench-store'
 
-interface DesktopWorkbenchState {
-  runtime: RuntimeSnapshot | null
-  agents: AgentSummary[]
-  sessions: AgentSessionSummary[]
-  selectedSessionId: string | null
-  transcript: TranscriptSnapshot | null
-  composerText: string
-  isLoading: boolean
-  isSendingMessage: boolean
-  pendingApprovals: BashApprovalRequest[]
-  pendingClarifications: QuestionClarificationRequest[]
-}
-
-interface DesktopWorkbenchAction {
-  setSessions(
-    value:
-      | AgentSessionSummary[]
-      | ((currentValue: AgentSessionSummary[]) => AgentSessionSummary[]),
-  ): void
-  setSelectedSessionId(
-    value: string | null | ((currentValue: string | null) => string | null),
-  ): void
-  setTranscript(value: TranscriptSnapshot | null): void
-  setComposerText(value: string): void
-  setIsSendingMessage(value: boolean): void
-  selectAgent(agentId: string): void
-  clearSessionRequestsForSessions(sessionIds: string[]): void
-  /** 将命令加入当前会话的"始终允许"列表。 */
-  addAlwaysAllowedCommand(sessionId: string, command: string): void
-}
-
-interface DesktopWorkbenchContext
-  extends DesktopWorkbenchState, DesktopWorkbenchAction {}
+/** 未加载时的稳定空列表，避免 selector 每次返回新引用引发重渲染循环。 */
+const EMPTY_SESSIONS: AgentSessionSummary[] = []
+const EMPTY_APPROVALS: BashApprovalRequest[] = []
+const EMPTY_CLARIFICATIONS: QuestionClarificationRequest[] = []
 
 function getAgentInitial(displayName: string): string {
   return Array.from(displayName.trim())[0] ?? '汤'
@@ -70,20 +41,22 @@ function getAgentInitial(displayName: string): string {
 /**
  * 聊天页路由守卫：运行时未就绪时重定向到控制台。
  *
- * @param props - 桌面工作台状态上下文。
+ * @param props - 工作台 store。
  * @returns 聊天页、控制台重定向或加载态。
  * @throws 此组件不会主动抛出错误。
  */
 export function ChatGuard(props: {
-  context: DesktopWorkbenchContext
+  store: WorkbenchStoreApi
 }): React.JSX.Element {
   const { agentId } = useParams<{ agentId: string; sessionId: string }>()
+  const isLoading = useStore(props.store, (state) => state.isInitializing)
+  const runtime = useStore(props.store, (state) => state.runtime)
 
-  if (props.context.isLoading) {
+  if (isLoading) {
     return <LoadingScreen />
   }
 
-  if (props.context.runtime?.status !== 'ready') {
+  if (runtime?.status !== 'ready') {
     const redirectTarget = agentId ? `/chat/${agentId}` : '/chat/tangyuan'
     return (
       <Navigate
@@ -93,34 +66,92 @@ export function ChatGuard(props: {
     )
   }
 
-  return <ChatPage context={props.context} />
+  return <ChatPage store={props.store} />
 }
 
 /**
  * 渲染大语言模型对话主界面。
  *
- * @param props - 桌面工作台状态上下文。
+ * 当前显示的 Agent 与 session 由路由参数决定：组件只按 URL 中的
+ * agentId/sessionId 用细粒度 selector 读取 store 中的会话与消息数据。
+ *
+ * @param props - 工作台 store。
  * @returns 聊天主界面组件树。
  * @throws 此组件不会主动抛出错误；交互错误会通过 toast 反馈。
  */
-function ChatPage(props: {
-  context: DesktopWorkbenchContext
-}): React.JSX.Element {
-  const { context } = props
+function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
+  const { store } = props
   const { agentId, sessionId } = useParams<{
     agentId: string
     sessionId: string
   }>()
   const navigate = useNavigate()
   const location = useLocation()
-  const activeAgentId =
-    agentId ?? context.runtime?.activeAgent.agentId ?? 'tangyuan'
+  const runtime = useStore(store, (state) => state.runtime)
+  const agents = useStore(store, (state) => state.agents)
+  const composerText = useStore(store, (state) => state.composerDraft)
+  const updateComposerDraft = useStore(
+    store,
+    (state) => state.updateComposerDraft,
+  )
+  const allowCommandForProcess = useStore(
+    store,
+    (state) => state.allowCommandForProcess,
+  )
+  const openTranscript = useStore(store, (state) => state.openTranscript)
+  const replaceAgentSessions = useStore(
+    store,
+    (state) => state.replaceAgentSessions,
+  )
+  const clearSessionRequests = useStore(
+    store,
+    (state) => state.clearSessionRequests,
+  )
+  const beginSending = useStore(store, (state) => state.beginSending)
+  const finishSending = useStore(store, (state) => state.finishSending)
+  const activeAgentId = agentId ?? runtime?.activeAgent.agentId ?? 'tangyuan'
+
+  const sessions = useStore(
+    store,
+    (state) =>
+      (activeAgentId ? state.sessionsByAgentId[activeAgentId] : undefined) ??
+      EMPTY_SESSIONS,
+  )
+  const hasLoadedAgentSessions = useStore(store, (state) =>
+    activeAgentId
+      ? Object.prototype.hasOwnProperty.call(
+          state.sessionsByAgentId,
+          activeAgentId,
+        )
+      : true,
+  )
+  const transcript = useStore(store, (state) =>
+    sessionId ? (state.transcriptsBySessionId[sessionId] ?? null) : null,
+  )
+  const isSendingMessage = useStore(store, (state) =>
+    sessionId ? (state.sendingBySessionId[sessionId] ?? false) : false,
+  )
+  const sessionPendingApprovals = useStore(store, (state) =>
+    sessionId
+      ? (state.pendingApprovalsBySessionId[sessionId] ?? EMPTY_APPROVALS)
+      : EMPTY_APPROVALS,
+  )
+  const sessionPendingClarifications = useStore(store, (state) =>
+    sessionId
+      ? (state.pendingClarificationsBySessionId[sessionId] ??
+        EMPTY_CLARIFICATIONS)
+      : EMPTY_CLARIFICATIONS,
+  )
+  const pendingApprovalsBySessionId = useStore(
+    store,
+    (state) => state.pendingApprovalsBySessionId,
+  )
 
   const activeAgent = useMemo(
     () =>
-      context.agents.find((agent) => agent.agentId === activeAgentId) ??
-      context.runtime?.activeAgent,
-    [context.agents, activeAgentId, context.runtime?.activeAgent],
+      agents.find((agent) => agent.agentId === activeAgentId) ??
+      runtime?.activeAgent,
+    [agents, activeAgentId, runtime?.activeAgent],
   )
   const activeAgentDisplayName =
     'displayName' in (activeAgent ?? {})
@@ -149,11 +180,9 @@ function ChatPage(props: {
     null,
   )
 
-  // 当选中 session 变化时加载模型信息
+  // 当 URL 中的 session 变化时加载模型信息
   useEffect(() => {
-    const currentSessionId = sessionId ?? context.selectedSessionId
-
-    if (!currentSessionId || !activeAgentId) {
+    if (!sessionId || !activeAgentId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- 依赖变化时同步重置状态是预期行为
       setSessionModelInfo(null)
       return
@@ -164,7 +193,7 @@ function ChatPage(props: {
     void window.api
       .getSessionModelInfo({
         agentId: activeAgentId,
-        sessionId: currentSessionId,
+        sessionId,
       })
       .then((info) => {
         setSessionModelInfo(info)
@@ -176,32 +205,71 @@ function ChatPage(props: {
       .finally(() => {
         setIsLoadingModelInfo(false)
       })
-  }, [sessionId, context.selectedSessionId, activeAgentId])
+  }, [sessionId, activeAgentId])
+
+  // 当前 Agent 的会话列表尚未加载时按需读取；结果按 Agent 落盘，互不覆盖。
+  useEffect(() => {
+    if (hasLoadedAgentSessions) return
+
+    void window.api
+      .listSessions({ agentId: activeAgentId })
+      .then((nextSessions) => {
+        store.getState().replaceAgentSessions(activeAgentId, nextSessions)
+      })
+      .catch((error: unknown) => {
+        toast.error(
+          error instanceof Error ? error.message : '加载 Agent 会话失败',
+        )
+      })
+    // 只在首次进入或 Agent 切换时触发一次；由 hasLoadedAgentSessions 收敛。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAgentId, hasLoadedAgentSessions])
+
+  // URL sessionId 是当前显示会话的事实来源：每次路由变化都按需读取
+  // transcript 并持久化最后激活会话，且只接纳最后一次请求的结果，
+  // 避免快速切换时旧结果覆盖新会话。
+  useEffect(() => {
+    if (!sessionId || !activeAgentId) return
+
+    const requestId = ++openSessionRequestIdRef.current
+    void window.api
+      .getTranscript({ agentId: activeAgentId, sessionId })
+      .then((nextTranscript) => {
+        if (requestId !== openSessionRequestIdRef.current) return
+
+        store.getState().openTranscript(nextTranscript)
+        void persistLastActiveSession(activeAgentId, sessionId)
+      })
+      .catch((error) => {
+        if (requestId !== openSessionRequestIdRef.current) return
+
+        toast.error(error instanceof Error ? error.message : '读取会话消息失败')
+      })
+    // 路由变化即会话切换；每次切换都重新读取最新 transcript。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, activeAgentId])
 
   const selectableModels = useMemo<ModelDescriptor[]>(() => {
-    const runtime = context.runtime
     if (!runtime) return []
 
     return runtime.models.filter(
       (model) =>
         runtime.configuredProviders[model.providerId]?.configured === true,
     )
-  }, [context.runtime])
+  }, [runtime])
 
   async function handleSessionModelChange(
     providerId: string,
     modelId: string,
   ): Promise<void> {
-    const currentSessionId = sessionId ?? context.selectedSessionId
-
-    if (!currentSessionId || !activeAgentId) return
+    if (!sessionId || !activeAgentId) return
 
     setIsSwitchingModel(true)
 
     try {
       const info = await window.api.setSessionModel({
         agentId: activeAgentId,
-        sessionId: currentSessionId,
+        sessionId,
         providerId,
         modelId,
       })
@@ -215,14 +283,12 @@ function ChatPage(props: {
   }
 
   async function handleThinkingLevelChange(level: string): Promise<void> {
-    const currentSessionId = sessionId ?? context.selectedSessionId
-
-    if (!currentSessionId || !activeAgentId) return
+    if (!sessionId || !activeAgentId) return
 
     try {
       const info = await window.api.setSessionThinkingLevel({
         agentId: activeAgentId,
-        sessionId: currentSessionId,
+        sessionId,
         level,
       })
       setSessionModelInfo(info)
@@ -234,40 +300,57 @@ function ChatPage(props: {
     }
   }
 
-  const selectedSession = useMemo(
-    () =>
-      context.sessions.find(
-        (session) => session.sessionId === context.selectedSessionId,
-      ) ??
-      context.sessions[0] ??
-      null,
-    [context.sessions, context.selectedSessionId],
-  )
+  const selectedSession = useMemo(() => {
+    if (sessionId) {
+      return sessions.find((session) => session.sessionId === sessionId) ?? null
+    }
+    return sessions[0] ?? null
+  }, [sessions, sessionId])
   const isSelectedSessionRunning = selectedSession?.state === 'running'
   // 响应等待提示信号：正在发送、排队或运行中。具体是否展示占位
   // 由 TranscriptMessages 根据本次执行尝试是否已有可见回复内容判定。
   const isAwaitingResponse =
-    context.isSendingMessage ||
+    isSendingMessage ||
     selectedSession?.state === 'running' ||
     selectedSession?.state === 'queued'
   const selectedTranscript =
-    context.transcript?.sessionId === selectedSession?.sessionId
-      ? context.transcript
-      : null
+    transcript?.sessionId === selectedSession?.sessionId ? transcript : null
+
+  const setSessions = (
+    targetAgentId: string,
+    value:
+      | AgentSessionSummary[]
+      | ((currentValue: AgentSessionSummary[]) => AgentSessionSummary[]),
+  ): void => {
+    const current = store.getState().sessionsByAgentId[targetAgentId] ?? []
+    replaceAgentSessions(
+      targetAgentId,
+      typeof value === 'function' ? value(current) : value,
+    )
+  }
+  const setIsSendingMessage = (value: boolean): void => {
+    if (!sessionId) return
+    if (value) beginSending(sessionId)
+    else finishSending(sessionId)
+  }
+  const clearSessionRequestsForSessions = (sessionIds: string[]): void => {
+    for (const sessionId of sessionIds) {
+      clearSessionRequests(sessionId)
+    }
+  }
+
   const sessionArchive = useSessionArchive({
     agentId: activeAgentId,
     selectedSession,
-    onSessionsChange: context.setSessions,
+    onSessionsChange: (nextSessions) => {
+      setSessions(activeAgentId, nextSessions)
+    },
     onArchived: (target, result) => {
-      context.clearSessionRequestsForSessions(result.affectedSessionIds)
-      context.setSelectedSessionId(null)
-      context.setTranscript(null)
+      clearSessionRequestsForSessions(result.affectedSessionIds)
       navigate(`/chat/${target.agentId}`, { replace: true })
     },
     onDeleted: (target, result) => {
-      context.clearSessionRequestsForSessions(result.affectedSessionIds)
-      context.setSelectedSessionId(null)
-      context.setTranscript(null)
+      clearSessionRequestsForSessions(result.affectedSessionIds)
       navigate(`/chat/${target.agentId}`, { replace: true })
     },
   })
@@ -276,29 +359,26 @@ function ChatPage(props: {
     if (!parentSessionId) return null
 
     return (
-      context.sessions.find(
-        (session) => session.sessionId === parentSessionId,
-      ) ?? null
+      sessions.find((session) => session.sessionId === parentSessionId) ?? null
     )
-  }, [context.sessions, selectedSession?.forkedFrom?.sessionId])
+  }, [sessions, selectedSession?.forkedFrom?.sessionId])
 
   /**
    * 持久化用户最后成功打开的会话。
    *
-   * @param session - 已成功打开的会话摘要。
+   * @param agentId - 会话所属 Agent。
+   * @param sessionId - 已成功打开的会话标识。
    * @returns 无返回值。
    * @throws Preload API 错误会被捕获并通过 toast 反馈。
    */
   function persistLastActiveSession(
-    session: AgentSessionSummary,
+    agentId: string,
+    sessionId: string,
   ): Promise<void> {
     persistLastActiveSessionQueueRef.current =
       persistLastActiveSessionQueueRef.current
         .then(async () => {
-          await window.api.setLastActiveSession({
-            agentId: session.agentId,
-            sessionId: session.sessionId,
-          })
+          await window.api.setLastActiveSession({ agentId, sessionId })
         })
         .catch((error) => {
           toast.error(
@@ -321,59 +401,20 @@ function ChatPage(props: {
         agentId: activeAgentId,
         title: '新会话',
       })
-      context.setSessions((currentSessions) => [
+      const currentSessions =
+        store.getState().sessionsByAgentId[activeAgentId] ?? []
+      replaceAgentSessions(activeAgentId, [
         session,
         ...currentSessions.filter(
           (candidate) => candidate.sessionId !== session.sessionId,
         ),
       ])
-      context.setSelectedSessionId(session.sessionId)
-      context.setTranscript(null)
       navigate(`/chat/${activeAgentId}/${session.sessionId}`, { replace: true })
-      await persistLastActiveSession(session)
+      await persistLastActiveSession(session.agentId, session.sessionId)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '创建会话失败')
     }
   }
-
-  /**
-   * 打开指定会话并读取 transcript。
-   *
-   * @param session - 用户在会话列表中选择的会话摘要。
-   * @returns 无返回值。
-   * @throws Preload API 错误会被捕获并通过 toast 反馈。
-   */
-  const openSession = async (session: AgentSessionSummary): Promise<void> => {
-    const requestId = ++openSessionRequestIdRef.current
-    context.setSelectedSessionId(session.sessionId)
-
-    try {
-      const nextTranscript = await window.api.getTranscript({
-        agentId: session.agentId,
-        sessionId: session.sessionId,
-      })
-      if (requestId !== openSessionRequestIdRef.current) return
-
-      context.setTranscript(nextTranscript)
-      await persistLastActiveSession(session)
-    } catch (error) {
-      if (requestId !== openSessionRequestIdRef.current) return
-
-      toast.error(error instanceof Error ? error.message : '读取会话消息失败')
-    }
-  }
-
-  // 当 URL 中有 sessionId 时自动选中对应会话
-  useEffect(() => {
-    if (sessionId && sessionId !== context.selectedSessionId) {
-      const targetSession = context.sessions.find(
-        (s) => s.sessionId === sessionId,
-      )
-      if (targetSession) {
-        void openSession(targetSession)
-      }
-    }
-  }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * 向当前会话发送用户消息。
@@ -382,7 +423,7 @@ function ChatPage(props: {
    * @throws Preload API 错误会被捕获并通过 toast 反馈。
    */
   const sendMessage = async (): Promise<void> => {
-    const content = context.composerText.trim()
+    const content = composerText.trim()
 
     if (!selectedSession) {
       toast.error('请先创建一个新会话。')
@@ -393,8 +434,8 @@ function ChatPage(props: {
       return
     }
 
-    context.setComposerText('')
-    context.setIsSendingMessage(true)
+    updateComposerDraft('')
+    setIsSendingMessage(true)
 
     try {
       const nextTranscript = await window.api.sendMessage({
@@ -402,8 +443,9 @@ function ChatPage(props: {
         sessionId: selectedSession.sessionId,
         content,
       })
-      context.setTranscript(nextTranscript)
-      context.setSessions(
+      openTranscript(nextTranscript)
+      setSessions(
+        selectedSession.agentId,
         await window.api.listSessions({ agentId: selectedSession.agentId }),
       )
       navigate(`/chat/${activeAgentId}/${selectedSession.sessionId}`, {
@@ -412,7 +454,7 @@ function ChatPage(props: {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '发送消息失败')
     } finally {
-      context.setIsSendingMessage(false)
+      setIsSendingMessage(false)
     }
   }
 
@@ -429,7 +471,7 @@ function ChatPage(props: {
       return
     }
 
-    context.setIsSendingMessage(true)
+    setIsSendingMessage(true)
 
     try {
       const nextTranscript = await window.api.retryMessage({
@@ -437,14 +479,15 @@ function ChatPage(props: {
         sessionId: selectedSession.sessionId,
         userMessageId,
       })
-      context.setTranscript(nextTranscript)
-      context.setSessions(
+      openTranscript(nextTranscript)
+      setSessions(
+        selectedSession.agentId,
         await window.api.listSessions({ agentId: selectedSession.agentId }),
       )
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '重试消息失败')
     } finally {
-      context.setIsSendingMessage(false)
+      setIsSendingMessage(false)
     }
   }
 
@@ -474,21 +517,23 @@ function ChatPage(props: {
         sessionId: selectedSession.sessionId,
         entryId: userMessageId,
       })
-      const [sessions, childTranscript] = await Promise.all([
+      const [nextSessions, childTranscript] = await Promise.all([
         window.api.listSessions({ agentId: childSession.agentId }),
         window.api.getTranscript({
           agentId: childSession.agentId,
           sessionId: childSession.sessionId,
         }),
       ])
-      context.setSessions(sessions)
-      context.setSelectedSessionId(childSession.sessionId)
-      context.setTranscript(childTranscript)
-      context.setComposerText(sourceMessageContent)
+      setSessions(childSession.agentId, nextSessions)
+      openTranscript(childTranscript)
+      updateComposerDraft(sourceMessageContent)
       navigate(`/chat/${activeAgentId}/${childSession.sessionId}`, {
         replace: true,
       })
-      await persistLastActiveSession(childSession)
+      await persistLastActiveSession(
+        childSession.agentId,
+        childSession.sessionId,
+      )
       toast.success('已创建分叉会话')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '分叉会话失败')
@@ -511,26 +556,27 @@ function ChatPage(props: {
         agentId: selectedSession.agentId,
         sessionId: selectedSession.sessionId,
       })
-      context.setIsSendingMessage(false)
+      finishSending(selectedSession.sessionId)
       // 刷新 sessions 以同步取消后的状态，避免仅依赖异步推送事件
-      context.setSessions(
+      setSessions(
+        selectedSession.agentId,
         await window.api.listSessions({ agentId: selectedSession.agentId }),
       )
       toast.success('已停止生成')
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : '取消运行失败')
       // 即使取消失败，也要重置 isSendingMessage，防止 UI 卡住
-      context.setIsSendingMessage(false)
+      finishSending(selectedSession.sessionId)
     }
   }
 
   const sessionGroups = useMemo(() => {
     const today = new Date().toDateString()
     const knownSessionIds = new Set(
-      context.sessions.map((session) => session.sessionId),
+      sessions.map((session) => session.sessionId),
     )
     // 父会话已不在列表里的分叉也作为根展示，避免整条谱系不可见。
-    const rootSessions = context.sessions.filter(
+    const rootSessions = sessions.filter(
       (session) =>
         !session.forkedFrom ||
         !knownSessionIds.has(session.forkedFrom.sessionId),
@@ -552,14 +598,15 @@ function ChatPage(props: {
     ]
 
     return groups.filter((group) => group.sessions.length > 0)
-  }, [context.sessions])
+  }, [sessions])
 
   const pendingApprovalSessionIds = useMemo(
     () =>
-      context.pendingApprovals
+      Object.values(pendingApprovalsBySessionId)
+        .flat()
         .filter((approval) => approval.status === 'pending')
         .map((approval) => approval.sessionId),
-    [context.pendingApprovals],
+    [pendingApprovalsBySessionId],
   )
 
   /**
@@ -570,7 +617,6 @@ function ChatPage(props: {
    */
   function handleSelectSession(session: AgentSessionSummary): void {
     setForkSourceMessageId(null)
-    void openSession(session)
     navigate(`/chat/${activeAgentId}/${session.sessionId}`, { replace: true })
   }
 
@@ -579,11 +625,10 @@ function ChatPage(props: {
    *
    * @returns 无返回值。
    */
-  async function viewForkSource(): Promise<void> {
+  function viewForkSource(): void {
     if (!parentSession || !selectedSession?.forkedFrom) return
 
     setForkSourceMessageId(selectedSession.forkedFrom.entryId)
-    await openSession(parentSession)
     navigate(`/chat/${activeAgentId}/${parentSession.sessionId}`, {
       replace: true,
     })
@@ -594,20 +639,9 @@ function ChatPage(props: {
    *
    * @param nextAgentId - 要切换到的 Agent 标识。
    * @returns 无返回值。
-   * @throws Preload API 错误会被捕获并通过 toast 反馈。
    */
-  async function handleAgentChange(nextAgentId: string): Promise<void> {
+  function handleAgentChange(nextAgentId: string): void {
     navigate(`/chat/${nextAgentId}`, { replace: true })
-    context.selectAgent(nextAgentId)
-
-    try {
-      const sessions = await window.api.listSessions({ agentId: nextAgentId })
-      context.setSessions(sessions)
-    } catch (error: unknown) {
-      toast.error(
-        error instanceof Error ? error.message : '加载 Agent 会话失败',
-      )
-    }
   }
 
   return (
@@ -626,7 +660,7 @@ function ChatPage(props: {
           >
             <div aria-hidden="true" className="h-9 shrink-0" />
 
-            {context.agents
+            {agents
               .filter((agent) => agent.status === 'active')
               .map((agent) => {
                 const isActive = agent.agentId === activeAgentId
@@ -643,7 +677,7 @@ function ChatPage(props: {
                         : 'border-border bg-card text-foreground hover:bg-background'
                     }`}
                     onClick={() => {
-                      void handleAgentChange(agent.agentId)
+                      handleAgentChange(agent.agentId)
                     }}
                   >
                     {getAgentInitial(agent.displayName)}
@@ -704,7 +738,7 @@ function ChatPage(props: {
                         {group.label}
                       </p>
                       <SessionLineageTree
-                        sessions={context.sessions}
+                        sessions={sessions}
                         rootSessions={group.sessions}
                         selectedSessionId={selectedSession?.sessionId ?? null}
                         pendingApprovalSessionIds={pendingApprovalSessionIds}
@@ -785,10 +819,10 @@ function ChatPage(props: {
             />
           </div>
 
-          {selectedSession && context.pendingApprovals.length > 0 && (
+          {selectedSession && sessionPendingApprovals.length > 0 && (
             <div className="bg-background shrink-0 px-4 py-2">
               <div className="mx-auto max-w-[720px] space-y-2">
-                {context.pendingApprovals
+                {sessionPendingApprovals
                   .filter(
                     (approval) =>
                       approval.sessionId === selectedSession.sessionId &&
@@ -802,7 +836,7 @@ function ChatPage(props: {
                         await window.api.approveBash({ approvalId })
                       }}
                       onApproveAlways={async (approvalId) => {
-                        context.addAlwaysAllowedCommand(
+                        allowCommandForProcess(
                           approval.sessionId,
                           approval.command,
                         )
@@ -817,10 +851,10 @@ function ChatPage(props: {
             </div>
           )}
 
-          {selectedSession && context.pendingClarifications.length > 0 && (
+          {selectedSession && sessionPendingClarifications.length > 0 && (
             <div className="bg-background shrink-0 px-4 py-2">
               <div className="mx-auto max-w-[720px] space-y-2">
-                {context.pendingClarifications
+                {sessionPendingClarifications
                   .filter(
                     (clarification) =>
                       clarification.sessionId === selectedSession.sessionId &&
@@ -852,8 +886,8 @@ function ChatPage(props: {
             className="bg-background shrink-0 px-4 pt-[5px] pb-[6px]"
           >
             <Composer
-              value={context.composerText}
-              onChange={context.setComposerText}
+              value={composerText}
+              onChange={updateComposerDraft}
               onSubmit={() => {
                 void sendMessage()
               }}
@@ -862,7 +896,7 @@ function ChatPage(props: {
                   ? '继续输入...'
                   : `给${activeAgentDisplayName}发送消息...`
               }
-              isRunning={isSelectedSessionRunning || context.isSendingMessage}
+              isRunning={isSelectedSessionRunning || isSendingMessage}
               onCancel={() => {
                 void cancelRun()
               }}
@@ -870,7 +904,7 @@ function ChatPage(props: {
               sessionModelInfo={selectedSession ? sessionModelInfo : null}
               isLoadingModelInfo={isLoadingModelInfo}
               isSwitchingModel={isSwitchingModel}
-              providers={context.runtime?.providers ?? []}
+              providers={runtime?.providers ?? []}
               selectableModels={selectableModels}
               onModelChange={(providerId, modelId) => {
                 void handleSessionModelChange(providerId, modelId)

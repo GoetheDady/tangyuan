@@ -1,9 +1,7 @@
 import type {
   AgentSessionSummary,
   AgentSummary,
-  BashApprovalRequest,
   DesktopPreloadApi,
-  QuestionClarificationRequest,
   RuntimeSnapshot,
   TranscriptSnapshot,
 } from '@tangyuan/contracts'
@@ -45,40 +43,6 @@ const ConversationComponentsFixturePage = componentFixturesEnabled
 const RendererRoutes = componentFixturesEnabled
   ? FixtureAwareRendererRoutes
   : DesktopRoutes
-
-interface DesktopWorkbenchState {
-  runtime: RuntimeSnapshot | null
-  agents: AgentSummary[]
-  sessions: AgentSessionSummary[]
-  selectedSessionId: string | null
-  transcript: TranscriptSnapshot | null
-  composerText: string
-  isLoading: boolean
-  isSendingMessage: boolean
-  pendingApprovals: BashApprovalRequest[]
-  pendingClarifications: QuestionClarificationRequest[]
-}
-
-interface DesktopWorkbenchAction {
-  setSessions(
-    value:
-      | AgentSessionSummary[]
-      | ((currentValue: AgentSessionSummary[]) => AgentSessionSummary[]),
-  ): void
-  setSelectedSessionId(
-    value: string | null | ((currentValue: string | null) => string | null),
-  ): void
-  setTranscript(value: TranscriptSnapshot | null): void
-  setComposerText(value: string): void
-  setIsSendingMessage(value: boolean): void
-  selectAgent(agentId: string): void
-  clearSessionRequestsForSessions(sessionIds: string[]): void
-  /** 将命令加入当前会话的"始终允许"列表。 */
-  addAlwaysAllowedCommand(sessionId: string, command: string): void
-}
-
-export interface DesktopWorkbenchContext
-  extends DesktopWorkbenchState, DesktopWorkbenchAction {}
 
 /**
  * 渲染桌面端应用的前端路由入口。
@@ -142,109 +106,10 @@ function FixtureAwareRendererRoutes(): React.JSX.Element {
 function DesktopRoutes(): React.JSX.Element {
   const navigate = useNavigate()
   const [workbenchStore] = useState<WorkbenchStoreApi>(createWorkbenchStore)
-  const workbench = useStore(workbenchStore)
-  const {
-    runtime,
-    agents,
-    activeAgentId,
-    activeSessionId: selectedSessionId,
-    composerDraft: composerText,
-    isInitializing: isLoading,
-  } = workbench
-  const sessions = activeAgentId
-    ? (workbench.sessionsByAgentId[activeAgentId] ?? [])
-    : []
-  const transcript = selectedSessionId
-    ? (workbench.transcriptsBySessionId[selectedSessionId] ?? null)
-    : null
-  const isSendingMessage = selectedSessionId
-    ? (workbench.sendingBySessionId[selectedSessionId] ?? false)
-    : false
-  const pendingApprovals = Object.values(
-    workbench.pendingApprovalsBySessionId,
-  ).flat()
-  const pendingClarifications = Object.values(
-    workbench.pendingClarificationsBySessionId,
-  ).flat()
-
-  /**
-   * 将命令加入指定会话的"始终允许"列表，后续同命令自动免审。
-   *
-   * @param sessionId - 会话标识。
-   * @param command - 免审的 bash 命令。
-   * @returns 无返回值。
-   */
-  function addAlwaysAllowedCommand(sessionId: string, command: string): void {
-    workbench.allowCommandForProcess(sessionId, command)
-  }
-
-  // 临时兼容适配层：仅把 ChatPage 的旧调用形态映射为 store 语义 action；
-  // 当聊天页在后续迁移中直接使用 selector/action 后应整体删除。
-  const setSessions: DesktopWorkbenchAction['setSessions'] = (value) => {
-    const agentId = workbenchStore.getState().activeAgentId
-    if (!agentId) return
-    const currentSessions =
-      workbenchStore.getState().sessionsByAgentId[agentId] ?? []
-    workbenchStore
-      .getState()
-      .replaceAgentSessions(
-        agentId,
-        typeof value === 'function' ? value(currentSessions) : value,
-      )
-  }
-  const setSelectedSessionId: DesktopWorkbenchAction['setSelectedSessionId'] = (
-    value,
-  ) => {
-    const state = workbenchStore.getState()
-    const agentId = state.activeAgentId ?? state.runtime?.activeAgent.agentId
-    if (!agentId) return
-    state.selectSession(
-      agentId,
-      typeof value === 'function' ? value(state.activeSessionId) : value,
-    )
-  }
-  const setTranscript = (value: TranscriptSnapshot | null): void => {
-    const currentSessionId = workbenchStore.getState().activeSessionId
-    if (value) {
-      workbenchStore.getState().openTranscript(value)
-    } else if (currentSessionId) {
-      workbenchStore.getState().clearTranscript(currentSessionId)
-    }
-  }
-  const setComposerText = (value: string): void => {
-    workbenchStore.getState().updateComposerDraft(value)
-  }
-  const setIsSendingMessage = (value: boolean): void => {
-    const state = workbenchStore.getState()
-    if (!state.activeSessionId) return
-    if (value) state.beginSending(state.activeSessionId)
-    else state.finishSending(state.activeSessionId)
-  }
-
-  const context: DesktopWorkbenchContext = {
-    runtime,
-    agents,
-    sessions,
-    selectedSessionId,
-    transcript,
-    composerText,
-    isLoading,
-    isSendingMessage,
-    pendingApprovals,
-    pendingClarifications,
-    setSessions,
-    setSelectedSessionId,
-    setTranscript,
-    setComposerText,
-    setIsSendingMessage,
-    selectAgent: workbench.selectAgent,
-    clearSessionRequestsForSessions: (sessionIds) => {
-      for (const sessionId of sessionIds) {
-        workbenchStore.getState().clearSessionRequests(sessionId)
-      }
-    },
-    addAlwaysAllowedCommand,
-  }
+  const [startupSession, setStartupSession] =
+    useState<AgentSessionSummary | null>(null)
+  const runtime = useStore(workbenchStore, (state) => state.runtime)
+  const isLoading = useStore(workbenchStore, (state) => state.isInitializing)
 
   useEffect(() => {
     let isMounted = true
@@ -254,6 +119,7 @@ function DesktopRoutes(): React.JSX.Element {
         if (!isMounted) return
 
         workbenchStore.getState().loadWorkbenchSnapshot(snapshot)
+        setStartupSession(snapshot.activeSession)
 
         // 启动重定向由 StartupRedirect 组件在根路由 '/' 上处理。
         // 此处不再从任意路由无条件跳转，以保留用户直接访问的深层控制台 URI。
@@ -288,6 +154,10 @@ function DesktopRoutes(): React.JSX.Element {
         request: (callback) => requestAnimationFrame(callback),
         cancel: (frameId) => cancelAnimationFrame(frameId),
       },
+      getActiveSessionId: () => {
+        const match = window.location.hash.match(/^#\/chat\/[^/]+\/([^/?#]+)/)
+        return match?.[1] ?? null
+      },
     })
 
     return () => {
@@ -306,6 +176,7 @@ function DesktopRoutes(): React.JSX.Element {
         activeSession,
         transcript,
       })
+      setStartupSession(activeSession)
     },
     [workbenchStore],
   )
@@ -317,18 +188,14 @@ function DesktopRoutes(): React.JSX.Element {
         element={
           <StartupRedirect
             runtime={runtime}
-            activeSession={
-              sessions.find(
-                (session) => session.sessionId === selectedSessionId,
-              ) ?? null
-            }
+            activeSession={startupSession}
             isLoading={isLoading}
           />
         }
       />
       <Route
         path="/chat/:agentId?/:sessionId?"
-        element={<ChatGuard context={context} />}
+        element={<ChatGuard store={workbenchStore} />}
       />
       <Route
         path="/setup"

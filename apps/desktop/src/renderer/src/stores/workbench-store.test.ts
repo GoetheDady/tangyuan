@@ -119,8 +119,6 @@ describe('createWorkbenchStore', () => {
       runtime: null,
       agents: [],
       sessionsByAgentId: {},
-      activeAgentId: null,
-      activeSessionId: null,
       transcriptsBySessionId: {},
       sendingBySessionId: {},
       pendingApprovalsBySessionId: {},
@@ -135,6 +133,8 @@ describe('createWorkbenchStore', () => {
 
     expect(second.getState().composerDraft).toBe('')
     expect(second.getState().isInitializing).toBe(true)
+    expect(first.getState()).not.toHaveProperty('activeAgentId')
+    expect(first.getState()).not.toHaveProperty('activeSessionId')
     expect(first).not.toHaveProperty('setState')
   })
 
@@ -160,8 +160,6 @@ describe('createWorkbenchStore', () => {
       runtime,
       agents: [TANGYUAN, RESEARCHER],
       sessionsByAgentId: { researcher: [session] },
-      activeAgentId: 'researcher',
-      activeSessionId: 'session-1',
       transcriptsBySessionId: { 'session-1': transcript },
       isInitializing: true,
     })
