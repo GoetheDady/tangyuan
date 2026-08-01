@@ -5,6 +5,7 @@ import {
   createDefaultSessionSummary,
   type AgentSessionSummary,
   type ArchiveSessionRequest,
+  type DeleteSessionRequest,
 } from '@tangyuan/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -401,5 +402,129 @@ describe('App 会话谱系归档与恢复', () => {
     expect(
       screen.getByRole('heading', { name: '研究助手' }),
     ).toBeInTheDocument()
+  })
+
+  it('无活动时直接永久删除目标子树并保留兄弟会话', async () => {
+    const user = userEvent.setup()
+    let isDeleted = false
+    installReadyArchiveApi((_includeArchived) => {
+      if (!isDeleted) return [PARENT, CHILD, SIBLING]
+      return [SIBLING]
+    })
+    vi.mocked(window.api.deleteSession).mockImplementation(async () => {
+      isDeleted = true
+      return {
+        status: 'deleted',
+        affectedSessionIds: [PARENT.sessionId, CHILD.sessionId],
+        affectedActivities: [],
+      }
+    })
+    window.location.hash = '#/chat/tangyuan/parent-session'
+
+    render(<App />)
+
+    await user.click(
+      await screen.findByRole('button', { name: '永久删除当前会话谱系' }),
+    )
+
+    expect(window.api.deleteSession).toHaveBeenCalledWith({
+      agentId: 'tangyuan',
+      sessionId: PARENT.sessionId,
+      confirmActivityStop: false,
+    })
+    await waitFor(() => {
+      expect(window.location.hash).toBe('#/chat/tangyuan')
+    })
+    expect(
+      screen.queryByRole('treeitem', { name: /父会话/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('treeitem', { name: /子会话/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('treeitem', { name: /兄弟会话/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: '恢复「父会话」会话谱系' }),
+    ).not.toBeInTheDocument()
+    expect(await screen.findByText('已永久删除会话谱系')).toBeInTheDocument()
+  })
+
+  it('有活动时先预览影响，确认后才永久删除', async () => {
+    const user = userEvent.setup()
+    let isDeleted = false
+    installReadyArchiveApi((_includeArchived) => {
+      if (!isDeleted) return [PARENT, CHILD, SIBLING]
+      return [SIBLING]
+    })
+    vi.mocked(window.api.deleteSession).mockImplementation(
+      async (request: DeleteSessionRequest) => {
+        if (!request.confirmActivityStop) {
+          return {
+            status: 'confirmation-required',
+            affectedSessionIds: [PARENT.sessionId, CHILD.sessionId],
+            affectedActivities: [
+              {
+                sessionId: PARENT.sessionId,
+                title: PARENT.title,
+                kinds: ['running', 'pending-approval'],
+              },
+              {
+                sessionId: CHILD.sessionId,
+                title: CHILD.title,
+                kinds: ['queued', 'pending-clarification'],
+              },
+            ],
+          }
+        }
+        isDeleted = true
+        return {
+          status: 'deleted',
+          affectedSessionIds: [PARENT.sessionId, CHILD.sessionId],
+          affectedActivities: [],
+        }
+      },
+    )
+    window.location.hash = '#/chat/tangyuan/parent-session'
+
+    render(<App />)
+
+    await user.click(
+      await screen.findByRole('button', { name: '永久删除当前会话谱系' }),
+    )
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+      '父会话：运行中、待审批',
+    )
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(
+      '子会话：排队中、待澄清',
+    )
+
+    await user.click(screen.getByRole('button', { name: '取消' }))
+    expect(window.api.deleteSession).toHaveBeenCalledTimes(1)
+    expect(
+      screen.getByRole('heading', { name: PARENT.title }),
+    ).toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('button', { name: '永久删除当前会话谱系' }),
+    )
+    await user.click(
+      await screen.findByRole('button', { name: '停止活动并永久删除' }),
+    )
+
+    expect(window.api.deleteSession).toHaveBeenLastCalledWith({
+      agentId: 'tangyuan',
+      sessionId: PARENT.sessionId,
+      confirmActivityStop: true,
+    })
+    await waitFor(() => {
+      expect(window.location.hash).toBe('#/chat/tangyuan')
+    })
+    expect(
+      screen.queryByRole('treeitem', { name: /父会话/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('treeitem', { name: /子会话/ }),
+    ).not.toBeInTheDocument()
   })
 })
