@@ -59,7 +59,7 @@ function createRuntime(agents = [TANGYUAN]): RuntimeSnapshot {
 
 function createApproval(
   sessionId = 'session-1',
-  command = 'pnpm test',
+  command = 'bun run test',
 ): BashApprovalRequest {
   return {
     approvalId: `approval-${sessionId}`,
@@ -240,7 +240,7 @@ describe('createAgentEventBridge', () => {
 
   it('自动批准始终允许的 Bash 命令且不加入待审批队列', () => {
     const harness = createHarness()
-    const approval = createApproval('session-1', 'pnpm test')
+    const approval = createApproval('session-1', 'bun run test')
     harness.store
       .getState()
       .allowCommandForProcess(approval.sessionId, approval.command)
@@ -370,17 +370,30 @@ describe('createAgentEventBridge', () => {
     expect(harness.store.getState().transcriptsBySessionId).toEqual({})
   })
 
-  it('取消、失败和运行结束会结束对应 session 的发送状态', () => {
+  it.each([
+    ['turn-cancelled', { type: 'turn-cancelled', runId: 'run-2' }],
+    [
+      'turn-failed',
+      {
+        type: 'turn-failed',
+        runId: 'run-2',
+        error: { code: 'unknown', message: '执行失败', recoverable: true },
+      },
+    ],
+    [
+      'run-state-changed (completed)',
+      { type: 'run-state-changed', state: 'completed' as const },
+    ],
+  ] as const)('%s 会结束对应 session 的发送状态', (_label, eventFragment) => {
     const harness = createHarness()
     harness.store.getState().beginSending('session-1')
     harness.store.getState().beginSending('session-2')
 
     harness.dispatch({
-      type: 'turn-cancelled',
       agentId: 'tangyuan',
       sessionId: 'session-2',
-      runId: 'run-2',
       occurredAt: NOW,
+      ...eventFragment,
     })
 
     expect(harness.store.getState().sendingBySessionId).toEqual({
