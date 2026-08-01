@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import {
   createMissingConfigSnapshot,
+  createLastActiveSession,
   createPreloadApiInitScript,
   createReadyRuntimeSnapshot,
   createTestMessages,
@@ -17,9 +18,9 @@ test.describe('页面人工截图 artifact', () => {
     const initScript = createPreloadApiInitScript(createMissingConfigSnapshot())
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/console/providers')
+    await page.goto('/#/setup')
     await expect(
-      page.getByRole('heading', { name: '配置模型服务' }),
+      page.getByRole('heading', { name: '连接模型服务' }),
     ).toBeVisible()
 
     await page.screenshot({
@@ -33,10 +34,11 @@ test.describe('页面人工截图 artifact', () => {
       createReadyRuntimeSnapshot(),
       createTestSessions(2),
       createTestMessages(),
+      createLastActiveSession(),
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
     await expect(page.getByRole('textbox', { name: '消息' })).toBeVisible()
 
     await page.screenshot({

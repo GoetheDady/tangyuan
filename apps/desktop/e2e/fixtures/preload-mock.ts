@@ -388,6 +388,23 @@ export function createPreloadApiInitScript(
 }
 
 /**
+ * 生成测试用的最后激活会话记录。
+ *
+ * @param agentId - 默认使用汤圆 Agent。
+ * @param sessionId - 默认使用第一个测试会话。
+ * @param updatedAt - 激活时间，默认使用当前时间。
+ * @returns 符合 contracts schema 的最后激活会话记录。
+ * @throws 此方法不会主动抛出错误。
+ */
+export function createLastActiveSession(
+  agentId = TANGYUAN_DEFAULT_AGENT_ID,
+  sessionId = 'session-1',
+  updatedAt = new Date().toISOString(),
+): LastActiveSession {
+  return { agentId, sessionId, updatedAt }
+}
+
+/**
  * 生成测试用的会话摘要列表。
  *
  * @param count - 需要的会话数量。

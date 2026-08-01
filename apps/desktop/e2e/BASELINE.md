@@ -44,7 +44,7 @@
 
 ### 固定视觉环境
 
-- Playwright：`1.61.1`（由 `pnpm-lock.yaml` 锁定）
+- Playwright：`1.61.1`（由 `bun.lock` 锁定）
 - Chromium：`149.0.7827.55`（Playwright 随附版本）
 - 平台快照后缀：`darwin`
 - viewport：`1440×1000`
@@ -106,11 +106,11 @@
 
 ### 修正内容
 
-- 真实 ChatPage 改为 Pencil 的 `64px Agent Rail + 216px Session Pane` 双栏侧边栏，总宽保持 `280px`。
+- 真实 ChatPage 使用加宽的 `80px Agent Rail + 216px Session Pane` 双栏侧边栏，总宽为 `296px`，将 macOS 窗口控制点包在 Agent Rail 内。
 - 标题栏固定为 `48px`；在 Pencil 原生 `1168×820` 视口下，消息区固定为 `720×630px`，Composer 区为 `888×142px`，Composer 卡片为 `720×131px`、`20px` 圆角。
 - User Message 使用 `max-width: 360px`、次级色表面、`16-16-4-16` 圆角、12/16px 内边距和 10px 时间戳；Assistant Message 移除旧卡片阴影与外边框，回到 640px 左对齐消息列。
 - Composer 按 Pencil 改为单一模型 pill、思考强度轨道、附件与发送/停止图标控制；Provider 不再作为聊天输入区中的独立视觉控件。
-- macOS BrowserWindow 使用 `hiddenInset` 标题栏，使系统 traffic lights 与 64px Agent Rail 对齐。
+- macOS BrowserWindow 使用 `hiddenInset` 标题栏，使系统 traffic lights 与 80px Agent Rail 对齐。
 - 新增 `chat-page.visual.spec.ts`，在固定 `1168×820` viewport 下直接截图真实产品路由，而不是再次截图组件夹具。
 
 ### 基准更新理由

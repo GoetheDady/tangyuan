@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  createLastActiveSession,
   createReadyRuntimeSnapshot,
   createTestSessions,
   createMarkdownTestMessages,
@@ -11,10 +12,15 @@ test.describe('Streamdown Markdown 渲染', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
     const messages = createMarkdownTestMessages()
-    const initScript = createPreloadApiInitScript(runtime, sessions, messages)
+    const initScript = createPreloadApiInitScript(
+      runtime,
+      sessions,
+      messages,
+      createLastActiveSession(),
+    )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
     await page.waitForSelector('#composer')
   })
 
@@ -97,10 +103,11 @@ test.describe('Streamdown Markdown 渲染', () => {
       runtime,
       sessions,
       xssMessages,
+      createLastActiveSession(),
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
     await page.waitForSelector('#composer')
 
     // <script> 标签不应被执行

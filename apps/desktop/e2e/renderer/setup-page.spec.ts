@@ -11,9 +11,7 @@ const apiKeyInputSelector = '[data-testid="setup-api-key-input"]'
 const modelSelectSelector = '[data-testid="setup-model-select"]'
 
 test.describe('初始化配置页面', () => {
-  test('runtime 未就绪时 /#/chat 重定向到 /#/console/providers', async ({
-    page,
-  }) => {
+  test('runtime 未就绪时 /#/chat 重定向到 /#/setup', async ({ page }) => {
     const runtime = createMissingConfigSnapshot()
     const initScript = createPreloadApiInitScript(runtime)
 
@@ -21,7 +19,7 @@ test.describe('初始化配置页面', () => {
     await page.goto('/#/chat')
 
     await expect(page.getByRole('heading', { name: formTitle })).toBeVisible()
-    await expect(page).toHaveURL(/\/console\/providers/)
+    await expect(page).toHaveURL(/\/setup/)
     await expect(page).toHaveURL(/redirect=/)
   })
 
@@ -30,7 +28,7 @@ test.describe('初始化配置页面', () => {
     const initScript = createPreloadApiInitScript(runtime)
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/console/providers')
+    await page.goto('/#/setup')
 
     await expect(page.getByRole('heading', { name: formTitle })).toBeVisible()
     await expect(page.getByText('首次配置')).toBeVisible()
@@ -46,7 +44,7 @@ test.describe('初始化配置页面', () => {
     const initScript = createPreloadApiInitScript(runtime)
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/console/providers')
+    await page.goto('/#/setup')
 
     await expect(page.locator(providerSelectSelector)).toBeVisible()
     await expect(page.locator(apiKeyInputSelector)).toBeVisible()
@@ -62,7 +60,7 @@ test.describe('初始化配置页面', () => {
     const initScript = createPreloadApiInitScript(runtime)
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/console/providers')
+    await page.goto('/#/setup')
 
     await expect(
       page.getByRole('button', { name: '验证并继续' }),
@@ -74,7 +72,7 @@ test.describe('初始化配置页面', () => {
     const initScript = createPreloadApiInitScript(runtime)
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/console/providers')
+    await page.goto('/#/setup')
 
     await page.fill(apiKeyInputSelector, 'sk-ant-test-key-not-real')
     // Radix Select：点击触发按钮，再选择选项
@@ -89,14 +87,14 @@ test.describe('初始化配置页面', () => {
     const initScript = createPreloadApiInitScript(runtime)
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/console/providers')
+    await page.goto('/#/setup')
 
     await expect(
       page.getByText('API Key 使用 macOS 安全存储加密保存在本机'),
     ).toBeVisible()
   })
 
-  test('runtime 就绪时直接访问 /#/console/providers 停留在配置页并提供返回聊天入口', async ({
+  test('runtime 就绪时直接访问 /#/setup 停留在配置页并提供返回聊天入口', async ({
     page,
   }) => {
     const runtime = createReadyRuntimeSnapshot()
@@ -112,10 +110,10 @@ test.describe('初始化配置页面', () => {
     const initScript = createPreloadApiInitScript(runtime, sessions)
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/console/providers')
+    await page.goto('/#/setup')
 
     // ready 且无 redirect 参数（用户主动进入）时停留在配置页，不自动跳走（#76）
-    await expect(page).toHaveURL(/\/console\/providers/)
+    await expect(page).toHaveURL(/\/setup/)
 
     // 提供手动返回聊天的入口
     const enterChatButton = page.getByRole('button', { name: '进入聊天' })
@@ -130,7 +128,7 @@ test.describe('初始化配置页面', () => {
     const initScript = createPreloadApiInitScript(runtime)
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/console/providers')
+    await page.goto('/#/setup')
 
     await expect(page.getByRole('button', { name: '刷新资源' })).toBeVisible()
   })
@@ -140,7 +138,7 @@ test.describe('初始化配置页面', () => {
     const initScript = createPreloadApiInitScript(runtime)
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/console/providers')
+    await page.goto('/#/setup')
     await page.getByRole('button', { name: '刷新资源' }).click()
 
     const item = page.locator('[data-sonner-toast][data-type="success"]')

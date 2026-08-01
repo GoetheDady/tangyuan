@@ -338,8 +338,8 @@ test.describe('Electron 窗口', () => {
       return window.location.hash
     })
 
-    // URL 应该包含 /console/providers 或 /chat
-    expect(currentUrl).toMatch(/\/(console\/providers|chat)/)
+    // URL 应该落在 /setup（初始化配置页）或 /chat（聊天页）
+    expect(currentUrl).toMatch(/\/(setup|chat)/)
   })
 
   test('调用 getRuntimeSnapshot 返回有效数据', async () => {

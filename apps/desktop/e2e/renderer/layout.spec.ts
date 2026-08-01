@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  createLastActiveSession,
   createReadyRuntimeSnapshot,
   createTestSessions,
   createLongTestMessage,
@@ -11,12 +12,15 @@ test.describe('长消息布局', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
     const longMessage = createLongTestMessage()
-    const initScript = createPreloadApiInitScript(runtime, sessions, [
-      longMessage,
-    ])
+    const initScript = createPreloadApiInitScript(
+      runtime,
+      sessions,
+      [longMessage],
+      createLastActiveSession(),
+    )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
 
     // 等待消息和 Composer 渲染
     await page.waitForSelector('#composer')
@@ -55,12 +59,15 @@ test.describe('长消息布局', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
     const longMessage = createLongTestMessage()
-    const initScript = createPreloadApiInitScript(runtime, sessions, [
-      longMessage,
-    ])
+    const initScript = createPreloadApiInitScript(
+      runtime,
+      sessions,
+      [longMessage],
+      createLastActiveSession(),
+    )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
     await page.waitForSelector('footer')
 
     const footerBox = await page.locator('footer').boundingBox()
@@ -84,12 +91,15 @@ test.describe('长消息布局', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
     const longMessage = createLongTestMessage()
-    const initScript = createPreloadApiInitScript(runtime, sessions, [
-      longMessage,
-    ])
+    const initScript = createPreloadApiInitScript(
+      runtime,
+      sessions,
+      [longMessage],
+      createLastActiveSession(),
+    )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
     await page.waitForSelector('[data-testid="message-scroll-area"]')
 
     const messageArea = page.locator('[data-testid="message-scroll-area"]')
@@ -105,12 +115,15 @@ test.describe('长消息布局', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
     const longMessage = createLongTestMessage()
-    const initScript = createPreloadApiInitScript(runtime, sessions, [
-      longMessage,
-    ])
+    const initScript = createPreloadApiInitScript(
+      runtime,
+      sessions,
+      [longMessage],
+      createLastActiveSession(),
+    )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
     await page.waitForSelector('[data-testid="message-scroll-area"]')
 
     const chatMainBox = await page
@@ -140,12 +153,15 @@ test.describe('长消息布局', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)
     const longMessage = createLongTestMessage()
-    const initScript = createPreloadApiInitScript(runtime, sessions, [
-      longMessage,
-    ])
+    const initScript = createPreloadApiInitScript(
+      runtime,
+      sessions,
+      [longMessage],
+      createLastActiveSession(),
+    )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
     await page.waitForSelector('[data-testid="message-scroll-area"]')
 
     // 验证长消息中包含的关键文本可被找到

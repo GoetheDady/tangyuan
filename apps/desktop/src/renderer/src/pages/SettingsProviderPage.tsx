@@ -68,7 +68,6 @@ export function SettingsProviderPage(): React.JSX.Element {
     return () => {
       isMounted = false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const configuredProviderIds = useMemo(

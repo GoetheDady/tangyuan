@@ -274,7 +274,7 @@ function classifySmokeTestPage(
   pageText: string,
 ): 'configuration' | 'workbench' | 'unknown' {
   if (
-    pageText.includes('配置模型服务') &&
+    pageText.includes('连接模型服务') &&
     pageText.includes('Provider') &&
     pageText.includes('API Key')
   ) {

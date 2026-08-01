@@ -182,7 +182,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
         'session-1': structured,
       }),
     })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
 
     await expect(page.getByText('请检查实现并运行测试。')).toBeVisible()
     await expect(
@@ -218,7 +218,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
         'session-1': initial,
       }),
     })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
     await page.waitForSelector('#composer')
     await expect(page.getByText('开始流式测试。')).toBeVisible()
 
@@ -247,7 +247,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
         'session-1': transcript('session-1', entries),
       }),
     })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
 
     const scrollArea = page.getByTestId('message-scroll-area')
     await scrollArea.evaluate((element) => {
@@ -286,7 +286,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
         'session-1': transcript('session-1', entries),
       }),
     })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
 
     const scrollArea = page.getByTestId('message-scroll-area')
     await scrollArea.evaluate((element) => {
@@ -333,7 +333,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
         'session-1': transcript('session-1', entries),
       }),
     })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
 
     const scrollArea = page.getByTestId('message-scroll-area')
     await expect(scrollArea).toBeVisible()
@@ -357,7 +357,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
         'session-1': structured,
       }),
     })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
 
     await expect(page.getByRole('status')).toContainText('自动压缩')
     await expect(page.locator('#composer')).toBeEnabled()
@@ -376,7 +376,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
         'session-2': second,
       }),
     })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
 
     await expect(page.getByText('第一会话内容')).toBeVisible()
     await page.getByRole('treeitem', { name: /测试会话 2/ }).click()
@@ -433,7 +433,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
         'session-1': failed,
       }),
     })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
 
     await page.getByRole('button', { name: '重试' }).click()
     const calls = await page.evaluate(() => window.__retryMessageCalls__)
@@ -470,7 +470,7 @@ test.describe('Transcript 真实 Renderer 回归', () => {
         'session-1': initial,
       }),
     })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
 
     const inner = page
       .getByTestId('message-scroll-area')

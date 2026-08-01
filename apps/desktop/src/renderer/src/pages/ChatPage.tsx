@@ -627,10 +627,10 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     <main className="bg-background text-foreground h-full overflow-hidden">
       <h1 className="sr-only">{activeAgentDisplayName}</h1>
       <p className="sr-only">大语言模型对话</p>
-      <div className="grid h-full min-h-0 grid-cols-[292px_minmax(0,1fr)]">
+      <div className="grid h-full min-h-0 grid-cols-[296px_minmax(0,1fr)]">
         <aside
           data-testid="chat-sidebar"
-          className="border-split bg-sidebar grid min-h-0 grid-cols-[76px_216px] border-r"
+          className="border-split bg-sidebar grid min-h-0 grid-cols-[80px_216px] border-r"
         >
           <nav
             aria-label="Agent 切换"

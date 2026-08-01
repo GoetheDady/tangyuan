@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  createLastActiveSession,
   createReadyRuntimeSnapshot,
   createTestSessions,
   createTestMessages,
@@ -11,10 +12,15 @@ test.describe('聊天页', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(3)
     const messages = createTestMessages()
-    const initScript = createPreloadApiInitScript(runtime, sessions, messages)
+    const initScript = createPreloadApiInitScript(
+      runtime,
+      sessions,
+      messages,
+      createLastActiveSession(),
+    )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
     // 等待 React 渲染完成
     await page.waitForSelector('#composer')
   })
@@ -25,7 +31,7 @@ test.describe('聊天页', () => {
     await expect(page.getByText('大语言模型对话')).toBeAttached()
   })
 
-  test('侧栏按 Pencil 使用 64px Agent Rail + 216px Session Pane', async ({
+  test('侧栏使用加宽的 80px Agent Rail + 216px Session Pane', async ({
     page,
   }) => {
     const sidebar = page.getByTestId('chat-sidebar')
@@ -36,8 +42,8 @@ test.describe('聊天页', () => {
     await expect(agentRail).toBeVisible()
     await expect(sessionPane).toBeVisible()
 
-    await expect(sidebar).toHaveCSS('width', '280px')
-    await expect(agentRail).toHaveCSS('width', '64px')
+    await expect(sidebar).toHaveCSS('width', '296px')
+    await expect(agentRail).toHaveCSS('width', '80px')
     await expect(sessionPane).toHaveCSS('width', '216px')
   })
 
@@ -123,9 +129,9 @@ test.describe('聊天页', () => {
     const messageArea = page.locator('[data-testid="message-scroll-area"]')
     const articles = messageArea.locator('article')
 
-    // 用户消息在右侧（justify-end）
+    // 用户消息在右侧（items-end）
     const userMessage = articles.first()
-    await expect(userMessage).toHaveClass(/justify-end/)
+    await expect(userMessage).toHaveClass(/items-end/)
 
     // Agent 消息在左侧（justify-start）
     const agentMessage = articles.nth(1)
@@ -144,10 +150,11 @@ test.describe('聊天主界面 Toast 回归', () => {
       runtime,
       sessions,
       createTestMessages(),
+      createLastActiveSession(),
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/tangyuan/session-1')
     await page.getByRole('button', { name: '停止' }).click()
 
     const item = page.locator('[data-sonner-toast][data-type="success"]')

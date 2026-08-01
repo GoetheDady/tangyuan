@@ -391,6 +391,7 @@ export function ConsoleProviderPage(props: {
               disabled={isVerifying}
             >
               <SelectTrigger
+                aria-label="Provider"
                 data-testid="setup-provider-select"
                 className="bg-card text-body h-10"
               >
@@ -466,6 +467,7 @@ export function ConsoleProviderPage(props: {
               disabled={isVerifying || !selectedProviderId}
             >
               <SelectTrigger
+                aria-label="Model"
                 data-testid="setup-model-select"
                 className="bg-card text-body h-10"
               >
