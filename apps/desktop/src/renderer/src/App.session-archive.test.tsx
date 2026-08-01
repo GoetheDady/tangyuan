@@ -407,7 +407,7 @@ describe('App 会话谱系归档与恢复', () => {
   it('无活动时直接永久删除目标子树并保留兄弟会话', async () => {
     const user = userEvent.setup()
     let isDeleted = false
-    installReadyArchiveApi((_includeArchived) => {
+    installReadyArchiveApi(() => {
       if (!isDeleted) return [PARENT, CHILD, SIBLING]
       return [SIBLING]
     })
@@ -453,7 +453,7 @@ describe('App 会话谱系归档与恢复', () => {
   it('有活动时先预览影响，确认后才永久删除', async () => {
     const user = userEvent.setup()
     let isDeleted = false
-    installReadyArchiveApi((_includeArchived) => {
+    installReadyArchiveApi(() => {
       if (!isDeleted) return [PARENT, CHILD, SIBLING]
       return [SIBLING]
     })
