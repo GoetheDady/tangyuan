@@ -84,7 +84,7 @@
 
 所有页面均已使用 Toast（sonner）。页面设计确认后再进入代码实现阶段。
 
-不要在设计阶段处理 shadcn CLI 环境问题。当前 `pnpm dlx shadcn@latest` 会因本机 `zod` 包导出冲突失败，设计依据应使用项目现有组件源码、Pencil 基础规范和 shadcn 技能规则。
+不要在设计阶段处理 shadcn CLI 环境问题。当前 `bunx shadcn@latest` 会因本机 `zod` 包导出冲突失败，设计依据应使用项目现有组件源码、Pencil 基础规范和 shadcn 技能规则。
 
 ## Pencil 操作注意事项
 

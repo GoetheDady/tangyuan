@@ -28,7 +28,7 @@ async function main() {
   const homePath = join(tempRoot, 'home')
 
   try {
-    await runCommand('pnpm', ['build:mac:dir'], appRoot)
+    await runCommand('bun', ['run', 'build:mac:dir'], appRoot)
 
     const appBundlePath = findPackagedAppBundle()
     const executablePath = resolveMacExecutablePath(appBundlePath)

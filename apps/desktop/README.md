@@ -11,26 +11,26 @@ An Electron application with React and TypeScript
 ### Install
 
 ```bash
-$ pnpm install
+$ bun install
 ```
 
 ### Development
 
 ```bash
-$ pnpm dev
+$ bun dev
 ```
 
 ### Build
 
 ```bash
 # For windows
-$ pnpm build:win
+$ bun build:win
 
 # For macOS
-$ pnpm build:mac
+$ bun build:mac
 
 # For Linux
-$ pnpm build:linux
+$ bun build:linux
 ```
 
 ### E2E 测试（Playwright）
@@ -39,16 +39,16 @@ $ pnpm build:linux
 
 ```bash
 # 先构建
-$ pnpm build
+$ bun build
 
 # 运行 Chromium Renderer 测试（真实浏览器，mock Preload API）
-$ pnpm test:e2e:renderer
+$ bun test:e2e:renderer
 
 # 运行 Electron 窗口测试（真实 Electron 应用）
-$ pnpm test:e2e:electron
+$ bun test:e2e:electron
 
 # 运行所有 E2E 测试
-$ pnpm test:e2e
+$ bun test:e2e
 ```
 
 详细说明见 `e2e/README.md`。
@@ -56,7 +56,7 @@ $ pnpm test:e2e
 ### macOS Packaged Smoke Test
 
 ```bash
-$ pnpm smoke:packaged:mac
+$ bun smoke:packaged:mac
 ```
 
 该命令会打包 `.app`，启动打包后的应用，并确认它能显示配置页或工作台。详细验收步骤见 `../../docs/desktop-packaging-and-sdk-acceptance.md`。

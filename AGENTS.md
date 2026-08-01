@@ -100,7 +100,7 @@
 - **每次改代码都要同步更新测试**：新增功能写新用例；修 bug 先写一个能复现的用例再修；重构保证前后测试都通过。不允许“改了代码但测试保持不动”。
 - **测试文件组织沿用现有逻辑**：单测与源文件同目录、同粒度（`xxx.ts` ↔ `xxx.test.ts`）；端到端测试放在 `apps/desktop/e2e/`。不另建平行的测试体系。
 - **测试用例随代码实时更新**：接口、行为或契约变化时，同一 commit 里更新对应用例，不把失效测试留到下一步。
-- **提交前验证**：改动涉及的包至少跑通 `pnpm -r test`与 `typecheck`；受影响时补跑相关 e2e。
+- **提交前验证**：改动涉及的包至少跑通 `bun run --workspaces test` 与 `bun run --workspaces typecheck`；受影响时补跑相关 e2e。
 
 ### 技术栈
 
@@ -108,7 +108,7 @@
 - 运行时：Node.js（Main 进程）/ Electron + React（Renderer）
 - 验证库：Zod（contracts 包）
 - 测试框架：Vitest
-- Monorepo 工具：pnpm workspaces
+- Monorepo 工具：bun workspaces
 
 ### 外部 SDK 文档
 

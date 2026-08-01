@@ -390,7 +390,7 @@ v1 策略：
 
 建议 issue 顺序：
 
-1. 初始化 pnpm workspace、Electron Vite、React、TypeScript。
+1. 初始化 bun workspace、Electron Vite、React、TypeScript。
 2. 定义 `AgentSessionDriver`、统一事件类型和 `RuntimeSnapshot`。
 3. 实现默认 Agent Home 初始化和固定 `bootstrap.md`。
 4. 实现 config JSON 存储，保存 Provider、Model、API Key。

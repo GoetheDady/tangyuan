@@ -22,7 +22,7 @@
 - `app-harness.ts` — `launchApp()` 启动应用并捕获 console error / 页面异常；`configureForQa()` 用注入的 key 完成配置到就绪。
 - `invariants.ts` — `checkAppHealth()` / `checkRuntimeReady()`，通用健康检查（不崩、无 console error、不白屏、运行时就绪）。
 
-需要的话直接 import 这两个起步；也可以完全自己写。启动入口是 `out/main/index.js`（先 `pnpm build` 出产物）。
+需要的话直接 import 这两个起步；也可以完全自己写。启动入口是 `out/main/index.js`（先 `bun build` 出产物）。
 
 ## 怎么交给 Pi 测试
 

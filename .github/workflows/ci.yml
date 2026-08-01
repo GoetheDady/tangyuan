@@ -21,30 +21,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
         with:
-          version: 11.7.0
+          bun-version: 1.3.10
 
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
           node-version: 22
-          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Lint
-        run: pnpm lint
+        run: bun run lint
 
       - name: Typecheck
-        run: pnpm typecheck
+        run: bun run typecheck
 
       - name: Test
-        run: pnpm test
+        run: bun run test
 
       # lint 已通过 eslint-plugin-prettier 覆盖受 eslint 管辖的文件，
       # 这一步补上 md / json / yaml 等 eslint 不处理的类型。
       - name: Format check
-        run: pnpm exec prettier --check .
+        run: bunx prettier --check .

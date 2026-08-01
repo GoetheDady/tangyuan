@@ -28,7 +28,7 @@
    - 代码评论和方法注释要完整，技术术语第一次出现时要解释。
 
 5. 收尾验证
-   - 跑完仓库级 `pnpm test`、`pnpm typecheck`、`pnpm lint`，必要时再跑 `pnpm build`。
+   - 跑完仓库级 `bun run test`、`bun run typecheck`、`bun run lint`，必要时再跑 `bun run build`。
    - 再走一次 `/code-review`，按 Standards 和 Spec 两个维度复查。
 
 6. 结束 issue

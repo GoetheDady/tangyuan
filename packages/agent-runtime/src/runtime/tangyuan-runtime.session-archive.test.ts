@@ -165,7 +165,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
       agentId: TANGYUAN_DEFAULT_AGENT_ID,
       sessionId: child.sessionId,
       runId: 'run-child',
-      command: 'pnpm test',
+      command: 'bun run test',
       cwd: '/tmp',
       riskDescription: '测试审批',
     })

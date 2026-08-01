@@ -9,7 +9,7 @@
 在 macOS 上运行：
 
 ```bash
-pnpm smoke:packaged:mac
+bun run smoke:packaged:mac
 ```
 
 该命令会执行以下步骤：
@@ -24,7 +24,7 @@ pnpm smoke:packaged:mac
 `--dir` 会生成未压缩的 `.app` 目录，适合本地快速 smoke test。需要产出正式 macOS 分发包时运行：
 
 ```bash
-pnpm package:mac
+bun run package:mac
 ```
 
 ## 本地质量门禁
@@ -32,14 +32,14 @@ pnpm package:mac
 提交前运行：
 
 ```bash
-pnpm verify:local
+bun run verify:local
 ```
 
 该命令会依次运行：
 
-- `pnpm lint`
-- `pnpm typecheck`
-- `pnpm test`
+- `bun run lint`
+- `bun run typecheck`
+- `bun run test`
 
 这里的 **lint** 指静态代码风格和常见问题检查；**typecheck** 指 TypeScript 类型检查，也就是确认代码里的类型约束能通过编译器验证；**test** 指自动化测试。
 
@@ -47,7 +47,7 @@ pnpm verify:local
 
 真实模型调用依赖有效 API Key，且可能产生费用或受网络影响，所以不放进默认自动化脚本。手动验收时执行：
 
-1. 运行 `pnpm package:mac`，确认 `apps/desktop/dist/` 下产出 macOS 应用包。
+1. 运行 `bun run package:mac`，确认 `apps/desktop/dist/` 下产出 macOS 应用包。
 2. 启动打包后的应用。
 3. 确认应用显示配置页或工作台。
 4. 确认默认 Agent Home 已存在：`~/.tangyuan/agents/tangyuan`。

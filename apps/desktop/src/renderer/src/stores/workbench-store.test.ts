@@ -85,7 +85,7 @@ function createApproval(
     agentId,
     sessionId,
     runId: `run-${sessionId}`,
-    command: 'pnpm test',
+    command: 'bun run test',
     cwd: '/workspace',
     riskDescription: '运行测试',
     status: 'pending',
@@ -412,15 +412,15 @@ describe('createWorkbenchStore', () => {
     const store = createWorkbenchStore()
 
     store.getState().updateComposerDraft('准备发送')
-    store.getState().allowCommandForProcess('session-1', 'pnpm test')
-    store.getState().allowCommandForProcess('session-1', 'pnpm test')
-    store.getState().allowCommandForProcess('session-2', 'pnpm typecheck')
+    store.getState().allowCommandForProcess('session-1', 'bun run test')
+    store.getState().allowCommandForProcess('session-1', 'bun run test')
+    store.getState().allowCommandForProcess('session-2', 'bun run typecheck')
     store.getState().clearComposerDraft()
 
     expect(store.getState().composerDraft).toBe('')
     expect(store.getState().alwaysAllowedCommandsBySessionId).toEqual({
-      'session-1': ['pnpm test'],
-      'session-2': ['pnpm typecheck'],
+      'session-1': ['bun run test'],
+      'session-2': ['bun run typecheck'],
     })
   })
 })

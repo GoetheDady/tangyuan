@@ -19,7 +19,7 @@ export function createRendererWebServer(
   const baseUrl = `http://127.0.0.1:${port}`
 
   return {
-    command: `pnpm exec serve out/renderer -l ${port} --no-clipboard`,
+    command: `bunx serve out/renderer -l ${port} --no-clipboard`,
     url: baseUrl,
     reuseExistingServer: !process.env['CI'],
   }

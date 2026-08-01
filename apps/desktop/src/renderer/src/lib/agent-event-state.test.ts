@@ -52,7 +52,7 @@ const FIRST_APPROVAL: BashApprovalRequest = {
   agentId: 'tangyuan',
   sessionId: 'session-1',
   runId: 'run-1',
-  command: 'pnpm test',
+  command: 'bun run test',
   cwd: '/workspace',
   riskDescription: '运行测试',
   status: 'pending',
@@ -62,7 +62,7 @@ const SECOND_APPROVAL: BashApprovalRequest = {
   ...FIRST_APPROVAL,
   approvalId: 'approval-2',
   sessionId: 'session-2',
-  command: 'pnpm typecheck',
+  command: 'bun run typecheck',
 }
 
 const FIRST_CLARIFICATION: QuestionClarificationRequest = {
@@ -142,7 +142,7 @@ describe('mergeAgentEventIntoAgents', () => {
 
 describe('mergeAgentEventIntoPendingApprovals', () => {
   it('按到达顺序加入审批请求，重复 approvalId 也保持现有追加语义', () => {
-    const updated = { ...FIRST_APPROVAL, command: 'pnpm -r test' }
+    const updated = { ...FIRST_APPROVAL, command: 'bun run --workspaces test' }
 
     expect(
       mergeAgentEventIntoPendingApprovals([FIRST_APPROVAL, SECOND_APPROVAL], {
