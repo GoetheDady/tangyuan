@@ -121,10 +121,12 @@ describe('App independent session fork', () => {
     ).toBeInTheDocument()
     expect(window.api.sendMessage).not.toHaveBeenCalled()
     expect(
-      screen.getByRole('heading', { name: '父会话（分叉）' }),
+      await screen.findByRole('heading', { name: '父会话（分叉）' }),
     ).toBeInTheDocument()
-    expect(window.location.hash).toBe('#/chat/tangyuan/child-session')
-    expect(screen.getAllByText('父会话（分叉）')).toHaveLength(2)
+    await waitFor(() => {
+      expect(window.location.hash).toBe('#/chat/tangyuan/child-session')
+    })
+    expect(await screen.findAllByText('父会话（分叉）')).toHaveLength(2)
     expect(window.api.setLastActiveSession).toHaveBeenCalledWith({
       agentId: 'tangyuan',
       sessionId: 'child-session',
