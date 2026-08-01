@@ -600,5 +600,3 @@ export function ConsoleProviderPage(props: {
     </main>
   )
 }
-
-
