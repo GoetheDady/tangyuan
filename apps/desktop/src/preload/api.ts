@@ -38,7 +38,7 @@ import {
   type UpdateAgentConfigRequest,
   type UpdateSoulRequest,
   type UpdateUserProfileRequest,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
 /**
  * 描述 Preload API 内部使用的 IPC 调用方法。
@@ -64,7 +64,7 @@ export type IpcSubscribe = (
  * @returns Renderer 可以通过 `window.api` 调用的 DesktopPreloadApi。
  * @throws 此方法不会主动抛出错误；具体 IPC 错误会在返回的 Promise 中 reject。
  */
-export function createTangyuanPreloadApi(
+export function createYuanxiaoPreloadApi(
   invoke: IpcInvoke,
   subscribe: IpcSubscribe = () => () => undefined,
 ): DesktopPreloadApi {
@@ -161,8 +161,8 @@ export function createTangyuanPreloadApi(
     claimAgentDirectory: async (request: ClaimAgentDirectoryRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.agentsClaimDirectory, request)
     },
-    rebuildTangyuanHome: async () => {
-      return invoke(DESKTOP_IPC_CHANNELS.agentsRebuildTangyuan)
+    rebuildYuanxiaoHome: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.agentsRebuildYuanxiao)
     },
     getSessionModelInfo: async (request: GetSessionModelInfoRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsGetModelInfo, request)

@@ -60,7 +60,7 @@ describe('RealPiSdkGateway profile tools', () => {
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-settings',
       sdkSessionFile: '/tmp/session.json',
       cwd: '/tmp',
@@ -97,7 +97,7 @@ describe('RealPiSdkGateway profile tools', () => {
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       sdkSessionFile: '/tmp/session.json',
       cwd: '/tmp',
@@ -148,7 +148,7 @@ describe('RealPiSdkGateway profile tools', () => {
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-2',
       sdkSessionFile: '/tmp/session.json',
       cwd: '/tmp',
@@ -194,7 +194,7 @@ describe('RealPiSdkGateway write/edit path protection', () => {
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-write-edit',
       sdkSessionFile: '/tmp/session.json',
       cwd: '/tmp',
@@ -214,7 +214,7 @@ describe('RealPiSdkGateway write/edit path protection', () => {
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-write-edit',
       sdkSessionFile: '/tmp/session.json',
       cwd: '/tmp',
@@ -362,7 +362,7 @@ describe('RealPiSdkGateway write/edit path protection', () => {
   })
 
   it('write 工具允许写入普通工作空间文件', async () => {
-    const tmpDir = await mkdtemp(join(tmpdir(), 'tangyuan-test-'))
+    const tmpDir = await mkdtemp(join(tmpdir(), 'yuanxiao-test-'))
     const testFile = join(tmpDir, 'notes.txt')
 
     createAgentSession.mockResolvedValueOnce({
@@ -416,7 +416,7 @@ describe('RealPiSdkGateway write/edit path protection', () => {
   })
 
   it('edit 工具允许编辑普通工作空间文件', async () => {
-    const tmpDir = await mkdtemp(join(tmpdir(), 'tangyuan-test-'))
+    const tmpDir = await mkdtemp(join(tmpdir(), 'yuanxiao-test-'))
     const testFile = join(tmpDir, 'notes.txt')
     await writeFile(testFile, 'hello world', 'utf8')
 
@@ -471,7 +471,7 @@ describe('RealPiSdkGateway write/edit path protection', () => {
   })
 
   it('edit 工具拒绝非唯一的 oldText', async () => {
-    const tmpDir = await mkdtemp(join(tmpdir(), 'tangyuan-test-'))
+    const tmpDir = await mkdtemp(join(tmpdir(), 'yuanxiao-test-'))
     const testFile = join(tmpDir, 'notes.txt')
     await writeFile(testFile, 'hello hello', 'utf8')
 
@@ -546,7 +546,7 @@ describe('RealPiSdkGateway 审批与路径拒绝不产生副作用', () => {
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-side-effect',
       sdkSessionFile: '/tmp/session.json',
       cwd: '/tmp',
@@ -600,7 +600,7 @@ describe('RealPiSdkGateway 审批与路径拒绝不产生副作用', () => {
   })
 
   it('write_file 工具路径校验拒绝时不创建文件（无副作用）', async () => {
-    const tmpDir = await mkdtemp(join(tmpdir(), 'tangyuan-test-'))
+    const tmpDir = await mkdtemp(join(tmpdir(), 'yuanxiao-test-'))
     const testFile = join(tmpDir, 'rejected.txt')
 
     mockToolApprovalGateway.validateFilePath.mockReturnValueOnce({

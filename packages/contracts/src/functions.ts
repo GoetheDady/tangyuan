@@ -15,7 +15,7 @@ import type {
   TranscriptEntry,
   TranscriptSnapshot,
 } from './types'
-import { CURRENT_SCHEMA_VERSION, TANGYUAN_DEFAULT_AGENT_ID } from './types'
+import { CURRENT_SCHEMA_VERSION, YUANXIAO_DEFAULT_AGENT_ID } from './types'
 
 /**
  * 根据运行时配置生成 Renderer 可直接展示的就绪状态。
@@ -126,7 +126,7 @@ export function createAgentProfileStatus(
  * 创建 v1 默认 Agent 的本地会话摘要。
  *
  * @param input - 会话标识、标题和更新时间。
- * @returns 默认归属 `tangyuan` Agent 且处于空闲状态的会话摘要。
+ * @returns 默认归属 `yuanxiao` Agent 且处于空闲状态的会话摘要。
  * @throws 此方法不会主动抛出错误。
  */
 export function createDefaultSessionSummary(input: {
@@ -135,7 +135,7 @@ export function createDefaultSessionSummary(input: {
   updatedAt: string
 }): AgentSessionSummary {
   return {
-    agentId: TANGYUAN_DEFAULT_AGENT_ID,
+    agentId: YUANXIAO_DEFAULT_AGENT_ID,
     sessionId: input.sessionId,
     title: input.title,
     updatedAt: input.updatedAt,
@@ -148,7 +148,7 @@ export function createDefaultSessionSummary(input: {
  *
  * v1 的单个 providerId/modelId/apiKey 被迁移为：
  * - providers[providerId] = { apiKey, updatedAt: now }
- * - agents.tangyuan = { defaultProviderId: providerId, defaultModelId: modelId, ... }
+ * - agents.yuanxiao = { defaultProviderId: providerId, defaultModelId: modelId, ... }
  *
  * 迁移后 API Key 仍为明文（未加密），需由 Runtime 在下次写入时加密。
  *
@@ -170,8 +170,8 @@ export function migrateConfigV1ToV2(
       },
     },
     agents: {
-      [TANGYUAN_DEFAULT_AGENT_ID]: {
-        displayName: '汤圆',
+      [YUANXIAO_DEFAULT_AGENT_ID]: {
+        displayName: '元宵',
         defaultProviderId: v1.providerId,
         defaultModelId: v1.modelId,
         status: 'active',

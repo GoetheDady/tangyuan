@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createDefaultSessionSummary } from '@tangyuan/contracts'
+import { createDefaultSessionSummary } from '@yuanxiao/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import {
@@ -39,14 +39,14 @@ describe('App independent session fork', () => {
       profileInitialized: true,
     })
 
-    window.location.hash = '#/chat/tangyuan/parent-session'
+    window.location.hash = '#/chat/yuanxiao/parent-session'
     vi.mocked(window.api.getRuntimeSnapshot).mockResolvedValue(readyRuntime)
     vi.mocked(window.api.refreshRuntime).mockResolvedValue(readyRuntime)
     let sessions = [parent]
     vi.mocked(window.api.listSessions).mockImplementation(async () => sessions)
     vi.mocked(window.api.getTranscript).mockImplementation(async (request) => ({
       sessionId: request.sessionId,
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       entries:
         request.sessionId === parent.sessionId
           ? [
@@ -111,7 +111,7 @@ describe('App independent session fork', () => {
 
     await waitFor(() => {
       expect(window.api.forkSession).toHaveBeenCalledWith({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'parent-session',
         entryId: 'source-user',
       })
@@ -124,11 +124,11 @@ describe('App independent session fork', () => {
       await screen.findByRole('heading', { name: '父会话（分叉）' }),
     ).toBeInTheDocument()
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/chat/tangyuan/child-session')
+      expect(window.location.hash).toBe('#/chat/yuanxiao/child-session')
     })
     expect(await screen.findAllByText('父会话（分叉）')).toHaveLength(2)
     expect(window.api.setLastActiveSession).toHaveBeenCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'child-session',
     })
   })

@@ -5,7 +5,7 @@ import type { ElectronApplication, Page } from '@playwright/test'
 /**
  * 真实 Electron 应用测试夹具。
  *
- * 与 e2e/electron/app.spec.ts 的关键区别：QA 使用**真实 HOME**（默认 ~/.tangyuan），
+ * 与 e2e/electron/app.spec.ts 的关键区别：QA 使用**真实 HOME**（默认 ~/.yuanxiao），
  * 以便主进程通过 safeStorage（macOS 钥匙串）解密真实 Provider API Key，
  * 从而进行真实的大模型对话。因此本夹具只应用于本地手动/定时 QA，
  * 绝不能进 CI（CI 无钥匙串、无真实 key）。
@@ -34,7 +34,7 @@ export async function launchApp(): Promise<AppHarness> {
     env: {
       ...process.env,
       // 显式不进入打包 smoke test 模式
-      TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: '',
+      YUANXIAO_DESKTOP_SMOKE_TEST_RESULT_PATH: '',
     },
   })
 
@@ -67,7 +67,7 @@ export async function launchApp(): Promise<AppHarness> {
 /**
  * QA 模式下用环境变量注入的测试凭据配置运行时。
  *
- * 依赖 main 进程的 QA 明文适配器（TANGYUAN_QA_API_KEY 存在时启用），
+ * 依赖 main 进程的 QA 明文适配器（YUANXIAO_QA_API_KEY 存在时启用），
  * 通过 saveRuntimeConfiguration 写入并**真实验证**测试 key（会真调一次模型）。
  * 成功后运行时进入 ready，方可进行真实对话测试。
  *
@@ -77,12 +77,12 @@ export async function launchApp(): Promise<AppHarness> {
 export async function configureForQa(
   harness: AppHarness,
 ): Promise<{ ok: boolean; reason?: string }> {
-  const apiKey = process.env.TANGYUAN_QA_API_KEY
+  const apiKey = process.env.YUANXIAO_QA_API_KEY
   if (!apiKey) {
-    return { ok: false, reason: '未设置 TANGYUAN_QA_API_KEY 环境变量' }
+    return { ok: false, reason: '未设置 YUANXIAO_QA_API_KEY 环境变量' }
   }
-  const providerId = process.env.TANGYUAN_QA_PROVIDER ?? 'deepseek'
-  const modelId = process.env.TANGYUAN_QA_MODEL ?? 'deepseek-v4-flash'
+  const providerId = process.env.YUANXIAO_QA_PROVIDER ?? 'deepseek'
+  const modelId = process.env.YUANXIAO_QA_MODEL ?? 'deepseek-v4-flash'
 
   return await harness.window.evaluate(
     async ({ providerId, modelId, apiKey }) => {

@@ -5,7 +5,7 @@ import {
   createDefaultSessionSummary,
   type AgentSessionSummary,
   type TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
@@ -69,12 +69,12 @@ describe('聊天路由状态', () => {
       status: 'active',
       defaultProviderId: 'anthropic',
       defaultModelId: 'claude-sonnet-4-5',
-      homePath: '~/.tangyuan/agents/researcher',
+      homePath: '~/.yuanxiao/agents/researcher',
       archivedAt: null,
       directoryStatus: 'healthy',
     })
     const defaultSession = createAgentSession(
-      'tangyuan',
+      'yuanxiao',
       'default-session',
       '默认会话',
     )
@@ -85,7 +85,7 @@ describe('聊天路由状态', () => {
     )
     window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(runtime)
     window.api.getLastActiveSession = vi.fn().mockResolvedValue({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'default-session',
       updatedAt: NOW,
     })
@@ -126,12 +126,12 @@ describe('聊天路由状态', () => {
       status: 'active',
       defaultProviderId: 'anthropic',
       defaultModelId: 'claude-sonnet-4-5',
-      homePath: '~/.tangyuan/agents/researcher',
+      homePath: '~/.yuanxiao/agents/researcher',
       archivedAt: null,
       directoryStatus: 'healthy',
     })
     const defaultSession = createAgentSession(
-      'tangyuan',
+      'yuanxiao',
       'default-session',
       '默认会话',
     )
@@ -149,7 +149,7 @@ describe('聊天路由状态', () => {
     const lastTranscript = createDeferred<TranscriptSnapshot>()
     window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(runtime)
     window.api.getLastActiveSession = vi.fn().mockResolvedValue({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'default-session',
       updatedAt: NOW,
     })

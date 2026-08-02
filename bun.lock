@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "tangyuan",
+      "name": "yuanxiao",
       "devDependencies": {
         "prettier": "^3.7.4",
         "prettier-plugin-tailwindcss": "^0.7.2",
@@ -12,8 +12,8 @@
       },
     },
     "apps/desktop": {
-      "name": "apps-desktop",
-      "version": "1.0.0",
+      "name": "@yuanxiao/desktop",
+      "version": "0.1.0",
       "dependencies": {
         "@electron-toolkit/preload": "^3.0.2",
         "@electron-toolkit/utils": "^4.0.0",
@@ -26,9 +26,9 @@
         "@radix-ui/react-tooltip": "^1.2.12",
         "@streamdown/cjk": "^1.0.3",
         "@streamdown/code": "^1.1.1",
-        "@tangyuan/agent-runtime": "workspace:*",
-        "@tangyuan/contracts": "workspace:*",
         "@tanstack/react-virtual": "^3.13.0",
+        "@yuanxiao/agent-runtime": "workspace:*",
+        "@yuanxiao/contracts": "workspace:*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "lucide-react": "^1.24.0",
@@ -74,36 +74,36 @@
       },
     },
     "packages/agent-runtime": {
-      "name": "@tangyuan/agent-runtime",
+      "name": "@yuanxiao/agent-runtime",
       "version": "0.1.0",
       "dependencies": {
         "@earendil-works/pi-coding-agent": "^0.80.3",
-        "@tangyuan/contracts": "workspace:*",
+        "@yuanxiao/contracts": "workspace:*",
       },
       "devDependencies": {
-        "@tangyuan/eslint-config": "workspace:*",
-        "@tangyuan/tsconfig": "workspace:*",
+        "@yuanxiao/eslint-config": "workspace:*",
+        "@yuanxiao/tsconfig": "workspace:*",
         "eslint": "^9.39.1",
         "typescript": "^5.9.3",
         "vitest": "^4.0.16",
       },
     },
     "packages/contracts": {
-      "name": "@tangyuan/contracts",
+      "name": "@yuanxiao/contracts",
       "version": "0.1.0",
       "dependencies": {
         "zod": "^4.2.1",
       },
       "devDependencies": {
-        "@tangyuan/eslint-config": "workspace:*",
-        "@tangyuan/tsconfig": "workspace:*",
+        "@yuanxiao/eslint-config": "workspace:*",
+        "@yuanxiao/tsconfig": "workspace:*",
         "eslint": "^9.39.1",
         "typescript": "^5.9.3",
         "vitest": "^4.0.16",
       },
     },
     "packages/eslint-config": {
-      "name": "@tangyuan/eslint-config",
+      "name": "@yuanxiao/eslint-config",
       "version": "0.1.0",
       "dependencies": {
         "@eslint/js": "^9.39.1",
@@ -116,7 +116,7 @@
       },
     },
     "packages/tsconfig": {
-      "name": "@tangyuan/tsconfig",
+      "name": "@yuanxiao/tsconfig",
       "version": "0.1.0",
     },
   },
@@ -667,14 +667,6 @@
 
     "@tailwindcss/postcss": ["@tailwindcss/postcss@4.3.2", "https://registry.npmmirror.com/@tailwindcss/postcss/-/postcss-4.3.2.tgz", { "dependencies": { "@alloc/quick-lru": "5.2.0", "@tailwindcss/node": "4.3.2", "@tailwindcss/oxide": "4.3.2", "postcss": "8.5.16", "tailwindcss": "4.3.2" } }, "sha512-rjVWYCa7Ngbi5AarT6k8TkxUG3Wl1QKzHdIZVsjZSzf36Jmo2IKZt/NHRAwly8oDkbBOH0YTu+CHuf9jPxMc+g=="],
 
-    "@tangyuan/agent-runtime": ["@tangyuan/agent-runtime@workspace:packages/agent-runtime"],
-
-    "@tangyuan/contracts": ["@tangyuan/contracts@workspace:packages/contracts"],
-
-    "@tangyuan/eslint-config": ["@tangyuan/eslint-config@workspace:packages/eslint-config"],
-
-    "@tangyuan/tsconfig": ["@tangyuan/tsconfig@workspace:packages/tsconfig"],
-
     "@tanstack/react-virtual": ["@tanstack/react-virtual@3.14.6", "https://registry.npmmirror.com/@tanstack/react-virtual/-/react-virtual-3.14.6.tgz", { "dependencies": { "@tanstack/virtual-core": "3.17.4" }, "peerDependencies": { "react": "19.2.7", "react-dom": "19.2.7" } }, "sha512-4+Uq8m0/gzO4kMCHUEpTtGX1RnONK0C+g88b2ltwPMWUBiaVarBuWKoPJaz7gj1cKCVRAdyu+U8GcKhwCc2beA=="],
 
     "@tanstack/virtual-core": ["@tanstack/virtual-core@3.17.4", "https://registry.npmmirror.com/@tanstack/virtual-core/-/virtual-core-3.17.4.tgz", {}, "sha512-nGm5KteqxasUdThLc2izl6dHUqLv0LQj7Nuyo5gYalTPf/U8a9ermvsl7reT+6ioBW1l8WfpP/mcU338nLXpqw=="],
@@ -863,6 +855,16 @@
 
     "@xmldom/xmldom": ["@xmldom/xmldom@0.8.13", "https://registry.npmmirror.com/@xmldom/xmldom/-/xmldom-0.8.13.tgz", {}, "sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw=="],
 
+    "@yuanxiao/agent-runtime": ["@yuanxiao/agent-runtime@workspace:packages/agent-runtime"],
+
+    "@yuanxiao/contracts": ["@yuanxiao/contracts@workspace:packages/contracts"],
+
+    "@yuanxiao/desktop": ["@yuanxiao/desktop@workspace:apps/desktop"],
+
+    "@yuanxiao/eslint-config": ["@yuanxiao/eslint-config@workspace:packages/eslint-config"],
+
+    "@yuanxiao/tsconfig": ["@yuanxiao/tsconfig@workspace:packages/tsconfig"],
+
     "@zeit/schemas": ["@zeit/schemas@2.36.0", "https://registry.npmmirror.com/@zeit/schemas/-/schemas-2.36.0.tgz", {}, "sha512-7kjMwcChYEzMKjeex9ZFXkt1AyNov9R5HZtjBKVsmVpw7pa7ZtlCGvCBC2vnnXctaYN+aRI61HjIqeetZW5ROg=="],
 
     "abbrev": ["abbrev@4.0.0", "https://registry.npmmirror.com/abbrev/-/abbrev-4.0.0.tgz", {}, "sha512-a1wflyaL0tHtJSmLSOVybYhy22vRih4eduhhrkcjgrWGnRfrZtovJ2FRjxuTtkkj47O/baf0R86QU5OuYpz8fA=="],
@@ -882,8 +884,6 @@
     "ansi-styles": ["ansi-styles@4.3.0", "https://registry.npmmirror.com/ansi-styles/-/ansi-styles-4.3.0.tgz", { "dependencies": { "color-convert": "2.0.1" } }, "sha512-zbB9rCJAT1rbjiVDb2hqKFHNYLxgtk8NURxZ3IZwD3F6NtxbXZQCnnSi1Lkx+IDohdPlFp222wVALIheZJQSEg=="],
 
     "app-builder-lib": ["app-builder-lib@26.15.3", "https://registry.npmmirror.com/app-builder-lib/-/app-builder-lib-26.15.3.tgz", { "dependencies": { "@electron/asar": "3.4.1", "@electron/fuses": "1.8.0", "@electron/get": "3.1.0", "@electron/notarize": "2.5.0", "@electron/osx-sign": "1.3.3", "@electron/rebuild": "4.1.0", "@electron/universal": "2.0.3", "@malept/flatpak-bundler": "0.4.0", "@noble/hashes": "2.2.0", "@peculiar/webcrypto": "1.7.1", "@types/fs-extra": "9.0.13", "ajv": "8.20.0", "asn1js": "3.0.10", "async-exit-hook": "2.0.1", "builder-util": "26.15.3", "builder-util-runtime": "9.7.0", "chromium-pickle-js": "0.2.0", "ci-info": "4.3.1", "debug": "4.4.3", "dotenv": "16.4.5", "dotenv-expand": "11.0.6", "ejs": "3.1.8", "electron-publish": "26.15.3", "fs-extra": "10.1.0", "hosted-git-info": "4.1.0", "isbinaryfile": "5.0.7", "jiti": "2.7.0", "js-yaml": "4.3.0", "json5": "2.2.3", "lazy-val": "1.0.5", "minimatch": "10.2.5", "pkijs": "3.4.0", "plist": "3.1.0", "proper-lockfile": "4.1.2", "resedit": "1.7.0", "semver": "7.7.4", "tar": "7.5.19", "temp-file": "3.4.0", "tiny-async-pool": "1.3.0", "unzipper": "0.12.5", "which": "5.0.0" }, "peerDependencies": { "dmg-builder": "26.15.3", "electron-builder-squirrel-windows": "26.15.3" } }, "sha512-2VnyWkqsP5v5XbBhL3tD5Syx8iNPBYsoU7kY4S2fz7wg8Rj/nztWKCUzGKaFRTv0Xwf3/H058CR1Kvtd/3lRow=="],
-
-    "apps-desktop": ["apps-desktop@workspace:apps/desktop"],
 
     "arch": ["arch@2.2.0", "https://registry.npmmirror.com/arch/-/arch-2.2.0.tgz", {}, "sha512-Of/R0wqp83cgHozfIYLbBMnej79U/SVGOOyuB3VVFv1NRM/PSFMK12x9KVtiYzJqmnU5WR2qp0Z5rHb7sWGnFQ=="],
 

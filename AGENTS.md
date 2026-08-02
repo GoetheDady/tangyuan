@@ -1,4 +1,4 @@
-# 汤圆 Agent 说明
+# 元宵 Agent 说明
 
 ## 基本约定
 
@@ -118,7 +118,7 @@
 
 ### Issue tracker
 
-Issues 和 PRD 使用 GitHub Issues，仓库是 `git@github.com:GoetheDady/tangyuan.git`；外部 PR 不作为 triage 请求入口。详见 `docs/agents/issue-tracker.md`。
+Issues 和 PRD 使用 GitHub Issues，仓库是 `git@github.com:GoetheDady/yuanxiao.git`；外部 PR 不作为 triage 请求入口。详见 `docs/agents/issue-tracker.md`。
 
 ### Triage labels
 

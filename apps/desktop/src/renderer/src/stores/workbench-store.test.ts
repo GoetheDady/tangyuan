@@ -6,38 +6,38 @@ import type {
   QuestionClarificationRequest,
   RuntimeSnapshot,
   TranscriptSnapshot,
-} from '@tangyuan/contracts'
-import { createRuntimeSnapshot } from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
+import { createRuntimeSnapshot } from '@yuanxiao/contracts'
 import { describe, expect, it } from 'vitest'
 
 import { createWorkbenchStore } from './workbench-store'
 
 const NOW = '2026-07-29T10:00:00.000Z'
 
-const TANGYUAN: AgentSummary = {
-  agentId: 'tangyuan',
-  displayName: '汤圆',
+const YUANXIAO: AgentSummary = {
+  agentId: 'yuanxiao',
+  displayName: '元宵',
   status: 'active',
   defaultProviderId: 'openai',
   defaultModelId: 'gpt-5',
-  homePath: '~/.tangyuan/agents/tangyuan',
+  homePath: '~/.yuanxiao/agents/yuanxiao',
   archivedAt: null,
   directoryStatus: 'healthy',
 }
 
 const RESEARCHER: AgentSummary = {
-  ...TANGYUAN,
+  ...YUANXIAO,
   agentId: 'researcher',
   displayName: '研究助手',
-  homePath: '~/.tangyuan/agents/researcher',
+  homePath: '~/.yuanxiao/agents/researcher',
 }
 
 function createRuntime(): RuntimeSnapshot {
   return createRuntimeSnapshot({
     activeAgent: {
-      agentId: TANGYUAN.agentId,
-      displayName: TANGYUAN.displayName,
-      homePath: TANGYUAN.homePath,
+      agentId: YUANXIAO.agentId,
+      displayName: YUANXIAO.displayName,
+      homePath: YUANXIAO.homePath,
       profile: {
         initialized: true,
         bootstrapRequired: false,
@@ -45,7 +45,7 @@ function createRuntime(): RuntimeSnapshot {
         userUpdatedAt: NOW,
       },
     },
-    agents: [TANGYUAN, RESEARCHER],
+    agents: [YUANXIAO, RESEARCHER],
     providers: [{ providerId: 'openai', displayName: 'OpenAI' }],
     models: [{ providerId: 'openai', modelId: 'gpt-5', displayName: 'GPT-5' }],
     settings: { selectedProviderId: 'openai', selectedModelId: 'gpt-5' },
@@ -153,7 +153,7 @@ describe('createWorkbenchStore', () => {
 
     expect(store.getState()).toMatchObject({
       runtime,
-      agents: [TANGYUAN, RESEARCHER],
+      agents: [YUANXIAO, RESEARCHER],
       activeSession: session,
       sessionsByAgentId: { researcher: [session] },
       transcriptsBySessionId: { 'session-1': transcript },
@@ -163,7 +163,7 @@ describe('createWorkbenchStore', () => {
 
   it('设置和清除启动时激活会话', () => {
     const store = createWorkbenchStore()
-    const session = createSession('tangyuan', 'session-1')
+    const session = createSession('yuanxiao', 'session-1')
 
     expect(store.getState().activeSession).toBeNull()
 
@@ -181,24 +181,24 @@ describe('createWorkbenchStore', () => {
     store.getState().loadRuntimeSnapshot(runtime)
 
     expect(store.getState().runtime).toBe(runtime)
-    expect(store.getState().agents).toEqual([TANGYUAN, RESEARCHER])
+    expect(store.getState().agents).toEqual([YUANXIAO, RESEARCHER])
   })
 
   it('替换指定 Agent 的 session 列表且不污染其他 Agent', () => {
     const store = createWorkbenchStore()
-    const firstSession = createSession('tangyuan', 'session-1')
+    const firstSession = createSession('yuanxiao', 'session-1')
     const secondSession = createSession('researcher', 'session-2')
 
-    store.getState().replaceAgentSessions('tangyuan', [firstSession])
+    store.getState().replaceAgentSessions('yuanxiao', [firstSession])
     store.getState().replaceAgentSessions('researcher', [secondSession])
     store
       .getState()
-      .replaceAgentSessions('tangyuan', [
+      .replaceAgentSessions('yuanxiao', [
         { ...firstSession, title: '更新后的会话' },
       ])
 
     expect(store.getState().sessionsByAgentId).toEqual({
-      tangyuan: [{ ...firstSession, title: '更新后的会话' }],
+      yuanxiao: [{ ...firstSession, title: '更新后的会话' }],
       researcher: [secondSession],
     })
   })
@@ -213,7 +213,7 @@ describe('createWorkbenchStore', () => {
     store.getState().applyTranscriptEvents([
       {
         type: 'transcript-delta',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         delta: {
           type: 'entry-appended',
@@ -247,7 +247,7 @@ describe('createWorkbenchStore', () => {
       },
       {
         type: 'transcript-delta',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         delta: { type: 'delta-appended', index: 0, delta: '好' },
         occurredAt: NOW,
@@ -256,7 +256,7 @@ describe('createWorkbenchStore', () => {
 
     expect(notifications).toBe(1)
     expect(store.getState().transcriptsBySessionId).toMatchObject({
-      'session-1': { agentId: 'tangyuan', entries: [{ content: '你好' }] },
+      'session-1': { agentId: 'yuanxiao', entries: [{ content: '你好' }] },
       'session-2': {
         agentId: 'researcher',
         entries: [{ content: '独立会话' }],
@@ -266,10 +266,10 @@ describe('createWorkbenchStore', () => {
 
   it('按事件所属 Agent 归并 session 和 Agent 摘要', () => {
     const store = createWorkbenchStore()
-    const firstSession = createSession('tangyuan', 'session-1')
+    const firstSession = createSession('yuanxiao', 'session-1')
     const secondSession = createSession('researcher', 'session-2')
     store.getState().loadRuntimeSnapshot(createRuntime())
-    store.getState().replaceAgentSessions('tangyuan', [firstSession])
+    store.getState().replaceAgentSessions('yuanxiao', [firstSession])
     store.getState().replaceAgentSessions('researcher', [secondSession])
 
     const runEvent: AgentEvent = {
@@ -288,7 +288,7 @@ describe('createWorkbenchStore', () => {
       occurredAt: NOW,
     })
 
-    expect(store.getState().sessionsByAgentId.tangyuan).toEqual([firstSession])
+    expect(store.getState().sessionsByAgentId.yuanxiao).toEqual([firstSession])
     expect(store.getState().sessionsByAgentId.researcher).toEqual([
       {
         ...secondSession,
@@ -296,14 +296,14 @@ describe('createWorkbenchStore', () => {
         updatedAt: '2026-07-29T10:01:00.000Z',
       },
     ])
-    expect(store.getState().agents).toEqual([TANGYUAN, renamedResearcher])
+    expect(store.getState().agents).toEqual([YUANXIAO, renamedResearcher])
   })
 
   it('通过事件按 session 加入和解决临时请求', () => {
     const store = createWorkbenchStore()
-    const firstApproval = createApproval('tangyuan', 'session-1')
+    const firstApproval = createApproval('yuanxiao', 'session-1')
     const secondApproval = createApproval('researcher', 'session-2')
-    const firstClarification = createClarification('tangyuan', 'session-1')
+    const firstClarification = createClarification('yuanxiao', 'session-1')
 
     store.getState().applyAgentEvent({
       type: 'approval-required',
@@ -347,7 +347,7 @@ describe('createWorkbenchStore', () => {
 
   it('按 session 打开、更新和清理 transcript', () => {
     const store = createWorkbenchStore()
-    store.getState().openTranscript(createTranscript('tangyuan', 'session-1'))
+    store.getState().openTranscript(createTranscript('yuanxiao', 'session-1'))
     store.getState().openTranscript(createTranscript('researcher', 'session-2'))
 
     store.getState().applyAgentEvent({
@@ -376,9 +376,9 @@ describe('createWorkbenchStore', () => {
 
   it('发送状态、审批和澄清请求按 session 隔离并可语义清理', () => {
     const store = createWorkbenchStore()
-    const firstApproval = createApproval('tangyuan', 'session-1')
+    const firstApproval = createApproval('yuanxiao', 'session-1')
     const secondApproval = createApproval('researcher', 'session-2')
-    const firstClarification = createClarification('tangyuan', 'session-1')
+    const firstClarification = createClarification('yuanxiao', 'session-1')
     const secondClarification = createClarification('researcher', 'session-2')
 
     store.getState().beginSending('session-1')

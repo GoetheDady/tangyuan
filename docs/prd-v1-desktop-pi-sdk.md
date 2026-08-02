@@ -1,10 +1,10 @@
-# 汤圆 v1 PRD：桌面端 Pi Agent SDK 会话闭环
+# 元宵 v1 PRD：桌面端 Pi Agent SDK 会话闭环
 
 Status: `ready-for-agent`
 
 ## Problem Statement
 
-用户想要一个可以直接安装和使用的桌面端 Agent 工作台，而不是每次都从命令行、脚本或零散 SDK 示例开始。第一版需要证明“汤圆”可以作为一个稳定的桌面产品壳，承载 Pi Agent SDK 的真实会话能力。
+用户想要一个可以直接安装和使用的桌面端 Agent 工作台，而不是每次都从命令行、脚本或零散 SDK 示例开始。第一版需要证明“元宵”可以作为一个稳定的桌面产品壳，承载 Pi Agent SDK 的真实会话能力。
 
 当前最大的不确定性不是记忆、技能或自我进化，而是第一条产品闭环能不能跑通：用户打开桌面应用，配置必要凭据，创建会话，发送消息，收到真实 Agent 响应，并且能保存和重新打开会话。
 
@@ -12,7 +12,7 @@ Status: `ready-for-agent`
 
 ## Solution
 
-汤圆 v1 将提供一个 Electron 桌面应用，第一版只集成 Pi Agent SDK。用户可以在应用内配置 Provider/API Key，选择模型，创建 Agent 会话，发送消息，查看响应，取消运行，并在重启后继续查看历史会话。
+元宵 v1 将提供一个 Electron 桌面应用，第一版只集成 Pi Agent SDK。用户可以在应用内配置 Provider/API Key，选择模型，创建 Agent 会话，发送消息，查看响应，取消运行，并在重启后继续查看历史会话。
 
 架构上，Renderer UI 不直接调用 Pi Agent SDK。应用会通过 Preload API 把界面操作传给 Electron Main，再由 DesktopAppStore 调用 AgentSessionDriver。第一版只实现 PiSdkDriver，但接口设计必须允许未来替换为自有 Agent Runtime。
 
@@ -25,39 +25,39 @@ Status: `ready-for-agent`
 - **AgentSessionDriver**：会话驱动接口，统一定义创建会话、发送消息、取消运行、订阅事件等能力。
 - **PiSdkDriver**：第一版的 Driver 实现，内部负责调用 Pi Agent SDK。
 - **RuntimeSnapshot**：运行时资源快照，表示当前可用 Provider、模型、设置和认证状态。
-- **Agent Home**：某个 Agent 的本地工作目录。v1 默认 Agent 是 `tangyuan`，目录是 `~/.tangyuan/agents/tangyuan`。
+- **Agent Home**：某个 Agent 的本地工作目录。v1 默认 Agent 是 `yuanxiao`，目录是 `~/.yuanxiao/agents/yuanxiao`。
 - **soul.md**：Agent 的核心身份和行为规则。v1 由首次 bootstrap 对话生成，后续每次会话注入上下文，并允许 Agent 自动更新。
 - **user.md**：Agent 对用户的用户画像。它记录用户称呼、语言偏好、工作类型、决策偏好和边界，由 Agent 在会话中自动维护。
 - **bootstrap.md**：首次初始化 Agent 时使用的固定问题模板。bootstrap 完成并生成 `soul.md` / `user.md` 后删除。
 
 ## User Stories
 
-1. As a 汤圆用户, I want to open a desktop app, so that I can use the Agent without starting from command-line tooling.
-2. As a 汤圆用户, I want to see whether the app is ready to use, so that I know if I still need to configure a Provider or model.
-3. As a 汤圆用户, I want to configure an API Key, so that the app can call the selected model provider.
-4. As a 汤圆用户, I want the app to avoid showing my full API Key after it is saved, so that I do not accidentally expose secrets on screen.
-5. As a 汤圆用户, I want to know whether an API Key has already been configured, so that I do not enter it repeatedly.
-6. As a 汤圆用户, I want to choose a Provider, so that I can decide which model service should power the Agent.
-7. As a 汤圆用户, I want to choose a model, so that I can control which model is used for the session.
-8. As a 汤圆用户, I want to refresh available runtime resources, so that the Provider and model list reflects the current configuration.
-9. As a 汤圆用户, I want to create a new Agent session, so that I can start a clean task.
-10. As a 汤圆用户, I want to see a session list, so that I can switch between previous conversations.
-11. As a 汤圆用户, I want to open an existing session, so that I can continue reviewing past work.
-12. As a 汤圆用户, I want to type a message into a composer, so that I can give the Agent a task.
-13. As a 汤圆用户, I want to send my message to the Agent, so that the Agent can start working.
-14. As a 汤圆用户, I want to see my sent message immediately, so that the app feels responsive.
-15. As a 汤圆用户, I want to see the Agent response stream or update as it arrives, so that I understand progress before the final answer.
-16. As a 汤圆用户, I want to see when the Agent is running, so that I do not accidentally start duplicate work.
-17. As a 汤圆用户, I want to cancel a running response, so that I can stop a mistaken or long-running request.
-18. As a 汤圆用户, I want to see cancellation reflected in the UI, so that I know the Agent stopped.
-19. As a 汤圆用户, I want to see errors in plain language, so that I can fix configuration or retry.
-20. As a 汤圆用户, I want the app to preserve the transcript, so that I can return to previous answers.
-21. As a 汤圆用户, I want session history to survive app restart, so that my work is not lost.
-22. As a 汤圆用户, I want the current selected Provider and model to persist, so that I do not reconfigure every launch.
-23. As a 汤圆用户, I want the app to prevent sending a message when required configuration is missing, so that failures are caught early.
-24. As a 汤圆用户, I want the app to show enough status information during a run, so that I can distinguish idle, running, cancelled, completed, and failed states.
-25. As a 汤圆用户, I want the UI to remain usable while the Agent is running, so that the app does not feel frozen.
-26. As a 汤圆用户, I want the first version to be focused and predictable, so that I can trust the core conversation loop before advanced features are added.
+1. As a 元宵用户, I want to open a desktop app, so that I can use the Agent without starting from command-line tooling.
+2. As a 元宵用户, I want to see whether the app is ready to use, so that I know if I still need to configure a Provider or model.
+3. As a 元宵用户, I want to configure an API Key, so that the app can call the selected model provider.
+4. As a 元宵用户, I want the app to avoid showing my full API Key after it is saved, so that I do not accidentally expose secrets on screen.
+5. As a 元宵用户, I want to know whether an API Key has already been configured, so that I do not enter it repeatedly.
+6. As a 元宵用户, I want to choose a Provider, so that I can decide which model service should power the Agent.
+7. As a 元宵用户, I want to choose a model, so that I can control which model is used for the session.
+8. As a 元宵用户, I want to refresh available runtime resources, so that the Provider and model list reflects the current configuration.
+9. As a 元宵用户, I want to create a new Agent session, so that I can start a clean task.
+10. As a 元宵用户, I want to see a session list, so that I can switch between previous conversations.
+11. As a 元宵用户, I want to open an existing session, so that I can continue reviewing past work.
+12. As a 元宵用户, I want to type a message into a composer, so that I can give the Agent a task.
+13. As a 元宵用户, I want to send my message to the Agent, so that the Agent can start working.
+14. As a 元宵用户, I want to see my sent message immediately, so that the app feels responsive.
+15. As a 元宵用户, I want to see the Agent response stream or update as it arrives, so that I understand progress before the final answer.
+16. As a 元宵用户, I want to see when the Agent is running, so that I do not accidentally start duplicate work.
+17. As a 元宵用户, I want to cancel a running response, so that I can stop a mistaken or long-running request.
+18. As a 元宵用户, I want to see cancellation reflected in the UI, so that I know the Agent stopped.
+19. As a 元宵用户, I want to see errors in plain language, so that I can fix configuration or retry.
+20. As a 元宵用户, I want the app to preserve the transcript, so that I can return to previous answers.
+21. As a 元宵用户, I want session history to survive app restart, so that my work is not lost.
+22. As a 元宵用户, I want the current selected Provider and model to persist, so that I do not reconfigure every launch.
+23. As a 元宵用户, I want the app to prevent sending a message when required configuration is missing, so that failures are caught early.
+24. As a 元宵用户, I want the app to show enough status information during a run, so that I can distinguish idle, running, cancelled, completed, and failed states.
+25. As a 元宵用户, I want the UI to remain usable while the Agent is running, so that the app does not feel frozen.
+26. As a 元宵用户, I want the first version to be focused and predictable, so that I can trust the core conversation loop before advanced features are added.
 27. As a 产品负责人, I want v1 to validate the desktop + Pi SDK path, so that later Memory and Skill work is built on a working foundation.
 28. As a 产品负责人, I want clear out-of-scope boundaries, so that the first version does not expand into a full Agent platform.
 29. As a 开发者, I want Renderer UI to call a narrow Preload API, so that desktop security boundaries stay clear.
@@ -80,8 +80,8 @@ Status: `ready-for-agent`
 - The application will still define a replaceable AgentSessionDriver interface from the beginning.
 - The first implementation of AgentSessionDriver will be PiSdkDriver. Product runtime will not include a fake driver.
 - Tests may mock Pi SDK behavior to avoid real model calls in fast local test runs.
-- The first release will create only one default agent profile: `tangyuan`.
-- The default agent home will be `~/.tangyuan/agents/tangyuan`.
+- The first release will create only one default agent profile: `yuanxiao`.
+- The default agent home will be `~/.yuanxiao/agents/yuanxiao`.
 - Runtime and session data structures must include `agentId` so later multi-agent work can add more agents without reshaping core contracts.
 - First use will create a fixed `bootstrap.md` under the default agent home.
 - The first conversation after verified configuration will run the bootstrap flow, generate `soul.md` and `user.md`, write both files, and delete `bootstrap.md`.
@@ -114,7 +114,7 @@ Status: `ready-for-agent`
 - Configuration verification must disable tools, avoid writing session history, and display only sanitized errors.
 - Secure credential storage is out of scope for v1 and should be handled by a later security issue.
 - Conversation history will use Pi SDK native session persistence as the source of truth.
-- Tangyuan JSON files will store only configuration, session index data, summaries, and UI metadata.
+- Yuanxiao JSON files will store only configuration, session index data, summaries, and UI metadata.
 - SQLite, Markdown, and dual-write storage are out of scope for v1.
 - Packaging verification is part of v1, not a later cleanup task.
 - v1 should include enough UI to operate the real loop: session list, transcript, composer, run state, cancel action, Provider/model settings, and error display.
@@ -158,7 +158,7 @@ Status: `ready-for-agent`
 
 ## Further Notes
 
-This PRD intentionally narrows the first release. The first milestone is not “make the final Agent platform”; it is “prove that 汤圆 can be a reliable desktop shell around a real Pi Agent SDK session.”
+This PRD intentionally narrows the first release. The first milestone is not “make the final Agent platform”; it is “prove that 元宵 can be a reliable desktop shell around a real Pi Agent SDK session.”
 
 The next planning artifact after this PRD should be an implementation issue list. Each issue should be small enough for an agent to complete independently, while preserving the v1 architecture boundary: UI talks to Preload API, Main talks to DesktopAppStore, DesktopAppStore talks to Driver interfaces, and Pi SDK remains behind PiSdkDriver.
 

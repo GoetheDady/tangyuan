@@ -31,13 +31,13 @@ import type {
   SetSessionModelRequest,
   SetSessionThinkingLevelRequest,
   TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
 export type {
   AgentEvent,
   AgentEventListener,
   AgentEventSubscription,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
 /**
  * 描述 Pi SDK 验证配置时需要的参数。
@@ -50,7 +50,7 @@ export interface PiSdkVerificationRequest extends RuntimeConfiguration {
 /**
  * 工具审批与文件路径校验网关。
  *
- * 由 TangyuanRuntime 实现，注入到 PiSdkDriver 的自定义工具中，
+ * 由 YuanxiaoRuntime 实现，注入到 PiSdkDriver 的自定义工具中，
  * 用于在执行 bash 前创建审批、在校验文件路径时判断是否允许访问。
  */
 export interface ToolApprovalGateway {
@@ -112,7 +112,7 @@ export interface PiSdkCreateSessionRequest extends RuntimeConfiguration {
   agentSkillsPath: string
   /** 共享 Skills 目录路径（用于 DefaultResourceLoader）。 */
   sharedSkillsPath: string
-  /** 仅在 tangyuan session 中提供，用于 create_agent 工具回调。 */
+  /** 仅在 yuanxiao session 中提供，用于 create_agent 工具回调。 */
   onCreateAgent?: (displayName: string) => Promise<AgentSummary>
   /** 绑定到当前 Agent 和当前会话观察版本的灵魂更新回调。 */
   onUpdateSoul: (content: string) => Promise<ProfileUpdateResult>
@@ -527,7 +527,7 @@ export interface AgentSessionDriver {
    * @throws 当配置缺失、会话不存在或 SDK 调用失败时，Promise 会 reject。
    */
   retryMessage?(
-    request: import('@tangyuan/contracts').RetryRunRequest,
+    request: import('@yuanxiao/contracts').RetryRunRequest,
   ): Promise<void>
 
   /**
@@ -538,8 +538,8 @@ export interface AgentSessionDriver {
    * @throws 当会话不存在或分叉操作失败时，Promise 会 reject。
    */
   forkSession?(
-    request: import('@tangyuan/contracts').ForkSessionRequest,
-  ): Promise<import('@tangyuan/contracts').AgentSessionSummary>
+    request: import('@yuanxiao/contracts').ForkSessionRequest,
+  ): Promise<import('@yuanxiao/contracts').AgentSessionSummary>
 
   /**
    * 读取指定会话的持久化执行尝试记录，用于会话重建。
@@ -577,7 +577,7 @@ export interface AgentSessionDriver {
    *
    * @param agentId - Agent 标识。
    * @returns 归档后的 AgentSummary。
-   * @throws 当 Agent 是汤圆或配置保存失败时，Promise 会 reject。
+   * @throws 当 Agent 是元宵或配置保存失败时，Promise 会 reject。
    */
   archiveAgent?(agentId: AgentId): Promise<AgentSummary>
 
@@ -598,7 +598,7 @@ export interface AgentSessionDriver {
    */
   reconcileAgentDirectories?(): Promise<{
     agents: AgentSummary[]
-    unclaimedDirectories: import('@tangyuan/contracts').UnclaimedDirectory[]
+    unclaimedDirectories: import('@yuanxiao/contracts').UnclaimedDirectory[]
   }>
 
   /**
@@ -615,12 +615,12 @@ export interface AgentSessionDriver {
   ): Promise<AgentSummary>
 
   /**
-   * 按固定模板重建汤圆目录结构。
+   * 按固定模板重建元宵目录结构。
    *
    * @returns 重建后的 AgentSummary。
    * @throws 当目录创建或文件写入失败时，Promise 会 reject。
    */
-  rebuildTangyuanHome?(): Promise<AgentSummary>
+  rebuildYuanxiaoHome?(): Promise<AgentSummary>
 
   /**
    * 读取当前 Session 的模型和 Thinking Level 信息。
@@ -660,7 +660,7 @@ export interface AgentSessionDriver {
    * @returns Agent 的 soul 内容和更新时间。
    * @throws 当 Agent 不存在或文件读取失败时，Promise 会 reject。
    */
-  getSoul?(agentId: AgentId): Promise<import('@tangyuan/contracts').SoulContent>
+  getSoul?(agentId: AgentId): Promise<import('@yuanxiao/contracts').SoulContent>
 
   /**
    * 读取共享 user profile 内容。
@@ -668,7 +668,7 @@ export interface AgentSessionDriver {
    * @returns 共享 user profile 内容和更新时间。
    * @throws 当文件不存在或读取失败时，Promise 会 reject。
    */
-  getUserProfile?(): Promise<import('@tangyuan/contracts').UserProfileContent>
+  getUserProfile?(): Promise<import('@yuanxiao/contracts').UserProfileContent>
 
   /**
    * 更新指定 Agent 的 soul（含权限校验和备份验证）。
@@ -683,7 +683,7 @@ export interface AgentSessionDriver {
     agentId: AgentId,
     content: string,
     expectedVersion: string,
-  ): Promise<import('@tangyuan/contracts').ProfileUpdateResult>
+  ): Promise<import('@yuanxiao/contracts').ProfileUpdateResult>
 
   /**
    * 更新共享 user profile（含备份验证和敏感信息过滤）。
@@ -696,7 +696,7 @@ export interface AgentSessionDriver {
   updateUserProfile?(
     content: string,
     expectedVersion: string,
-  ): Promise<import('@tangyuan/contracts').ProfileUpdateResult>
+  ): Promise<import('@yuanxiao/contracts').ProfileUpdateResult>
 
   /**
    * 列出指定 Agent 实际生效的 Skill 列表（含冲突诊断）。
@@ -707,7 +707,7 @@ export interface AgentSessionDriver {
    */
   listAgentSkills?(
     agentId: AgentId,
-  ): Promise<import('@tangyuan/contracts').SkillSummary[]>
+  ): Promise<import('@yuanxiao/contracts').SkillSummary[]>
 
   /**
    * 列出共享 Skill 列表。
@@ -715,7 +715,7 @@ export interface AgentSessionDriver {
    * @returns 共享 Skill 摘要列表。
    * @throws 当共享 Skill 目录不存在或解析失败时，Promise 会 reject。
    */
-  listSharedSkills?(): Promise<import('@tangyuan/contracts').SkillSummary[]>
+  listSharedSkills?(): Promise<import('@yuanxiao/contracts').SkillSummary[]>
 
   /**
    * 重新加载指定 Agent 所有活跃 session 的 ResourceLoader。
@@ -746,8 +746,8 @@ export interface AgentSessionDriver {
    * @throws 当校验失败或文件操作失败时，Promise 会 reject。
    */
   installSkill?(
-    params: import('@tangyuan/contracts').SkillOperationParams,
-  ): Promise<import('@tangyuan/contracts').SkillSummary[]>
+    params: import('@yuanxiao/contracts').SkillOperationParams,
+  ): Promise<import('@yuanxiao/contracts').SkillSummary[]>
 
   /**
    * 删除 Skill（含备份）。
@@ -757,8 +757,8 @@ export interface AgentSessionDriver {
    * @throws 当文件操作失败时，Promise 会 reject。
    */
   deleteSkill?(
-    params: import('@tangyuan/contracts').SkillOperationParams,
-  ): Promise<import('@tangyuan/contracts').SkillSummary[]>
+    params: import('@yuanxiao/contracts').SkillOperationParams,
+  ): Promise<import('@yuanxiao/contracts').SkillSummary[]>
 
   /**
    * 读取 Skill 安装记录。
@@ -767,7 +767,7 @@ export interface AgentSessionDriver {
    * @throws 当读取失败时，Promise 会 reject。
    */
   getSkillInstallRecords?(): Promise<
-    import('@tangyuan/contracts').SkillInstallRecord[]
+    import('@yuanxiao/contracts').SkillInstallRecord[]
   >
 
   /**

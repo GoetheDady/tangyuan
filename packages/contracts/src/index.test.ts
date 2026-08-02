@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CURRENT_SCHEMA_VERSION,
   DESKTOP_IPC_CHANNELS,
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   archiveSessionRequestSchema,
   archiveSessionResultSchema,
   agentSessionSummarySchema,
@@ -95,14 +95,14 @@ describe('contracts schemas', () => {
     expect(
       agentEventSchema.parse({
         type: 'attempt-started',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         runId: 'run-1',
         occurredAt: '2026-07-16T00:00:00.000Z',
       }),
     ).toEqual({
       type: 'attempt-started',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       runId: 'run-1',
       occurredAt: '2026-07-16T00:00:00.000Z',
@@ -111,7 +111,7 @@ describe('contracts schemas', () => {
     expect(() =>
       agentEventSchema.parse({
         type: 'message-delta',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         runId: 'run-1',
         messageId: 'message-1',
@@ -125,14 +125,14 @@ describe('contracts schemas', () => {
     expect(
       agentEventSchema.parse({
         type: 'run-state-changed',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         state: 'queued',
         occurredAt: '2026-07-17T00:00:00.000Z',
       }),
     ).toEqual({
       type: 'run-state-changed',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       state: 'queued',
       occurredAt: '2026-07-17T00:00:00.000Z',
@@ -142,7 +142,7 @@ describe('contracts schemas', () => {
   it('requires a non-empty fork source entry at the IPC contract boundary', () => {
     expect(() =>
       forkSessionRequestSchema.parse({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         entryId: '',
       }),
@@ -150,12 +150,12 @@ describe('contracts schemas', () => {
 
     expect(
       forkSessionRequestSchema.parse({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         entryId: 'entry-1',
       }),
     ).toEqual({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       entryId: 'entry-1',
     })
@@ -164,7 +164,7 @@ describe('contracts schemas', () => {
   it('rejects an empty session title at the IPC contract boundary', () => {
     expect(() =>
       createSessionRequestSchema.parse({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         title: '   ',
       }),
     ).toThrow()
@@ -255,7 +255,7 @@ describe('createRuntimeSnapshot', () => {
 
     expect(snapshot).toMatchObject({
       activeAgent: {
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         profile: {
           initialized: false,
           bootstrapRequired: false,
@@ -371,7 +371,7 @@ describe('createRuntimeSnapshot', () => {
 })
 
 describe('createDefaultSessionSummary', () => {
-  it('creates a tangyuan session summary in the initial idle state', () => {
+  it('creates a yuanxiao session summary in the initial idle state', () => {
     expect(
       createDefaultSessionSummary({
         sessionId: 'session-1',
@@ -379,7 +379,7 @@ describe('createDefaultSessionSummary', () => {
         updatedAt: '2026-07-08T00:00:00.000Z',
       }),
     ).toEqual({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       title: '新会话',
       updatedAt: '2026-07-08T00:00:00.000Z',
@@ -391,57 +391,57 @@ describe('createDefaultSessionSummary', () => {
 describe('DESKTOP_IPC_CHANNELS', () => {
   it('names the IPC requests that the preload layer may invoke', () => {
     expect(DESKTOP_IPC_CHANNELS).toEqual({
-      runtimeGetSnapshot: 'tangyuan:runtime:get-snapshot',
-      runtimeRefresh: 'tangyuan:runtime:refresh',
-      runtimeSaveConfiguration: 'tangyuan:runtime:save-configuration',
+      runtimeGetSnapshot: 'yuanxiao:runtime:get-snapshot',
+      runtimeRefresh: 'yuanxiao:runtime:refresh',
+      runtimeSaveConfiguration: 'yuanxiao:runtime:save-configuration',
       runtimeCancelConfigurationVerification:
-        'tangyuan:runtime:cancel-configuration-verification',
-      runtimeRestoreFromBackup: 'tangyuan:runtime:restore-from-backup',
-      runtimeResetConfiguration: 'tangyuan:runtime:reset-configuration',
-      runtimeSaveProvider: 'tangyuan:runtime:save-provider',
-      runtimeDeleteProvider: 'tangyuan:runtime:delete-provider',
-      sessionsList: 'tangyuan:sessions:list',
-      sessionsCreate: 'tangyuan:sessions:create',
-      sessionsSendMessage: 'tangyuan:sessions:send-message',
-      sessionsCancelRun: 'tangyuan:sessions:cancel-run',
-      sessionsAnswerClarification: 'tangyuan:sessions:answer-clarification',
-      sessionsApproveBash: 'tangyuan:sessions:approve-bash',
-      sessionsCancelClarification: 'tangyuan:sessions:cancel-clarification',
-      sessionsRejectBash: 'tangyuan:sessions:reject-bash',
-      sessionsGetPendingApprovals: 'tangyuan:sessions:get-pending-approvals',
+        'yuanxiao:runtime:cancel-configuration-verification',
+      runtimeRestoreFromBackup: 'yuanxiao:runtime:restore-from-backup',
+      runtimeResetConfiguration: 'yuanxiao:runtime:reset-configuration',
+      runtimeSaveProvider: 'yuanxiao:runtime:save-provider',
+      runtimeDeleteProvider: 'yuanxiao:runtime:delete-provider',
+      sessionsList: 'yuanxiao:sessions:list',
+      sessionsCreate: 'yuanxiao:sessions:create',
+      sessionsSendMessage: 'yuanxiao:sessions:send-message',
+      sessionsCancelRun: 'yuanxiao:sessions:cancel-run',
+      sessionsAnswerClarification: 'yuanxiao:sessions:answer-clarification',
+      sessionsApproveBash: 'yuanxiao:sessions:approve-bash',
+      sessionsCancelClarification: 'yuanxiao:sessions:cancel-clarification',
+      sessionsRejectBash: 'yuanxiao:sessions:reject-bash',
+      sessionsGetPendingApprovals: 'yuanxiao:sessions:get-pending-approvals',
       sessionsGetPendingClarifications:
-        'tangyuan:sessions:get-pending-clarifications',
-      sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
-      sessionsRetryMessage: 'tangyuan:sessions:retry-message',
-      sessionsFork: 'tangyuan:sessions:fork',
-      sessionsArchive: 'tangyuan:sessions:archive',
-      sessionsRecover: 'tangyuan:sessions:recover',
-      sessionsDelete: 'tangyuan:sessions:delete',
-      sessionsGetLastActive: 'tangyuan:sessions:get-last-active',
-      sessionsSetLastActive: 'tangyuan:sessions:set-last-active',
-      agentsArchive: 'tangyuan:agents:archive',
-      agentsClaimDirectory: 'tangyuan:agents:claim-directory',
-      agentsList: 'tangyuan:agents:list',
-      agentsRebuildTangyuan: 'tangyuan:agents:rebuild-tangyuan',
-      agentsReconcile: 'tangyuan:agents:reconcile',
-      agentsRecover: 'tangyuan:agents:recover',
-      agentsUpdateConfig: 'tangyuan:agents:update-config',
-      sessionsGetModelInfo: 'tangyuan:sessions:get-model-info',
-      sessionsSetModel: 'tangyuan:sessions:set-model',
-      sessionsSetThinkingLevel: 'tangyuan:sessions:set-thinking-level',
-      profileGetSoul: 'tangyuan:profile:get-soul',
-      profileGetUser: 'tangyuan:profile:get-user',
-      profileUpdateSoul: 'tangyuan:profile:update-soul',
-      profileUpdateUser: 'tangyuan:profile:update-user',
-      skillsListAgent: 'tangyuan:skills:list-agent',
-      skillsListShared: 'tangyuan:skills:list-shared',
-      skillsInstall: 'tangyuan:skills:install',
-      skillsDelete: 'tangyuan:skills:delete',
-      skillsApproveOperation: 'tangyuan:skills:approve-operation',
-      skillsRejectOperation: 'tangyuan:skills:reject-operation',
-      skillsGetPendingApprovals: 'tangyuan:skills:get-pending-approvals',
-      skillsGetInstallRecords: 'tangyuan:skills:get-install-records',
-      openExternalLink: 'tangyuan:open-external-link',
+        'yuanxiao:sessions:get-pending-clarifications',
+      sessionsGetTranscript: 'yuanxiao:sessions:get-transcript',
+      sessionsRetryMessage: 'yuanxiao:sessions:retry-message',
+      sessionsFork: 'yuanxiao:sessions:fork',
+      sessionsArchive: 'yuanxiao:sessions:archive',
+      sessionsRecover: 'yuanxiao:sessions:recover',
+      sessionsDelete: 'yuanxiao:sessions:delete',
+      sessionsGetLastActive: 'yuanxiao:sessions:get-last-active',
+      sessionsSetLastActive: 'yuanxiao:sessions:set-last-active',
+      agentsArchive: 'yuanxiao:agents:archive',
+      agentsClaimDirectory: 'yuanxiao:agents:claim-directory',
+      agentsList: 'yuanxiao:agents:list',
+      agentsRebuildYuanxiao: 'yuanxiao:agents:rebuild-yuanxiao',
+      agentsReconcile: 'yuanxiao:agents:reconcile',
+      agentsRecover: 'yuanxiao:agents:recover',
+      agentsUpdateConfig: 'yuanxiao:agents:update-config',
+      sessionsGetModelInfo: 'yuanxiao:sessions:get-model-info',
+      sessionsSetModel: 'yuanxiao:sessions:set-model',
+      sessionsSetThinkingLevel: 'yuanxiao:sessions:set-thinking-level',
+      profileGetSoul: 'yuanxiao:profile:get-soul',
+      profileGetUser: 'yuanxiao:profile:get-user',
+      profileUpdateSoul: 'yuanxiao:profile:update-soul',
+      profileUpdateUser: 'yuanxiao:profile:update-user',
+      skillsListAgent: 'yuanxiao:skills:list-agent',
+      skillsListShared: 'yuanxiao:skills:list-shared',
+      skillsInstall: 'yuanxiao:skills:install',
+      skillsDelete: 'yuanxiao:skills:delete',
+      skillsApproveOperation: 'yuanxiao:skills:approve-operation',
+      skillsRejectOperation: 'yuanxiao:skills:reject-operation',
+      skillsGetPendingApprovals: 'yuanxiao:skills:get-pending-approvals',
+      skillsGetInstallRecords: 'yuanxiao:skills:get-install-records',
+      openExternalLink: 'yuanxiao:open-external-link',
     })
   })
 })
@@ -471,9 +471,9 @@ function createRuntimeSnapshotInput(
 
   return {
     activeAgent: {
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
-      displayName: '汤圆',
-      homePath: '~/.tangyuan/agents/tangyuan',
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
+      displayName: '元宵',
+      homePath: '~/.yuanxiao/agents/yuanxiao',
       profile: {
         initialized: false,
         bootstrapRequired: false,
@@ -510,7 +510,7 @@ function createRuntimeSnapshotInput(
 }
 
 describe('migrateConfigV1ToV2', () => {
-  it('migrates a v1 config to v2 with the provider and default tangyuan agent', () => {
+  it('migrates a v1 config to v2 with the provider and default yuanxiao agent', () => {
     const v1: PersistedConfigurationV1 = {
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
@@ -528,8 +528,8 @@ describe('migrateConfigV1ToV2', () => {
       },
     })
     expect(result.agents).toEqual({
-      [TANGYUAN_DEFAULT_AGENT_ID]: {
-        displayName: '汤圆',
+      [YUANXIAO_DEFAULT_AGENT_ID]: {
+        displayName: '元宵',
         defaultProviderId: 'anthropic',
         defaultModelId: 'claude-sonnet-4-5',
         status: 'active',
@@ -605,7 +605,7 @@ describe('Skill schemas', () => {
     expect(
       skillApprovalRequestSchema.parse({
         approvalId: 'approval-1',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         operation: 'install',
         source: 'shared',
         skillName: 'code-review',
@@ -642,7 +642,7 @@ describe('Skill schemas', () => {
     expect(() =>
       skillApprovalRequestSchema.parse({
         approvalId: 'approval-1',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         operation: 'invalid',
         source: 'shared',
         skillName: 'test',
@@ -659,7 +659,7 @@ describe('Skill schemas', () => {
       skillOperationParamsSchema.parse({
         operation: 'install',
         source: 'shared',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         skillName: 'test-skill',
         skillDirPath: '/tmp/test-skill',
       }),
@@ -683,7 +683,7 @@ describe('Skill schemas', () => {
       skillOperationParamsSchema.parse({
         operation: 'install',
         source: 'invalid',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         skillName: 'test',
       }),
     ).toThrow()

@@ -1,4 +1,4 @@
-import type { UserProfileContent } from '@tangyuan/contracts'
+import type { UserProfileContent } from '@yuanxiao/contracts'
 import { Save } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'

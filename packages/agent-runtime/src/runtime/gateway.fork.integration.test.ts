@@ -18,7 +18,7 @@ afterEach(async () => {
 
 describe('RealPiSdkGateway independent fork', () => {
   it('creates a new Pi JSONL that excludes the fork source user message', async () => {
-    const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-pi-fork-'))
+    const rootPath = await mkdtemp(join(tmpdir(), 'yuanxiao-pi-fork-'))
     tempDirs.push(rootPath)
     const cwd = join(rootPath, 'agent-home')
     const sessionDir = join(rootPath, 'sessions')
@@ -89,7 +89,7 @@ describe('RealPiSdkGateway independent fork', () => {
       expect.objectContaining({ id: previousReplyId }),
       expect.objectContaining({
         type: 'custom',
-        customType: 'tangyuan:fork-source',
+        customType: 'yuanxiao:fork-source',
         data: { sessionId: parentSessionId, entryId: sourceMessageId },
       }),
     ])
@@ -113,7 +113,7 @@ describe('RealPiSdkGateway independent fork', () => {
     ])
   })
   it('creates an empty child JSONL when the source is the first user message', async () => {
-    const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-pi-first-fork-'))
+    const rootPath = await mkdtemp(join(tmpdir(), 'yuanxiao-pi-first-fork-'))
     tempDirs.push(rootPath)
     const cwd = join(rootPath, 'agent-home')
     const sessionDir = join(rootPath, 'sessions')
@@ -151,13 +151,13 @@ describe('RealPiSdkGateway independent fork', () => {
     expect(child.getEntries()).toEqual([
       expect.objectContaining({
         type: 'custom',
-        customType: 'tangyuan:fork-source',
+        customType: 'yuanxiao:fork-source',
         data: { sessionId: parent.getSessionId(), entryId: sourceMessageId },
       }),
     ])
   })
   it('keeps the fork source record out of the model context when the child continues', async () => {
-    const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-pi-fork-context-'))
+    const rootPath = await mkdtemp(join(tmpdir(), 'yuanxiao-pi-fork-context-'))
     tempDirs.push(rootPath)
     const cwd = join(rootPath, 'agent-home')
     const sessionDir = join(rootPath, 'sessions')
@@ -213,7 +213,7 @@ describe('RealPiSdkGateway independent fork', () => {
     ).toEqual(['保留的历史消息', '保留的历史回答', '子会话的新消息'])
   })
   it('persists the fork source record when the retained path has no assistant reply', async () => {
-    const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-pi-fork-draft-'))
+    const rootPath = await mkdtemp(join(tmpdir(), 'yuanxiao-pi-fork-draft-'))
     tempDirs.push(rootPath)
     const cwd = join(rootPath, 'agent-home')
     const sessionDir = join(rootPath, 'sessions')
@@ -275,7 +275,7 @@ describe('RealPiSdkGateway independent fork', () => {
         .filter(
           (entry) =>
             entry.type === 'custom' &&
-            entry.customType === 'tangyuan:fork-source',
+            entry.customType === 'yuanxiao:fork-source',
         ),
     ).toEqual([
       expect.objectContaining({
@@ -294,7 +294,7 @@ describe('RealPiSdkGateway independent fork', () => {
     )
   })
   it('keeps sibling forks from the same source independent', async () => {
-    const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-pi-fork-siblings-'))
+    const rootPath = await mkdtemp(join(tmpdir(), 'yuanxiao-pi-fork-siblings-'))
     tempDirs.push(rootPath)
     const cwd = join(rootPath, 'agent-home')
     const sessionDir = join(rootPath, 'sessions')
@@ -393,7 +393,7 @@ describe('RealPiSdkGateway independent fork', () => {
     )
   })
   it('keeps exactly one fork source record and excludes it from the model context on recursive forks', async () => {
-    const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-pi-fork-nested-'))
+    const rootPath = await mkdtemp(join(tmpdir(), 'yuanxiao-pi-fork-nested-'))
     tempDirs.push(rootPath)
     const cwd = join(rootPath, 'agent-home')
     const sessionDir = join(rootPath, 'sessions')
@@ -470,7 +470,7 @@ describe('RealPiSdkGateway independent fork', () => {
         .filter(
           (entry) =>
             entry.type === 'custom' &&
-            entry.customType === 'tangyuan:fork-source',
+            entry.customType === 'yuanxiao:fork-source',
         ),
     ).toEqual([
       expect.objectContaining({
@@ -494,7 +494,7 @@ describe('RealPiSdkGateway independent fork', () => {
     ])
   })
   it('reports an unavailable parent session when the source file has no persisted history', async () => {
-    const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-pi-fork-empty-'))
+    const rootPath = await mkdtemp(join(tmpdir(), 'yuanxiao-pi-fork-empty-'))
     tempDirs.push(rootPath)
     const sessionDir = join(rootPath, 'sessions')
     // Pi 会话在出现首条 assistant 回复前不落盘，此时父文件不可读。

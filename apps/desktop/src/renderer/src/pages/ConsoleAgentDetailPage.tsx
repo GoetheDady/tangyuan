@@ -41,7 +41,7 @@ import type {
   RuntimeSnapshot,
   SkillInstallRecord,
   SkillSummary,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
 /**
  * Agent 详情控制台页面：展示单个 Agent 的配置、模型选择和状态。
@@ -226,15 +226,15 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
     }
   }
 
-  async function handleRebuildTangyuan(): Promise<void> {
+  async function handleRebuildYuanxiao(): Promise<void> {
     setIsRebuilding(true)
 
     try {
-      const updated = await window.api.rebuildTangyuanHome()
+      const updated = await window.api.rebuildYuanxiaoHome()
       setAgent(updated)
-      toast.success('汤圆目录已重建')
+      toast.success('元宵目录已重建')
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : '重建汤圆目录失败')
+      toast.error(error instanceof Error ? error.message : '重建元宵目录失败')
     } finally {
       setIsRebuilding(false)
     }
@@ -528,7 +528,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                     暂无安装记录
                   </p>
                   <p className="text-label text-muted-foreground mt-1">
-                    通过控制台或汤圆对话安装 Skill 后，记录会出现在此处。
+                    通过控制台或元宵对话安装 Skill 后，记录会出现在此处。
                   </p>
                 </div>
               ) : (
@@ -593,7 +593,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                   </Button>
                 </Link>
               ) : null}
-              {agent.status === 'active' && agent.agentId !== 'tangyuan' ? (
+              {agent.status === 'active' && agent.agentId !== 'yuanxiao' ? (
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -615,18 +615,18 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                   恢复 Agent
                 </Button>
               ) : null}
-              {agent.agentId === 'tangyuan' &&
+              {agent.agentId === 'yuanxiao' &&
               agent.directoryStatus === 'damaged' ? (
                 <Button
                   variant="outline"
-                  onClick={handleRebuildTangyuan}
+                  onClick={handleRebuildYuanxiao}
                   disabled={isRebuilding}
                 >
                   <HardDrive aria-hidden="true" />
                   {isRebuilding ? '重建中...' : '重建目录'}
                 </Button>
               ) : null}
-              {agent.agentId === 'tangyuan' &&
+              {agent.agentId === 'yuanxiao' &&
               agent.directoryStatus !== 'damaged' ? (
                 <p className="text-label text-muted-foreground">
                   默认 Agent 不可归档

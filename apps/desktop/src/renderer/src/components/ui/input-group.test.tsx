@@ -45,7 +45,7 @@ describe('InputGroup', () => {
           ref={ref}
           name="query"
           placeholder="搜索 Agent"
-          defaultValue="汤圆"
+          defaultValue="元宵"
           onChange={onChange}
           aria-label="搜索 Agent"
         />
@@ -57,13 +57,13 @@ describe('InputGroup', () => {
     expect(input).toHaveAttribute('name', 'query')
     expect(input).toHaveAttribute('placeholder', '搜索 Agent')
     expect(input).toHaveAttribute('aria-invalid', 'true')
-    expect(input).toHaveValue('汤圆')
+    expect(input).toHaveValue('元宵')
     expect(ref.current).toBe(input)
     expect(document.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
 
     await user.type(input, '助手')
     expect(onChange).toHaveBeenCalled()
-    expect(input).toHaveValue('汤圆助手')
+    expect(input).toHaveValue('元宵助手')
   })
 
   it('keeps native textarea props, ref, and events', async () => {

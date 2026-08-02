@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type {
   ConfigEncryptionAdapter,
   InternalRuntimeConfig,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { ConfigStore, DirectoryLayout } from '../core'
 import { ProfileStore } from './profile-store'
 
@@ -31,7 +31,7 @@ let store: ProfileStore
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'profile-store-'))
   layout = new DirectoryLayout({
-    agentHomePath: join(dir, 'agents', 'tangyuan'),
+    agentHomePath: join(dir, 'agents', 'yuanxiao'),
     fsRoot: dir,
     userDataPath: dir,
   })
@@ -63,7 +63,7 @@ describe('ProfileStore.ensureDefaultAgentHome', () => {
     await store.ensureDefaultAgentHome()
     await writeFile(
       join(layout.agentHome(), 'soul.md'),
-      '# 汤圆\n有内容',
+      '# 元宵\n有内容',
       'utf8',
     )
     await mkdir(layout.sharedProfile(), { recursive: true })
@@ -211,8 +211,8 @@ describe('ProfileStore.writeSoul', () => {
         openai: { apiKey: 'sk-secret-123456789', updatedAt: 'now' },
       },
       agents: {
-        tangyuan: {
-          displayName: '汤圆',
+        yuanxiao: {
+          displayName: '元宵',
           defaultProviderId: 'openai',
           defaultModelId: 'gpt-4',
           status: 'active',
@@ -221,16 +221,16 @@ describe('ProfileStore.writeSoul', () => {
       },
     }
     await configStore.write(config)
-    const current = await store.readSoul('tangyuan')
+    const current = await store.readSoul('yuanxiao')
     const created = await store.writeSoul(
-      'tangyuan',
+      'yuanxiao',
       '安全的旧内容',
       current.version,
     )
 
     const outcome = await store.writeSoul(
-      'tangyuan',
-      '# 汤圆\nkey 是 sk-secret-123456789 请记住',
+      'yuanxiao',
+      '# 元宵\nkey 是 sk-secret-123456789 请记住',
       created.result.version,
     )
 
@@ -239,8 +239,8 @@ describe('ProfileStore.writeSoul', () => {
       status: 'rejected',
       reason: { code: 'sensitive-content' },
     })
-    expect(await readFile(layout.soul('tangyuan'), 'utf8')).toBe('安全的旧内容')
-    expect(await readdir(layout.soulHistory('tangyuan'))).toEqual([])
+    expect(await readFile(layout.soul('yuanxiao'), 'utf8')).toBe('安全的旧内容')
+    expect(await readdir(layout.soulHistory('yuanxiao'))).toEqual([])
   })
 
   it('备份失败时正式内容保持不变', async () => {
@@ -278,7 +278,7 @@ describe('ProfileStore.redactSensitiveContent', () => {
 describe('ProfileStore.buildSystemPromptContext', () => {
   it('未初始化时注入 bootstrap 指令', async () => {
     await store.ensureDefaultAgentHome()
-    const ctx = await store.buildSystemPromptContext('tangyuan')
+    const ctx = await store.buildSystemPromptContext('yuanxiao')
     expect(ctx).toContain('bootstrap.md')
     expect(ctx).toContain('尚未初始化')
   })
@@ -289,7 +289,7 @@ describe('ProfileStore.buildSystemPromptContext', () => {
     await mkdir(layout.sharedProfile(), { recursive: true })
     await writeFile(layout.userProfile(), 'USER_BODY', 'utf8')
 
-    const ctx = await store.buildSystemPromptContext('tangyuan')
+    const ctx = await store.buildSystemPromptContext('yuanxiao')
     expect(ctx).toContain('SOUL_BODY')
     expect(ctx).toContain('USER_BODY')
   })

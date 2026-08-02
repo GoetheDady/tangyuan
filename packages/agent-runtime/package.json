@@ -1,5 +1,5 @@
 {
-  "name": "@tangyuan/agent-runtime",
+  "name": "@yuanxiao/agent-runtime",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,11 +17,11 @@
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.3",
-    "@tangyuan/contracts": "workspace:*"
+    "@yuanxiao/contracts": "workspace:*"
   },
   "devDependencies": {
-    "@tangyuan/eslint-config": "workspace:*",
-    "@tangyuan/tsconfig": "workspace:*",
+    "@yuanxiao/eslint-config": "workspace:*",
+    "@yuanxiao/tsconfig": "workspace:*",
     "eslint": "^9.39.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16"

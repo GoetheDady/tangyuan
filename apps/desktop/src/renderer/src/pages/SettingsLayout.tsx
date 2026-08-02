@@ -1,6 +1,7 @@
 import { ArrowLeft, Bot, Settings2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useSearchParams } from 'react-router'
+import desktopPackage from '../../../../package.json'
 
 /**
  * 设置页布局外壳：左侧导航 200px + 右侧内容区 Outlet。
@@ -10,7 +11,7 @@ import { Link, NavLink, Outlet, useSearchParams } from 'react-router'
 export function SettingsLayout(): React.JSX.Element {
   const [searchParams] = useSearchParams()
   const [redirectTarget] = useState(
-    () => searchParams.get('redirect') ?? '/chat/tangyuan',
+    () => searchParams.get('redirect') ?? '/chat/yuanxiao',
   )
 
   return (
@@ -54,7 +55,9 @@ export function SettingsLayout(): React.JSX.Element {
 
         <div className="flex-1" />
 
-        <p className="text-disabled px-2 font-mono text-[8px]">汤圆 0.1.0</p>
+        <p className="text-disabled px-2 font-mono text-[8px]">
+          元宵 {desktopPackage.version}
+        </p>
       </aside>
 
       <div className="bg-background flex-1 overflow-y-auto px-[72px] py-[52px]">

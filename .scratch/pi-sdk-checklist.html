@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pi SDK 功能全景 — 汤圆对接清单</title>
+<title>Pi SDK 功能全景 — 元宵对接清单</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
 tailwind.config = {
   theme: {
     extend: {
       colors: {
-        tangyuan: { ink: '#2d2d2d', rice: '#faf8f5', red: '#c44b3c', border: '#e8e4df' }
+        yuanxiao: { ink: '#2d2d2d', rice: '#faf8f5', red: '#c44b3c', border: '#e8e4df' }
       }
     }
   }
@@ -24,13 +24,13 @@ tailwind.config = {
   .progress-bar { transition: width 0.3s ease; }
 </style>
 </head>
-<body class="bg-tangyuan-rice text-tangyuan-ink min-h-screen">
+<body class="bg-yuanxiao-rice text-yuanxiao-ink min-h-screen">
 
-<header class="sticky top-0 z-10 bg-tangyuan-rice/90 backdrop-blur border-b border-tangyuan-border">
+<header class="sticky top-0 z-10 bg-yuanxiao-rice/90 backdrop-blur border-b border-yuanxiao-border">
   <div class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
     <div>
       <h1 class="text-lg font-semibold tracking-tight">Pi SDK 功能全景</h1>
-      <p class="text-sm text-gray-500">汤圆对接清单 · <a href="https://github.com/GoetheDady/tangyuan/issues/88" class="underline hover:text-tangyuan-red">Issue #88</a></p>
+      <p class="text-sm text-gray-500">元宵对接清单 · <a href="https://github.com/GoetheDady/yuanxiao/issues/88" class="underline hover:text-yuanxiao-red">Issue #88</a></p>
     </div>
     <div class="flex items-center gap-4 text-sm">
       <div class="flex items-center gap-1.5">
@@ -45,16 +45,16 @@ tailwind.config = {
     </div>
   </div>
   <div class="h-0.5 bg-gray-200">
-    <div id="overallProgress" class="progress-bar h-full bg-tangyuan-red" style="width: 0%"></div>
+    <div id="overallProgress" class="progress-bar h-full bg-yuanxiao-red" style="width: 0%"></div>
   </div>
 </header>
 
 <main class="max-w-4xl mx-auto px-6 py-8 space-y-8">
 
-<section class="bg-white rounded-xl border border-tangyuan-border p-6">
+<section class="bg-white rounded-xl border border-yuanxiao-border p-6">
   <h2 class="font-semibold mb-3">背景</h2>
   <p class="text-gray-600 leading-relaxed">
-    本清单列出 <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">@earendil-works/pi-coding-agent</code> SDK 的全部功能模块，按大类拆分，每个子功能附白话解释。目的是逐块评估、对接、测试，确保汤圆不遗漏 SDK 提供的标准能力。
+    本清单列出 <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">@earendil-works/pi-coding-agent</code> SDK 的全部功能模块，按大类拆分，每个子功能附白话解释。目的是逐块评估、对接、测试，确保元宵不遗漏 SDK 提供的标准能力。
   </p>
   <div class="mt-4 flex flex-wrap gap-3 text-sm">
     <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-200">
@@ -71,7 +71,7 @@ tailwind.config = {
 
 <div id="modules"></div>
 
-<section class="bg-white rounded-xl border border-tangyuan-border p-6">
+<section class="bg-white rounded-xl border border-yuanxiao-border p-6">
   <h2 class="font-semibold mb-3">对接顺序建议</h2>
   <ol class="list-decimal list-inside space-y-2 text-gray-600">
     <li><strong>先把已打勾的补完整</strong> — 已打勾但可能只对接了部分参数/事件的，完善到完整覆盖</li>
@@ -83,7 +83,7 @@ tailwind.config = {
 </main>
 
 <footer class="max-w-4xl mx-auto px-6 py-8 text-center text-xs text-gray-400">
-  Tangyuan · Pi SDK Integration Checklist
+  Yuanxiao · Pi SDK Integration Checklist
 </footer>
 
 <script>
@@ -142,7 +142,7 @@ const MODULES_JSON = `
       {
         "id": "1.7",
         "name": "AgentSessionRuntime — 会话运行时（高级）",
-        "desc": "为「进程内复用会话」设计的高级 API。汤圆每个会话独立 openSession，无此场景。P2 暂缓。",
+        "desc": "为「进程内复用会话」设计的高级 API。元宵每个会话独立 openSession，无此场景。P2 暂缓。",
         "done": false,
         "skip": true
       },
@@ -163,7 +163,7 @@ const MODULES_JSON = `
       {
         "id": "1.10",
         "name": "SessionManager.createBranchedSession() → 独立分叉会话",
-        "desc": "从来源用户消息之前的 leaf 导出新的 Pi JSONL 与 session ID，来源消息预填到 Composer；汤圆索引记录父子谱系，侧边栏嵌套展示。",
+        "desc": "从来源用户消息之前的 leaf 导出新的 Pi JSONL 与 session ID，来源消息预填到 Composer；元宵索引记录父子谱系，侧边栏嵌套展示。",
         "done": true,
         "tag": "已对接"
       }
@@ -474,7 +474,7 @@ const MODULES_JSON = `
       {
         "id": "6.8",
         "name": "defineTool() — 自定义工具",
-        "desc": "自己写一个新的工具给 Agent 用，定义名字、描述、参数和实际执行逻辑。SDK 标准方法，汤圆用来注册业务工具。",
+        "desc": "自己写一个新的工具给 Agent 用，定义名字、描述、参数和实际执行逻辑。SDK 标准方法，元宵用来注册业务工具。",
         "done": true,
         "tag": "默认对接"
       },
@@ -779,7 +779,7 @@ const MODULES_JSON = `
       {
         "id": "14.1",
         "name": "InteractiveMode — 交互式 TUI 模式",
-        "desc": "Pi 自带的终端交互界面。对汤圆来说不需要（我们有桌面 UI），但可以作为参考实现。",
+        "desc": "Pi 自带的终端交互界面。对元宵来说不需要（我们有桌面 UI），但可以作为参考实现。",
         "done": false,
         "skip": true
       },
@@ -919,7 +919,7 @@ const MODULES_JSON = `
       {
         "id": "17.6",
         "name": "loader.getThemes() — 获取主题列表",
-        "desc": "拿到所有可用的 TUI 主题（汤圆有自己的主题体系，可能用不到）。",
+        "desc": "拿到所有可用的 TUI 主题（元宵有自己的主题体系，可能用不到）。",
         "done": false,
         "skip": true
       },
@@ -947,7 +947,7 @@ const MODULES_JSON = `
       {
         "id": "18.1",
         "name": "AuthStorage — 认证存储",
-        "desc": "管理 API Key 的存储和读取。可以存在文件里也可以只在内存中。目前汤圆用 inMemory 模式。",
+        "desc": "管理 API Key 的存储和读取。可以存在文件里也可以只在内存中。目前元宵用 inMemory 模式。",
         "done": true,
         "tag": "默认对接"
       },
@@ -1014,7 +1014,7 @@ modules.forEach(mod => {
   totalItems += total;
 
   const card = document.createElement('section');
-  card.className = 'module-card bg-white rounded-xl border border-tangyuan-border overflow-hidden';
+  card.className = 'module-card bg-white rounded-xl border border-yuanxiao-border overflow-hidden';
 
   let itemsHtml = '';
   mod.items.forEach(item => {

@@ -1,4 +1,4 @@
-import type { AgentEvent, DesktopPreloadApi } from '@tangyuan/contracts'
+import type { AgentEvent, DesktopPreloadApi } from '@yuanxiao/contracts'
 
 import type { WorkbenchStoreApi } from '@/stores/workbench-store'
 

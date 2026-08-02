@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentEvent, SkillApprovalRequest } from '@tangyuan/contracts'
+import type { AgentEvent, SkillApprovalRequest } from '@yuanxiao/contracts'
 import { SkillApprovalRegistry } from './skill-approval-registry'
 
 function makeRequest(
@@ -7,7 +7,7 @@ function makeRequest(
 ): SkillApprovalRequest {
   return {
     approvalId: 'skill-approval-1',
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     operation: 'install',
     source: 'shared',
     skillName: 'demo',

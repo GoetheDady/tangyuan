@@ -1,4 +1,4 @@
-import type { ProfileUpdateResult } from '@tangyuan/contracts'
+import type { ProfileUpdateResult } from '@yuanxiao/contracts'
 
 interface ProfileToolResult {
   content: Array<{ type: 'text'; text: string }>

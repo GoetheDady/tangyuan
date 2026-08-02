@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { createDefaultSessionSummary } from '@tangyuan/contracts'
+import { createDefaultSessionSummary } from '@yuanxiao/contracts'
 import {
   AgentRuntimeError,
   type AgentEvent,
   type PiSdkPromptOptions,
-  createTangyuanRuntimeForTesting,
+  createYuanxiaoRuntimeForTesting,
 } from './index'
 import {
   cleanupTempDirs,
@@ -16,7 +16,7 @@ import {
 afterEach(cleanupTempDirs)
 
 describe('createDefaultSessionSummary', () => {
-  it('creates a tangyuan session summary in the initial idle state', () => {
+  it('creates a yuanxiao session summary in the initial idle state', () => {
     expect(
       createDefaultSessionSummary({
         sessionId: 'session-1',
@@ -24,7 +24,7 @@ describe('createDefaultSessionSummary', () => {
         updatedAt: '2026-07-08T00:00:00.000Z',
       }),
     ).toEqual({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       title: '新会话',
       updatedAt: '2026-07-08T00:00:00.000Z',
@@ -50,7 +50,7 @@ describe('AgentRuntimeError', () => {
   })
 })
 
-describe('TangyuanRuntime', () => {
+describe('YuanxiaoRuntime', () => {
   it('keeps configuration, sessions, messages, streaming events, and cancellation behind one interface', async () => {
     const runStarted = createDeferred<void>()
     const releaseRun = createDeferred<void>()
@@ -89,7 +89,7 @@ describe('TangyuanRuntime', () => {
       },
     })
     const { driver } = await createDriver({ gateway })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: driver,
       sessionDriver: driver,
     })
@@ -104,11 +104,11 @@ describe('TangyuanRuntime', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await runtime.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '运行时边界测试',
     })
     const sendPromise = runtime.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '你好',
     })
@@ -122,7 +122,7 @@ describe('TangyuanRuntime', () => {
     ])
     await expect(
       runtime.cancelRun({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
     ).resolves.toEqual(
@@ -141,7 +141,7 @@ describe('TangyuanRuntime', () => {
     )
     await expect(
       runtime.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
     ).resolves.toEqual(

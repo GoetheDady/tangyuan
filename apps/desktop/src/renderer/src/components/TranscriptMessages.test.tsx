@@ -7,7 +7,7 @@ import type {
   TranscriptEntry,
   TranscriptSnapshot,
   UserMessageEntry,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { TranscriptMessages } from './TranscriptMessages'
 
 const FIXED_TIME = '2026-07-21T00:00:00.000Z'
@@ -63,7 +63,7 @@ function createTranscriptSnapshot(
 ): TranscriptSnapshot {
   return {
     sessionId: 'session-1',
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     entries,
     updatedAt: FIXED_TIME,
     ...overrides,

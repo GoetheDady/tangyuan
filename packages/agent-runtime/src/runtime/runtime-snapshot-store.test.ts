@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { RuntimeSnapshot } from '@tangyuan/contracts'
+import type { RuntimeSnapshot } from '@yuanxiao/contracts'
 import type { RuntimeResourceDriver } from '../index'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
 

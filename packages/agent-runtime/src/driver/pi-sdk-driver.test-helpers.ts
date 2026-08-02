@@ -5,7 +5,7 @@ import type {
   ConfigEncryptionAdapter,
   TranscriptEntry,
   TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import {
   type InternalMessage,
   PiSdkDriver,
@@ -67,8 +67,8 @@ export async function createDriver(
     encryptionAdapter?: ConfigEncryptionAdapter | null
   } = {},
 ) {
-  const rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-agent-runtime-'))
-  const userDataPath = join(rootPath, 'Library/Application Support/Tangyuan')
+  const rootPath = await mkdtemp(join(tmpdir(), 'yuanxiao-agent-runtime-'))
+  const userDataPath = join(rootPath, 'Library/Application Support/Yuanxiao')
   tempDirs.push(rootPath)
 
   return {
@@ -82,7 +82,7 @@ export async function createDriver(
     }),
     rootPath,
     userDataPath,
-    homePath: '~/.tangyuan/agents/tangyuan',
+    homePath: '~/.yuanxiao/agents/yuanxiao',
   }
 }
 
@@ -109,7 +109,7 @@ export async function writeInitializedProfile(
   )
   // 写入共享 user profile 路径（新架构）
   if (rootPath) {
-    const profileDir = join(rootPath, '.tangyuan/profile')
+    const profileDir = join(rootPath, '.yuanxiao/profile')
     await import('node:fs/promises').then(async ({ mkdir }) => {
       await mkdir(profileDir, { recursive: true })
       await mkdir(join(profileDir, 'user.history'), { recursive: true })
@@ -149,7 +149,7 @@ export function createDriverAtPath(options: {
   const driverOptions: PiSdkDriverOptions = {
     fsRoot: options.rootPath,
     userDataPath: options.userDataPath,
-    agentHomePath: '~/.tangyuan/agents/tangyuan',
+    agentHomePath: '~/.yuanxiao/agents/yuanxiao',
     now: () => '2026-07-08T00:00:00.000Z',
     ...(options.gateway ? { gateway: options.gateway } : {}),
   }
@@ -260,7 +260,7 @@ export function createPiSdkGateway(
       readMessageRequests.push(request)
       return snapshotFromMessages(
         request.sessionId,
-        messagesBySession.get(request.sessionId)?.[0]?.agentId ?? 'tangyuan',
+        messagesBySession.get(request.sessionId)?.[0]?.agentId ?? 'yuanxiao',
         messagesBySession.get(request.sessionId) ?? [],
       )
     },
@@ -305,7 +305,7 @@ export function createPromptingHandle(
       const messages: InternalMessage[] = [
         {
           messageId: `${sessionId}-sdk-user-1`,
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId,
           role: 'user',
           content: userContent,
@@ -313,7 +313,7 @@ export function createPromptingHandle(
         },
         {
           messageId: `${sessionId}-sdk-agent-1`,
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId,
           role: 'agent',
           content: `收到：${userContent}`,

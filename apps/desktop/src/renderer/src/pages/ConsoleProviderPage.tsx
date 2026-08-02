@@ -1,4 +1,4 @@
-import type { RuntimeConfiguration, RuntimeSnapshot } from '@tangyuan/contracts'
+import type { RuntimeConfiguration, RuntimeSnapshot } from '@yuanxiao/contracts'
 import {
   Eye,
   EyeOff,
@@ -42,7 +42,7 @@ export function ConsoleProviderPage(props: {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const redirectTarget = searchParams.get('redirect') ?? '/chat/tangyuan'
+  const redirectTarget = searchParams.get('redirect') ?? '/chat/yuanxiao'
   const isSetupRoute = location.pathname === '/setup'
 
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null)
@@ -376,7 +376,7 @@ export function ConsoleProviderPage(props: {
             连接模型服务
           </h1>
           <p className="text-body text-muted-foreground">
-            配置一个可用的模型服务，并将所选模型作为默认 Agent 汤圆的初始模型。
+            配置一个可用的模型服务，并将所选模型作为默认 Agent 元宵的初始模型。
           </p>
         </div>
 

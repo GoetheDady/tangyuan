@@ -3,7 +3,7 @@ import type {
   AgentSummary,
   BashApprovalRequest,
   QuestionClarificationRequest,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -16,12 +16,12 @@ import {
 
 const OCCURRED_AT = '2026-07-28T10:00:00.000Z'
 const FIRST_AGENT: AgentSummary = {
-  agentId: 'tangyuan',
-  displayName: '汤圆',
+  agentId: 'yuanxiao',
+  displayName: '元宵',
   status: 'active',
   defaultProviderId: 'anthropic',
   defaultModelId: 'claude-sonnet-4-5',
-  homePath: '~/.tangyuan/agents/tangyuan',
+  homePath: '~/.yuanxiao/agents/yuanxiao',
   archivedAt: null,
   directoryStatus: 'healthy',
 }
@@ -31,7 +31,7 @@ const SECOND_AGENT: AgentSummary = {
   status: 'active',
   defaultProviderId: 'openai',
   defaultModelId: 'gpt-5',
-  homePath: '~/.tangyuan/agents/agent-2',
+  homePath: '~/.yuanxiao/agents/agent-2',
   archivedAt: null,
   directoryStatus: 'healthy',
 }
@@ -49,7 +49,7 @@ function createAgentEvent(
 
 const FIRST_APPROVAL: BashApprovalRequest = {
   approvalId: 'approval-1',
-  agentId: 'tangyuan',
+  agentId: 'yuanxiao',
   sessionId: 'session-1',
   runId: 'run-1',
   command: 'bun run test',
@@ -67,7 +67,7 @@ const SECOND_APPROVAL: BashApprovalRequest = {
 
 const FIRST_CLARIFICATION: QuestionClarificationRequest = {
   clarificationId: 'clarification-1',
-  agentId: 'tangyuan',
+  agentId: 'yuanxiao',
   sessionId: 'session-1',
   runId: 'run-1',
   question: '选择哪一个？',
@@ -85,7 +85,7 @@ const SECOND_CLARIFICATION: QuestionClarificationRequest = {
 
 const UNRELATED_EVENT: AgentEvent = {
   type: 'profile-updated',
-  agentId: 'tangyuan',
+  agentId: 'yuanxiao',
   target: 'soul',
   updatedAt: OCCURRED_AT,
   occurredAt: OCCURRED_AT,

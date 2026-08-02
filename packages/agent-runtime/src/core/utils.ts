@@ -2,11 +2,11 @@ import type { PiSdkStreamEvent } from '../driver'
 import { access, readFile, readdir, stat } from 'node:fs/promises'
 import { constants as fsConstants } from 'node:fs'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   type ForkSource,
   type InternalRuntimeConfig,
   type RuntimeConfiguration,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { AgentRuntimeError } from './errors'
 export {
   buildTranscriptSnapshotFromSdkEntries,
@@ -165,7 +165,7 @@ export function createToolActivityLabel(
  * 把真实 Pi SDK session 事件宽松解析成 v1 所需的最小流式事件。
  *
  * @param event - SDK subscribe 回调收到的未知事件对象。
- * @returns 一个或多个可映射到汤圆事件的最小流式事件。
+ * @returns 一个或多个可映射到元宵事件的最小流式事件。
  * @throws 此方法不会主动抛出错误。
  */
 export function normalizePiSdkSessionEvent(event: unknown): PiSdkStreamEvent[] {
@@ -404,7 +404,7 @@ export function normalizeRuntimeConfiguration(
 }
 
 /**
- * 构造仅含默认汤圆 Agent 的空 v2 配置。
+ * 构造仅含默认元宵 Agent 的空 v2 配置。
  *
  * @returns 默认 InternalRuntimeConfig。
  * @throws 此方法不会主动抛出错误。
@@ -414,8 +414,8 @@ export function createDefaultInternalConfig(): InternalRuntimeConfig {
     schemaVersion: 2,
     providers: {},
     agents: {
-      [TANGYUAN_DEFAULT_AGENT_ID]: {
-        displayName: '汤圆',
+      [YUANXIAO_DEFAULT_AGENT_ID]: {
+        displayName: '元宵',
         defaultProviderId: null,
         defaultModelId: null,
         status: 'active',
@@ -446,7 +446,7 @@ export function buildInternalConfigForSave(
     updatedAt: now,
   }
 
-  const agent = config.agents[TANGYUAN_DEFAULT_AGENT_ID]
+  const agent = config.agents[YUANXIAO_DEFAULT_AGENT_ID]
   if (agent) {
     agent.defaultProviderId = runtimeConfig.providerId
     agent.defaultModelId = runtimeConfig.modelId

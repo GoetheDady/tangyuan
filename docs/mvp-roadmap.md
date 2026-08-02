@@ -1,6 +1,6 @@
-# 汤圆 MVP 路线图
+# 元宵 MVP 路线图
 
-> 项目代号：`tangyuan`
+> 项目代号：`yuanxiao`
 >
 > 产品方向：桌面端 Agent 工作台。第一版使用 Pi Agent SDK 跑通真实 Agent 会话；后续逐步加入记忆、技能和自我进化能力。
 
@@ -14,7 +14,7 @@
 - **Pi Agent SDK**：第一阶段使用的 Agent 执行层。它负责真正创建 Agent 会话、发送消息、返回事件。
 - **Driver**：驱动适配层。上层只调用统一接口，底层可以接 Pi SDK，也可以以后换成我们自己的 Agent Runtime。
 - **Agent Runtime**：Agent 的运行时系统，负责模型调用、工具调用、上下文组织、任务循环等能力。
-- **Agent Home**：某个 Agent 的本地工作目录。v1 默认 Agent 是 `tangyuan`，目录是 `~/.tangyuan/agents/tangyuan`。
+- **Agent Home**：某个 Agent 的本地工作目录。v1 默认 Agent 是 `yuanxiao`，目录是 `~/.yuanxiao/agents/yuanxiao`。
 - **soul.md**：Agent 的核心身份和行为规则。v1 由首次 bootstrap 对话生成，后续每次会话注入上下文，并允许 Agent 自动更新。
 - **user.md**：Agent 对用户的用户画像。它记录用户称呼、语言偏好、工作类型、决策偏好和边界，由 Agent 在会话中自动维护。
 - **bootstrap.md**：首次初始化 Agent 时使用的固定问题模板。bootstrap 完成并生成 `soul.md` 后删除。
@@ -63,7 +63,7 @@ Pi Agent SDK 的能力清单、支持顺序和暂不支持项见 `docs/pi-agent-
 第一阶段只验证一个核心闭环：
 
 1. 用户打开 Electron 应用。
-2. 应用创建默认 Agent Home：`~/.tangyuan/agents/tangyuan`。
+2. 应用创建默认 Agent Home：`~/.yuanxiao/agents/yuanxiao`。
 3. 用户配置 Provider、API Key 和 Model，并通过真实 SDK 验证。
 4. 用户进入首次 bootstrap 对话，回答固定问题。
 5. 应用生成并写入 `soul.md` 和 `user.md`。
@@ -92,7 +92,7 @@ flowchart TD
   UI["Renderer UI<br/>桌面界面"] --> Preload["Preload API<br/>安全暴露给界面的接口"]
   Preload --> Main["Electron Main<br/>主进程"]
   Main --> AppStore["DesktopAppStore<br/>应用状态中心"]
-  AppStore --> AgentHome["Agent Home<br/>~/.tangyuan/agents/tangyuan"]
+  AppStore --> AgentHome["Agent Home<br/>~/.yuanxiao/agents/yuanxiao"]
   AgentHome --> Soul["soul.md<br/>Agent 核心规则"]
   AgentHome --> Bootstrap["bootstrap.md<br/>首次初始化模板"]
   AppStore --> SessionDriver["AgentSessionDriver<br/>会话驱动接口"]
@@ -205,7 +205,7 @@ Pi SDK 只出现在这个模块内部。其他模块不直接 import Pi SDK。
 ### 推荐目录结构
 
 ```text
-/Users/gdsw/gdsw/tangyuan
+/Users/gdsw/gdsw/yuanxiao
   apps/
     desktop/
       electron/
@@ -232,7 +232,7 @@ Pi SDK 只出现在这个模块内部。其他模块不直接 import Pi SDK。
 第一阶段完成时，必须满足：
 
 - 可以启动 Electron 桌面应用。
-- 首次启动会创建 `~/.tangyuan/agents/tangyuan`。
+- 首次启动会创建 `~/.yuanxiao/agents/yuanxiao`。
 - 可以配置至少一个 Provider 的 API Key。
 - 可以选择一个模型。
 - 配置保存前必须通过真实 SDK 验证。
@@ -253,7 +253,7 @@ Pi SDK 只出现在这个模块内部。其他模块不直接 import Pi SDK。
 - 可以取消正在运行的会话。
 - 可以保存会话记录。
 - 重启应用后可以看到历史会话。
-- 会话正文以 Pi SDK 原生 session 为准，汤圆只保存会话索引和 UI 元数据。
+- 会话正文以 Pi SDK 原生 session 为准，元宵只保存会话索引和 UI 元数据。
 - Renderer 没有直接 import Pi SDK。
 - Pi SDK 只存在于 `packages/agent-runtime` 内部。
 
@@ -303,7 +303,7 @@ Pi SDK 只出现在这个模块内部。其他模块不直接 import Pi SDK。
 9. 使用 Pi SDK 工具实现 bootstrap 问答、`soul.md` / `user.md` 写入和 `bootstrap.md` 删除。
 10. 使用后台 profile 维护回合实现 Agent 自动更新 `soul.md` / `user.md`、历史备份和系统消息。
 11. 实现会话列表、消息流、输入框。
-12. 实现 Pi SDK session 持久化和汤圆会话索引。
+12. 实现 Pi SDK session 持久化和元宵会话索引。
 13. 做一次开发环境运行验证。
 14. 做一次打包验证。
 
@@ -311,8 +311,8 @@ Pi SDK 只出现在这个模块内部。其他模块不直接 import Pi SDK。
 
 已确认：
 
-- 产品名：汤圆。
-- 项目目录：`/Users/gdsw/gdsw/tangyuan`。
+- 产品名：元宵。
+- 项目目录：`/Users/gdsw/gdsw/yuanxiao`。
 - 第一阶段目标：跑通 Electron + Pi Agent SDK 的真实会话闭环。
 - 第一阶段后端：只实现 `PiSdkDriver`。
 - 架构边界：保留 `AgentSessionDriver` 抽象，UI 不直接依赖 Pi SDK。

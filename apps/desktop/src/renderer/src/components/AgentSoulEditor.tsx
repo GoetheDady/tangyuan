@@ -1,4 +1,4 @@
-import type { SoulContent } from '@tangyuan/contracts'
+import type { SoulContent } from '@yuanxiao/contracts'
 import { Save } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'

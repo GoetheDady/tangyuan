@@ -4,7 +4,7 @@ import type {
   SkillInstallRecord,
   SkillOperationParams,
   SkillSummary,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import type { AgentSessionDriver } from '../driver'
 import { SkillApprovalRegistry } from './skill-approval-registry'
 
@@ -160,20 +160,20 @@ export class SkillService {
    */
   private validatePermission(params: SkillOperationParams): void {
     if (params.source === 'shared') {
-      // 共享 Skill 只能由汤圆管理
+      // 共享 Skill 只能由元宵管理
       if (params.agentId !== this.defaultAgentId) {
         throw new Error(
-          `只有默认 Agent「汤圆」可以管理共享 Skill，当前 Agent "${params.agentId}" 无权操作。`,
+          `只有默认 Agent「元宵」可以管理共享 Skill，当前 Agent "${params.agentId}" 无权操作。`,
         )
       }
       return
     }
 
-    // 专属 Skill：只能由 Agent 自身或汤圆管理
+    // 专属 Skill：只能由 Agent 自身或元宵管理
     const targetId = params.targetAgentId ?? params.agentId
     if (params.agentId !== targetId && params.agentId !== this.defaultAgentId) {
       throw new Error(
-        `Agent "${params.agentId}" 无权管理 Agent "${targetId}" 的专属 Skill。只有 Agent 自身或汤圆可以操作。`,
+        `Agent "${params.agentId}" 无权管理 Agent "${targetId}" 的专属 Skill。只有 Agent 自身或元宵可以操作。`,
       )
     }
   }

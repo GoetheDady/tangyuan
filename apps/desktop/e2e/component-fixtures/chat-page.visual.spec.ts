@@ -16,7 +16,7 @@ test.describe('ChatPage Pencil 视觉基准', () => {
 
   test('真实页面骨架与消息流保持 Pencil 基准', async ({ page }) => {
     const runtime = createReadyRuntimeSnapshot()
-    const tangyuan = runtime.agents[0]!
+    const yuanxiao = runtime.agents[0]!
     const today = new Date()
     today.setHours(14, 32, 0, 0)
     const earlier = new Date(today)
@@ -26,28 +26,28 @@ test.describe('ChatPage Pencil 视觉基准', () => {
       {
         ...runtime,
         agents: [
-          tangyuan,
-          { ...tangyuan, agentId: 'research', displayName: '研究' },
-          { ...tangyuan, agentId: 'code', displayName: '代码' },
+          yuanxiao,
+          { ...yuanxiao, agentId: 'research', displayName: '研究' },
+          { ...yuanxiao, agentId: 'code', displayName: '代码' },
         ],
       },
       [
         {
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'session-1',
           title: '数据库迁移上线评估',
           state: 'running',
           updatedAt: today.toISOString(),
         },
         {
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'session-2',
           title: '修复登录状态丢失',
           state: 'idle',
           updatedAt: today.toISOString(),
         },
         {
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'session-3',
           title: '整理用户反馈',
           state: 'completed',
@@ -57,7 +57,7 @@ test.describe('ChatPage Pencil 视觉基准', () => {
       [
         {
           messageId: 'user-message-1',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'session-1',
           role: 'user',
           content:
@@ -66,7 +66,7 @@ test.describe('ChatPage Pencil 视觉基准', () => {
         },
         {
           messageId: 'agent-message-1',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'session-1',
           role: 'agent',
           content:
@@ -77,7 +77,7 @@ test.describe('ChatPage Pencil 视觉基准', () => {
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan/session-1')
+    await page.goto('/#/chat/yuanxiao/session-1')
     await expect(page.getByTestId('chat-sidebar')).toBeVisible()
     await expect(page.getByTestId('composer-card')).toBeVisible()
     await page.evaluate(() => document.fonts.ready)

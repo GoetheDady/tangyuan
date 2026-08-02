@@ -63,18 +63,18 @@ describe('AgentManager', () => {
     })
   })
 
-  it('archive/recover/claimDirectory/rebuildTangyuanHome 均刷新快照', async () => {
+  it('archive/recover/claimDirectory/rebuildYuanxiaoHome 均刷新快照', async () => {
     const { manager, snapshotStore } = createManager({
       archiveAgent: vi.fn(async () => ({}) as never),
       recoverAgent: vi.fn(async () => ({}) as never),
       claimAgentDirectory: vi.fn(async () => ({}) as never),
-      rebuildTangyuanHome: vi.fn(async () => ({}) as never),
+      rebuildYuanxiaoHome: vi.fn(async () => ({}) as never),
     })
 
     await manager.archive('a1')
     await manager.recover('a1')
     await manager.claimDirectory('a1', 'A1')
-    await manager.rebuildTangyuanHome()
+    await manager.rebuildYuanxiaoHome()
 
     expect(snapshotStore.reload).toHaveBeenCalledTimes(4)
   })

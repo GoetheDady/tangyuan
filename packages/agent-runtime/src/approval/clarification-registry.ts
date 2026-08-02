@@ -1,7 +1,7 @@
 import type {
   AgentEvent,
   QuestionClarificationRequest,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
 /**
  * 创建 ClarificationRegistry 所需的依赖。

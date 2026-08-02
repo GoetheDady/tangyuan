@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentSessionSummary } from '@tangyuan/contracts'
+import type { AgentSessionSummary } from '@yuanxiao/contracts'
 import { SessionCache } from './session-cache'
 
 function makeSession(
   overrides: Partial<AgentSessionSummary> = {},
 ): AgentSessionSummary {
   return {
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId: 'session-1',
     title: '会话',
     state: 'idle',

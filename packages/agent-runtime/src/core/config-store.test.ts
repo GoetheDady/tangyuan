@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type {
   ConfigEncryptionAdapter,
   InternalRuntimeConfig,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { DirectoryLayout } from './directory-layout'
 import { ConfigStore } from './config-store'
 import { AgentRuntimeError } from './errors'
@@ -23,8 +23,8 @@ const sampleConfig: InternalRuntimeConfig = {
   schemaVersion: 2,
   providers: { openai: { apiKey: 'sk-secret', updatedAt: 'now' } },
   agents: {
-    tangyuan: {
-      displayName: '汤圆',
+    yuanxiao: {
+      displayName: '元宵',
       defaultProviderId: 'openai',
       defaultModelId: 'gpt-4',
       status: 'active',
@@ -40,7 +40,7 @@ let layout: DirectoryLayout
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'config-store-'))
   layout = new DirectoryLayout({
-    agentHomePath: join(dir, 'agents', 'tangyuan'),
+    agentHomePath: join(dir, 'agents', 'yuanxiao'),
     fsRoot: dir,
     userDataPath: dir,
   })
@@ -73,7 +73,7 @@ describe('ConfigStore.read 边界', () => {
   it('配置不存在时返回默认配置', async () => {
     const read = await store.read()
     expect(read.recoveryState).toBe('ok')
-    expect(read.config?.agents.tangyuan?.displayName).toBe('汤圆')
+    expect(read.config?.agents.yuanxiao?.displayName).toBe('元宵')
     expect(read.hasBackup).toBe(false)
   })
 
@@ -88,7 +88,7 @@ describe('ConfigStore.read 边界', () => {
 describe('ConfigStore.readRequired', () => {
   it('返回 Agent 运行时配置', async () => {
     await store.write(sampleConfig)
-    expect(await store.readRequired('tangyuan')).toEqual({
+    expect(await store.readRequired('yuanxiao')).toEqual({
       providerId: 'openai',
       modelId: 'gpt-4',
       apiKey: 'sk-secret',
@@ -96,7 +96,7 @@ describe('ConfigStore.readRequired', () => {
   })
 
   it('配置缺失时抛 AgentRuntimeError', async () => {
-    await expect(store.readRequired('tangyuan')).rejects.toThrow(
+    await expect(store.readRequired('yuanxiao')).rejects.toThrow(
       AgentRuntimeError,
     )
   })
@@ -144,6 +144,6 @@ describe('ConfigStore.restore/reset/hasBackup', () => {
 
     expect(await store.hasBackup()).toBe(false)
     const read = await store.read()
-    expect(read.config?.agents.tangyuan?.displayName).toBe('汤圆')
+    expect(read.config?.agents.yuanxiao?.displayName).toBe('元宵')
   })
 })

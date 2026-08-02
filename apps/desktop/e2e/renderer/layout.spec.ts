@@ -20,7 +20,7 @@ test.describe('长消息布局', () => {
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan/session-1')
+    await page.goto('/#/chat/yuanxiao/session-1')
 
     // 等待消息和 Composer 渲染
     await page.waitForSelector('#composer')
@@ -67,7 +67,7 @@ test.describe('长消息布局', () => {
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan/session-1')
+    await page.goto('/#/chat/yuanxiao/session-1')
     await page.waitForSelector('footer')
 
     const footerBox = await page.locator('footer').boundingBox()
@@ -99,7 +99,7 @@ test.describe('长消息布局', () => {
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan/session-1')
+    await page.goto('/#/chat/yuanxiao/session-1')
     await page.waitForSelector('[data-testid="message-scroll-area"]')
 
     const messageArea = page.locator('[data-testid="message-scroll-area"]')
@@ -123,7 +123,7 @@ test.describe('长消息布局', () => {
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan/session-1')
+    await page.goto('/#/chat/yuanxiao/session-1')
     await page.waitForSelector('[data-testid="message-scroll-area"]')
 
     const chatMainBox = await page
@@ -161,7 +161,7 @@ test.describe('长消息布局', () => {
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan/session-1')
+    await page.goto('/#/chat/yuanxiao/session-1')
     await page.waitForSelector('[data-testid="message-scroll-area"]')
 
     // 验证长消息中包含的关键文本可被找到

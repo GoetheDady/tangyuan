@@ -4,7 +4,7 @@ import type {
   ProviderConfiguration,
   RuntimeConfiguration,
   RuntimeSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import type { RuntimeResourceDriver } from '../driver'
 
 /**
@@ -18,7 +18,7 @@ export interface RuntimeSnapshotStoreDependencies {
  * 运行时快照存储：持有最近一次读取的 RuntimeSnapshot 缓存，
  * 承载「快照如何读取、刷新、随配置生命周期（保存/取消验证/恢复/重置）更新」
  * 这一条状态知识。所有会改变运行时资源的操作都在此刷新缓存，
- * 供 TangyuanRuntime 编排层与 Agent/soul/profile 操作在写后回填。
+ * 供 YuanxiaoRuntime 编排层与 Agent/soul/profile 操作在写后回填。
  */
 export class RuntimeSnapshotStore {
   private readonly runtimeDriver: RuntimeResourceDriver

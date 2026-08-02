@@ -14,7 +14,7 @@ test.describe('路由导航', () => {
 
     await page.setViewportSize({ width: 900, height: 670 })
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/yuanxiao')
 
     await page.getByRole('button', { name: '设置' }).click()
 
@@ -30,12 +30,12 @@ test.describe('路由导航', () => {
 
     await page.setViewportSize({ width: 900, height: 670 })
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/setup?redirect=%2Fchat%2Ftangyuan%2Fsession-1')
+    await page.goto('/#/setup?redirect=%2Fchat%2Fyuanxiao%2Fsession-1')
 
     // 有 redirect 参数且 runtime ready 时自动跳转到聊天页
     await page.waitForSelector('#composer')
-    await expect(page).toHaveURL(/#\/chat\/tangyuan\/session-1$/)
-    await expect(page.getByRole('heading', { name: '汤圆' })).toBeVisible()
+    await expect(page).toHaveURL(/#\/chat\/yuanxiao\/session-1$/)
+    await expect(page.getByRole('heading', { name: '元宵' })).toBeVisible()
   })
 
   test('配置阻断保留原始目标并在配置完成后返回', async ({ page }) => {
@@ -44,7 +44,7 @@ test.describe('路由导航', () => {
 
     await page.addInitScript({ content: initScript })
     // 尝试直接访问聊天页
-    await page.goto('/#/chat/tangyuan/session-1')
+    await page.goto('/#/chat/yuanxiao/session-1')
 
     // 应被重定向到控制台 Providers 页，且 URL 包含 redirect 参数
     await expect(
@@ -79,12 +79,12 @@ test.describe('路由导航', () => {
     await expect(
       page.getByRole('heading', { name: '共享用户画像' }),
     ).toBeVisible()
-    // 默认 Agent "汤圆" 始终存在，显示活跃状态
+    // 默认 Agent "元宵" 始终存在，显示活跃状态
     await expect(
-      page.getByRole('heading', { name: '汤圆', level: 3 }),
+      page.getByRole('heading', { name: '元宵', level: 3 }),
     ).toBeVisible()
-    // 默认 Agent "汤圆" 显示 Agent ID 和活跃状态
-    await expect(page.getByText('ID：tangyuan')).toBeVisible()
+    // 默认 Agent "元宵" 显示 Agent ID 和活跃状态
+    await expect(page.getByText('ID：yuanxiao')).toBeVisible()
     await expect(page.getByText('活跃')).toBeVisible()
   })
 
@@ -96,7 +96,7 @@ test.describe('路由导航', () => {
 
     await page.addInitScript({ content: initScript })
 
-    for (const route of ['/settings/agents/tangyuan']) {
+    for (const route of ['/settings/agents/yuanxiao']) {
       await page.goto(`/#${route}`)
 
       const separator = page.locator('[data-slot="separator"]').first()
@@ -205,7 +205,7 @@ test.describe('路由导航', () => {
     const initScript = createPreloadApiInitScript(runtime, sessions)
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/yuanxiao')
     await page.waitForSelector('#composer')
 
     // 刷新页面
@@ -214,7 +214,7 @@ test.describe('路由导航', () => {
 
     // 刷新后仍在聊天页
     await expect(page).toHaveURL(/\/chat/)
-    await expect(page.getByRole('heading', { name: '汤圆' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '元宵' })).toBeVisible()
   })
 
   test('浏览器后退按钮可在控制台页面间导航', async ({ page }) => {
@@ -265,7 +265,7 @@ test.describe('路由导航', () => {
     const initScript = createPreloadApiInitScript(runtime, sessions)
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/yuanxiao')
 
     // openExternalLink 在 mock 中只是空操作，验证不会丢错
     const result = await page.evaluate(async () => {

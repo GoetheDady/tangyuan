@@ -1,4 +1,4 @@
-import type { AgentReplyEntry, RunTurn, TurnStep } from '@tangyuan/contracts'
+import type { AgentReplyEntry, RunTurn, TurnStep } from '@yuanxiao/contracts'
 import {
   Check,
   ChevronDown,

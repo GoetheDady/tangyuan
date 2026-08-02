@@ -1,4 +1,4 @@
-# 汤圆 macOS MVP 发布说明
+# 元宵 macOS MVP 发布说明
 
 ## 版本
 
@@ -53,14 +53,14 @@ pnpm build:linux # 产出 AppImage/snap/deb
 
 本版本包含以下 issue 的全部实现（#12–#29）：
 
-- #12: contracts 与 TangyuanRuntime 深模块
+- #12: contracts 与 YuanxiaoRuntime 深模块
 - #13: Playwright 真实页面与 Electron 测试基线
-- #14: 前端基础栈升级与黑芝麻汤圆主题
+- #14: 前端基础栈升级与黑芝麻元宵主题
 - #15: 聊天/控制台路由与 Renderer 沙箱
 - #16: 版本化加密配置与配置恢复
 - #17: 多 Provider 凭据配置与真实 Pi 验证
-- #18: 汤圆 bootstrap 文件门控
-- #19: 通过汤圆对话创建自定义 Agent
+- #18: 元宵 bootstrap 文件门控
+- #19: 通过元宵对话创建自定义 Agent
 - #20: Agent 默认模型与当前 session 模型管理
 - #21: 多 Agent Pi session 恢复与全局索引重建
 - #22: Agent 归档、恢复与目录对账

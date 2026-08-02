@@ -12,13 +12,13 @@ describe('MessageStore.append / getMessages', () => {
     store.initSession('s1')
 
     const m1 = store.append({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 's1',
       role: 'user',
       content: '你好',
     })
     const m2 = store.append({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 's1',
       role: 'agent',
       content: '在',

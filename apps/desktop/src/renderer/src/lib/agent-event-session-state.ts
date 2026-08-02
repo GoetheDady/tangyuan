@@ -2,7 +2,7 @@ import type {
   AgentEvent,
   AgentRunState,
   AgentSessionSummary,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
 /**
  * 将一个 Agent 事件归并到会话摘要集合。

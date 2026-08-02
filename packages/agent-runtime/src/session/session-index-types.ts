@@ -3,7 +3,7 @@ import type {
   AgentRunState,
   ForkSource,
   AgentRuntimeErrorPayload,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
 /**
  * 描述会话的一次执行尝试记录，用于会话重建时还原 attempt 状态。
@@ -22,7 +22,7 @@ export interface PersistedAttemptEntry {
 }
 
 /**
- * 描述汤圆写入 userData/sessions/index.json 的单个会话索引条目。
+ * 描述元宵写入 userData/sessions/index.json 的单个会话索引条目。
  */
 export interface PersistedSessionIndexEntry {
   sessionId: string
@@ -46,7 +46,7 @@ export interface PersistedSessionIndexEntry {
 }
 
 /**
- * 描述汤圆本地会话索引文件结构。
+ * 描述元宵本地会话索引文件结构。
  */
 export interface PersistedSessionIndex {
   sessions: PersistedSessionIndexEntry[]

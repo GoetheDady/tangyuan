@@ -1,4 +1,4 @@
-import type { AgentSessionSummary } from '@tangyuan/contracts'
+import type { AgentSessionSummary } from '@yuanxiao/contracts'
 import React, { useMemo } from 'react'
 
 /**

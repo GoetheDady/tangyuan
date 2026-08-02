@@ -1,23 +1,23 @@
 import { type AgentEvent } from '../index'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   agentEventSchema,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { describe, expect, it } from 'vitest'
-import { createTangyuanRuntimeForTesting } from './tangyuan-runtime'
+import { createYuanxiaoRuntimeForTesting } from './yuanxiao-runtime'
 import {
   createReadySnapshot,
   createRuntimeDriver,
   createSessionDriver,
   createSessionSummary,
-} from './tangyuan-runtime.test-helpers'
+} from './yuanxiao-runtime.test-helpers'
 
 describe('bash 审批事件', () => {
   it('turn-cancelled 触发时自动清理该 session 的待审批请求', () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -31,7 +31,7 @@ describe('bash 审批事件', () => {
     // 启动 run
     sessionDriver.emit({
       type: 'attempt-started',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       occurredAt: '2026-07-23T00:00:00.000Z',
@@ -41,7 +41,7 @@ describe('bash 审批事件', () => {
 
     // 注册一个 bash 审批请求
     void gateway.requestBashApproval({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: '',
       command: 'ls -la',
@@ -55,7 +55,7 @@ describe('bash 审批事件', () => {
     // 模拟 run 被异常取消（不经过 cancelRun，直接由 Driver 发出 turn-cancelled）
     sessionDriver.emit({
       type: 'turn-cancelled',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       occurredAt: '2026-07-23T00:00:01.000Z',
@@ -69,7 +69,7 @@ describe('bash 审批事件', () => {
     const session = createSessionSummary('session-2')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -77,7 +77,7 @@ describe('bash 审批事件', () => {
     // 启动 run
     sessionDriver.emit({
       type: 'attempt-started',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       occurredAt: '2026-07-23T00:00:00.000Z',
@@ -87,7 +87,7 @@ describe('bash 审批事件', () => {
 
     // 注册 bash 审批
     void gateway.requestBashApproval({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: '',
       command: 'rm -rf /tmp/test',
@@ -100,7 +100,7 @@ describe('bash 审批事件', () => {
     // 模拟 run 失败
     sessionDriver.emit({
       type: 'turn-failed',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       error: { code: 'unknown', message: '模型错误', recoverable: true },
@@ -114,7 +114,7 @@ describe('bash 审批事件', () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -129,7 +129,7 @@ describe('bash 审批事件', () => {
     // 先让 session 进入 active run（bash 工具执行时一定处于某个 run 内）。
     sessionDriver.emit({
       type: 'attempt-started',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       occurredAt: '2026-07-23T00:00:00.000Z',
@@ -141,7 +141,7 @@ describe('bash 审批事件', () => {
     // 审批网关应用 active run 的真实 runId 补齐，避免 schema 报错。
     expect(() => {
       void gateway.requestBashApproval({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: '',
         command: 'ls -la',

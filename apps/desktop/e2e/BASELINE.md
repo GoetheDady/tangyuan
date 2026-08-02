@@ -40,7 +40,7 @@
 
 ## #48 跨组件视觉验收（2026-07-21）
 
-基础组件夹具完成 9 个分区的统一 Renderer 与视觉门禁，并以 `docs/design/tangyuan-ui.pen` 的组件画板逐区核对尺寸、间距、排版、边框、焦点环、语义色、动效和阴影层级。
+基础组件夹具完成 9 个分区的统一 Renderer 与视觉门禁，并以 `docs/design/yuanxiao-ui.pen` 的组件画板逐区核对尺寸、间距、排版、边框、焦点环、语义色、动效和阴影层级。
 
 ### 固定视觉环境
 
@@ -79,7 +79,7 @@
 
 ## #59 对话业务组件跨组件验收（2026-07-22）
 
-新增独立 `conversation-components` Renderer 夹具，并以 `docs/design/tangyuan-ui.pen` 中的 Composer、User Message、Assistant Message、Bash Approval 和 Question Clarification 画板逐区核对尺寸、间距、排版、圆角、边框、语义颜色、阴影层级、图标、执行轨道和状态文案。
+新增独立 `conversation-components` Renderer 夹具，并以 `docs/design/yuanxiao-ui.pen` 中的 Composer、User Message、Assistant Message、Bash Approval 和 Question Clarification 画板逐区核对尺寸、间距、排版、圆角、边框、语义颜色、阴影层级、图标、执行轨道和状态文案。
 
 ### 固定视觉环境
 

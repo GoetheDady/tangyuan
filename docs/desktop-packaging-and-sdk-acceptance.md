@@ -17,7 +17,7 @@ bun run smoke:packaged:mac
 1. 运行 `apps/desktop` 的生产构建。
 2. 使用 `electron-builder --mac --dir` 生成可启动的 `.app` 包。
 3. 启动 `.app` 内部的 macOS 可执行文件。
-4. 设置临时 `HOME`，让应用在隔离目录中读取或创建 `~/.tangyuan/agents/tangyuan`。
+4. 设置临时 `HOME`，让应用在隔离目录中读取或创建 `~/.yuanxiao/agents/yuanxiao`。
 5. 等待 Renderer 显示配置页或工作台。
 6. 将 Main 进程自检结果写入临时 JSON，并根据结果退出。
 
@@ -50,7 +50,7 @@ bun run verify:local
 1. 运行 `bun run package:mac`，确认 `apps/desktop/dist/` 下产出 macOS 应用包。
 2. 启动打包后的应用。
 3. 确认应用显示配置页或工作台。
-4. 确认默认 Agent Home 已存在：`~/.tangyuan/agents/tangyuan`。
+4. 确认默认 Agent Home 已存在：`~/.yuanxiao/agents/yuanxiao`。
 5. 在配置页填写 Provider、API Key、Model。
 6. 点击“验证并保存”，确认失败时不会保存 API Key，成功时进入工作台。
 7. 创建新会话，发送一条测试消息。

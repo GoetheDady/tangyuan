@@ -5,7 +5,7 @@ import type {
   ModelDescriptor,
   ProviderDescriptor,
   SessionModelInfo,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'

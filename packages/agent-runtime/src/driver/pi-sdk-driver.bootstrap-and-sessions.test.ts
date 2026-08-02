@@ -1,7 +1,7 @@
 import { readFile, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { AgentEvent, TranscriptSnapshot } from '@tangyuan/contracts'
+import type { AgentEvent, TranscriptSnapshot } from '@yuanxiao/contracts'
 import {
   type InternalMessage,
   PiSdkDriver,
@@ -26,7 +26,7 @@ describe('PiSdkDriver', () => {
 
     await expect(driver.getSnapshot()).resolves.toMatchObject({
       activeAgent: {
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         profile: {
           initialized: false,
           bootstrapRequired: true,
@@ -42,7 +42,7 @@ describe('PiSdkDriver', () => {
     })
     await expect(
       readFile(join(rootPath, homePath.slice(2), 'bootstrap.md'), 'utf8'),
-    ).resolves.toContain('1. 用户希望汤圆怎么称呼自己。')
+    ).resolves.toContain('1. 用户希望元宵怎么称呼自己。')
     await expect(
       stat(join(rootPath, homePath.slice(2), 'memory')),
     ).resolves.toBeDefined()
@@ -103,7 +103,7 @@ describe('PiSdkDriver', () => {
     await import('node:fs/promises').then(async ({ writeFile, mkdir }) => {
       await writeFile(join(resolvedHomePath, 'soul.md'), '# soul', 'utf8')
       // 写入共享 user profile 路径
-      const profileDir = join(rootPath, '.tangyuan/profile')
+      const profileDir = join(rootPath, '.yuanxiao/profile')
       await mkdir(profileDir, { recursive: true })
       await writeFile(join(profileDir, 'user.md'), '# user', 'utf8')
     })
@@ -143,13 +143,13 @@ describe('PiSdkDriver', () => {
 
     await expect(
       readFile(
-        join(rootPath, 'Library/Application Support/Tangyuan/config.json'),
+        join(rootPath, 'Library/Application Support/Yuanxiao/config.json'),
         'utf8',
       ),
     ).resolves.not.toContain('sk-test-secret-7890')
     await expect(
       readFile(
-        join(rootPath, 'Library/Application Support/Tangyuan/config.json'),
+        join(rootPath, 'Library/Application Support/Yuanxiao/config.json'),
         'utf8',
       ),
     ).resolves.toContain('encrypted:')
@@ -181,7 +181,7 @@ describe('PiSdkDriver', () => {
     })
     await expect(
       readFile(
-        join(rootPath, 'Library/Application Support/Tangyuan/config.json'),
+        join(rootPath, 'Library/Application Support/Yuanxiao/config.json'),
         'utf8',
       ),
     ).rejects.toThrow()
@@ -235,11 +235,11 @@ describe('PiSdkDriver', () => {
     })
     await expect(
       driver.createSession({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         title: '新会话',
       }),
     ).resolves.toMatchObject({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: expect.any(String),
       state: 'idle',
     })
@@ -248,7 +248,7 @@ describe('PiSdkDriver', () => {
       expect.objectContaining({
         sessionId: expect.any(String),
         sdkSessionFile: expect.stringContaining('.jsonl'),
-        cwd: join(rootPath, '.tangyuan/agents/tangyuan'),
+        cwd: join(rootPath, '.yuanxiao/agents/yuanxiao'),
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',
       }),
@@ -264,11 +264,11 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '调试启动流程',
     })
     expect(session).toMatchObject({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: expect.any(String),
       title: '调试启动流程',
       state: 'idle',
@@ -279,7 +279,7 @@ describe('PiSdkDriver', () => {
     ).resolves.toEqual({
       sessions: [
         expect.objectContaining({
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: session.sessionId,
           title: '调试启动流程',
           createdAt: '2026-07-08T00:00:00.000Z',
@@ -306,7 +306,7 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '可恢复会话',
     })
 
@@ -316,7 +316,7 @@ describe('PiSdkDriver', () => {
     )
     await expect(
       driver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
     ).rejects.toMatchObject({ code: 'session-not-found' })
@@ -324,7 +324,7 @@ describe('PiSdkDriver', () => {
     await driver.setSessionsArchived([session.sessionId], null)
     await expect(
       driver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
     ).resolves.toMatchObject({ sessionId: session.sessionId })
@@ -339,11 +339,11 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '新会话',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '帮我检查保存逻辑',
     })
@@ -368,7 +368,7 @@ describe('PiSdkDriver', () => {
         const handle = createPromptingHandle(request.sessionId, (messages) => {
           sdkMessagesBySessionFile.set(
             request.sdkSessionFile,
-            snapshotFromMessages(request.sessionId, 'tangyuan', messages),
+            snapshotFromMessages(request.sessionId, 'yuanxiao', messages),
           )
         })
         gateway.sessionRequests.push(request)
@@ -386,7 +386,7 @@ describe('PiSdkDriver', () => {
       readMessages: async (request) =>
         sdkMessagesBySessionFile.get(request.sdkSessionFile) ?? {
           sessionId: request.sessionId,
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           entries: [],
           updatedAt: new Date().toISOString(),
         },
@@ -399,11 +399,11 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '持久化检查',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '重启后还能看到吗',
     })
@@ -414,7 +414,7 @@ describe('PiSdkDriver', () => {
       userDataPath,
     })
     await expect(
-      restartedDriver.listSessions({ agentId: 'tangyuan' }),
+      restartedDriver.listSessions({ agentId: 'yuanxiao' }),
     ).resolves.toEqual([
       expect.objectContaining({
         sessionId: session.sessionId,
@@ -424,7 +424,7 @@ describe('PiSdkDriver', () => {
     ])
     await expect(
       restartedDriver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
     ).resolves.toEqual(
@@ -451,21 +451,21 @@ describe('PiSdkDriver', () => {
   })
   it('rebuilds a basic local index from Pi SDK sessions when the index is missing', async () => {
     // 重建按 session header 的工作目录归属 Agent，cwd 在拿到 rootPath 后才能确定。
-    let tangyuanCwd = ''
+    let yuanxiaoCwd = ''
     const gateway = createPiSdkGateway({
       listSessions: async () => [
         {
           sessionId: 'session-from-sdk',
           sdkSessionFile: '/tmp/pi-sessions/session-from-sdk.json',
           title: 'SDK 恢复会话',
-          cwd: tangyuanCwd,
+          cwd: yuanxiaoCwd,
           createdAt: '2026-07-07T00:00:00.000Z',
           updatedAt: '2026-07-07T00:01:00.000Z',
         },
       ],
     })
     const { driver, rootPath, userDataPath } = await createDriver({ gateway })
-    tangyuanCwd = join(rootPath, '.tangyuan/agents/tangyuan')
+    yuanxiaoCwd = join(rootPath, '.yuanxiao/agents/yuanxiao')
 
     await driver.saveConfiguration({
       providerId: 'anthropic',
@@ -476,10 +476,10 @@ describe('PiSdkDriver', () => {
       force: true,
     })
 
-    await expect(driver.listSessions({ agentId: 'tangyuan' })).resolves.toEqual(
+    await expect(driver.listSessions({ agentId: 'yuanxiao' })).resolves.toEqual(
       [
         expect.objectContaining({
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'session-from-sdk',
           title: 'SDK 恢复会话',
           state: 'idle',
@@ -513,18 +513,18 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '新会话',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '你好',
     })
 
     await expect(
       driver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
     ).resolves.toEqual(
@@ -594,11 +594,11 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '新会话',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '你好',
     })
@@ -633,7 +633,7 @@ describe('PiSdkDriver', () => {
     )
     await expect(
       driver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
     ).resolves.toEqual(expect.objectContaining({ entries: [] }))
@@ -681,15 +681,15 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const sessionOne = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '会话一',
     })
     const sessionTwo = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '会话二',
     })
     const firstRun = driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: sessionOne.sessionId,
       content: '第一条',
     })
@@ -708,14 +708,14 @@ describe('PiSdkDriver', () => {
 
     await expect(
       driver.sendMessage({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: sessionOne.sessionId,
         content: '重复',
       }),
     ).rejects.toMatchObject({ code: 'run-already-active' })
     await expect(
       driver.sendMessage({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: sessionTwo.sessionId,
         content: '并发',
       }),
@@ -759,10 +759,10 @@ describe('PiSdkDriver', () => {
     }
     gateway.readMessages = async (request) => {
       if (request.sessionId === 'child-session-id') {
-        return snapshotFromMessages('child-session-id', 'tangyuan', [
+        return snapshotFromMessages('child-session-id', 'yuanxiao', [
           {
             messageId: 'before-user',
-            agentId: 'tangyuan',
+            agentId: 'yuanxiao',
             sessionId: 'child-session-id',
             role: 'user',
             content: '之前的问题',
@@ -770,7 +770,7 @@ describe('PiSdkDriver', () => {
           },
           {
             messageId: 'before-agent',
-            agentId: 'tangyuan',
+            agentId: 'yuanxiao',
             sessionId: 'child-session-id',
             role: 'agent',
             content: '之前的回答',
@@ -790,7 +790,7 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const parent = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '父会话',
     })
     const parentHandle = gateway.sessionHandles[0]!
@@ -804,7 +804,7 @@ describe('PiSdkDriver', () => {
       supportsThinking: false,
     })
     await driver.setSessionModel({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       providerId: 'anthropic',
       modelId: 'claude-opus-4-6',
@@ -821,7 +821,7 @@ describe('PiSdkDriver', () => {
     )
 
     const child = await driver.forkSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       entryId: 'source-user',
     })
@@ -845,7 +845,7 @@ describe('PiSdkDriver', () => {
     ])
     await expect(
       driver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'child-session-id',
       }),
     ).resolves.toMatchObject({
@@ -855,12 +855,12 @@ describe('PiSdkDriver', () => {
       ],
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       content: '父会话继续',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: child.sessionId,
       content: '子会话继续',
     })
@@ -868,7 +868,7 @@ describe('PiSdkDriver', () => {
     expect(childHandle.prompts).toEqual(['子会话继续'])
     await expect(
       driver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: parent.sessionId,
       }),
     ).resolves.toMatchObject({
@@ -878,7 +878,7 @@ describe('PiSdkDriver', () => {
     })
     await expect(
       driver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: child.sessionId,
       }),
     ).resolves.toMatchObject({

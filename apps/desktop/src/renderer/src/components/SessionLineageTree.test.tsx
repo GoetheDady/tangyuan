@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import {
   createDefaultSessionSummary,
   type AgentSessionSummary,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { describe, expect, it, vi } from 'vitest'
 import { SessionLineageTree } from './SessionLineageTree'
 

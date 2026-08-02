@@ -1,15 +1,15 @@
-import { TANGYUAN_DEFAULT_AGENT_ID } from '@tangyuan/contracts'
+import { YUANXIAO_DEFAULT_AGENT_ID } from '@yuanxiao/contracts'
 import { describe, expect, it, vi } from 'vitest'
-import { createTangyuanRuntimeForTesting } from './tangyuan-runtime'
+import { createYuanxiaoRuntimeForTesting } from './yuanxiao-runtime'
 import {
   createDeferred,
   createRuntimeDriver,
   createSessionDriver,
   createSessionSummary,
   createSnapshot,
-} from './tangyuan-runtime.test-helpers'
+} from './yuanxiao-runtime.test-helpers'
 
-describe('TangyuanRuntime', () => {
+describe('YuanxiaoRuntime', () => {
   describe('run scheduling', () => {
     it('allows up to four concurrent runs across different sessions', async () => {
       const sessions = [1, 2, 3, 4].map((n) =>
@@ -30,7 +30,7 @@ describe('TangyuanRuntime', () => {
       sessionDriver.sendMessage = vi.fn(async (request) => {
         sessionDriver.emit({
           type: 'attempt-started',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
           occurredAt: '2026-07-17T00:00:01.000Z',
@@ -40,13 +40,13 @@ describe('TangyuanRuntime', () => {
         await deferred.promise
         sessionDriver.emit({
           type: 'run-state-changed',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           state: 'completed',
           occurredAt: '2026-07-17T00:00:05.000Z',
         })
       })
-      const runtime = createTangyuanRuntimeForTesting({
+      const runtime = createYuanxiaoRuntimeForTesting({
         runtimeDriver,
         sessionDriver,
       })
@@ -55,7 +55,7 @@ describe('TangyuanRuntime', () => {
       // 同时发送 4 条消息
       const runs = sessions.map((s) =>
         runtime.sendMessage({
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: s.sessionId,
           content: 'hello',
         }),
@@ -98,7 +98,7 @@ describe('TangyuanRuntime', () => {
       sessionDriver.sendMessage = vi.fn(async (request) => {
         sessionDriver.emit({
           type: 'attempt-started',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
           occurredAt: '2026-07-17T00:00:01.000Z',
@@ -110,13 +110,13 @@ describe('TangyuanRuntime', () => {
         }
         sessionDriver.emit({
           type: 'run-state-changed',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           state: 'completed',
           occurredAt: '2026-07-17T00:00:05.000Z',
         })
       })
-      const runtime = createTangyuanRuntimeForTesting({
+      const runtime = createYuanxiaoRuntimeForTesting({
         runtimeDriver,
         sessionDriver,
       })
@@ -141,7 +141,7 @@ describe('TangyuanRuntime', () => {
       // 同时发送 5 条消息
       const runs = sessions.map((s) =>
         runtime.sendMessage({
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: s.sessionId,
           content: 'hello',
         }),
@@ -190,7 +190,7 @@ describe('TangyuanRuntime', () => {
         startedSessions.push(request.sessionId)
         sessionDriver.emit({
           type: 'attempt-started',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
           occurredAt: '2026-07-17T00:00:01.000Z',
@@ -201,13 +201,13 @@ describe('TangyuanRuntime', () => {
         }
         sessionDriver.emit({
           type: 'run-state-changed',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           state: 'completed',
           occurredAt: '2026-07-17T00:00:05.000Z',
         })
       })
-      const runtime = createTangyuanRuntimeForTesting({
+      const runtime = createYuanxiaoRuntimeForTesting({
         runtimeDriver,
         sessionDriver,
       })
@@ -221,7 +221,7 @@ describe('TangyuanRuntime', () => {
       // 发送全部 6 条
       const runs = sessions.map((s) =>
         runtime.sendMessage({
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: s.sessionId,
           content: 'hello',
         }),
@@ -278,7 +278,7 @@ describe('TangyuanRuntime', () => {
       sessionDriver.sendMessage = vi.fn(async (request) => {
         sessionDriver.emit({
           type: 'attempt-started',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
           occurredAt: '2026-07-17T00:00:01.000Z',
@@ -289,13 +289,13 @@ describe('TangyuanRuntime', () => {
         }
         sessionDriver.emit({
           type: 'run-state-changed',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           state: 'completed',
           occurredAt: '2026-07-17T00:00:05.000Z',
         })
       })
-      const runtime = createTangyuanRuntimeForTesting({
+      const runtime = createYuanxiaoRuntimeForTesting({
         runtimeDriver,
         sessionDriver,
       })
@@ -309,7 +309,7 @@ describe('TangyuanRuntime', () => {
       // 同时发送 5 条
       const runs = sessions.map((s) =>
         runtime.sendMessage({
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: s.sessionId,
           content: 'hello',
         }),
@@ -344,7 +344,7 @@ describe('TangyuanRuntime', () => {
       // 对已在队列中的 session-5 再次发送会失败
       await expect(
         runtime.sendMessage({
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: 'session-5',
           content: '重复发送',
         }),
@@ -378,7 +378,7 @@ describe('TangyuanRuntime', () => {
         startedSessions.push(request.sessionId)
         sessionDriver.emit({
           type: 'attempt-started',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
           occurredAt: '2026-07-17T00:00:01.000Z',
@@ -389,13 +389,13 @@ describe('TangyuanRuntime', () => {
         }
         sessionDriver.emit({
           type: 'run-state-changed',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           state: 'completed',
           occurredAt: '2026-07-17T00:00:05.000Z',
         })
       })
-      const runtime = createTangyuanRuntimeForTesting({
+      const runtime = createYuanxiaoRuntimeForTesting({
         runtimeDriver,
         sessionDriver,
       })
@@ -409,7 +409,7 @@ describe('TangyuanRuntime', () => {
       // 发送所有 5 条
       const runs = sessions.map((s) =>
         runtime.sendMessage({
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: s.sessionId,
           content: 'hello',
         }),
@@ -422,7 +422,7 @@ describe('TangyuanRuntime', () => {
 
       // 取消排队的 session-5
       const cancelled = await runtime.cancelRun({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: 'session-5',
       })
       expect(cancelled.state).toBe('cancelled')
@@ -463,7 +463,7 @@ describe('TangyuanRuntime', () => {
         startedSessions.push(request.sessionId)
         sessionDriver.emit({
           type: 'attempt-started',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
           occurredAt: '2026-07-17T00:00:01.000Z',
@@ -476,7 +476,7 @@ describe('TangyuanRuntime', () => {
         if (!abortedSessions.includes(request.sessionId)) {
           sessionDriver.emit({
             type: 'run-state-changed',
-            agentId: TANGYUAN_DEFAULT_AGENT_ID,
+            agentId: YUANXIAO_DEFAULT_AGENT_ID,
             sessionId: request.sessionId,
             state: 'completed',
             occurredAt: '2026-07-17T00:00:05.000Z',
@@ -491,13 +491,13 @@ describe('TangyuanRuntime', () => {
         }
         sessionDriver.emit({
           type: 'turn-cancelled',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
           occurredAt: '2026-07-17T00:00:03.000Z',
         })
       })
-      const runtime = createTangyuanRuntimeForTesting({
+      const runtime = createYuanxiaoRuntimeForTesting({
         runtimeDriver,
         sessionDriver,
       })
@@ -511,7 +511,7 @@ describe('TangyuanRuntime', () => {
       // 发送全部 5 条
       const runs = sessions.map((s) =>
         runtime.sendMessage({
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: s.sessionId,
           content: 'hello',
         }),
@@ -524,7 +524,7 @@ describe('TangyuanRuntime', () => {
 
       // 取消 session-1（运行中）
       const cancelled = await runtime.cancelRun({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: 'session-1',
       })
       expect(cancelled.state).toBe('cancelled')
@@ -563,7 +563,7 @@ describe('TangyuanRuntime', () => {
         startedSessions.push(request.sessionId)
         sessionDriver.emit({
           type: 'attempt-started',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
           occurredAt: '2026-07-17T00:00:01.000Z',
@@ -574,7 +574,7 @@ describe('TangyuanRuntime', () => {
         }
         sessionDriver.emit({
           type: 'run-state-changed',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           state: 'completed',
           occurredAt: '2026-07-17T00:00:05.000Z',
@@ -584,13 +584,13 @@ describe('TangyuanRuntime', () => {
         sessionDeferreds.get(request.sessionId)?.resolve()
         sessionDriver.emit({
           type: 'turn-cancelled',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: request.sessionId,
           runId: `${request.sessionId}-run-1`,
           occurredAt: '2026-07-17T00:00:03.000Z',
         })
       })
-      const runtime = createTangyuanRuntimeForTesting({
+      const runtime = createYuanxiaoRuntimeForTesting({
         runtimeDriver,
         sessionDriver,
       })
@@ -604,7 +604,7 @@ describe('TangyuanRuntime', () => {
       // 发送全部 5 条
       const runs = sessions.map((s) =>
         runtime.sendMessage({
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: s.sessionId,
           content: 'hello',
         }),

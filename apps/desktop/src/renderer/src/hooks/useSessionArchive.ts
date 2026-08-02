@@ -2,7 +2,7 @@ import type {
   AgentSessionSummary,
   ArchiveSessionResult,
   DeleteSessionResult,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 

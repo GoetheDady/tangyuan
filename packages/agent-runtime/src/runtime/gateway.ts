@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import type { TranscriptSnapshot } from '@tangyuan/contracts'
+import type { TranscriptSnapshot } from '@yuanxiao/contracts'
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
 import {
   type PiSdkBranchedSession,
@@ -22,8 +22,8 @@ import {
   normalizePiSdkSessionEvent,
 } from '../core'
 
-/** 汤圆写入分叉会话 Pi JSONL 的来源记录 custom entry 类型。 */
-const TANGYUAN_FORK_SOURCE_ENTRY_TYPE = 'tangyuan:fork-source'
+/** 元宵写入分叉会话 Pi JSONL 的来源记录 custom entry 类型。 */
+const YUANXIAO_FORK_SOURCE_ENTRY_TYPE = 'yuanxiao:fork-source'
 import { createUpdateSoulTool, createUpdateUserProfileTool } from '../profile'
 import {
   createProtectedTools,
@@ -184,7 +184,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
    * 从 Pi SDK 原生 session 文件读取 transcript 消息。
    *
    * @param request - 会话标识和 SDK session 文件。
-   * @returns 转换后的汤圆标准消息列表。
+   * @returns 转换后的元宵标准消息列表。
    * @throws 当 SDK session 文件无法打开、读取或完整解析时，Promise 会 reject。
    */
   async readMessages(
@@ -225,7 +225,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
     return buildTranscriptSnapshotFromSdkEntries(
       entries,
       request.sessionId,
-      'tangyuan',
+      'yuanxiao',
     )
   }
 
@@ -293,7 +293,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
       forkedSessionFile,
       dirname(forkedSessionFile),
     )
-    forkedSession.appendCustomEntry(TANGYUAN_FORK_SOURCE_ENTRY_TYPE, {
+    forkedSession.appendCustomEntry(YUANXIAO_FORK_SOURCE_ENTRY_TYPE, {
       sessionId: parentSessionId,
       entryId: request.entryId,
     })
@@ -333,7 +333,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
     for (const entry of branchedSession.getEntries()) {
       if (
         entry.type === 'custom' &&
-        entry.customType === TANGYUAN_FORK_SOURCE_ENTRY_TYPE
+        entry.customType === YUANXIAO_FORK_SOURCE_ENTRY_TYPE
       ) {
         continue
       }
@@ -379,7 +379,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
   /**
    * 从 Pi session 文件投影分叉来源与会话运行配置。
    *
-   * 分叉来源来自汤圆写入的 custom entry；Provider/Model/Thinking Level
+   * 分叉来源来自元宵写入的 custom entry；Provider/Model/Thinking Level
    * 来自 Pi 自己的 model_change / thinking_level_change 记录，
    * 因此本地索引丢失后仍能恢复该会话的有效配置。
    *
@@ -403,7 +403,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
         .find(
           (candidate) =>
             candidate.type === 'custom' &&
-            candidate.customType === TANGYUAN_FORK_SOURCE_ENTRY_TYPE,
+            candidate.customType === YUANXIAO_FORK_SOURCE_ENTRY_TYPE,
         )
       const data = entry?.type === 'custom' ? entry.data : undefined
 
@@ -507,7 +507,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
     })
     await resourceLoader.reload()
 
-    // customTools 收容两种来源：TangyuanToolDefinition（带简化的 execute 签名）
+    // customTools 收容两种来源：YuanxiaoToolDefinition（带简化的 execute 签名）
     // 与 ToolDefinition（来自 createProtectedTools 的 read_file 包装）。
     // toSdkCustomTools 是唯一的类型适配边界，参见 protected-tools.ts。
     const customTools: unknown[] = []
@@ -615,7 +615,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
           },
         ) {
           const result = await approvalGateway.requestClarification({
-            agentId: approvalRunContext.agentId || 'tangyuan',
+            agentId: approvalRunContext.agentId || 'yuanxiao',
             sessionId: approvalRunContext.sessionId,
             runId: '',
             question: params.question,
@@ -646,7 +646,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
       })
     }
 
-    // 显式排除 Pi SDK 原生危险工具，由汤圆受保护版本接管。
+    // 显式排除 Pi SDK 原生危险工具，由元宵受保护版本接管。
     // 受保护版本使用不同的工具名（run_command / write_file / edit_file / read_file），
     // 因此排除原生名不会牵连它们——安全边界不依赖 SDK 的工具注册顺序。
     const excludedToolNames: string[] = []

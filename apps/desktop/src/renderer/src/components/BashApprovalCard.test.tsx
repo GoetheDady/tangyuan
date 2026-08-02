@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import type { BashApprovalRequest } from '@tangyuan/contracts'
+import type { BashApprovalRequest } from '@yuanxiao/contracts'
 import { BashApprovalCard } from './BashApprovalCard'
 
 function createApproval(
@@ -10,7 +10,7 @@ function createApproval(
 ): BashApprovalRequest {
   return {
     approvalId: 'approval-1',
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId: 'session-1',
     runId: 'run-1',
     command: 'npm install lodash',

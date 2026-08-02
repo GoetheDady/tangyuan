@@ -1,7 +1,7 @@
 import type {
   ProviderConfiguration,
   RuntimeSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import {
   Eye,
   EyeOff,

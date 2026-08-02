@@ -1,4 +1,4 @@
-import type { AgentId } from '@tangyuan/contracts'
+import type { AgentId } from '@yuanxiao/contracts'
 import type { InternalMessage } from '../driver'
 import { AgentRuntimeError } from '../core'
 

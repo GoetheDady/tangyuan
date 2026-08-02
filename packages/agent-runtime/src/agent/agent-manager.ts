@@ -2,7 +2,7 @@ import type {
   AgentSummary,
   UnclaimedDirectory,
   UpdateAgentConfigRequest,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import type { AgentSessionDriver } from '../driver'
 import type { RuntimeSnapshotStore } from '../runtime/runtime-snapshot-store'
 
@@ -16,7 +16,7 @@ export interface AgentManagerDependencies {
 
 /**
  * Agent 生命周期管理：承载「Agent 如何列出、创建、改配置、归档、恢复、
- * 目录对账/认领、重建汤圆目录」这一族操作。所有会改变 Agent 配置的操作
+ * 目录对账/认领、重建元宵目录」这一族操作。所有会改变 Agent 配置的操作
  * 完成后都刷新运行时快照缓存，保证后续读取一致。
  * 不持有独立状态，编排 sessionDriver 与 snapshotStore。
  */
@@ -85,7 +85,7 @@ export class AgentManager {
   }
 
   /**
-   * 归档指定的自定义 Agent（默认汤圆不可归档），并刷新快照缓存。
+   * 归档指定的自定义 Agent（默认元宵不可归档），并刷新快照缓存。
    *
    * @param agentId - Agent 标识。
    * @returns 归档后的 AgentSummary。
@@ -160,17 +160,17 @@ export class AgentManager {
   }
 
   /**
-   * 按固定模板重建默认汤圆的目录结构，并刷新快照缓存。
+   * 按固定模板重建默认元宵的目录结构，并刷新快照缓存。
    *
    * @returns 重建后的 AgentSummary。
    * @throws 当 Driver 不支持或重建失败时，Promise 会 reject。
    */
-  async rebuildTangyuanHome(): Promise<AgentSummary> {
-    if (!this.sessionDriver.rebuildTangyuanHome) {
-      throw new Error('当前运行时不支持重建汤圆目录。')
+  async rebuildYuanxiaoHome(): Promise<AgentSummary> {
+    if (!this.sessionDriver.rebuildYuanxiaoHome) {
+      throw new Error('当前运行时不支持重建元宵目录。')
     }
 
-    const summary = await this.sessionDriver.rebuildTangyuanHome()
+    const summary = await this.sessionDriver.rebuildYuanxiaoHome()
     await this.snapshotStore.reload()
     return summary
   }

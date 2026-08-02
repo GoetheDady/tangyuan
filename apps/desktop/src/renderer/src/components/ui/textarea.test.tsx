@@ -27,7 +27,7 @@ describe('Textarea', () => {
       <Textarea
         name="description"
         autoComplete="off"
-        defaultValue="汤圆的故事"
+        defaultValue="元宵的故事"
         placeholder="请输入描述"
         rows={5}
         cols={40}
@@ -43,7 +43,7 @@ describe('Textarea', () => {
     expect(textarea).toHaveAttribute('rows', '5')
     expect(textarea).toHaveAttribute('cols', '40')
     expect(textarea).toHaveAttribute('maxlength', '500')
-    expect(textarea).toHaveValue('汤圆的故事')
+    expect(textarea).toHaveValue('元宵的故事')
   })
 
   it('merges className without snapshotting full class string', () => {

@@ -50,22 +50,22 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '新会话',
     })
     const sendPromise = driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '开始',
     })
     await runStarted.promise
     await driver.cancelRun({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
     })
 
     await expect(sendPromise).resolves.toBeUndefined()
-    await expect(driver.listSessions({ agentId: 'tangyuan' })).resolves.toEqual(
+    await expect(driver.listSessions({ agentId: 'yuanxiao' })).resolves.toEqual(
       [
         expect.objectContaining({
           sessionId: session.sessionId,
@@ -75,7 +75,7 @@ describe('PiSdkDriver', () => {
     )
     await expect(
       driver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
     ).resolves.toEqual(expect.objectContaining({ entries: [] }))
@@ -110,20 +110,20 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '新会话',
     })
 
     await expect(
       driver.sendMessage({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: session.sessionId,
         content: '开始',
       }),
     ).rejects.toThrow('provider failed')
     await expect(
       driver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
     ).resolves.toEqual(expect.objectContaining({ entries: [] }))
@@ -150,12 +150,12 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '新会话',
     })
 
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '开始',
     })
@@ -200,11 +200,11 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '新会话',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '记住我偏好短回答',
     })
@@ -212,7 +212,7 @@ describe('PiSdkDriver', () => {
     expect(gateway.sessionHandles[0]?.prompts).toEqual(['记住我偏好短回答'])
     await expect(
       driver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
     ).resolves.toEqual(expect.objectContaining({ entries: [] }))
@@ -232,7 +232,7 @@ describe('PiSdkDriver', () => {
             await request.onUpdateSoul(
               [
                 '# Soul',
-                '身份：汤圆是桌面端 Agent。',
+                '身份：元宵是桌面端 Agent。',
                 '用户偏好：优先中文。',
                 '工作范围：协助工程任务。',
                 '沟通方式：解释专业术语。',
@@ -275,17 +275,17 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: 'Bootstrap 初始化',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '请开始初始化。',
     })
 
     const resolvedHomePath = join(rootPath, homePath.slice(2))
-    const sharedProfilePath = join(rootPath, '.tangyuan/profile')
+    const sharedProfilePath = join(rootPath, '.yuanxiao/profile')
     // bootstrap 回合的身份上下文（建会话时注入）包含 bootstrap 指令。
     const bootstrapContext = gateway.sessionHandles[0]?.systemPromptContexts[0]
     expect(bootstrapContext).toContain('# Bootstrap')
@@ -295,7 +295,7 @@ describe('PiSdkDriver', () => {
     expect(bootstrapContext).toContain('update_soul')
     await expect(
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
-    ).resolves.toContain('身份：汤圆是桌面端 Agent。')
+    ).resolves.toContain('身份：元宵是桌面端 Agent。')
     await expect(
       readFile(join(sharedProfilePath, 'user.md'), 'utf8'),
     ).resolves.toContain('称呼：用户。')
@@ -313,7 +313,7 @@ describe('PiSdkDriver', () => {
         },
       },
     })
-    await expect(driver.listSessions({ agentId: 'tangyuan' })).resolves.toEqual(
+    await expect(driver.listSessions({ agentId: 'yuanxiao' })).resolves.toEqual(
       [
         expect.objectContaining({
           sessionId: session.sessionId,
@@ -356,17 +356,17 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: 'Bootstrap 初始化',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '请开始初始化。',
     })
 
     const resolvedHomePath = join(rootPath, homePath.slice(2))
-    const sharedProfilePath = join(rootPath, '.tangyuan/profile')
+    const sharedProfilePath = join(rootPath, '.yuanxiao/profile')
     // soul.md 和 user.md 存在
     await expect(
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
@@ -420,11 +420,11 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: 'Bootstrap 初始化',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '请开始初始化。',
     })
@@ -436,7 +436,7 @@ describe('PiSdkDriver', () => {
     ).resolves.toContain('# Soul')
     // user.md 不存在
     await expect(
-      readFile(join(rootPath, '.tangyuan/profile/user.md'), 'utf8'),
+      readFile(join(rootPath, '.yuanxiao/profile/user.md'), 'utf8'),
     ).rejects.toMatchObject({ code: 'ENOENT' })
     // bootstrap.md 仍存在（初始化阻断保留）
     await expect(
@@ -483,11 +483,11 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: 'Bootstrap 初始化',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '请开始初始化。',
     })
@@ -495,7 +495,7 @@ describe('PiSdkDriver', () => {
     const resolvedHomePath = join(rootPath, homePath.slice(2))
     // user.md 存在于共享路径
     await expect(
-      readFile(join(rootPath, '.tangyuan/profile/user.md'), 'utf8'),
+      readFile(join(rootPath, '.yuanxiao/profile/user.md'), 'utf8'),
     ).resolves.toContain('# User')
     // soul.md 不存在
     await expect(
@@ -544,17 +544,17 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: 'Bootstrap 初始化',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '请开始初始化。',
     })
 
     const resolvedHomePath = join(rootPath, homePath.slice(2))
-    const sharedProfilePath = join(rootPath, '.tangyuan/profile')
+    const sharedProfilePath = join(rootPath, '.yuanxiao/profile')
     // 两个 profile 文件都不存在（Agent Home 和共享路径均无）
     await expect(
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
@@ -616,17 +616,17 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: 'Bootstrap 初始化',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '我想用中文。',
     })
 
     const resolvedHomePath = join(rootPath, homePath.slice(2))
-    const sharedProfilePath = join(rootPath, '.tangyuan/profile')
+    const sharedProfilePath = join(rootPath, '.yuanxiao/profile')
     // 第一回合后：soul.md 存在，user.md 不存在，bootstrap.md 仍存在
     await expect(
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
@@ -647,7 +647,7 @@ describe('PiSdkDriver', () => {
 
     // 第二回合
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '我喜欢简洁回答。',
     })

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type {
   AgentEvent,
   QuestionClarificationRequest,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { ClarificationRegistry } from './clarification-registry'
 
 function makeRequest(
@@ -10,7 +10,7 @@ function makeRequest(
 ): QuestionClarificationRequest {
   return {
     clarificationId: 'clarify-1',
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId: 'session-1',
     runId: 'run-1',
     question: '选哪个？',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentEvent, BashApprovalRequest } from '@tangyuan/contracts'
+import type { AgentEvent, BashApprovalRequest } from '@yuanxiao/contracts'
 import { BashApprovalRegistry } from './bash-approval-registry'
 
 function makeRequest(
@@ -7,7 +7,7 @@ function makeRequest(
 ): BashApprovalRequest {
   return {
     approvalId: 'approval-1',
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId: 'session-1',
     runId: 'run-1',
     command: 'ls',

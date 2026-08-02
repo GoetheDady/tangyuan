@@ -1,3 +1,3 @@
 export { AgentRuntimeError } from './core'
-export { createTangyuanRuntime } from './index'
-export type { TangyuanRuntime, ConfigEncryptionAdapter } from './index'
+export { createYuanxiaoRuntime } from './index'
+export type { YuanxiaoRuntime, ConfigEncryptionAdapter } from './index'

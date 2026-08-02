@@ -4,7 +4,7 @@ import {
   getMtimeIso,
 } from '../core'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   createAgentProfileStatus,
   createRuntimeSnapshot,
   type AgentConfig,
@@ -24,7 +24,7 @@ import {
   type SkillSummary,
   type SoulContent,
   type UserProfileContent,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { PiSdkDriverState } from './pi-sdk-driver-state'
 
 export class PiSdkDriverResources extends PiSdkDriverState {
@@ -59,7 +59,7 @@ export class PiSdkDriverResources extends PiSdkDriverState {
     ])
 
     const runtimeConfig = readResult.config
-      ? extractAgentRuntimeConfig(readResult.config, TANGYUAN_DEFAULT_AGENT_ID)
+      ? extractAgentRuntimeConfig(readResult.config, YUANXIAO_DEFAULT_AGENT_ID)
       : null
     const hasBackup = await this.configStore.hasBackup()
 
@@ -78,8 +78,8 @@ export class PiSdkDriverResources extends PiSdkDriverState {
 
     return createRuntimeSnapshot({
       activeAgent: {
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
-        displayName: '汤圆',
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
+        displayName: '元宵',
         homePath: this.agentHomePath,
         profile: createAgentProfileStatus(homeStatus),
       },
@@ -160,11 +160,11 @@ export class PiSdkDriverResources extends PiSdkDriverState {
   }
 
   /**
-   * 归档指定的自定义 Agent（默认汤圆不可归档）。
+   * 归档指定的自定义 Agent（默认元宵不可归档）。
    *
    * @param agentId - Agent 标识。
    * @returns 归档后的 AgentSummary。
-   * @throws 当 Agent 是汤圆、不存在或配置保存失败时，Promise 会 reject。
+   * @throws 当 Agent 是元宵、不存在或配置保存失败时，Promise 会 reject。
    */
   async archiveAgent(agentId: AgentId): Promise<AgentSummary> {
     return this.agentRegistry.archiveAgent(agentId)
@@ -189,7 +189,7 @@ export class PiSdkDriverResources extends PiSdkDriverState {
    */
   async reconcileAgentDirectories(): Promise<{
     agents: AgentSummary[]
-    unclaimedDirectories: import('@tangyuan/contracts').UnclaimedDirectory[]
+    unclaimedDirectories: import('@yuanxiao/contracts').UnclaimedDirectory[]
   }> {
     return this.agentRegistry.reconcileAgentDirectories()
   }
@@ -210,13 +210,13 @@ export class PiSdkDriverResources extends PiSdkDriverState {
   }
 
   /**
-   * 按固定模板重建默认汤圆的目录结构。
+   * 按固定模板重建默认元宵的目录结构。
    *
    * @returns 重建后的 AgentSummary。
    * @throws 当目录创建或文件写入失败时，Promise 会 reject。
    */
-  async rebuildTangyuanHome(): Promise<AgentSummary> {
-    return this.agentRegistry.rebuildTangyuanHome()
+  async rebuildYuanxiaoHome(): Promise<AgentSummary> {
+    return this.agentRegistry.rebuildYuanxiaoHome()
   }
 
   /**
@@ -392,7 +392,7 @@ export class PiSdkDriverResources extends PiSdkDriverState {
       this.emitProfileUpdated('user', updatedAt)
       // profile 变化点：共享 user.md 影响所有 Agent，刷新全部活跃会话。
       await this.refreshAllProfileContext().catch((error) => {
-        this.emitProfileRefreshError(TANGYUAN_DEFAULT_AGENT_ID, error)
+        this.emitProfileRefreshError(YUANXIAO_DEFAULT_AGENT_ID, error)
       })
     }
 

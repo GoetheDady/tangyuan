@@ -1,1 +1,1 @@
-export { default } from '@tangyuan/eslint-config/base'
+export { default } from '@yuanxiao/eslint-config/base'

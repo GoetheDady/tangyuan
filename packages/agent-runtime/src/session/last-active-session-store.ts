@@ -3,7 +3,7 @@ import { dirname } from 'node:path'
 import {
   lastActiveSessionSchema,
   type LastActiveSession,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import type { DirectoryLayout } from '../core'
 
 /**

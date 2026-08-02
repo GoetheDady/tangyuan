@@ -22,10 +22,10 @@ const SESSION_MODEL_ID = 'claude-sonnet-4-5'
  * @returns 分叉会话 Pi 文件路径。
  */
 function writeStartupRestorationFixture(tempHome: string): string {
-  const userDataPath = join(tempHome, '.tangyuan-qa-root', '.tangyuan')
+  const userDataPath = join(tempHome, '.yuanxiao-qa-root', '.yuanxiao')
   const sessionDir = join(userDataPath, 'sessions')
   const sdkSessionDir = join(sessionDir, 'pi-sdk')
-  const agentHomePath = join(userDataPath, 'agents', 'tangyuan')
+  const agentHomePath = join(userDataPath, 'agents', 'yuanxiao')
   const parentSessionFile = join(sdkSessionDir, `${PARENT_SESSION_ID}.jsonl`)
   const childSessionFile = join(sdkSessionDir, `${CHILD_SESSION_ID}.jsonl`)
   const parentTimestamp = '2026-07-28T00:00:00.000Z'
@@ -43,8 +43,8 @@ function writeStartupRestorationFixture(tempHome: string): string {
         },
       },
       agents: {
-        tangyuan: {
-          displayName: '汤圆',
+        yuanxiao: {
+          displayName: '元宵',
           defaultProviderId: 'anthropic',
           defaultModelId: SESSION_MODEL_ID,
           status: 'active',
@@ -91,7 +91,7 @@ function writeStartupRestorationFixture(tempHome: string): string {
       },
       {
         type: 'custom',
-        customType: 'tangyuan:fork-source',
+        customType: 'yuanxiao:fork-source',
         id: 'electron-fork-source',
         parentId: null,
         timestamp: childTimestamp,
@@ -143,7 +143,7 @@ function writeStartupRestorationFixture(tempHome: string): string {
           provider: 'anthropic',
           model: SESSION_MODEL_ID,
           thinkingLevel: 'high',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           lastMessagePreview: '最后激活分叉会话内容',
           status: 'completed',
           forkedFrom: {
@@ -160,7 +160,7 @@ function writeStartupRestorationFixture(tempHome: string): string {
           provider: 'anthropic',
           model: SESSION_MODEL_ID,
           thinkingLevel: 'low',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           lastMessagePreview: '父会话中的分叉源消息',
           status: 'completed',
         },
@@ -170,7 +170,7 @@ function writeStartupRestorationFixture(tempHome: string): string {
   writeFileSync(
     join(sessionDir, 'last-active-session.json'),
     JSON.stringify({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: CHILD_SESSION_ID,
       updatedAt: childTimestamp,
     }),
@@ -195,8 +195,8 @@ async function launchRestorationApp(
     env: {
       ...process.env,
       HOME: tempHome,
-      TANGYUAN_QA_API_KEY: 'enable-plaintext-e2e-adapter',
-      TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: '',
+      YUANXIAO_QA_API_KEY: 'enable-plaintext-e2e-adapter',
+      YUANXIAO_DESKTOP_SMOKE_TEST_RESULT_PATH: '',
     },
   })
   const window = await app.firstWindow()
@@ -220,8 +220,8 @@ test.describe('Electron 窗口', () => {
     // Playwright 从 playwright.config.ts 所在目录运行，process.cwd() 即 apps/desktop
     const mainEntry = join(process.cwd(), 'out/main/index.js')
 
-    // 创建临时 HOME 目录，避免污染真实 ~/.tangyuan 配置
-    tempHome = mkdtempSync(join(tmpdir(), 'tangyuan-e2e-electron-'))
+    // 创建临时 HOME 目录，避免污染真实 ~/.yuanxiao 配置
+    tempHome = mkdtempSync(join(tmpdir(), 'yuanxiao-e2e-electron-'))
 
     electronApp = await electron.launch({
       args: [mainEntry],
@@ -229,7 +229,7 @@ test.describe('Electron 窗口', () => {
         ...process.env,
         HOME: tempHome,
         // 确保不会触发打包 smoke test 模式
-        TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: '',
+        YUANXIAO_DESKTOP_SMOKE_TEST_RESULT_PATH: '',
       },
     })
 
@@ -290,7 +290,7 @@ test.describe('Electron 窗口', () => {
     const result = await mainWindow.evaluate(async () => {
       try {
         await window.api.forkSession({
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'missing-session',
           entryId: 'missing-entry',
         })
@@ -349,7 +349,7 @@ test.describe('Electron 窗口', () => {
 
     expect(snapshot).toBeDefined()
     expect(snapshot.activeAgent).toBeDefined()
-    expect(snapshot.activeAgent.agentId).toBe('tangyuan')
+    expect(snapshot.activeAgent.agentId).toBe('yuanxiao')
     expect(snapshot.providers).toBeInstanceOf(Array)
     expect(snapshot.status).toMatch(/^(missing-config|ready)$/)
   })
@@ -366,7 +366,7 @@ test.describe('Electron 窗口', () => {
     const result = await mainWindow.evaluate(async () => {
       const initial = await window.api.getLastActiveSession()
       const updated = await window.api.setLastActiveSession({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'missing-session',
       })
       return { initial, updated }
@@ -392,7 +392,7 @@ test.describe('Electron 窗口', () => {
 test.describe('真实 Electron 启动恢复', () => {
   test('恢复最后激活分叉会话，失效后回退默认 Agent 最近可用会话', async () => {
     const mainEntry = join(process.cwd(), 'out/main/index.js')
-    const tempHome = mkdtempSync(join(tmpdir(), 'tangyuan-e2e-restoration-'))
+    const tempHome = mkdtempSync(join(tmpdir(), 'yuanxiao-e2e-restoration-'))
     const childSessionFile = writeStartupRestorationFixture(tempHome)
     let runningApp: ElectronApplication | null = null
 
@@ -401,7 +401,7 @@ test.describe('真实 Electron 启动恢复', () => {
       runningApp = firstLaunch.app
       await firstLaunch.window.waitForFunction(
         ({ sessionId, transcriptText }) =>
-          window.location.hash === `#/chat/tangyuan/${sessionId}` &&
+          window.location.hash === `#/chat/yuanxiao/${sessionId}` &&
           document.body.innerText.includes(transcriptText),
         { sessionId: CHILD_SESSION_ID, transcriptText: '最后激活分叉会话内容' },
       )
@@ -418,7 +418,7 @@ test.describe('真实 Electron 启动恢复', () => {
             agentId,
             sessionId,
           }),
-        { agentId: 'tangyuan', sessionId: CHILD_SESSION_ID },
+        { agentId: 'yuanxiao', sessionId: CHILD_SESSION_ID },
       )
       expect(sessionModelInfo).toMatchObject({
         providerId: 'anthropic',
@@ -455,7 +455,7 @@ test.describe('真实 Electron 启动恢复', () => {
           }
         },
         {
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           parentSessionId: PARENT_SESSION_ID,
           childSessionId: CHILD_SESSION_ID,
         },
@@ -488,7 +488,7 @@ test.describe('真实 Electron 启动恢复', () => {
       runningApp = secondLaunch.app
       await secondLaunch.window.waitForFunction(
         ({ sessionId, transcriptText }) =>
-          window.location.hash === `#/chat/tangyuan/${sessionId}` &&
+          window.location.hash === `#/chat/yuanxiao/${sessionId}` &&
           document.body.innerText.includes(transcriptText),
         {
           sessionId: PARENT_SESSION_ID,
@@ -500,7 +500,7 @@ test.describe('真实 Electron 启动恢复', () => {
         await secondLaunch.window.evaluate(async () =>
           window.api.getLastActiveSession(),
         ),
-      ).toMatchObject({ agentId: 'tangyuan', sessionId: PARENT_SESSION_ID })
+      ).toMatchObject({ agentId: 'yuanxiao', sessionId: PARENT_SESSION_ID })
     } finally {
       await runningApp?.close()
       rmSync(tempHome, { recursive: true, force: true })

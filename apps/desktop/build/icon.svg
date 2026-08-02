@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="元宵">
+  <rect width="1024" height="1024" rx="224" fill="#1f1a15" />
+  <circle cx="512" cy="512" r="328" fill="#fbf7ef" />
+  <circle cx="512" cy="540" r="132" fill="#1f1a15" />
+  <circle cx="720" cy="304" r="66" fill="#b6403a" stroke="#fbf7ef" stroke-width="24" />
+</svg>

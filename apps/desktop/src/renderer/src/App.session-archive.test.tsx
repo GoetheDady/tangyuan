@@ -6,7 +6,7 @@ import {
   type AgentSessionSummary,
   type ArchiveSessionRequest,
   type DeleteSessionRequest,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
@@ -53,7 +53,7 @@ function installReadyArchiveApi(
   vi.mocked(window.api.getRuntimeSnapshot).mockResolvedValue(readyRuntime)
   vi.mocked(window.api.refreshRuntime).mockResolvedValue(readyRuntime)
   vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId: PARENT.sessionId,
     updatedAt: '2026-07-28T00:00:00.000Z',
   })
@@ -97,7 +97,7 @@ describe('App 会话谱系归档与恢复', () => {
         affectedActivities: [],
       }
     })
-    window.location.hash = '#/chat/tangyuan/parent-session'
+    window.location.hash = '#/chat/yuanxiao/parent-session'
 
     render(<App />)
 
@@ -106,12 +106,12 @@ describe('App 会话谱系归档与恢复', () => {
     )
 
     expect(window.api.archiveSession).toHaveBeenCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: PARENT.sessionId,
       confirmActivityStop: false,
     })
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/chat/tangyuan')
+      expect(window.location.hash).toBe('#/chat/yuanxiao')
     })
     expect(
       screen.queryByRole('treeitem', { name: /父会话/ }),
@@ -149,7 +149,7 @@ describe('App 会话谱系归档与恢复', () => {
         ],
       }),
     )
-    window.location.hash = '#/chat/tangyuan/parent-session'
+    window.location.hash = '#/chat/yuanxiao/parent-session'
 
     render(<App />)
 
@@ -175,7 +175,7 @@ describe('App 会话谱系归档与恢复', () => {
     )
 
     expect(window.api.archiveSession).toHaveBeenLastCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: PARENT.sessionId,
       confirmActivityStop: true,
     })
@@ -194,7 +194,7 @@ describe('App 会话谱系归档与恢复', () => {
         : allSessions.filter((session) => !session.archivedAt)
     })
     vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: SIBLING.sessionId,
       updatedAt: '2026-07-28T00:00:00.000Z',
     })
@@ -202,7 +202,7 @@ describe('App 会话谱系归档与恢复', () => {
       isArchived = false
       return [PARENT, CHILD]
     })
-    window.location.hash = '#/chat/tangyuan/sibling-session'
+    window.location.hash = '#/chat/yuanxiao/sibling-session'
 
     render(<App />)
 
@@ -211,7 +211,7 @@ describe('App 会话谱系归档与恢复', () => {
     )
 
     expect(window.api.recoverSession).toHaveBeenCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: PARENT.sessionId,
     })
     expect(
@@ -243,7 +243,7 @@ describe('App 会话谱系归档与恢复', () => {
       status: 'active',
       defaultProviderId: 'anthropic',
       defaultModelId: 'claude-sonnet-4-5',
-      homePath: '~/.tangyuan/agents/agent-2',
+      homePath: '~/.yuanxiao/agents/agent-2',
       archivedAt: null,
       directoryStatus: 'healthy',
     })
@@ -261,7 +261,7 @@ describe('App 会话谱系归档与恢复', () => {
     vi.mocked(window.api.getRuntimeSnapshot).mockResolvedValue(readyRuntime)
     vi.mocked(window.api.refreshRuntime).mockResolvedValue(readyRuntime)
     vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: PARENT.sessionId,
       updatedAt: '2026-07-28T00:00:00.000Z',
     })
@@ -281,7 +281,7 @@ describe('App 会话谱系归档与恢复', () => {
     vi.mocked(window.api.archiveSession).mockImplementation(
       async () => archiveResult.promise,
     )
-    window.location.hash = '#/chat/tangyuan/parent-session'
+    window.location.hash = '#/chat/yuanxiao/parent-session'
 
     render(<App />)
 
@@ -327,7 +327,7 @@ describe('App 会话谱系归档与恢复', () => {
       status: 'active',
       defaultProviderId: 'anthropic',
       defaultModelId: 'claude-sonnet-4-5',
-      homePath: '~/.tangyuan/agents/agent-2',
+      homePath: '~/.yuanxiao/agents/agent-2',
       archivedAt: null,
       directoryStatus: 'healthy',
     })
@@ -350,7 +350,7 @@ describe('App 会话谱系归档与恢复', () => {
     vi.mocked(window.api.getRuntimeSnapshot).mockResolvedValue(readyRuntime)
     vi.mocked(window.api.refreshRuntime).mockResolvedValue(readyRuntime)
     vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: PARENT.sessionId,
       updatedAt: '2026-07-28T00:00:00.000Z',
     })
@@ -366,7 +366,7 @@ describe('App 会话谱系归档与恢复', () => {
     vi.mocked(window.api.archiveSession).mockImplementation(
       async () => archiveResult.promise,
     )
-    window.location.hash = '#/chat/tangyuan/parent-session'
+    window.location.hash = '#/chat/yuanxiao/parent-session'
 
     render(<App />)
 
@@ -419,7 +419,7 @@ describe('App 会话谱系归档与恢复', () => {
         affectedActivities: [],
       }
     })
-    window.location.hash = '#/chat/tangyuan/parent-session'
+    window.location.hash = '#/chat/yuanxiao/parent-session'
 
     render(<App />)
 
@@ -428,12 +428,12 @@ describe('App 会话谱系归档与恢复', () => {
     )
 
     expect(window.api.deleteSession).toHaveBeenCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: PARENT.sessionId,
       confirmActivityStop: false,
     })
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/chat/tangyuan')
+      expect(window.location.hash).toBe('#/chat/yuanxiao')
     })
     expect(
       screen.queryByRole('treeitem', { name: /父会话/ }),
@@ -485,7 +485,7 @@ describe('App 会话谱系归档与恢复', () => {
         }
       },
     )
-    window.location.hash = '#/chat/tangyuan/parent-session'
+    window.location.hash = '#/chat/yuanxiao/parent-session'
 
     render(<App />)
 
@@ -513,12 +513,12 @@ describe('App 会话谱系归档与恢复', () => {
     )
 
     expect(window.api.deleteSession).toHaveBeenLastCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: PARENT.sessionId,
       confirmActivityStop: true,
     })
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/chat/tangyuan')
+      expect(window.location.hash).toBe('#/chat/yuanxiao')
     })
     expect(
       screen.queryByRole('treeitem', { name: /父会话/ }),

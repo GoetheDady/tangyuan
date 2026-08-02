@@ -1,10 +1,10 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   type AgentRunState,
   type AgentSessionSummary,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import type { ConfigStore, DirectoryLayout } from '../core'
 import type { PiSdkGateway } from '../driver'
 import { AgentRuntimeError } from '../core'
@@ -107,7 +107,7 @@ export class SessionIndexStore {
 
     for (const agentId of Object.keys(config.agents)) {
       const cwd =
-        agentId === TANGYUAN_DEFAULT_AGENT_ID
+        agentId === YUANXIAO_DEFAULT_AGENT_ID
           ? this.layout.agentHome()
           : this.layout.workspace(agentId)
       agentIdByCwd.set(resolve(cwd), agentId)

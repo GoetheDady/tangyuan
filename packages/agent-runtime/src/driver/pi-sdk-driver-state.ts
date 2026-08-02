@@ -9,7 +9,7 @@ import { SessionIndexStore } from '../session/session-index-store'
 import { MessageStore } from '../session/message-store'
 import { AgentRuntimeError, sanitizeErrorMessage } from '../core'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   type AgentEvent,
   type AgentEventListener,
   type AgentId,
@@ -19,7 +19,7 @@ import {
   type ProfileUpdateResult,
   type RuntimeConfiguration,
   type TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import type {
   DriverEvent,
   InternalMessage,
@@ -64,9 +64,9 @@ export abstract class PiSdkDriverState {
    */
   constructor(options: PiSdkDriverOptions = {}) {
     this.now = options.now ?? (() => new Date().toISOString())
-    this.agentHomePath = options.agentHomePath ?? '~/.tangyuan/agents/tangyuan'
+    this.agentHomePath = options.agentHomePath ?? '~/.yuanxiao/agents/yuanxiao'
     this.fsRoot = options.fsRoot ?? homedir()
-    this.userDataPath = options.userDataPath ?? join(this.fsRoot, '.tangyuan')
+    this.userDataPath = options.userDataPath ?? join(this.fsRoot, '.yuanxiao')
     this.layout = new DirectoryLayout({
       agentHomePath: this.agentHomePath,
       fsRoot: this.fsRoot,
@@ -264,7 +264,7 @@ export abstract class PiSdkDriverState {
   ): Promise<PiSdkSessionHandle> {
     const indexEntry = this.sessionIndexStore.getEntry(sessionId)
     const cwd =
-      indexEntry.agentId === TANGYUAN_DEFAULT_AGENT_ID
+      indexEntry.agentId === YUANXIAO_DEFAULT_AGENT_ID
         ? this.layout.agentHome()
         : this.layout.workspace(indexEntry.agentId)
     const openRequest = {
@@ -293,7 +293,7 @@ export abstract class PiSdkDriverState {
         : openRequest,
     )
     this.sessionHandles.set(sessionId, handle)
-    // 会话运行配置属于会话：Thinking Level 由汤圆索引恢复，
+    // 会话运行配置属于会话：Thinking Level 由元宵索引恢复，
     // 不依赖 Pi session 文件是否记住上次取值。
     if (indexEntry.thinkingLevel && handle.setThinkingLevel) {
       await handle.setThinkingLevel(indexEntry.thinkingLevel)
@@ -324,7 +324,7 @@ export abstract class PiSdkDriverState {
   protected emitProfileUpdated(
     target: 'soul' | 'user',
     updatedAt: string,
-    eventAgentId: AgentId = TANGYUAN_DEFAULT_AGENT_ID,
+    eventAgentId: AgentId = YUANXIAO_DEFAULT_AGENT_ID,
   ): void {
     this.emit({
       type: 'profile-updated',
@@ -484,7 +484,7 @@ export abstract class PiSdkDriverState {
    */
   protected assertKnownSession(
     sessionId: string,
-    agentId = TANGYUAN_DEFAULT_AGENT_ID,
+    agentId = YUANXIAO_DEFAULT_AGENT_ID,
   ): AgentSessionSummary {
     const session = this.sessionIndexStore.getSummary(sessionId)
 

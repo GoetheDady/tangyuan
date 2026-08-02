@@ -6,7 +6,7 @@ import {
   createDefaultSessionSummary,
   type DesktopPreloadApi,
   type TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import {
@@ -47,7 +47,7 @@ describe('App', () => {
           }),
         ]),
         getLastActiveSession: vi.fn().mockResolvedValue({
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'welcome',
           updatedAt: '2026-07-08T00:00:00.000Z',
         }),
@@ -55,7 +55,7 @@ describe('App', () => {
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: 'welcome',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           entries: [],
           updatedAt: '2026-01-01T00:00:00.000Z',
         }),
@@ -63,14 +63,14 @@ describe('App', () => {
           for (const listener of listeners) {
             listener({
               type: 'run-state-changed',
-              agentId: 'tangyuan',
+              agentId: 'yuanxiao',
               sessionId: 'welcome',
               state: 'running',
               occurredAt: '2026-07-08T00:00:01.000Z',
             })
             listener({
               type: 'transcript-delta',
-              agentId: 'tangyuan',
+              agentId: 'yuanxiao',
               sessionId: 'welcome',
               delta: {
                 type: 'entry-appended',
@@ -98,7 +98,7 @@ describe('App', () => {
             ] as const) {
               listener({
                 type: 'transcript-delta',
-                agentId: 'tangyuan',
+                agentId: 'yuanxiao',
                 sessionId: 'welcome',
                 delta: { type: 'delta-appended', index: 0, delta },
                 occurredAt,
@@ -110,7 +110,7 @@ describe('App', () => {
 
           return {
             sessionId: 'welcome',
-            agentId: 'tangyuan',
+            agentId: 'yuanxiao',
             entries: [
               {
                 kind: 'agent-reply',
@@ -144,12 +144,12 @@ describe('App', () => {
         resetConfiguration: vi.fn(),
         listAgents: vi.fn().mockResolvedValue([
           {
-            agentId: 'tangyuan',
-            displayName: '汤圆',
+            agentId: 'yuanxiao',
+            displayName: '元宵',
             status: 'active' as const,
             defaultProviderId: null,
             defaultModelId: null,
-            homePath: '~/.tangyuan/agents/tangyuan',
+            homePath: '~/.yuanxiao/agents/yuanxiao',
             archivedAt: null,
           },
         ]),
@@ -171,7 +171,7 @@ describe('App', () => {
         deleteSession: vi.fn(),
         reconcileAgentDirectories: vi.fn(),
         claimAgentDirectory: vi.fn(),
-        rebuildTangyuanHome: vi.fn(),
+        rebuildYuanxiaoHome: vi.fn(),
         getSoul: vi.fn(),
         getUserProfile: vi.fn(),
         updateSoul: vi.fn(),
@@ -226,7 +226,7 @@ describe('App', () => {
           }),
         ]),
         getLastActiveSession: vi.fn().mockResolvedValue({
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'welcome',
           updatedAt: '2026-07-08T00:00:00.000Z',
         }),
@@ -234,7 +234,7 @@ describe('App', () => {
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: 'welcome',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           entries: [
             {
               kind: 'user-message',
@@ -265,12 +265,12 @@ describe('App', () => {
         resetConfiguration: vi.fn(),
         listAgents: vi.fn().mockResolvedValue([
           {
-            agentId: 'tangyuan',
-            displayName: '汤圆',
+            agentId: 'yuanxiao',
+            displayName: '元宵',
             status: 'active' as const,
             defaultProviderId: null,
             defaultModelId: null,
-            homePath: '~/.tangyuan/agents/tangyuan',
+            homePath: '~/.yuanxiao/agents/yuanxiao',
             archivedAt: null,
           },
         ]),
@@ -292,7 +292,7 @@ describe('App', () => {
         deleteSession: vi.fn(),
         reconcileAgentDirectories: vi.fn(),
         claimAgentDirectory: vi.fn(),
-        rebuildTangyuanHome: vi.fn(),
+        rebuildYuanxiaoHome: vi.fn(),
         getSoul: vi.fn(),
         getUserProfile: vi.fn(),
         updateSoul: vi.fn(),
@@ -344,7 +344,7 @@ describe('App', () => {
           }),
         ]),
         getLastActiveSession: vi.fn().mockResolvedValue({
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'welcome',
           updatedAt: '2026-07-08T00:00:00.000Z',
         }),
@@ -352,7 +352,7 @@ describe('App', () => {
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: 'welcome',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           entries: [
             {
               kind: 'agent-reply',
@@ -376,12 +376,12 @@ describe('App', () => {
         resetConfiguration: vi.fn(),
         listAgents: vi.fn().mockResolvedValue([
           {
-            agentId: 'tangyuan',
-            displayName: '汤圆',
+            agentId: 'yuanxiao',
+            displayName: '元宵',
             status: 'active' as const,
             defaultProviderId: null,
             defaultModelId: null,
-            homePath: '~/.tangyuan/agents/tangyuan',
+            homePath: '~/.yuanxiao/agents/yuanxiao',
             archivedAt: null,
           },
         ]),
@@ -403,7 +403,7 @@ describe('App', () => {
         deleteSession: vi.fn(),
         reconcileAgentDirectories: vi.fn(),
         claimAgentDirectory: vi.fn(),
-        rebuildTangyuanHome: vi.fn(),
+        rebuildYuanxiaoHome: vi.fn(),
         getSoul: vi.fn(),
         getUserProfile: vi.fn(),
         updateSoul: vi.fn(),
@@ -478,7 +478,7 @@ describe('App', () => {
           .mockResolvedValue(readyRuntime),
         listSessions: mockListSessions,
         getLastActiveSession: vi.fn().mockResolvedValue({
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'welcome',
           updatedAt: '2026-07-08T00:00:00.000Z',
         }),
@@ -486,7 +486,7 @@ describe('App', () => {
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: 'welcome',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           entries: [
             {
               kind: 'user-message',
@@ -518,14 +518,14 @@ describe('App', () => {
           for (const listener of listeners) {
             listener({
               type: 'run-state-changed',
-              agentId: 'tangyuan',
+              agentId: 'yuanxiao',
               sessionId: 'welcome',
               state: 'running',
               occurredAt: '2026-07-08T00:00:01.000Z',
             })
             listener({
               type: 'transcript-delta',
-              agentId: 'tangyuan',
+              agentId: 'yuanxiao',
               sessionId: 'welcome',
               delta: {
                 type: 'entry-appended',
@@ -553,7 +553,7 @@ describe('App', () => {
 
           return {
             sessionId: 'welcome',
-            agentId: 'tangyuan',
+            agentId: 'yuanxiao',
             entries: [
               {
                 kind: 'user-message',
@@ -589,14 +589,14 @@ describe('App', () => {
           for (const listener of listeners) {
             listener({
               type: 'turn-cancelled',
-              agentId: 'tangyuan',
+              agentId: 'yuanxiao',
               sessionId: 'welcome',
               runId: 'run-1',
               occurredAt: '2026-07-08T00:00:05.000Z',
             })
             listener({
               type: 'transcript-delta',
-              agentId: 'tangyuan',
+              agentId: 'yuanxiao',
               sessionId: 'welcome',
               delta: {
                 type: 'attempt-status-changed',
@@ -624,12 +624,12 @@ describe('App', () => {
         resetConfiguration: vi.fn(),
         listAgents: vi.fn().mockResolvedValue([
           {
-            agentId: 'tangyuan',
-            displayName: '汤圆',
+            agentId: 'yuanxiao',
+            displayName: '元宵',
             status: 'active' as const,
             defaultProviderId: null,
             defaultModelId: null,
-            homePath: '~/.tangyuan/agents/tangyuan',
+            homePath: '~/.yuanxiao/agents/yuanxiao',
             archivedAt: null,
           },
         ]),
@@ -651,7 +651,7 @@ describe('App', () => {
         deleteSession: vi.fn(),
         reconcileAgentDirectories: vi.fn(),
         claimAgentDirectory: vi.fn(),
-        rebuildTangyuanHome: vi.fn(),
+        rebuildYuanxiaoHome: vi.fn(),
         getSoul: vi.fn(),
         getUserProfile: vi.fn(),
         updateSoul: vi.fn(),
@@ -717,7 +717,7 @@ describe('App', () => {
           }),
         ]),
         getLastActiveSession: vi.fn().mockResolvedValue({
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'welcome',
           updatedAt: '2026-07-08T00:00:00.000Z',
         }),
@@ -725,7 +725,7 @@ describe('App', () => {
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: 'welcome',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           entries: [
             {
               kind: 'user-message',
@@ -747,12 +747,12 @@ describe('App', () => {
         resetConfiguration: vi.fn(),
         listAgents: vi.fn().mockResolvedValue([
           {
-            agentId: 'tangyuan',
-            displayName: '汤圆',
+            agentId: 'yuanxiao',
+            displayName: '元宵',
             status: 'active' as const,
             defaultProviderId: null,
             defaultModelId: null,
-            homePath: '~/.tangyuan/agents/tangyuan',
+            homePath: '~/.yuanxiao/agents/yuanxiao',
             archivedAt: null,
           },
         ]),
@@ -774,7 +774,7 @@ describe('App', () => {
         deleteSession: vi.fn(),
         reconcileAgentDirectories: vi.fn(),
         claimAgentDirectory: vi.fn(),
-        rebuildTangyuanHome: vi.fn(),
+        rebuildYuanxiaoHome: vi.fn(),
         getSoul: vi.fn(),
         getUserProfile: vi.fn(),
         updateSoul: vi.fn(),

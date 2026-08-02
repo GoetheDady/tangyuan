@@ -16,7 +16,7 @@ import {
   createMessagePreview,
 } from '../core'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   type AgentId,
   type AgentSessionSummary,
   type CancelConfigurationVerificationRequest,
@@ -31,7 +31,7 @@ import {
   type RuntimeSnapshot,
   type SendMessageRequest,
   type TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import type {
   AgentSessionDriver,
   InternalMessage,
@@ -303,7 +303,7 @@ export class PiSdkDriver
     const now = this.now()
     const sdkSessionFile = this.layout.sdkSessionFile(sessionId)
     const cwd =
-      request.agentId === TANGYUAN_DEFAULT_AGENT_ID
+      request.agentId === YUANXIAO_DEFAULT_AGENT_ID
         ? this.layout.agentHome()
         : this.layout.workspace(request.agentId)
     await mkdir(dirname(sdkSessionFile), { recursive: true })
@@ -325,7 +325,7 @@ export class PiSdkDriver
       ? { ...baseRequest, toolApprovalGateway: this.toolApprovalGateway }
       : baseRequest
 
-    if (request.agentId === TANGYUAN_DEFAULT_AGENT_ID) {
+    if (request.agentId === YUANXIAO_DEFAULT_AGENT_ID) {
       createSessionRequest.onCreateAgent = async (displayName: string) =>
         this.createAgent(displayName)
     }
@@ -576,7 +576,7 @@ export class PiSdkDriver
     if (!content) {
       throw new AgentRuntimeError({
         code: 'unknown',
-        message: '请输入要发送给汤圆的消息。',
+        message: '请输入要发送给元宵的消息。',
         recoverable: true,
       })
     }
@@ -678,7 +678,7 @@ export class PiSdkDriver
    * @throws 当配置缺失、会话不存在或 SDK 调用失败时，Promise 会 reject。
    */
   async retryMessage(
-    request: import('@tangyuan/contracts').RetryRunRequest,
+    request: import('@yuanxiao/contracts').RetryRunRequest,
   ): Promise<void> {
     await this.ensureSessionLoaded(request.sessionId)
     const session = this.assertKnownSession(request.sessionId, request.agentId)
@@ -1063,7 +1063,7 @@ export class PiSdkDriver
    * @throws 当 SDK 调用失败时，Promise 会 reject。
    */
   private async executeRetry(
-    request: import('@tangyuan/contracts').RetryRunRequest,
+    request: import('@yuanxiao/contracts').RetryRunRequest,
     content: string,
     session: AgentSessionSummary,
     handle: PiSdkSessionHandle | undefined,

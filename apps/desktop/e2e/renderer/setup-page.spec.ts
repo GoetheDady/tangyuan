@@ -34,7 +34,7 @@ test.describe('初始化配置页面', () => {
     await expect(page.getByText('首次配置')).toBeVisible()
     await expect(
       page.getByText(
-        '配置一个可用的模型服务，并将所选模型作为默认 Agent 汤圆的初始模型。',
+        '配置一个可用的模型服务，并将所选模型作为默认 Agent 元宵的初始模型。',
       ),
     ).toBeVisible()
   })
@@ -100,7 +100,7 @@ test.describe('初始化配置页面', () => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = [
       {
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         title: '已存在的会话',
         state: 'idle' as const,

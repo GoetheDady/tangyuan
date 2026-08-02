@@ -20,7 +20,7 @@ export const NATIVE_DANGEROUS_TOOL_NAMES = [
 ] as const
 
 /**
- * 汤圆受保护工具名，与被排除的原生工具一一对应。
+ * 元宵受保护工具名，与被排除的原生工具一一对应。
  */
 export const PROTECTED_TOOL_NAMES = {
   read: 'read_file',
@@ -37,13 +37,13 @@ interface ProtectedToolResult {
 }
 
 /**
- * 汤圆自定义工具定义。
+ * 元宵自定义工具定义。
  *
  * 参数用 JSON Schema 字面量描述、`execute` 采用简化签名，沿用
  * profile-tools 的既有约定。转成 Pi SDK `ToolDefinition` 的适配集中在
  * {@link toSdkCustomTools} 一处，避免类型断言散落在接线代码里。
  */
-export interface TangyuanToolDefinition extends Record<string, unknown> {
+export interface YuanxiaoToolDefinition extends Record<string, unknown> {
   name: string
   label: string
   description: string
@@ -104,7 +104,7 @@ function guardPath(
  */
 export function createRunCommandTool(
   context: ProtectedToolContext,
-): TangyuanToolDefinition {
+): YuanxiaoToolDefinition {
   return {
     name: PROTECTED_TOOL_NAMES.bash,
     label: '运行命令（需审批）',
@@ -126,7 +126,7 @@ export function createRunCommandTool(
     },
     async execute(_toolCallId: string, params: { command: string }) {
       const result = await context.gateway.requestBashApproval({
-        agentId: context.agentId || 'tangyuan',
+        agentId: context.agentId || 'yuanxiao',
         sessionId: context.sessionId,
         runId: '',
         command: params.command,
@@ -177,7 +177,7 @@ export function createRunCommandTool(
  */
 export function createWriteFileTool(
   context: ProtectedToolContext,
-): TangyuanToolDefinition {
+): YuanxiaoToolDefinition {
   return {
     name: PROTECTED_TOOL_NAMES.write,
     label: '写入文件',
@@ -227,7 +227,7 @@ export function createWriteFileTool(
  */
 export function createEditFileTool(
   context: ProtectedToolContext,
-): TangyuanToolDefinition {
+): YuanxiaoToolDefinition {
   return {
     name: PROTECTED_TOOL_NAMES.edit,
     label: '编辑文件',
@@ -358,18 +358,18 @@ export function createReadFileTool(
 }
 
 /**
- * 把汤圆自定义工具定义适配成 Pi SDK 的 `ToolDefinition`。
+ * 把元宵自定义工具定义适配成 Pi SDK 的 `ToolDefinition`。
  *
- * 这是整个接线中唯一的类型窄化边界：汤圆工具用 JSON Schema 字面量描述
+ * 这是整个接线中唯一的类型窄化边界：元宵工具用 JSON Schema 字面量描述
  * 参数、并采用简化的两参数 `execute`，与 SDK 要求的 TypeBox schema 和
  * 五参数签名在类型上不同构，但运行时兼容（SDK 不校验 parameters，多余的
  * 形参由 JS 调用约定忽略）。把断言收敛在这一处，接线代码本身保持类型安全，
  * 从而不会再掩盖 `excludeTools` 这类配置名写错的问题。
  *
- * @param tools - 汤圆自定义工具定义列表。
+ * @param tools - 元宵自定义工具定义列表。
  * @returns 可直接传给 `createAgentSession` 的 customTools。
  *
- * 接受 `unknown[]` 以同时处理 TangyuanToolDefinition、profile tools 和
+ * 接受 `unknown[]` 以同时处理 YuanxiaoToolDefinition、profile tools 和
  * 内联工具定义——它们运行时形状一致。
  */
 export function toSdkCustomTools(tools: unknown[]): ToolDefinition[] {

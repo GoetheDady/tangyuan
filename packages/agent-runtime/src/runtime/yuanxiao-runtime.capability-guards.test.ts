@@ -1,18 +1,18 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createTangyuanRuntimeForTesting } from './tangyuan-runtime'
+import { createYuanxiaoRuntimeForTesting } from './yuanxiao-runtime'
 import {
   createRuntimeDriver,
   createSessionDriver,
   createSnapshot,
-} from './tangyuan-runtime.test-helpers'
+} from './yuanxiao-runtime.test-helpers'
 
-describe('TangyuanRuntime capability guards', () => {
+describe('YuanxiaoRuntime capability guards', () => {
   it('rejects getSoul when the session driver does not support it', async () => {
     const snapshot = createSnapshot()
     const runtimeDriver = createRuntimeDriver(snapshot)
     const sessionDriver = createSessionDriver([])
     // 不设置 getSoul
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -26,7 +26,7 @@ describe('TangyuanRuntime capability guards', () => {
     const runtimeDriver = createRuntimeDriver(snapshot)
     const sessionDriver = createSessionDriver([])
     // 不设置 updateSoul
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -48,7 +48,7 @@ describe('TangyuanRuntime capability guards', () => {
         hasScripts: false,
       },
     ])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -77,7 +77,7 @@ describe('TangyuanRuntime capability guards', () => {
         hasScripts: false,
       },
     ])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -98,7 +98,7 @@ describe('TangyuanRuntime capability guards', () => {
     const runtimeDriver = createRuntimeDriver(snapshot)
     const sessionDriver = createSessionDriver([])
     // 不设置 listAgentSkills
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -112,7 +112,7 @@ describe('TangyuanRuntime capability guards', () => {
     const runtimeDriver = createRuntimeDriver(snapshot)
     const sessionDriver = createSessionDriver([])
     // 不设置 listSharedSkills
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -126,7 +126,7 @@ describe('TangyuanRuntime capability guards', () => {
     const runtimeDriver = createRuntimeDriver(snapshot)
     const sessionDriver = createSessionDriver([])
     sessionDriver.reloadAgentSessions = vi.fn().mockResolvedValue(undefined)
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -141,7 +141,7 @@ describe('TangyuanRuntime capability guards', () => {
     const runtimeDriver = createRuntimeDriver(snapshot)
     const sessionDriver = createSessionDriver([])
     sessionDriver.reloadAllSessions = vi.fn().mockResolvedValue(undefined)
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -153,7 +153,7 @@ describe('TangyuanRuntime capability guards', () => {
     const snapshot = createSnapshot()
     const runtimeDriver = createRuntimeDriver(snapshot)
     const sessionDriver = createSessionDriver([])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })

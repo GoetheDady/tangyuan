@@ -30,7 +30,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import type { AgentSummary, UnclaimedDirectory } from '@tangyuan/contracts'
+import type { AgentSummary, UnclaimedDirectory } from '@yuanxiao/contracts'
 
 /**
  * Agent 控制台页面：展示所有 Agent 列表、状态和归档管理。
@@ -184,7 +184,7 @@ export function ConsoleAgentListPage(): React.JSX.Element {
             </div>
             <h2 className="text-section-heading font-medium">暂无 Agent</h2>
             <p className="text-body text-muted-foreground mx-auto mt-2 max-w-md">
-              请先在控制台中配置模型服务，然后在汤圆对话中创建新的 Agent。
+              请先在控制台中配置模型服务，然后在元宵对话中创建新的 Agent。
             </p>
             <div className="mt-6">
               <Link to="/settings/providers">
@@ -233,7 +233,7 @@ export function ConsoleAgentListPage(): React.JSX.Element {
                       <h3 className="text-body truncate font-semibold">
                         {agent.displayName}
                       </h3>
-                      {agent.agentId === 'tangyuan' ? (
+                      {agent.agentId === 'yuanxiao' ? (
                         <Badge variant="secondary">默认</Badge>
                       ) : null}
                       <Badge
@@ -279,7 +279,7 @@ export function ConsoleAgentListPage(): React.JSX.Element {
                       </Link>
                     ) : null}
                     {agent.status === 'active' &&
-                    agent.agentId !== 'tangyuan' ? (
+                    agent.agentId !== 'yuanxiao' ? (
                       <Button
                         variant="ghost"
                         size="sm"

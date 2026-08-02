@@ -138,7 +138,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
             </Badge>
             <h1 className={styles.heading}>基础组件验收夹具</h1>
             <p className={styles.introduction}>
-              以稳定分区展示黑芝麻汤圆主题下的 variant、size、状态与 Portal
+              以稳定分区展示黑芝麻元宵主题下的 variant、size、状态与 Portal
               场景。
             </p>
           </header>
@@ -459,7 +459,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                     显示名称
                   </Label>
                 </div>
-                <Input id="fixture-name" defaultValue="汤圆" />
+                <Input id="fixture-name" defaultValue="元宵" />
               </div>
               <div className={styles.field}>
                 <Label
@@ -815,7 +815,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                 >
                   <InputGroupTextarea
                     aria-label="发送消息"
-                    placeholder="给汤圆发送消息"
+                    placeholder="给元宵发送消息"
                     rows={3}
                   />
                   <InputGroupAddon
@@ -1236,7 +1236,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                     </div>
                     <div className={styles.cardDetailRow}>
                       <dt>工作空间</dt>
-                      <dd>~/gdsw/tangyuan</dd>
+                      <dd>~/gdsw/yuanxiao</dd>
                     </div>
                   </dl>
                 </CardContent>

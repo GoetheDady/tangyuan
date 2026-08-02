@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentSessionSummary } from '@tangyuan/contracts'
+import type { AgentEvent, AgentSessionSummary } from '@yuanxiao/contracts'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -7,7 +7,7 @@ import {
 } from './agent-event-session-state'
 
 const FIRST_SESSION: AgentSessionSummary = {
-  agentId: 'tangyuan',
+  agentId: 'yuanxiao',
   sessionId: 'session-1',
   title: '第一会话',
   state: 'idle',

@@ -1,6 +1,6 @@
 /**
  * 生产接线回归测试：验证 Pi SDK 原生危险工具被显式排除，
- * 且只有汤圆受保护版本生效。不 mock SDK，不依赖工具的注册顺序。
+ * 且只有元宵受保护版本生效。不 mock SDK，不依赖工具的注册顺序。
  */
 import { describe, expect, it } from 'vitest'
 import {
@@ -45,7 +45,7 @@ describe('生产接线级回归 — 原生危险工具被显式排除', () => {
       customTools: createProtectedTools(
         {
           gateway: createMockGateway(),
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'test-session',
           cwd: '/tmp',
         },

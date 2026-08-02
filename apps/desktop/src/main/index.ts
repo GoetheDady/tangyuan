@@ -10,9 +10,9 @@ import { mkdir, writeFile } from 'fs/promises'
 import { homedir } from 'os'
 import { dirname, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { createTangyuanRuntime } from '@tangyuan/agent-runtime'
-import type { ConfigEncryptionAdapter } from '@tangyuan/agent-runtime'
-import { DESKTOP_AGENT_EVENT_CHANNEL } from '@tangyuan/contracts'
+import { createYuanxiaoRuntime } from '@yuanxiao/agent-runtime'
+import type { ConfigEncryptionAdapter } from '@yuanxiao/agent-runtime'
+import { DESKTOP_AGENT_EVENT_CHANNEL } from '@yuanxiao/contracts'
 import icon from '../../resources/icon.png?asset'
 import { buildContentSecurityPolicy } from './content-security-policy'
 import { registerDesktopAppIpc } from './ipc'
@@ -36,7 +36,7 @@ const safeStorageAdapter: ConfigEncryptionAdapter = {
 /**
  * 自动化 QA 模式：明文加密适配器（encrypt/decrypt 恒等，不触碰 safeStorage）。
  *
- * 仅在设置 TANGYUAN_QA_API_KEY 时启用。Playwright electron.launch() 启动的进程
+ * 仅在设置 YUANXIAO_QA_API_KEY 时启用。Playwright electron.launch() 启动的进程
  * 无法解密日常 app 用 macOS 钥匙串加密的配置，故 QA 用独立数据目录 + 明文适配器 +
  * 环境变量注入的测试 key，与用户日常配置完全隔离。绝不用于生产。
  */
@@ -46,22 +46,22 @@ const plaintextAdapter: ConfigEncryptionAdapter = {
   isAvailable: (): boolean => true,
 }
 
-const qaApiKey = process.env['TANGYUAN_QA_API_KEY']
+const qaApiKey = process.env['YUANXIAO_QA_API_KEY']
 const isQaMode = Boolean(qaApiKey)
 
 const encryptionAdapter = isQaMode ? plaintextAdapter : safeStorageAdapter
 
-// QA 模式用独立数据目录，避免污染用户 ~/.tangyuan。
-const tangyuanRuntime = isQaMode
-  ? createTangyuanRuntime({
+// QA 模式用独立数据目录，避免污染用户 ~/.yuanxiao。
+const yuanxiaoRuntime = isQaMode
+  ? createYuanxiaoRuntime({
       encryptionAdapter,
-      fsRoot: join(homedir(), '.tangyuan-qa-root'),
-      userDataPath: join(homedir(), '.tangyuan-qa-root', '.tangyuan'),
-      agentHomePath: '~/.tangyuan-qa-root/.tangyuan/agents/tangyuan',
+      fsRoot: join(homedir(), '.yuanxiao-qa-root'),
+      userDataPath: join(homedir(), '.yuanxiao-qa-root', '.yuanxiao'),
+      agentHomePath: '~/.yuanxiao-qa-root/.yuanxiao/agents/yuanxiao',
     })
-  : createTangyuanRuntime({ encryptionAdapter })
+  : createYuanxiaoRuntime({ encryptionAdapter })
 const smokeTestResultPath =
-  process.env['TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH']
+  process.env['YUANXIAO_DESKTOP_SMOKE_TEST_RESULT_PATH']
 let isQuittingAfterCancellingRuns = false
 
 /**
@@ -174,7 +174,7 @@ async function runPackagedSmokeTest(mainWindow: BrowserWindow): Promise<void> {
       phase: 'electron-ready',
       checkedAt: new Date().toISOString(),
     })
-    const runtimeSnapshot = await tangyuanRuntime.getRuntimeSnapshot()
+    const runtimeSnapshot = await yuanxiaoRuntime.getRuntimeSnapshot()
     await writeSmokeTestResult({
       ok: false,
       phase: 'runtime-snapshot-loaded',
@@ -352,7 +352,7 @@ app.whenReady().then(() => {
 
   registerDesktopAppIpc(
     ipcMain,
-    tangyuanRuntime,
+    yuanxiaoRuntime,
     (event) => {
       for (const window of BrowserWindow.getAllWindows()) {
         window.webContents.send(DESKTOP_AGENT_EVENT_CHANNEL, event)
@@ -393,7 +393,7 @@ app.on('before-quit', (event) => {
 
   event.preventDefault()
   isQuittingAfterCancellingRuns = true
-  void tangyuanRuntime.cancelAllActiveRuns().finally(() => {
+  void yuanxiaoRuntime.cancelAllActiveRuns().finally(() => {
     app.quit()
   })
 })

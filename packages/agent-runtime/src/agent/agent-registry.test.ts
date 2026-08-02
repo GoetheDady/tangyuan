@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { AgentEvent, ConfigEncryptionAdapter } from '@tangyuan/contracts'
+import type { AgentEvent, ConfigEncryptionAdapter } from '@yuanxiao/contracts'
 import { ConfigStore, DirectoryLayout } from '../core'
 import { AgentRegistry } from './agent-registry'
 import { AgentRuntimeError } from '../core'
@@ -22,7 +22,7 @@ let events: AgentEvent[]
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'agent-registry-'))
-  const agentHomePath = join(dir, 'agents', 'tangyuan')
+  const agentHomePath = join(dir, 'agents', 'yuanxiao')
   layout = new DirectoryLayout({
     agentHomePath,
     fsRoot: dir,
@@ -95,8 +95,8 @@ describe('AgentRegistry.archive/recover', () => {
     )
   })
 
-  it('默认汤圆不可归档', async () => {
-    await expect(registry.archiveAgent('tangyuan')).rejects.toThrow(
+  it('默认元宵不可归档', async () => {
+    await expect(registry.archiveAgent('yuanxiao')).rejects.toThrow(
       AgentRuntimeError,
     )
   })
@@ -127,10 +127,10 @@ describe('AgentRegistry.reconcile/claim', () => {
   })
 })
 
-describe('AgentRegistry.rebuildTangyuanHome', () => {
-  it('重建默认汤圆目录结构', async () => {
-    const summary = await registry.rebuildTangyuanHome()
-    expect(summary.agentId).toBe('tangyuan')
+describe('AgentRegistry.rebuildYuanxiaoHome', () => {
+  it('重建默认元宵目录结构', async () => {
+    const summary = await registry.rebuildYuanxiaoHome()
+    expect(summary.agentId).toBe('yuanxiao')
     expect(summary.directoryStatus).toBe('healthy')
   })
 })

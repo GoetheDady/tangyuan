@@ -1,5 +1,5 @@
 import { dirname, join } from 'node:path'
-import { TANGYUAN_DEFAULT_AGENT_ID, type AgentId } from '@tangyuan/contracts'
+import { YUANXIAO_DEFAULT_AGENT_ID, type AgentId } from '@yuanxiao/contracts'
 
 /**
  * DirectoryLayout 的根路径依赖。
@@ -9,7 +9,7 @@ export interface DirectoryLayoutRoots {
   agentHomePath: string
   /** 文件系统根，用于展开 `~` 前缀。 */
   fsRoot: string
-  /** 汤圆用户数据目录（config、sessions 等所在）。 */
+  /** 元宵用户数据目录（config、sessions 等所在）。 */
   userDataPath: string
 }
 
@@ -31,15 +31,15 @@ export class DirectoryLayout {
   /**
    * 解析指定 Agent 的 home 绝对路径。
    *
-   * @param agentId - Agent 标识，缺省为默认汤圆。
+   * @param agentId - Agent 标识，缺省为默认元宵。
    * @returns Agent Home 目录的绝对路径。
    */
-  agentHome(agentId: string = TANGYUAN_DEFAULT_AGENT_ID): string {
+  agentHome(agentId: string = YUANXIAO_DEFAULT_AGENT_ID): string {
     const resolvedDefault = this.agentHomePath.startsWith('~')
       ? join(this.fsRoot, this.agentHomePath.slice(2))
       : this.agentHomePath
 
-    if (agentId === TANGYUAN_DEFAULT_AGENT_ID) {
+    if (agentId === YUANXIAO_DEFAULT_AGENT_ID) {
       return resolvedDefault
     }
 
@@ -59,20 +59,20 @@ export class DirectoryLayout {
   /**
    * 解析共享 Skills 目录的绝对路径。
    *
-   * @returns ~/.tangyuan/skills/ 绝对路径。
+   * @returns ~/.yuanxiao/skills/ 绝对路径。
    */
   sharedSkills(): string {
-    // 共享 skills: ~/.tangyuan/skills/
-    // agentHomePath: ~/.tangyuan/agents/tangyuan
-    const tangyuanDir = dirname(this.agentHome()) // ~/.tangyuan/agents
-    return join(dirname(tangyuanDir), 'skills') // ~/.tangyuan/skills
+    // 共享 skills: ~/.yuanxiao/skills/
+    // agentHomePath: ~/.yuanxiao/agents/yuanxiao
+    const yuanxiaoDir = dirname(this.agentHome()) // ~/.yuanxiao/agents
+    return join(dirname(yuanxiaoDir), 'skills') // ~/.yuanxiao/skills
   }
 
   /**
    * 解析指定 Agent 专属 Skills 目录的绝对路径。
    *
    * @param agentId - Agent 标识。
-   * @returns ~/.tangyuan/agents/<agentId>/skills/ 绝对路径。
+   * @returns ~/.yuanxiao/agents/<agentId>/skills/ 绝对路径。
    */
   agentSkills(agentId: string): string {
     return join(this.agentHome(agentId), 'skills')
@@ -81,19 +81,19 @@ export class DirectoryLayout {
   /**
    * 解析共享 profile 目录的绝对路径。
    *
-   * @returns ~/.tangyuan/profile/ 绝对路径。
+   * @returns ~/.yuanxiao/profile/ 绝对路径。
    */
   sharedProfile(): string {
-    // 共享 profile: ~/.tangyuan/profile/
-    // agentHomePath: ~/.tangyuan/agents/tangyuan
-    const tangyuanDir = dirname(this.agentHome()) // ~/.tangyuan/agents
-    return join(dirname(tangyuanDir), 'profile') // ~/.tangyuan/profile
+    // 共享 profile: ~/.yuanxiao/profile/
+    // agentHomePath: ~/.yuanxiao/agents/yuanxiao
+    const yuanxiaoDir = dirname(this.agentHome()) // ~/.yuanxiao/agents
+    return join(dirname(yuanxiaoDir), 'profile') // ~/.yuanxiao/profile
   }
 
   /**
    * 解析共享 user profile 文件的绝对路径。
    *
-   * @returns ~/.tangyuan/profile/user.md 绝对路径。
+   * @returns ~/.yuanxiao/profile/user.md 绝对路径。
    */
   userProfile(): string {
     return join(this.sharedProfile(), 'user.md')
@@ -102,7 +102,7 @@ export class DirectoryLayout {
   /**
    * 解析共享 user profile 历史目录的绝对路径。
    *
-   * @returns ~/.tangyuan/profile/user.history/ 绝对路径。
+   * @returns ~/.yuanxiao/profile/user.history/ 绝对路径。
    */
   userHistory(): string {
     return join(this.sharedProfile(), 'user.history')
@@ -193,13 +193,13 @@ export class DirectoryLayout {
    */
   installRecords(source: 'shared' | 'agent', agentId?: string): string {
     if (source === 'shared') {
-      return join(this.sharedSkills(), '.tangyuan-records.json')
+      return join(this.sharedSkills(), '.yuanxiao-records.json')
     }
 
     if (!agentId) {
       throw new Error('Agent 专属 Skill 记录需要提供 agentId。')
     }
 
-    return join(this.agentSkills(agentId), '.tangyuan-records.json')
+    return join(this.agentSkills(agentId), '.yuanxiao-records.json')
   }
 }

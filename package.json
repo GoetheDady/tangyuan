@@ -1,5 +1,5 @@
 {
-  "name": "tangyuan",
+  "name": "yuanxiao",
   "version": "0.1.0",
   "private": true,
   "packageManager": "bun@1.3.10",
@@ -8,14 +8,14 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "bun run --filter apps-desktop dev",
-    "build": "bun run --filter apps-desktop build",
+    "dev": "bun run --filter @yuanxiao/desktop dev",
+    "build": "bun run --filter @yuanxiao/desktop build",
     "lint": "bun run --workspaces --if-present lint",
     "typecheck": "bun run --workspaces --if-present typecheck",
     "test": "bun run --workspaces --if-present test",
     "verify:local": "bun run lint && bun run typecheck && bun run test",
-    "package:mac": "bun run --filter apps-desktop package:mac",
-    "smoke:packaged:mac": "bun run --filter apps-desktop smoke:packaged:mac",
+    "package:mac": "bun run --filter @yuanxiao/desktop package:mac",
+    "smoke:packaged:mac": "bun run --filter @yuanxiao/desktop smoke:packaged:mac",
     "format": "bun run --workspaces --if-present format"
   },
   "overrides": {

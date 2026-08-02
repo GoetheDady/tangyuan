@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { ConfigEncryptionAdapter } from '@tangyuan/contracts'
+import type { ConfigEncryptionAdapter } from '@yuanxiao/contracts'
 import { ConfigStore, DirectoryLayout } from '../core'
 import { RealPiSdkGateway } from '../runtime/gateway'
 import { SessionIndexStore } from './session-index-store'
@@ -21,9 +21,9 @@ let layout: DirectoryLayout
 let configStore: ConfigStore
 
 beforeEach(async () => {
-  rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-fork-rebuild-'))
+  rootPath = await mkdtemp(join(tmpdir(), 'yuanxiao-fork-rebuild-'))
   layout = new DirectoryLayout({
-    agentHomePath: join(rootPath, 'agents', 'tangyuan'),
+    agentHomePath: join(rootPath, 'agents', 'yuanxiao'),
     fsRoot: rootPath,
     userDataPath: rootPath,
   })
@@ -36,8 +36,8 @@ beforeEach(async () => {
     schemaVersion: 2,
     providers: { anthropic: { apiKey: 'sk-test', updatedAt: 'now' } },
     agents: {
-      tangyuan: {
-        displayName: '汤圆',
+      yuanxiao: {
+        displayName: '元宵',
         defaultProviderId: 'anthropic',
         defaultModelId: 'claude-sonnet-4-5',
         status: 'active',
@@ -162,7 +162,7 @@ describe('SessionIndexStore 从真实 Pi session 重建会话谱系', () => {
     })
     expect(
       rebuiltStore
-        .listSummaries('tangyuan')
+        .listSummaries('yuanxiao')
         .map((summary) => summary.sessionId)
         .sort(),
     ).toEqual(

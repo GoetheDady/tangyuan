@@ -20,14 +20,14 @@ test.describe('聊天页', () => {
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan/session-1')
+    await page.goto('/#/chat/yuanxiao/session-1')
     // 等待 React 渲染完成
     await page.waitForSelector('#composer')
   })
 
   test('显示品牌标题和布局', async ({ page }) => {
     // 左侧 sidebar 品牌区域
-    await expect(page.getByRole('heading', { name: '汤圆' })).toBeAttached()
+    await expect(page.getByRole('heading', { name: '元宵' })).toBeAttached()
     await expect(page.getByText('大语言模型对话')).toBeAttached()
   })
 
@@ -91,7 +91,7 @@ test.describe('聊天页', () => {
     await expect(messageArea).toBeVisible()
 
     // 用户消息和 Agent 回复都应渲染
-    await expect(page.getByText('你好汤圆，请帮我写一段代码。')).toBeVisible()
+    await expect(page.getByText('你好元宵，请帮我写一段代码。')).toBeVisible()
     await expect(
       page.getByText(
         '你好！我很乐意帮你写代码。请告诉我你需要什么功能，我会为你生成相应的代码。',
@@ -154,7 +154,7 @@ test.describe('聊天主界面 Toast 回归', () => {
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan/session-1')
+    await page.goto('/#/chat/yuanxiao/session-1')
     await page.getByRole('button', { name: '停止' }).click()
 
     const item = page.locator('[data-sonner-toast][data-type="success"]')

@@ -1,7 +1,7 @@
 import type {
   AgentRuntimeErrorCode,
   AgentRuntimeErrorPayload,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
 /**
  * 创建 AgentRuntimeError 所需的输入，允许携带非序列化的原始 cause。

@@ -2,7 +2,7 @@ import type {
   AgentSessionSummary,
   SessionLineageActivity,
   SessionLineageActivityKind,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { Archive, ArchiveRestore, Trash2 } from 'lucide-react'
 import { useMemo } from 'react'
 

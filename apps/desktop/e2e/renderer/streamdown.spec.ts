@@ -20,7 +20,7 @@ test.describe('Streamdown Markdown 渲染', () => {
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan/session-1')
+    await page.goto('/#/chat/yuanxiao/session-1')
     await page.waitForSelector('#composer')
   })
 
@@ -92,7 +92,7 @@ test.describe('Streamdown Markdown 渲染', () => {
     const xssMessages = [
       {
         messageId: 'msg-xss-1',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         role: 'agent' as const,
         content: '<script>window.__xssExecuted__ = true</script>',
@@ -107,7 +107,7 @@ test.describe('Streamdown Markdown 渲染', () => {
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan/session-1')
+    await page.goto('/#/chat/yuanxiao/session-1')
     await page.waitForSelector('#composer')
 
     // <script> 标签不应被执行

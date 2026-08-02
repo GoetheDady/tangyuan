@@ -1,5 +1,5 @@
 {
-  "name": "@tangyuan/contracts",
+  "name": "@yuanxiao/contracts",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -19,8 +19,8 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
-    "@tangyuan/tsconfig": "workspace:*",
-    "@tangyuan/eslint-config": "workspace:*",
+    "@yuanxiao/tsconfig": "workspace:*",
+    "@yuanxiao/eslint-config": "workspace:*",
     "eslint": "^9.39.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16"

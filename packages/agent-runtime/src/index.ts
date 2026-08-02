@@ -1,8 +1,8 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import {
-  createTangyuanRuntimeForTesting,
-  type TangyuanRuntime,
+  createYuanxiaoRuntimeForTesting,
+  type YuanxiaoRuntime,
 } from './runtime'
 import { DirectoryLayout } from './core'
 import { LastActiveSessionStore } from './session'
@@ -10,7 +10,7 @@ import { PiSdkDriver } from './driver'
 import type { PiSdkDriverOptions, ToolApprovalGateway } from './driver'
 
 export {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   applyTranscriptDelta,
   createAgentProfileStatus,
   type AgentEvent,
@@ -42,20 +42,20 @@ export {
   type TranscriptSnapshot,
   type UserMessageEntry,
   type AgentReplyEntry,
-} from '@tangyuan/contracts'
-export { createTangyuanRuntimeForTesting } from './runtime'
-export type { TangyuanRuntime } from './runtime'
+} from '@yuanxiao/contracts'
+export { createYuanxiaoRuntimeForTesting } from './runtime'
+export type { YuanxiaoRuntime } from './runtime'
 export { PiSdkDriver } from './driver'
 
 /**
- * 创建 Electron Main 使用的默认 TangyuanRuntime。
+ * 创建 Electron Main 使用的默认 YuanxiaoRuntime。
  *
  * @returns 内部使用同一个 Pi SDK Driver 管理资源与会话的运行时实例。
  * @throws 此方法不会主动抛出错误；具体初始化错误会由运行时异步方法返回。
  */
-export function createTangyuanRuntime(
+export function createYuanxiaoRuntime(
   options?: PiSdkDriverOptions,
-): TangyuanRuntime {
+): YuanxiaoRuntime {
   // eslint-disable-next-line prefer-const -- assigned after driver/runtime creation
   let gatewayInstance: ToolApprovalGateway | undefined
 
@@ -85,13 +85,13 @@ export function createTangyuanRuntime(
   const fsRoot = options?.fsRoot ?? homedir()
   const now = options?.now ?? (() => new Date().toISOString())
   const layout = new DirectoryLayout({
-    agentHomePath: options?.agentHomePath ?? '~/.tangyuan/agents/tangyuan',
+    agentHomePath: options?.agentHomePath ?? '~/.yuanxiao/agents/yuanxiao',
     fsRoot,
-    userDataPath: options?.userDataPath ?? join(fsRoot, '.tangyuan'),
+    userDataPath: options?.userDataPath ?? join(fsRoot, '.yuanxiao'),
   })
   const lastActiveSessionStore = new LastActiveSessionStore({ layout, now })
 
-  const runtime = createTangyuanRuntimeForTesting({
+  const runtime = createYuanxiaoRuntimeForTesting({
     runtimeDriver: driver,
     sessionDriver: driver,
     lastActiveSessionStore,

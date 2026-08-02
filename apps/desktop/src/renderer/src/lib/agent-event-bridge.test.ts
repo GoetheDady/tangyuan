@@ -5,8 +5,8 @@ import type {
   BashApprovalRequest,
   QuestionClarificationRequest,
   RuntimeSnapshot,
-} from '@tangyuan/contracts'
-import { createRuntimeSnapshot } from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
+import { createRuntimeSnapshot } from '@yuanxiao/contracts'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createWorkbenchStore } from '@/stores/workbench-store'
@@ -15,30 +15,30 @@ import { createAgentEventBridge } from './agent-event-bridge'
 
 const NOW = '2026-07-31T08:00:00.000Z'
 
-const TANGYUAN: AgentSummary = {
-  agentId: 'tangyuan',
-  displayName: '汤圆',
+const YUANXIAO: AgentSummary = {
+  agentId: 'yuanxiao',
+  displayName: '元宵',
   status: 'active',
   defaultProviderId: 'openai',
   defaultModelId: 'gpt-5',
-  homePath: '~/.tangyuan/agents/tangyuan',
+  homePath: '~/.yuanxiao/agents/yuanxiao',
   archivedAt: null,
   directoryStatus: 'healthy',
 }
 
 const RESEARCHER: AgentSummary = {
-  ...TANGYUAN,
+  ...YUANXIAO,
   agentId: 'researcher',
   displayName: '研究助手',
-  homePath: '~/.tangyuan/agents/researcher',
+  homePath: '~/.yuanxiao/agents/researcher',
 }
 
-function createRuntime(agents = [TANGYUAN]): RuntimeSnapshot {
+function createRuntime(agents = [YUANXIAO]): RuntimeSnapshot {
   return createRuntimeSnapshot({
     activeAgent: {
-      agentId: TANGYUAN.agentId,
-      displayName: TANGYUAN.displayName,
-      homePath: TANGYUAN.homePath,
+      agentId: YUANXIAO.agentId,
+      displayName: YUANXIAO.displayName,
+      homePath: YUANXIAO.homePath,
       profile: {
         initialized: true,
         bootstrapRequired: false,
@@ -63,7 +63,7 @@ function createApproval(
 ): BashApprovalRequest {
   return {
     approvalId: `approval-${sessionId}`,
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId,
     runId: `run-${sessionId}`,
     command,
@@ -79,7 +79,7 @@ function createClarification(
 ): QuestionClarificationRequest {
   return {
     clarificationId: `clarification-${sessionId}`,
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId,
     runId: `run-${sessionId}`,
     question: '是否继续？',
@@ -167,9 +167,9 @@ describe('createAgentEventBridge', () => {
     })
     harness.dispatch({
       type: 'session-created',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       session: {
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         title: '新会话',
         state: 'idle',
@@ -179,21 +179,21 @@ describe('createAgentEventBridge', () => {
     })
     harness.dispatch({
       type: 'approval-required',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       approval,
       occurredAt: NOW,
     })
     harness.dispatch({
       type: 'clarification-required',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       clarification,
       occurredAt: NOW,
     })
 
     expect(harness.store.getState().agents).toEqual([RESEARCHER])
-    expect(harness.store.getState().sessionsByAgentId.tangyuan).toHaveLength(1)
+    expect(harness.store.getState().sessionsByAgentId.yuanxiao).toHaveLength(1)
     expect(
       harness.store.getState().pendingApprovalsBySessionId['session-1'],
     ).toEqual([approval])
@@ -208,12 +208,12 @@ describe('createAgentEventBridge', () => {
 
   it('Profile 更新后刷新 Runtime，并按现有规则报告刷新失败', async () => {
     const success = createHarness()
-    const nextRuntime = createRuntime([TANGYUAN, RESEARCHER])
+    const nextRuntime = createRuntime([YUANXIAO, RESEARCHER])
     success.api.refreshRuntime.mockResolvedValue(nextRuntime)
 
     success.dispatch({
       type: 'profile-updated',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       target: 'soul',
       updatedAt: NOW,
       occurredAt: NOW,
@@ -227,7 +227,7 @@ describe('createAgentEventBridge', () => {
     failure.api.refreshRuntime.mockRejectedValue(new Error('刷新失败'))
     failure.dispatch({
       type: 'profile-updated',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       target: 'user',
       updatedAt: NOW,
       occurredAt: NOW,
@@ -272,7 +272,7 @@ describe('createAgentEventBridge', () => {
 
     harness.dispatch({
       type: 'transcript-delta',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       delta: {
         type: 'entry-appended',
@@ -290,7 +290,7 @@ describe('createAgentEventBridge', () => {
     })
     harness.dispatch({
       type: 'transcript-delta',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       delta: { type: 'delta-appended', index: 0, delta: '好' },
       occurredAt: NOW,
@@ -311,7 +311,7 @@ describe('createAgentEventBridge', () => {
     const harness = createHarness()
 
     for (const [agentId, sessionId, content] of [
-      ['tangyuan', 'session-1', '汤圆回复'],
+      ['yuanxiao', 'session-1', '元宵回复'],
       ['researcher', 'session-2', '研究回复'],
     ] as const) {
       harness.dispatch({
@@ -337,7 +337,7 @@ describe('createAgentEventBridge', () => {
     harness.flushFrame()
 
     expect(harness.store.getState().transcriptsBySessionId).toMatchObject({
-      'session-1': { agentId: 'tangyuan', entries: [{ content: '汤圆回复' }] },
+      'session-1': { agentId: 'yuanxiao', entries: [{ content: '元宵回复' }] },
       'session-2': {
         agentId: 'researcher',
         entries: [{ content: '研究回复' }],
@@ -349,7 +349,7 @@ describe('createAgentEventBridge', () => {
     const harness = createHarness()
     harness.dispatch({
       type: 'transcript-delta',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       delta: {
         type: 'entry-appended',
@@ -390,7 +390,7 @@ describe('createAgentEventBridge', () => {
     harness.store.getState().beginSending('session-2')
 
     harness.dispatch({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-2',
       occurredAt: NOW,
       ...eventFragment,

@@ -1,4 +1,4 @@
-import type { QuestionClarificationRequest } from '@tangyuan/contracts'
+import type { QuestionClarificationRequest } from '@yuanxiao/contracts'
 import { Check, HelpCircle, LoaderCircle, MessageSquare, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 

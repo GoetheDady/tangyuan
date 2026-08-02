@@ -10,7 +10,7 @@ describe('renderer process boundary', () => {
     const bannedImports = [
       'electron',
       'node:',
-      '@tangyuan/agent-runtime',
+      '@yuanxiao/agent-runtime',
       '@earendil-works/pi-coding-agent',
       '@pi/agent-sdk',
       'pi-agent-sdk',

@@ -1,4 +1,4 @@
-import type { AgentEvent, BashApprovalRequest } from '@tangyuan/contracts'
+import type { AgentEvent, BashApprovalRequest } from '@yuanxiao/contracts'
 
 /**
  * 创建 BashApprovalRegistry 所需的依赖。

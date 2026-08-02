@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentEvent, SkillOperationParams } from '@tangyuan/contracts'
+import type { AgentEvent, SkillOperationParams } from '@yuanxiao/contracts'
 import type { AgentSessionDriver } from '../index'
 import { SkillService } from './skill-service'
 
-const DEFAULT_AGENT = 'tangyuan'
+const DEFAULT_AGENT = 'yuanxiao'
 
 function createService(driver: Partial<AgentSessionDriver>) {
   const events: AgentEvent[] = []
@@ -78,7 +78,7 @@ describe('SkillService', () => {
     ).rejects.toThrow('无权管理')
   })
 
-  it('install 共享 Skill 非汤圆发起时拒绝', async () => {
+  it('install 共享 Skill 非元宵发起时拒绝', async () => {
     const { service } = createService({ installSkill: vi.fn() })
     await expect(
       service.install(sharedInstall({ agentId: 'other' })),

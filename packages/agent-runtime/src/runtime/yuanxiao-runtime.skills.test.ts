@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { createTangyuanRuntimeForTesting } from './tangyuan-runtime'
+import { createYuanxiaoRuntimeForTesting } from './yuanxiao-runtime'
 import {
   createRuntimeDriver,
   createSessionDriver,
   createSnapshot,
-} from './tangyuan-runtime.test-helpers'
+} from './yuanxiao-runtime.test-helpers'
 
-describe('TangyuanRuntime', () => {
+describe('YuanxiaoRuntime', () => {
   describe('skill management', () => {
-    it('rejects shared skill install by non-tangyuan agent', async () => {
+    it('rejects shared skill install by non-yuanxiao agent', async () => {
       const runtimeDriver = createRuntimeDriver(createSnapshot())
       const sessionDriver = createSessionDriver([])
-      const runtime = createTangyuanRuntimeForTesting({
+      const runtime = createYuanxiaoRuntimeForTesting({
         runtimeDriver,
         sessionDriver,
       })
@@ -23,13 +23,13 @@ describe('TangyuanRuntime', () => {
           agentId: 'agent-1',
           skillName: 'test-skill',
         }),
-      ).rejects.toThrow('只有默认 Agent「汤圆」可以管理共享 Skill')
+      ).rejects.toThrow('只有默认 Agent「元宵」可以管理共享 Skill')
     })
 
-    it('rejects shared skill delete by non-tangyuan agent', async () => {
+    it('rejects shared skill delete by non-yuanxiao agent', async () => {
       const runtimeDriver = createRuntimeDriver(createSnapshot())
       const sessionDriver = createSessionDriver([])
-      const runtime = createTangyuanRuntimeForTesting({
+      const runtime = createYuanxiaoRuntimeForTesting({
         runtimeDriver,
         sessionDriver,
       })
@@ -41,13 +41,13 @@ describe('TangyuanRuntime', () => {
           agentId: 'agent-1',
           skillName: 'test-skill',
         }),
-      ).rejects.toThrow('只有默认 Agent「汤圆」可以管理共享 Skill')
+      ).rejects.toThrow('只有默认 Agent「元宵」可以管理共享 Skill')
     })
 
     it('rejects agent skill operation by another agent', async () => {
       const runtimeDriver = createRuntimeDriver(createSnapshot())
       const sessionDriver = createSessionDriver([])
-      const runtime = createTangyuanRuntimeForTesting({
+      const runtime = createYuanxiaoRuntimeForTesting({
         runtimeDriver,
         sessionDriver,
       })
@@ -67,7 +67,7 @@ describe('TangyuanRuntime', () => {
     it('rejects install when session driver does not support it', async () => {
       const runtimeDriver = createRuntimeDriver(createSnapshot())
       const sessionDriver = createSessionDriver([])
-      const runtime = createTangyuanRuntimeForTesting({
+      const runtime = createYuanxiaoRuntimeForTesting({
         runtimeDriver,
         sessionDriver,
       })
@@ -76,7 +76,7 @@ describe('TangyuanRuntime', () => {
         runtime.installSkill({
           operation: 'install',
           source: 'shared',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           skillName: 'test-skill',
         }),
       ).rejects.toThrow('当前运行时不支持安装 Skill')
@@ -85,7 +85,7 @@ describe('TangyuanRuntime', () => {
     it('rejects delete when session driver does not support it', async () => {
       const runtimeDriver = createRuntimeDriver(createSnapshot())
       const sessionDriver = createSessionDriver([])
-      const runtime = createTangyuanRuntimeForTesting({
+      const runtime = createYuanxiaoRuntimeForTesting({
         runtimeDriver,
         sessionDriver,
       })
@@ -104,7 +104,7 @@ describe('TangyuanRuntime', () => {
     it('returns empty pending skill approvals initially', () => {
       const runtimeDriver = createRuntimeDriver(createSnapshot())
       const sessionDriver = createSessionDriver([])
-      const runtime = createTangyuanRuntimeForTesting({
+      const runtime = createYuanxiaoRuntimeForTesting({
         runtimeDriver,
         sessionDriver,
       })

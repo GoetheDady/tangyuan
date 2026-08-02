@@ -4,7 +4,7 @@ import type {
   DesktopPreloadApi,
   RuntimeSnapshot,
   TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import {
   HashRouter,
@@ -248,7 +248,7 @@ function StartupRedirect(props: {
         to={
           activeSession
             ? `/chat/${activeSession.agentId}/${activeSession.sessionId}`
-            : '/chat/tangyuan'
+            : '/chat/yuanxiao'
         }
         replace
       />

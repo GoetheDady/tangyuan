@@ -1,6 +1,6 @@
 # Issue tracker：GitHub
 
-本仓库的 issues 和 PRD 都放在 GitHub Issues，仓库为 `GoetheDady/tangyuan`。所有 issue tracker 操作优先使用 `gh` CLI。
+本仓库的 issues 和 PRD 都放在 GitHub Issues，仓库为 `GoetheDady/yuanxiao`。所有 issue tracker 操作优先使用 `gh` CLI。
 
 ## 语言规则
 

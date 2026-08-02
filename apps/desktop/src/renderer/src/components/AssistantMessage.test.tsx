@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentReplyEntry, RunTurn, TurnStep } from '@tangyuan/contracts'
+import type { AgentReplyEntry, RunTurn, TurnStep } from '@yuanxiao/contracts'
 import { AssistantMessage } from './AssistantMessage'
 
 function createMockApi() {

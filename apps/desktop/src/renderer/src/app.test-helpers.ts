@@ -3,7 +3,7 @@ import {
   createRuntimeSnapshot,
   type DesktopPreloadApi,
   type RuntimeSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { vi } from 'vitest'
 
 export function installDefaultAppApi(): void {
@@ -30,7 +30,7 @@ export function installDefaultAppApi(): void {
       }),
     ]),
     getLastActiveSession: vi.fn().mockResolvedValue({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'welcome',
       updatedAt: '2026-07-08T00:00:00.000Z',
     }),
@@ -44,14 +44,14 @@ export function installDefaultAppApi(): void {
     ),
     getTranscript: vi.fn().mockResolvedValue({
       sessionId: '',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       entries: [],
       updatedAt: '2026-01-01T00:00:00.000Z',
     }),
     sendMessage: vi.fn().mockResolvedValue([
       {
         messageId: 'message-1',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'welcome',
         role: 'user',
         content: '你好',
@@ -59,7 +59,7 @@ export function installDefaultAppApi(): void {
       },
       {
         messageId: 'message-2',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'welcome',
         role: 'agent',
         content: '收到：你好',
@@ -94,22 +94,22 @@ export function installDefaultAppApi(): void {
     resetConfiguration: vi.fn(),
     listAgents: vi.fn().mockResolvedValue([
       {
-        agentId: 'tangyuan',
-        displayName: '汤圆',
+        agentId: 'yuanxiao',
+        displayName: '元宵',
         status: 'active' as const,
         defaultProviderId: null,
         defaultModelId: null,
-        homePath: '~/.tangyuan/agents/tangyuan',
+        homePath: '~/.yuanxiao/agents/yuanxiao',
         archivedAt: null,
       },
     ]),
     updateAgentConfig: vi.fn().mockResolvedValue({
-      agentId: 'tangyuan',
-      displayName: '汤圆',
+      agentId: 'yuanxiao',
+      displayName: '元宵',
       status: 'active' as const,
       defaultProviderId: 'anthropic',
       defaultModelId: 'claude-sonnet-4-5',
-      homePath: '~/.tangyuan/agents/tangyuan',
+      homePath: '~/.yuanxiao/agents/yuanxiao',
       archivedAt: null,
     }),
     getSessionModelInfo: vi.fn().mockResolvedValue({
@@ -143,9 +143,9 @@ export function installDefaultAppApi(): void {
       unclaimedDirectories: [],
     }),
     claimAgentDirectory: vi.fn(),
-    rebuildTangyuanHome: vi.fn(),
+    rebuildYuanxiaoHome: vi.fn(),
     getSoul: vi.fn().mockResolvedValue({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       content: '',
       updatedAt: '',
       version: 'sha256:empty',
@@ -212,9 +212,9 @@ export function createMissingConfigurationSnapshot(
 ): RuntimeSnapshot {
   return createRuntimeSnapshot({
     activeAgent: {
-      agentId: 'tangyuan',
-      displayName: '汤圆',
-      homePath: '~/.tangyuan/agents/tangyuan',
+      agentId: 'yuanxiao',
+      displayName: '元宵',
+      homePath: '~/.yuanxiao/agents/yuanxiao',
       profile: {
         initialized: false,
         bootstrapRequired: true,
@@ -253,9 +253,9 @@ export function createReadyRuntimeSnapshot(input: {
 }): RuntimeSnapshot {
   return createRuntimeSnapshot({
     activeAgent: {
-      agentId: 'tangyuan',
-      displayName: '汤圆',
-      homePath: '~/.tangyuan/agents/tangyuan',
+      agentId: 'yuanxiao',
+      displayName: '元宵',
+      homePath: '~/.yuanxiao/agents/yuanxiao',
       profile: {
         initialized: input.profileInitialized ?? false,
         bootstrapRequired: !(input.profileInitialized ?? false),

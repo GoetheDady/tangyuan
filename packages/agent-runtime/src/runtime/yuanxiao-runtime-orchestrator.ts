@@ -19,7 +19,7 @@ import { SkillService } from '../skill'
 import { SessionModelService } from '../session/session-model-service'
 import { SessionArchiveCoordinator } from '../session/session-archive-coordinator'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
   type BashApprovalRequest,
   type QuestionClarificationRequest,
@@ -31,7 +31,7 @@ import {
   type SkillOperationParams,
   type SkillSummary,
   type TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
 /**
  * 内部驱动事件类型：存在于 DriverEvent 但不属于公开 AgentEvent，
@@ -58,10 +58,10 @@ function isInternalDriverEvent(event: AgentEvent | DriverEvent): boolean {
   return INTERNAL_DRIVER_EVENT_TYPES.has(event.type)
 }
 
-import type { TangyuanRuntimeDependencies } from './tangyuan-runtime-dependencies'
+import type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencies'
 import type { LastActiveSessionStore } from '../session/last-active-session-store'
 
-export abstract class TangyuanRuntimeOrchestrator {
+export abstract class YuanxiaoRuntimeOrchestrator {
   protected static readonly MAX_CONCURRENT_RUNS = 4
   protected readonly sessionDriver: AgentSessionDriver
   protected readonly lastActiveSessionStore: Pick<
@@ -91,13 +91,13 @@ export abstract class TangyuanRuntimeOrchestrator {
   protected readonly clarifications: ClarificationRegistry
 
   /**
-   * 创建默认 TangyuanRuntime。
+   * 创建默认 YuanxiaoRuntime。
    *
    * @param dependencies - Runtime 和会话 Driver。
-   * @returns TangyuanRuntime 实例。
+   * @returns YuanxiaoRuntime 实例。
    * @throws 此构造方法不会主动抛出错误。
    */
-  constructor(dependencies: TangyuanRuntimeDependencies) {
+  constructor(dependencies: YuanxiaoRuntimeDependencies) {
     this.sessionDriver = dependencies.sessionDriver
     this.lastActiveSessionStore = dependencies.lastActiveSessionStore ?? {
       read: async () => null,
@@ -127,7 +127,7 @@ export abstract class TangyuanRuntimeOrchestrator {
     this.bashApprovals = new BashApprovalRegistry({ emit, now })
     this.skillService = new SkillService({
       sessionDriver: dependencies.sessionDriver,
-      defaultAgentId: TANGYUAN_DEFAULT_AGENT_ID,
+      defaultAgentId: YUANXIAO_DEFAULT_AGENT_ID,
       emit,
       now,
     })
@@ -206,7 +206,7 @@ export abstract class TangyuanRuntimeOrchestrator {
     this.runQueue.length = 0
     for (const queued of queue) {
       queued.resolve({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: queued.request.sessionId,
         entries: [],
         updatedAt: new Date().toISOString(),
@@ -682,7 +682,7 @@ export abstract class TangyuanRuntimeOrchestrator {
   protected hasRunCapacity(): boolean {
     return (
       this.activeRunIds.size + this.pendingRunStarts.size <
-      TangyuanRuntimeOrchestrator.MAX_CONCURRENT_RUNS
+      YuanxiaoRuntimeOrchestrator.MAX_CONCURRENT_RUNS
     )
   }
 

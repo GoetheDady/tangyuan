@@ -31,7 +31,7 @@
               "id": "FPuAM",
               "name": "Foundation Title",
               "fill": "$color-text",
-              "content": "汤圆 UI 基础规范",
+              "content": "元宵 UI 基础规范",
               "fontFamily": "$font-ui",
               "fontSize": 30,
               "fontWeight": "600"
@@ -6477,7 +6477,7 @@
               "id": "KCCnr",
               "name": "Input Board Description",
               "fill": "$color-muted",
-              "content": "基于 shadcn Input，优化为汤圆的 Level 0 控件：默认不使用阴影，依靠边框、文字与 focus ring 表达状态。",
+              "content": "基于 shadcn Input，优化为元宵的 Level 0 控件：默认不使用阴影，依靠边框、文字与 focus ring 表达状态。",
               "fontFamily": "$font-ui",
               "fontSize": 13,
               "fontWeight": "normal"
@@ -7157,7 +7157,7 @@
                           "fill": "$color-text",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "tangyuan",
+                          "content": "yuanxiao",
                           "fontFamily": "$font-ui",
                           "fontSize": 13,
                           "fontWeight": "normal"
@@ -7330,7 +7330,7 @@
                           "id": "UPAoH",
                           "name": "Identifier Input Type Value",
                           "fill": "$color-text",
-                          "content": "tangyuan",
+                          "content": "yuanxiao",
                           "fontFamily": "$font-mono",
                           "fontSize": 13,
                           "fontWeight": "normal"
@@ -13573,7 +13573,7 @@
                           "id": "kqmzu",
                           "name": "InputGroup Textarea Placeholder",
                           "fill": "$color-muted",
-                          "content": "给汤圆发送消息",
+                          "content": "给元宵发送消息",
                           "fontFamily": "$font-ui",
                           "fontSize": 14,
                           "fontWeight": "normal"
@@ -14911,7 +14911,7 @@
               "id": "DRiRn",
               "name": "Product Badge Heading",
               "fill": "$color-text",
-              "content": "汤圆状态映射",
+              "content": "元宵状态映射",
               "fontFamily": "$font-ui",
               "fontSize": 17,
               "fontWeight": "600"
@@ -15544,7 +15544,7 @@
                               "id": "rlb1R",
                               "name": "工作目录 Value",
                               "fill": "$color-text",
-                              "content": "~/gdsw/tangyuan",
+                              "content": "~/gdsw/yuanxiao",
                               "fontFamily": "$font-mono",
                               "fontSize": 13,
                               "fontWeight": "500"
@@ -19604,7 +19604,7 @@
                               "type": "text",
                               "id": "f3kU1",
                               "fill": "$color-primary-fg",
-                              "content": "GoetheDady/tangyuan",
+                              "content": "GoetheDady/yuanxiao",
                               "fontFamily": "$font-ui",
                               "fontSize": 11,
                               "fontWeight": "500"
@@ -25348,7 +25348,7 @@
                       "id": "Z5efN",
                       "name": "Demo Cwd",
                       "fill": "$color-muted",
-                      "content": "工作目录：/Users/gdsw/projects/tangyuan",
+                      "content": "工作目录：/Users/gdsw/projects/yuanxiao",
                       "fontFamily": "$font-ui",
                       "fontSize": 11,
                       "fontWeight": "normal"
@@ -26500,7 +26500,7 @@
                                   "id": "VQTkG",
                                   "name": "Placeholder",
                                   "fill": "$color-disabled",
-                                  "content": "给汤圆发送消息...",
+                                  "content": "给元宵发送消息...",
                                   "lineHeight": 1.55,
                                   "fontFamily": "$font-ui",
                                   "fontSize": 14,
@@ -35397,7 +35397,7 @@
                       "fill": "$color-muted",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "配置一个可用的模型服务，并将所选模型作为默认 Agent 汤圆的初始模型。",
+                      "content": "配置一个可用的模型服务，并将所选模型作为默认 Agent 元宵的初始模型。",
                       "lineHeight": 1.5,
                       "fontFamily": "$font-ui",
                       "fontSize": 13,
@@ -35824,7 +35824,7 @@
                       "fill": "$color-muted",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "配置一个可用的模型服务，并将所选模型作为默认 Agent 汤圆的初始模型。",
+                      "content": "配置一个可用的模型服务，并将所选模型作为默认 Agent 元宵的初始模型。",
                       "lineHeight": 1.5,
                       "fontFamily": "$font-ui",
                       "fontSize": 13,
@@ -36325,7 +36325,7 @@
                       "fill": "$color-muted",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "配置一个可用的模型服务，并将所选模型作为默认 Agent 汤圆的初始模型。",
+                      "content": "配置一个可用的模型服务，并将所选模型作为默认 Agent 元宵的初始模型。",
                       "lineHeight": 1.5,
                       "fontFamily": "$font-ui",
                       "fontSize": 13,
@@ -37274,7 +37274,7 @@
                   "id": "zYRBb",
                   "name": "Version",
                   "fill": "$color-disabled",
-                  "content": "汤圆 0.1.0",
+                  "content": "元宵 0.1.0",
                   "fontFamily": "$font-mono",
                   "fontSize": 8,
                   "fontWeight": "normal"
@@ -37998,7 +37998,7 @@
                   "id": "dwQEr",
                   "name": "Version",
                   "fill": "$color-disabled",
-                  "content": "汤圆 0.1.0",
+                  "content": "元宵 0.1.0",
                   "fontFamily": "$font-mono",
                   "fontSize": 8,
                   "fontWeight": "normal"
@@ -38104,7 +38104,7 @@
                         {
                           "type": "frame",
                           "id": "oQo2S",
-                          "name": "Agent 汤圆",
+                          "name": "Agent 元宵",
                           "width": "fill_container",
                           "fill": "$color-card",
                           "cornerRadius": 10,
@@ -38156,7 +38156,7 @@
                                       "id": "bqZdT",
                                       "name": "Agent name",
                                       "fill": "$color-text",
-                                      "content": "汤圆",
+                                      "content": "元宵",
                                       "fontFamily": "$font-ui",
                                       "fontSize": 12,
                                       "fontWeight": "600"
@@ -38930,7 +38930,7 @@
                   "id": "Jgcl8",
                   "name": "Version",
                   "fill": "$color-disabled",
-                  "content": "汤圆 0.1.0",
+                  "content": "元宵 0.1.0",
                   "fontFamily": "$font-mono",
                   "fontSize": 8,
                   "fontWeight": "normal"
@@ -39027,7 +39027,7 @@
                           "id": "BRDPF",
                           "name": "Page title",
                           "fill": "$color-text",
-                          "content": "汤圆",
+                          "content": "元宵",
                           "fontFamily": "$font-ui",
                           "fontSize": 26,
                           "fontWeight": "600"
@@ -39119,7 +39119,7 @@
                       "fill": "$color-muted",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "此设置只影响汤圆之后创建的新会话，不会修改其他 Agent 或已有会话。",
+                      "content": "此设置只影响元宵之后创建的新会话，不会修改其他 Agent 或已有会话。",
                       "lineHeight": 1.45,
                       "fontFamily": "$font-ui",
                       "fontSize": 10,
@@ -39321,7 +39321,7 @@
                               "id": "LIDrc",
                               "name": "Workspace path",
                               "fill": "$color-text",
-                              "content": "~/.tangyuan/agents/tangyuan",
+                              "content": "~/.yuanxiao/agents/yuanxiao",
                               "fontFamily": "$font-mono",
                               "fontSize": 9,
                               "fontWeight": "normal"
@@ -40045,7 +40045,7 @@
                   "id": "cIphF",
                   "name": "Version",
                   "fill": "$color-disabled",
-                  "content": "汤圆 0.1.0",
+                  "content": "元宵 0.1.0",
                   "fontFamily": "$font-mono",
                   "fontSize": 8,
                   "fontWeight": "normal"
@@ -40859,7 +40859,7 @@
                   "id": "MkO7m",
                   "name": "Version",
                   "fill": "$color-disabled",
-                  "content": "汤圆 0.1.0",
+                  "content": "元宵 0.1.0",
                   "fontFamily": "$font-mono",
                   "fontSize": 8,
                   "fontWeight": "normal"
@@ -41252,7 +41252,7 @@
                               "id": "Y0ct3a",
                               "name": "Workspace path",
                               "fill": "$color-text",
-                              "content": "~/.tangyuan/agents/code-helper",
+                              "content": "~/.yuanxiao/agents/code-helper",
                               "fontFamily": "$font-mono",
                               "fontSize": 9,
                               "fontWeight": "normal"
@@ -42008,7 +42008,7 @@
                   "id": "f5L4ar",
                   "name": "Version",
                   "fill": "$color-disabled",
-                  "content": "汤圆 0.1.0",
+                  "content": "元宵 0.1.0",
                   "fontFamily": "$font-mono",
                   "fontSize": 8,
                   "fontWeight": "normal"
@@ -42197,7 +42197,7 @@
                       "fill": "$color-muted",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "此设置只影响汤圆之后创建的新会话，不会修改其他 Agent 或已有会话。",
+                      "content": "此设置只影响元宵之后创建的新会话，不会修改其他 Agent 或已有会话。",
                       "lineHeight": 1.45,
                       "fontFamily": "$font-ui",
                       "fontSize": 10,
@@ -42401,7 +42401,7 @@
                               "id": "fBcy4",
                               "name": "Workspace path",
                               "fill": "$color-text",
-                              "content": "~/.tangyuan/agents/legacy-writer",
+                              "content": "~/.yuanxiao/agents/legacy-writer",
                               "fontFamily": "$font-mono",
                               "fontSize": 9,
                               "fontWeight": "normal"

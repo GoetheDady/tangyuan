@@ -2,7 +2,7 @@ import type {
   AgentReplyEntry,
   TranscriptEntry,
   TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { GitBranchPlus, Sparkles } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'

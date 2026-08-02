@@ -6,8 +6,8 @@ import type {
   QuestionClarificationRequest,
   RuntimeSnapshot,
   TranscriptSnapshot,
-} from '@tangyuan/contracts'
-import { applyTranscriptDelta } from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
+import { applyTranscriptDelta } from '@yuanxiao/contracts'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 
 import {

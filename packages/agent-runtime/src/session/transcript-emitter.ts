@@ -8,7 +8,7 @@ import {
   type TranscriptDelta,
   type TranscriptSnapshot,
   type TurnStep,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { assembleRunTurn } from './run-turn-assembly'
 import { createToolStepSummary } from '../core'
 
@@ -609,7 +609,7 @@ export class TranscriptEmitter {
     }
     this.emitTranscriptDeltaEvent(
       // Use a reasonable agentId; the session should be known
-      'tangyuan',
+      'yuanxiao',
       sessionId,
       delta,
     )

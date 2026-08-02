@@ -1,14 +1,14 @@
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   type AgentConfig,
   type AgentEvent,
   type AgentId,
   type AgentSummary,
   type InternalRuntimeConfig,
   type UnclaimedDirectory,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import type { ConfigStore, DirectoryLayout } from '../core'
 import { AgentRuntimeError } from '../core'
 import {
@@ -72,12 +72,12 @@ export class AgentRegistry {
     const homePath = this.layout.agentHome(agentId)
     const workspacePath = this.layout.workspace(agentId)
 
-    // 1. 读取当前配置并继承 tangyuan 的 Provider/Model
+    // 1. 读取当前配置并继承 yuanxiao 的 Provider/Model
     const readResult = await this.configStore.read()
     const config = readResult.config ?? createDefaultInternalConfig()
-    const tangyuanConfig = extractAgentRuntimeConfig(
+    const yuanxiaoConfig = extractAgentRuntimeConfig(
       config,
-      TANGYUAN_DEFAULT_AGENT_ID,
+      YUANXIAO_DEFAULT_AGENT_ID,
     )
 
     // 2. 原子创建目录和初始文件
@@ -112,8 +112,8 @@ export class AgentRegistry {
       // 3. 更新配置
       config.agents[agentId] = {
         displayName,
-        defaultProviderId: tangyuanConfig?.providerId ?? null,
-        defaultModelId: tangyuanConfig?.modelId ?? null,
+        defaultProviderId: yuanxiaoConfig?.providerId ?? null,
+        defaultModelId: yuanxiaoConfig?.modelId ?? null,
         status: 'active',
         archivedAt: null,
       }
@@ -123,8 +123,8 @@ export class AgentRegistry {
         agentId,
         displayName,
         status: 'active',
-        defaultProviderId: tangyuanConfig?.providerId ?? null,
-        defaultModelId: tangyuanConfig?.modelId ?? null,
+        defaultProviderId: yuanxiaoConfig?.providerId ?? null,
+        defaultModelId: yuanxiaoConfig?.modelId ?? null,
         homePath,
         archivedAt: null,
         directoryStatus: 'healthy',
@@ -215,17 +215,17 @@ export class AgentRegistry {
   }
 
   /**
-   * 归档指定的自定义 Agent（默认汤圆不可归档）。
+   * 归档指定的自定义 Agent（默认元宵不可归档）。
    *
    * @param agentId - Agent 标识。
    * @returns 归档后的 AgentSummary。
-   * @throws 当 Agent 是汤圆、不存在或配置保存失败时，Promise 会 reject。
+   * @throws 当 Agent 是元宵、不存在或配置保存失败时，Promise 会 reject。
    */
   async archiveAgent(agentId: AgentId): Promise<AgentSummary> {
-    if (agentId === TANGYUAN_DEFAULT_AGENT_ID) {
+    if (agentId === YUANXIAO_DEFAULT_AGENT_ID) {
       throw new AgentRuntimeError({
         code: 'session-not-found',
-        message: '默认 Agent「汤圆」不可归档。',
+        message: '默认 Agent「元宵」不可归档。',
         recoverable: true,
       })
     }
@@ -346,7 +346,7 @@ export class AgentRegistry {
     const agents = await this.buildAgentSummaries(config)
 
     // 扫描 agents 目录，发现磁盘上有但配置中没有的目录
-    const agentsDir = dirname(this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID))
+    const agentsDir = dirname(this.layout.agentHome(YUANXIAO_DEFAULT_AGENT_ID))
     const unclaimedDirectories: UnclaimedDirectory[] = []
 
     try {
@@ -359,8 +359,8 @@ export class AgentRegistry {
         if (!entry.isDirectory()) continue
         const agentId = entry.name
 
-        // 跳过 tangyuan（始终在配置中）
-        if (agentId === TANGYUAN_DEFAULT_AGENT_ID) continue
+        // 跳过 yuanxiao（始终在配置中）
+        if (agentId === YUANXIAO_DEFAULT_AGENT_ID) continue
         // 跳过已有配置条的目录
         if (configAgentIds.has(agentId)) continue
 
@@ -406,16 +406,16 @@ export class AgentRegistry {
     const readResult = await this.configStore.read()
     const config = readResult.config ?? createDefaultInternalConfig()
 
-    // 继承 tangyuan 的 Provider/Model
-    const tangyuanConfig = extractAgentRuntimeConfig(
+    // 继承 yuanxiao 的 Provider/Model
+    const yuanxiaoConfig = extractAgentRuntimeConfig(
       config,
-      TANGYUAN_DEFAULT_AGENT_ID,
+      YUANXIAO_DEFAULT_AGENT_ID,
     )
 
     config.agents[agentId] = {
       displayName,
-      defaultProviderId: tangyuanConfig?.providerId ?? null,
-      defaultModelId: tangyuanConfig?.modelId ?? null,
+      defaultProviderId: yuanxiaoConfig?.providerId ?? null,
+      defaultModelId: yuanxiaoConfig?.modelId ?? null,
       status: 'active',
       archivedAt: null,
     }
@@ -425,8 +425,8 @@ export class AgentRegistry {
       agentId,
       displayName,
       status: 'active',
-      defaultProviderId: tangyuanConfig?.providerId ?? null,
-      defaultModelId: tangyuanConfig?.modelId ?? null,
+      defaultProviderId: yuanxiaoConfig?.providerId ?? null,
+      defaultModelId: yuanxiaoConfig?.modelId ?? null,
       homePath,
       archivedAt: null,
       directoryStatus: 'healthy',
@@ -436,13 +436,13 @@ export class AgentRegistry {
   }
 
   /**
-   * 按固定模板重建默认汤圆的目录结构。
+   * 按固定模板重建默认元宵的目录结构。
    *
    * @returns 重建后的 AgentSummary。
    * @throws 当目录创建或文件写入失败时，Promise 会 reject。
    */
-  async rebuildTangyuanHome(): Promise<AgentSummary> {
-    const homePath = this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID)
+  async rebuildYuanxiaoHome(): Promise<AgentSummary> {
+    const homePath = this.layout.agentHome(YUANXIAO_DEFAULT_AGENT_ID)
     const now = this.now()
 
     // 确保目录结构存在
@@ -457,12 +457,12 @@ export class AgentRegistry {
 
     // 写出模板 soul.md
     const soulContent = [
-      '# 汤圆',
+      '# 元宵',
       '',
       `重建时间：${now}`,
       '',
       '## 身份',
-      '汤圆是默认 Agent，负责凭据管理和创建其他 Agent。',
+      '元宵是默认 Agent，负责凭据管理和创建其他 Agent。',
       '',
       '## 职责',
       '- 帮助用户配置模型服务凭据',
@@ -480,16 +480,16 @@ export class AgentRegistry {
     const config = readResult.config
 
     const summary: AgentSummary = {
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       displayName:
-        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.displayName ?? '汤圆',
-      status: config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.status ?? 'active',
+        config?.agents[YUANXIAO_DEFAULT_AGENT_ID]?.displayName ?? '元宵',
+      status: config?.agents[YUANXIAO_DEFAULT_AGENT_ID]?.status ?? 'active',
       defaultProviderId:
-        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.defaultProviderId ?? null,
+        config?.agents[YUANXIAO_DEFAULT_AGENT_ID]?.defaultProviderId ?? null,
       defaultModelId:
-        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.defaultModelId ?? null,
+        config?.agents[YUANXIAO_DEFAULT_AGENT_ID]?.defaultModelId ?? null,
       homePath,
-      archivedAt: config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.archivedAt ?? null,
+      archivedAt: config?.agents[YUANXIAO_DEFAULT_AGENT_ID]?.archivedAt ?? null,
       directoryStatus: 'healthy',
     }
 
@@ -506,31 +506,31 @@ export class AgentRegistry {
   async buildAgentSummaries(
     config: InternalRuntimeConfig | null,
   ): Promise<AgentSummary[]> {
-    const tangyuanHomeExists = await pathExists(
-      join(this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID), 'soul.md'),
+    const yuanxiaoHomeExists = await pathExists(
+      join(this.layout.agentHome(YUANXIAO_DEFAULT_AGENT_ID), 'soul.md'),
     )
 
-    const tangyuanSummary: AgentSummary = {
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+    const yuanxiaoSummary: AgentSummary = {
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       displayName:
-        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.displayName ?? '汤圆',
-      status: config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.status ?? 'active',
+        config?.agents[YUANXIAO_DEFAULT_AGENT_ID]?.displayName ?? '元宵',
+      status: config?.agents[YUANXIAO_DEFAULT_AGENT_ID]?.status ?? 'active',
       defaultProviderId:
-        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.defaultProviderId ?? null,
+        config?.agents[YUANXIAO_DEFAULT_AGENT_ID]?.defaultProviderId ?? null,
       defaultModelId:
-        config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.defaultModelId ?? null,
+        config?.agents[YUANXIAO_DEFAULT_AGENT_ID]?.defaultModelId ?? null,
       homePath: this.agentHomePath,
-      archivedAt: config?.agents[TANGYUAN_DEFAULT_AGENT_ID]?.archivedAt ?? null,
-      directoryStatus: tangyuanHomeExists ? 'healthy' : 'damaged',
+      archivedAt: config?.agents[YUANXIAO_DEFAULT_AGENT_ID]?.archivedAt ?? null,
+      directoryStatus: yuanxiaoHomeExists ? 'healthy' : 'damaged',
     }
 
     if (!config) {
-      return [tangyuanSummary]
+      return [yuanxiaoSummary]
     }
 
     const otherAgents = await Promise.all(
       Object.entries(config.agents)
-        .filter(([agentId]) => agentId !== TANGYUAN_DEFAULT_AGENT_ID)
+        .filter(([agentId]) => agentId !== YUANXIAO_DEFAULT_AGENT_ID)
         .map(async ([agentId, agentConfig]) => {
           const homePath = this.layout.agentHome(agentId)
           const soulExists = await pathExists(join(homePath, 'soul.md'))
@@ -550,6 +550,6 @@ export class AgentRegistry {
         }),
     )
 
-    return [tangyuanSummary, ...otherAgents]
+    return [yuanxiaoSummary, ...otherAgents]
   }
 }

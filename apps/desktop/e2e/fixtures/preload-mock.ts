@@ -1,11 +1,11 @@
 import {
   createRuntimeSnapshot,
   createDefaultSessionSummary,
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
   type LastActiveSession,
   type RuntimeSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
 type LegacyTestMessage = {
   messageId: string
@@ -27,9 +27,9 @@ export function createReadyRuntimeSnapshot(
 ): RuntimeSnapshot {
   return createRuntimeSnapshot({
     activeAgent: {
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
-      displayName: '汤圆',
-      homePath: '~/.tangyuan/agents/tangyuan',
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
+      displayName: '元宵',
+      homePath: '~/.yuanxiao/agents/yuanxiao',
       profile: {
         initialized: true,
         bootstrapRequired: false,
@@ -81,9 +81,9 @@ export function createMissingConfigSnapshot(
 ): RuntimeSnapshot {
   return createRuntimeSnapshot({
     activeAgent: {
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
-      displayName: '汤圆',
-      homePath: '~/.tangyuan/agents/tangyuan',
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
+      displayName: '元宵',
+      homePath: '~/.yuanxiao/agents/yuanxiao',
       profile: {
         initialized: false,
         bootstrapRequired: true,
@@ -126,7 +126,7 @@ export function createTestMessage(
 ): LegacyTestMessage {
   return {
     messageId: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    agentId: TANGYUAN_DEFAULT_AGENT_ID,
+    agentId: YUANXIAO_DEFAULT_AGENT_ID,
     sessionId: 'session-1',
     role: 'agent',
     content: '这是一条测试消息。',
@@ -225,7 +225,7 @@ export function createPreloadApiInitScript(
         sendMessage: async () => data.messages,
         cancelRun: async () => {
           const session = data.sessions[0] || {
-            agentId: '${TANGYUAN_DEFAULT_AGENT_ID}',
+            agentId: '${YUANXIAO_DEFAULT_AGENT_ID}',
             sessionId: 'session-1',
             title: '新会话',
             state: 'cancelled',
@@ -325,7 +325,7 @@ export function createPreloadApiInitScript(
           unclaimedDirectories: [],
         }),
         claimAgentDirectory: async () => data.runtime.agents[0] || null,
-        rebuildTangyuanHome: async () => data.runtime.agents[0] || null,
+        rebuildYuanxiaoHome: async () => data.runtime.agents[0] || null,
         getSessionModelInfo: async () => ({
           providerId: data.runtime.settings.selectedProviderId || 'anthropic',
           modelId: data.runtime.settings.selectedModelId || 'claude-sonnet-4-5',
@@ -351,7 +351,7 @@ export function createPreloadApiInitScript(
           supportsThinking: false,
         }),
         getSoul: async () => ({
-          agentId: '${TANGYUAN_DEFAULT_AGENT_ID}',
+          agentId: '${YUANXIAO_DEFAULT_AGENT_ID}',
           content: '',
           updatedAt: new Date().toISOString(),
           version: 'sha256:empty',
@@ -390,14 +390,14 @@ export function createPreloadApiInitScript(
 /**
  * 生成测试用的最后激活会话记录。
  *
- * @param agentId - 默认使用汤圆 Agent。
+ * @param agentId - 默认使用元宵 Agent。
  * @param sessionId - 默认使用第一个测试会话。
  * @param updatedAt - 激活时间，默认使用当前时间。
  * @returns 符合 contracts schema 的最后激活会话记录。
  * @throws 此方法不会主动抛出错误。
  */
 export function createLastActiveSession(
-  agentId = TANGYUAN_DEFAULT_AGENT_ID,
+  agentId = YUANXIAO_DEFAULT_AGENT_ID,
   sessionId = 'session-1',
   updatedAt = new Date().toISOString(),
 ): LastActiveSession {
@@ -431,15 +431,15 @@ export function createTestMessages(): LegacyTestMessage[] {
   return [
     {
       messageId: 'msg-user-1',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: 'session-1',
       role: 'user',
-      content: '你好汤圆，请帮我写一段代码。',
+      content: '你好元宵，请帮我写一段代码。',
       createdAt: new Date(Date.now() - 60000).toISOString(),
     },
     {
       messageId: 'msg-agent-1',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: 'session-1',
       role: 'agent',
       content:
@@ -461,7 +461,7 @@ export function createMarkdownTestMessages(): LegacyTestMessage[] {
   return [
     {
       messageId: 'msg-user-1',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: 'session-1',
       role: 'user',
       content: '帮我写一段代码',
@@ -469,7 +469,7 @@ export function createMarkdownTestMessages(): LegacyTestMessage[] {
     },
     {
       messageId: 'msg-agent-2',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: 'session-1',
       role: 'agent',
       content: [

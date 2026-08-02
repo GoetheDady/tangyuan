@@ -1,13 +1,13 @@
-# 汤圆功能测试简报（给 AI 测试员）
+# 元宵功能测试简报（给 AI 测试员）
 
-你是汤圆桌面应用的功能测试员。像一个真实用户那样使用这个应用，自己判断测什么、怎么测，发现问题就提 GitHub issue。**只测试和提 issue，不要改代码。**
+你是元宵桌面应用的功能测试员。像一个真实用户那样使用这个应用，自己判断测什么、怎么测，发现问题就提 GitHub issue。**只测试和提 issue，不要改代码。**
 
-## 汤圆是什么
+## 元宵是什么
 
-汤圆是一个桌面端「大语言模型对话」应用（Electron + React）。用户在里面：
+元宵是一个桌面端「大语言模型对话」应用（Electron + React）。用户在里面：
 
 - 配置模型服务（Provider / Model / API Key）
-- 新建会话，和 Agent「汤圆」对话
+- 新建会话，和 Agent「元宵」对话
 - 查看 Agent 的执行历史（思考、工具调用、最终回复）
 - 重试失败的回复、中途停止运行
 - 处理 Bash 审批、回答澄清问题
@@ -15,7 +15,7 @@
 
 ## 怎么启动到「能真实对话」的状态
 
-日常配置的 API Key 用系统钥匙串加密，自动化启动的进程解不了密。所以用 **QA 模式**：设置 `TANGYUAN_QA_API_KEY` 环境变量时，应用改用明文 key + 独立数据目录 `~/.tangyuan-qa-root/`（与用户日常 `~/.tangyuan` 完全隔离，不会污染真实配置）。
+日常配置的 API Key 用系统钥匙串加密，自动化启动的进程解不了密。所以用 **QA 模式**：设置 `YUANXIAO_QA_API_KEY` 环境变量时，应用改用明文 key + 独立数据目录 `~/.yuanxiao-qa-root/`（与用户日常 `~/.yuanxiao` 完全隔离，不会污染真实配置）。
 
 用 Playwright 的 `_electron.launch()` 启动真实应用，像真人一样点界面、打字、看反应。`qa/lib/` 有两个现成工具：
 
@@ -26,14 +26,14 @@
 
 ## 怎么交给 Pi 测试
 
-Pi CLI 不需要加载旧的交互式 QA skill。确保 `TANGYUAN_QA_API_KEY` 已经存在于进程环境中，然后在仓库根目录运行：
+Pi CLI 不需要加载旧的交互式 QA skill。确保 `YUANXIAO_QA_API_KEY` 已经存在于进程环境中，然后在仓库根目录运行：
 
 ```bash
 pi \
   --model packyapi/deepseek-v4-pro \
-  --name tangyuan-real-ui-qa \
+  --name yuanxiao-real-ui-qa \
   @apps/desktop/qa/README.md \
-  "主动执行汤圆桌面应用功能测试。必须启动真实 Electron 窗口并点击页面中实际渲染、可见、可操作的元素。只测试和提交 GitHub issue，不修改产品代码。"
+  "主动执行元宵桌面应用功能测试。必须启动真实 Electron 窗口并点击页面中实际渲染、可见、可操作的元素。只测试和提交 GitHub issue，不修改产品代码。"
 ```
 
 不要把 API Key 写进提示词、测试日志或 GitHub issue。
@@ -73,7 +73,7 @@ pi \
 
 ## 发现问题怎么提 issue
 
-按仓库约定用 `gh` 提到 GitHub（`GoetheDady/tangyuan`）：
+按仓库约定用 `gh` 提到 GitHub（`GoetheDady/yuanxiao`）：
 
 - 格式和标签见 `docs/agents/issue-tracker.md` 和 `docs/agents/triage-labels.md`
 - 用中文，从用户视角描述：现象、复现步骤、预期 vs 实际
@@ -84,5 +84,5 @@ pi \
 ## 边界
 
 - 只测试、只提 issue，不改代码
-- 不碰用户日常 `~/.tangyuan`（QA 模式已隔离到 `~/.tangyuan-qa-root/`）
+- 不碰用户日常 `~/.yuanxiao`（QA 模式已隔离到 `~/.yuanxiao-qa-root/`）
 - 每次真实对话都消耗 token，别无意义地刷

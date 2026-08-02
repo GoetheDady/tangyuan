@@ -1,14 +1,14 @@
 import type {
   AgentSessionSummary,
   LastActiveSession,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { describe, expect, it, vi } from 'vitest'
-import { createTangyuanRuntimeForTesting } from './tangyuan-runtime'
+import { createYuanxiaoRuntimeForTesting } from './yuanxiao-runtime'
 import {
   createRuntimeDriver,
   createSessionDriver,
   createSnapshot,
-} from './tangyuan-runtime.test-helpers'
+} from './yuanxiao-runtime.test-helpers'
 
 const savedRecord: LastActiveSession = {
   agentId: 'agent-2',
@@ -18,7 +18,7 @@ const savedRecord: LastActiveSession = {
 
 const sessions: AgentSessionSummary[] = [
   {
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId: 'default-recent',
     title: '默认最近会话',
     state: 'idle',
@@ -41,7 +41,7 @@ const sessions: AgentSessionSummary[] = [
   },
 ]
 
-describe('TangyuanRuntime · 最后激活会话', () => {
+describe('YuanxiaoRuntime · 最后激活会话', () => {
   it('优先恢复仍可用的自定义 Agent 分叉会话', async () => {
     const snapshot = createSnapshot()
     snapshot.agents.push({
@@ -50,7 +50,7 @@ describe('TangyuanRuntime · 最后激活会话', () => {
       status: 'active',
       defaultProviderId: null,
       defaultModelId: null,
-      homePath: '~/.tangyuan/agents/agent-2',
+      homePath: '~/.yuanxiao/agents/agent-2',
       archivedAt: null,
       directoryStatus: 'healthy',
     })
@@ -58,7 +58,7 @@ describe('TangyuanRuntime · 最后激活会话', () => {
     sessionDriver.listSessions = vi.fn(async ({ agentId }) =>
       sessions.filter((session) => session.agentId === agentId),
     )
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(snapshot),
       sessionDriver,
       lastActiveSessionStore: {
@@ -79,7 +79,7 @@ describe('TangyuanRuntime · 最后激活会话', () => {
       status: 'archived',
       defaultProviderId: null,
       defaultModelId: null,
-      homePath: '~/.tangyuan/agents/agent-2',
+      homePath: '~/.yuanxiao/agents/agent-2',
       archivedAt: '2026-07-28T11:00:00.000Z',
       directoryStatus: 'healthy',
     })
@@ -88,11 +88,11 @@ describe('TangyuanRuntime · 最后激活会话', () => {
       sessions.filter((session) => session.agentId === agentId),
     )
     const fallbackRecord: LastActiveSession = {
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'default-recent',
       updatedAt: '2026-07-28T13:00:00.000Z',
     }
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(snapshot),
       sessionDriver,
       lastActiveSessionStore: {
@@ -115,14 +115,14 @@ describe('TangyuanRuntime · 最后激活会话', () => {
       status: 'active',
       defaultProviderId: null,
       defaultModelId: null,
-      homePath: '~/.tangyuan/agents/agent-2',
+      homePath: '~/.yuanxiao/agents/agent-2',
       archivedAt: null,
       directoryStatus: 'healthy',
     })
     const sessionsWithOlderFallback: AgentSessionSummary[] = [
       ...sessions,
       {
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'default-older',
         title: '默认较旧会话',
         state: 'idle',
@@ -148,11 +148,11 @@ describe('TangyuanRuntime · 最后激活会话', () => {
       }
     })
     const fallbackRecord: LastActiveSession = {
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'default-older',
       updatedAt: '2026-07-28T13:00:00.000Z',
     }
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(snapshot),
       sessionDriver,
       lastActiveSessionStore: {
@@ -166,7 +166,7 @@ describe('TangyuanRuntime · 最后激活会话', () => {
       fallbackRecord,
     )
     expect(sessionDriver.getTranscript).toHaveBeenCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'default-older',
     })
   })
@@ -179,7 +179,7 @@ describe('TangyuanRuntime · 最后激活会话', () => {
       status: 'active',
       defaultProviderId: null,
       defaultModelId: null,
-      homePath: '~/.tangyuan/agents/agent-2',
+      homePath: '~/.yuanxiao/agents/agent-2',
       archivedAt: null,
       directoryStatus: 'healthy',
     })
@@ -191,11 +191,11 @@ describe('TangyuanRuntime · 最后激活会话', () => {
       sessionsWithoutParent.filter((session) => session.agentId === agentId),
     )
     const fallbackRecord: LastActiveSession = {
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'default-recent',
       updatedAt: '2026-07-28T13:00:00.000Z',
     }
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(snapshot),
       sessionDriver,
       lastActiveSessionStore: {
@@ -218,7 +218,7 @@ describe('TangyuanRuntime · 最后激活会话', () => {
       status: 'active',
       defaultProviderId: null,
       defaultModelId: null,
-      homePath: '~/.tangyuan/agents/agent-2',
+      homePath: '~/.yuanxiao/agents/agent-2',
       archivedAt: null,
       directoryStatus: 'healthy',
     })
@@ -230,7 +230,7 @@ describe('TangyuanRuntime · 最后激活会话', () => {
       ...savedRecord,
       updatedAt: '2026-07-28T14:00:00.000Z',
     }
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(snapshot),
       sessionDriver,
       lastActiveSessionStore: {

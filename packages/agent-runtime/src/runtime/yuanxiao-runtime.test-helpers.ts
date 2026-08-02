@@ -6,11 +6,11 @@ import type {
   RuntimeResourceDriver,
 } from '../index'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
   type RuntimeSnapshot,
   type TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { vi } from 'vitest'
 
 export { createDeferred } from '../test-utils'
@@ -45,9 +45,9 @@ export function createSnapshot(
 
   return {
     activeAgent: {
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
-      displayName: '汤圆',
-      homePath: '~/.tangyuan/agents/tangyuan',
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
+      displayName: '元宵',
+      homePath: '~/.yuanxiao/agents/yuanxiao',
       profile: {
         initialized: false,
         bootstrapRequired: true,
@@ -57,12 +57,12 @@ export function createSnapshot(
     },
     agents: [
       {
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
-        displayName: '汤圆',
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
+        displayName: '元宵',
         status: 'active' as const,
         defaultProviderId: overrides.providerId ?? null,
         defaultModelId: overrides.modelId ?? null,
-        homePath: '~/.tangyuan/agents/tangyuan',
+        homePath: '~/.yuanxiao/agents/yuanxiao',
         archivedAt: null,
         directoryStatus: 'healthy' as const,
       },
@@ -202,7 +202,7 @@ export function createSessionDriver(
  */
 export function createSessionSummary(sessionId: string): AgentSessionSummary {
   return {
-    agentId: TANGYUAN_DEFAULT_AGENT_ID,
+    agentId: YUANXIAO_DEFAULT_AGENT_ID,
     sessionId,
     title: '新会话',
     state: 'idle',

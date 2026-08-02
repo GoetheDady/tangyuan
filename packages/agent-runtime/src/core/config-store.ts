@@ -20,8 +20,8 @@ import {
   type PersistedConfigurationV2,
   type ProviderCredentials,
   type RuntimeConfiguration,
-  TANGYUAN_DEFAULT_AGENT_ID,
-} from '@tangyuan/contracts'
+  YUANXIAO_DEFAULT_AGENT_ID,
+} from '@yuanxiao/contracts'
 import type { DirectoryLayout } from './directory-layout'
 import { AgentRuntimeError } from './errors'
 import { createDefaultInternalConfig, extractAgentRuntimeConfig } from './utils'
@@ -46,7 +46,7 @@ export interface ConfigStoreDependencies {
 
 /**
  * 配置的磁盘存取：读取、写入、迁移、加解密、备份判断、恢复与重置。
- * 集中承载「汤圆配置在磁盘上如何存取」这一条知识，不涉及会话簇或快照重建。
+ * 集中承载「元宵配置在磁盘上如何存取」这一条知识，不涉及会话簇或快照重建。
  */
 export class ConfigStore {
   private readonly layout: DirectoryLayout
@@ -130,12 +130,12 @@ export class ConfigStore {
   /**
    * 读取指定 Agent 的运行时配置，配置缺失或损坏时抛错。
    *
-   * @param agentId - Agent 标识，缺省为默认汤圆。
+   * @param agentId - Agent 标识，缺省为默认元宵。
    * @returns 运行时配置。
    * @throws 当配置损坏或该 Agent 未配置 Provider/Model 时抛出 configuration-missing。
    */
   async readRequired(
-    agentId: string = TANGYUAN_DEFAULT_AGENT_ID,
+    agentId: string = YUANXIAO_DEFAULT_AGENT_ID,
   ): Promise<RuntimeConfiguration> {
     const readResult = await this.read()
 

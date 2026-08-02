@@ -331,7 +331,7 @@ describe('buildTranscriptSnapshotFromSdkEntries', () => {
         },
       ],
       'session-1',
-      'tangyuan',
+      'yuanxiao',
     )
 
     expect(snapshot.entries).toHaveLength(4)
@@ -435,13 +435,13 @@ describe('normalizeRuntimeConfiguration', () => {
 })
 
 describe('createDefaultInternalConfig', () => {
-  it('返回带默认汤圆 Agent 的 v2 配置', () => {
+  it('返回带默认元宵 Agent 的 v2 配置', () => {
     expect(createDefaultInternalConfig()).toEqual({
       schemaVersion: 2,
       providers: {},
       agents: {
-        tangyuan: {
-          displayName: '汤圆',
+        yuanxiao: {
+          displayName: '元宵',
           defaultProviderId: null,
           defaultModelId: null,
           status: 'active',
@@ -463,8 +463,8 @@ describe('buildInternalConfigForSave', () => {
       apiKey: 'sk-x',
       updatedAt: '2026-01-01T00:00:00.000Z',
     })
-    expect(result.agents.tangyuan?.defaultProviderId).toBe('openai')
-    expect(result.agents.tangyuan?.defaultModelId).toBe('gpt-4')
+    expect(result.agents.yuanxiao?.defaultProviderId).toBe('openai')
+    expect(result.agents.yuanxiao?.defaultModelId).toBe('gpt-4')
     expect(result.schemaVersion).toBe(2)
   })
 })
@@ -474,8 +474,8 @@ describe('extractAgentRuntimeConfig', () => {
     schemaVersion: 2,
     providers: { openai: { apiKey: 'sk-x', updatedAt: 'now' } },
     agents: {
-      tangyuan: {
-        displayName: '汤圆',
+      yuanxiao: {
+        displayName: '元宵',
         defaultProviderId: 'openai',
         defaultModelId: 'gpt-4',
         status: 'active' as const,
@@ -485,7 +485,7 @@ describe('extractAgentRuntimeConfig', () => {
   }
 
   it('返回 Agent 的运行时配置', () => {
-    expect(extractAgentRuntimeConfig(config, 'tangyuan')).toEqual({
+    expect(extractAgentRuntimeConfig(config, 'yuanxiao')).toEqual({
       providerId: 'openai',
       modelId: 'gpt-4',
       apiKey: 'sk-x',
@@ -496,10 +496,10 @@ describe('extractAgentRuntimeConfig', () => {
     const noModel = {
       ...config,
       agents: {
-        tangyuan: { ...config.agents.tangyuan, defaultModelId: null },
+        yuanxiao: { ...config.agents.yuanxiao, defaultModelId: null },
       },
     }
-    expect(extractAgentRuntimeConfig(noModel, 'tangyuan')).toBeNull()
+    expect(extractAgentRuntimeConfig(noModel, 'yuanxiao')).toBeNull()
   })
 
   it('Agent 不存在时返回 null', () => {

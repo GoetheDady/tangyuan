@@ -4,7 +4,7 @@ import { TranscriptEmitter } from './transcript-emitter'
 import {
   transcriptSnapshotSchema,
   type TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
 describe('TranscriptEmitter tool step handling', () => {
   function createEmitter(): {
@@ -56,7 +56,7 @@ describe('TranscriptEmitter tool step handling', () => {
   ) {
     const event: Extract<DriverEvent, { type: 'activity-updated' }> = {
       type: 'activity-updated',
-      agentId: overrides.agentId ?? 'tangyuan',
+      agentId: overrides.agentId ?? 'yuanxiao',
       sessionId: overrides.sessionId ?? 'session-1',
       runId: overrides.runId ?? 'run-1',
       activity: {
@@ -100,8 +100,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('produces a snapshot that passes transcriptSnapshotSchema validation', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
     emitActivityUpdated(emitter, {
       kind: 'tool',
       state: 'running',
@@ -126,7 +126,7 @@ describe('TranscriptEmitter tool step handling', () => {
   ) {
     const event: Extract<DriverEvent, { type: 'message-delta' }> = {
       type: 'message-delta',
-      agentId: overrides.agentId ?? 'tangyuan',
+      agentId: overrides.agentId ?? 'yuanxiao',
       sessionId: overrides.sessionId ?? 'session-1',
       runId: overrides.runId ?? 'run-1',
       messageId: overrides.messageId ?? 'msg-1',
@@ -144,7 +144,7 @@ describe('TranscriptEmitter tool step handling', () => {
   ) {
     const event: Extract<DriverEvent, { type: 'turn-started' }> = {
       type: 'turn-started',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: overrides.sessionId ?? 'session-1',
       runId: overrides.runId ?? 'run-1',
       turnIndex,
@@ -171,7 +171,7 @@ describe('TranscriptEmitter tool step handling', () => {
   ) {
     const event: Extract<DriverEvent, { type: 'turn-ended' }> = {
       type: 'turn-ended',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: overrides.sessionId ?? 'session-1',
       runId: overrides.runId ?? 'run-1',
       turnIndex,
@@ -203,8 +203,8 @@ describe('TranscriptEmitter tool step handling', () => {
   it('renders thinking step when attempt-started arrives before agent message-appended (real order)', () => {
     const { emitter, getSnapshot } = createEmitter()
     // 真实运行顺序：attempt-started 先于 agent message-appended
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
     emitThinkingDelta(emitter, { delta: '正在思考' })
 
     const snapshot = getSnapshot('session-1')
@@ -220,8 +220,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('accumulates multiple thinking deltas into one step instead of replacing', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
     for (const delta of ['我', '在', '思', '考']) {
       emitThinkingDelta(emitter, { delta })
     }
@@ -239,8 +239,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('creates a tool step in turn 0 on first tool-started', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
     emitActivityUpdated(emitter, {
       kind: 'tool',
       state: 'running',
@@ -263,8 +263,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('updates the same tool step when tool-completed matches toolCallId', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
 
     const toolCallId = 'tc-1'
     emitActivityUpdated(emitter, {
@@ -291,8 +291,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('assembles multi-turn tool calls without misalignment (turn events drive boundaries)', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
 
     // 回合 0：read
     emitTurnStarted(emitter, 0)
@@ -326,8 +326,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('uses the last turn text as the reply content, including an empty final turn', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
 
     emitTurnStarted(emitter, 0)
     emitTurnEnded(emitter, 0, [{ type: 'text', text: '中间结论' }] as never)
@@ -343,8 +343,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('keeps failed tool in timeline (does not advance turn on failure alone)', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
 
     emitActivityUpdated(emitter, {
       kind: 'tool',
@@ -371,8 +371,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('preserves a failed tool step in its own turn across a turn boundary', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
 
     // 回合 0：bash 失败
     emitTurnStarted(emitter, 0)
@@ -404,13 +404,13 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('does not advance turn for thinking steps (same turn)', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
 
     // Thinking in turn 0
     const thinkingEvent: Extract<DriverEvent, { type: 'message-delta' }> = {
       type: 'message-delta',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       runId: 'run-1',
       messageId: 'msg-1',
@@ -440,8 +440,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('assembles thinking + tool in each turn driven by turn events', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
 
     // 回合 0：thinking + read
     emitTurnStarted(emitter, 0)
@@ -488,8 +488,8 @@ describe('TranscriptEmitter tool step handling', () => {
     const { emitter, getSnapshot } = createEmitter()
 
     // 第一轮对话（真实顺序：attempt-started 先于 agent message-appended）
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
     emitThinkingDelta(emitter, {
       runId: 'run-1',
       messageId: 'msg-1',
@@ -497,8 +497,8 @@ describe('TranscriptEmitter tool step handling', () => {
     })
 
     // 第二轮对话：新 run、新 agent 消息
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-2')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-2', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-2')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-2', 'agent')
     emitThinkingDelta(emitter, {
       runId: 'run-2',
       messageId: 'msg-2',
@@ -536,8 +536,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('uses safe summary with tool name and status for custom tools', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
 
     emitActivityUpdated(emitter, {
       kind: 'tool',
@@ -557,8 +557,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('assembles three sequential turns from turn events', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
 
     emitTurnStarted(emitter, 0)
     emitTurnEnded(
@@ -595,8 +595,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('assembles a no-tool final turn (无工具收尾轮)', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
 
     // 回合 0：工具
     emitTurnStarted(emitter, 0)
@@ -623,8 +623,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('sets entry.content to the last turn text, not cross-turn accumulation', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
 
     emitTurnStarted(emitter, 0)
     emitTurnEnded(
@@ -651,8 +651,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('preserves live-preview steps when a turn is interrupted before turn-ended', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
 
     emitTurnStarted(emitter, 0)
     // 实时预览：thinking + 进行中的工具，但 turn-ended 未到达（中断）
@@ -686,8 +686,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('emits transcript-delta events with correct delta types', () => {
     const { emitter, events } = createEmitter()
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
 
     emitActivityUpdated(emitter, {
       kind: 'tool',
@@ -712,10 +712,10 @@ describe('TranscriptEmitter tool step handling', () => {
     const { emitter, getSnapshot } = createEmitter()
     const event: Extract<DriverEvent, { type: 'message-appended' }> = {
       type: 'message-appended',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       message: {
         messageId: 'agent-msg-1',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         role: 'agent',
         content: '重试成功',
@@ -737,7 +737,7 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('failAttemptForRun includes error in ExecutionAttempt when provided', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
 
     const error = {
       code: 'unknown' as const,
@@ -763,7 +763,7 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('failAttemptForRun for cancelled does not include error', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
 
     emitter.failAttemptForRun(
       'session-1',
@@ -783,8 +783,8 @@ describe('TranscriptEmitter tool step handling', () => {
 
   it('fills missing turns when turn-ended arrives for non-consecutive indices, preventing sparse array', () => {
     const { emitter, getSnapshot } = createEmitter()
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1', 'agent')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1', 'agent')
 
     // Simulate SDK emitting turn-started for turns 0..2 but only turn-ended for turn 2
     // (turns 0 and 1 were 'invisible' — no steps, no events)
@@ -870,10 +870,10 @@ describe('TranscriptEmitter compaction and auto-retry', () => {
     // 先建一个 user message 条目（index 0）
     emitter.emitTranscriptDeltaForMessageAppended({
       type: 'message-appended',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       message: {
         messageId: 'user-1',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         role: 'user',
         content: '你好',
@@ -885,7 +885,7 @@ describe('TranscriptEmitter compaction and auto-retry', () => {
     // 触发 compaction
     emitter.appendCompactionEntry({
       type: 'compaction-detected',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       runId: 'run-1',
       occurredAt: '2026-07-30T10:00:00.000Z',
@@ -904,12 +904,12 @@ describe('TranscriptEmitter compaction and auto-retry', () => {
   it('updateAttemptRetryCount 更新 attempt 的 retryCount 并发出 attempt-status-changed delta', () => {
     const { emitter, events, getSnapshot } = createEmitter()
 
-    emitAttemptStarted(emitter, 'tangyuan', 'session-1', 'run-1')
-    emitMessageAppended(emitter, 'tangyuan', 'session-1', 'msg-1')
+    emitAttemptStarted(emitter, 'yuanxiao', 'session-1', 'run-1')
+    emitMessageAppended(emitter, 'yuanxiao', 'session-1', 'msg-1')
 
     emitter.updateAttemptRetryCount({
       type: 'auto-retry-progress',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       runId: 'run-1',
       retryCount: 1,
@@ -947,7 +947,7 @@ describe('TranscriptEmitter compaction and auto-retry', () => {
     expect(() => {
       emitter.updateAttemptRetryCount({
         type: 'auto-retry-progress',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         runId: 'run-nonexistent',
         retryCount: 1,

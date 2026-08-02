@@ -5,7 +5,7 @@ import type {
   ModelDescriptor,
   QuestionClarificationRequest,
   SessionModelInfo,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { MessageSquarePlus, Settings } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router'
@@ -57,7 +57,7 @@ export function ChatGuard(props: {
   }
 
   if (runtime?.status !== 'ready') {
-    const redirectTarget = agentId ? `/chat/${agentId}` : '/chat/tangyuan'
+    const redirectTarget = agentId ? `/chat/${agentId}` : '/chat/yuanxiao'
     return (
       <Navigate
         to={`/setup?redirect=${encodeURIComponent(redirectTarget)}`}
@@ -109,7 +109,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
   )
   const beginSending = useStore(store, (state) => state.beginSending)
   const finishSending = useStore(store, (state) => state.finishSending)
-  const activeAgentId = agentId ?? runtime?.activeAgent.agentId ?? 'tangyuan'
+  const activeAgentId = agentId ?? runtime?.activeAgent.agentId ?? 'yuanxiao'
 
   const sessions = useStore(
     store,
@@ -156,7 +156,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
   const activeAgentDisplayName =
     'displayName' in (activeAgent ?? {})
       ? (activeAgent as AgentSummary).displayName
-      : ((activeAgent as { displayName?: string })?.displayName ?? '汤圆')
+      : ((activeAgent as { displayName?: string })?.displayName ?? '元宵')
 
   // 当 URL 中无 agentId 时补充默认值
   useEffect(() => {
@@ -924,7 +924,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
 export function LoadingScreen(): React.JSX.Element {
   return (
     <main className="bg-background text-foreground grid min-h-full place-items-center">
-      <div className="text-body text-muted-foreground">正在打开汤圆...</div>
+      <div className="text-body text-muted-foreground">正在打开元宵...</div>
     </main>
   )
 }

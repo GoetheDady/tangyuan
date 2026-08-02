@@ -1,5 +1,5 @@
 import type { TurnEndEvent } from '@earendil-works/pi-coding-agent'
-import type { RunTurn, TurnStep } from '@tangyuan/contracts'
+import type { RunTurn, TurnStep } from '@yuanxiao/contracts'
 import { createToolStepSummary } from '../core'
 
 /**

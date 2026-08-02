@@ -3,7 +3,7 @@ import type {
   RunTurn,
   TranscriptEntry,
   TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { assembleRunTurn } from './run-turn-assembly'
 
 type TurnAssistantMessage = Parameters<typeof assembleRunTurn>[0]['message']
@@ -255,7 +255,7 @@ export function buildTranscriptWithAttempts(
     status: 'running' | 'completed' | 'cancelled' | 'failed'
     startedAt: string
     completedAt: string | null
-    error?: import('@tangyuan/contracts').AgentRuntimeErrorPayload
+    error?: import('@yuanxiao/contracts').AgentRuntimeErrorPayload
     inReplyTo?: string
   }>,
 ): TranscriptSnapshot {

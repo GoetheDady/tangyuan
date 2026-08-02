@@ -25,7 +25,7 @@ describe('createToolApprovalGateway', () => {
     const { gateway, bashApprovals } = createGateway()
 
     const result = await gateway.requestBashApproval({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 's1',
       command: 'ls',
       cwd: '/tmp',
@@ -35,7 +35,7 @@ describe('createToolApprovalGateway', () => {
     expect(result).toEqual({ approved: true })
     expect(bashApprovals.register).toHaveBeenCalledWith(
       expect.objectContaining({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 's1',
         runId: 'run-active',
         command: 'ls',
@@ -48,7 +48,7 @@ describe('createToolApprovalGateway', () => {
   it('requestBashApproval 优先使用参数自带的 runId', async () => {
     const { gateway, bashApprovals } = createGateway()
     await gateway.requestBashApproval({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 's1',
       runId: 'run-explicit',
       command: 'ls',
@@ -61,8 +61,8 @@ describe('createToolApprovalGateway', () => {
   it('validateFilePath 拦截受保护路径', () => {
     const { gateway } = createGateway()
     const result = gateway.validateFilePath({
-      agentId: 'tangyuan',
-      path: '/home/agents/tangyuan/soul.md',
+      agentId: 'yuanxiao',
+      path: '/home/agents/yuanxiao/soul.md',
       operation: 'write',
     })
     expect(result.allowed).toBe(false)
@@ -71,7 +71,7 @@ describe('createToolApprovalGateway', () => {
   it('requestClarification 组装请求并委托登记表', async () => {
     const { gateway, clarifications } = createGateway()
     const result = await gateway.requestClarification({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 's1',
       question: '选哪个？',
       options: ['A', 'B'],

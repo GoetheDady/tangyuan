@@ -2,7 +2,7 @@ import type {
   ProfileUpdateResult,
   SoulContent,
   UserProfileContent,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import type { AgentSessionDriver } from '../driver'
 import type { RuntimeSnapshotStore } from '../runtime/runtime-snapshot-store'
 

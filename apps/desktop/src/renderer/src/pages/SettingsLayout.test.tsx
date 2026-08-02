@@ -28,6 +28,8 @@ describe('SettingsLayout', () => {
 
     render(<RouterProvider router={router} />)
 
+    expect(screen.getByText('元宵 0.1.0')).toBeInTheDocument()
+
     const backLink = screen.getByRole('link', { name: '返回聊天' })
     expect(backLink).toHaveAttribute('href', '/chat/agent-1/session-1')
 

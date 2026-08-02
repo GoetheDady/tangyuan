@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createTangyuanRuntime } from './index'
+import { createYuanxiaoRuntime } from './index'
 import {
   createFakeEncryptionAdapter,
   createPiSdkGateway,
@@ -17,9 +17,9 @@ afterEach(async () => {
   }
 })
 
-describe('createTangyuanRuntime · 最后激活会话存储', () => {
+describe('createYuanxiaoRuntime · 最后激活会话存储', () => {
   it('从生产 Runtime 的 userDataPath 恢复磁盘记录', async () => {
-    rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-runtime-last-active-'))
+    rootPath = await mkdtemp(join(tmpdir(), 'yuanxiao-runtime-last-active-'))
     const sessionsPath = join(rootPath, 'sessions')
     await mkdir(sessionsPath, { recursive: true })
     await writeFile(
@@ -34,7 +34,7 @@ describe('createTangyuanRuntime · 最后激活会话存储', () => {
             updatedAt: '2026-07-28T09:00:00.000Z',
             provider: 'anthropic',
             model: 'claude-sonnet-4-5',
-            agentId: 'tangyuan',
+            agentId: 'yuanxiao',
             lastMessagePreview: '',
             status: 'idle',
           },
@@ -45,14 +45,14 @@ describe('createTangyuanRuntime · 最后激活会话存储', () => {
     await writeFile(
       join(sessionsPath, 'last-active-session.json'),
       JSON.stringify({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'session-1',
         updatedAt: '2026-07-28T10:00:00.000Z',
       }),
       'utf8',
     )
-    const runtime = createTangyuanRuntime({
-      agentHomePath: join(rootPath, 'agents', 'tangyuan'),
+    const runtime = createYuanxiaoRuntime({
+      agentHomePath: join(rootPath, 'agents', 'yuanxiao'),
       fsRoot: rootPath,
       userDataPath: rootPath,
       gateway: createPiSdkGateway(),
@@ -65,7 +65,7 @@ describe('createTangyuanRuntime · 最后激活会话存储', () => {
     })
 
     await expect(runtime.getLastActiveSession()).resolves.toEqual({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'session-1',
       updatedAt: '2026-07-28T10:00:00.000Z',
     })

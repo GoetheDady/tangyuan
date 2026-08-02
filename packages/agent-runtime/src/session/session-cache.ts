@@ -1,4 +1,4 @@
-import type { AgentSessionSummary } from '@tangyuan/contracts'
+import type { AgentSessionSummary } from '@yuanxiao/contracts'
 
 /**
  * 会话状态记事本：持有当前已知会话摘要列表，

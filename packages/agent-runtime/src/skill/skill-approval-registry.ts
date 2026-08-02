@@ -1,4 +1,4 @@
-import type { AgentEvent, SkillApprovalRequest } from '@tangyuan/contracts'
+import type { AgentEvent, SkillApprovalRequest } from '@yuanxiao/contracts'
 
 /**
  * 创建 SkillApprovalRegistry 所需的依赖。

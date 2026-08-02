@@ -107,63 +107,63 @@ import type {
 } from './types'
 
 export const DESKTOP_IPC_CHANNELS = {
-  runtimeGetSnapshot: 'tangyuan:runtime:get-snapshot',
-  runtimeRefresh: 'tangyuan:runtime:refresh',
-  runtimeSaveConfiguration: 'tangyuan:runtime:save-configuration',
+  runtimeGetSnapshot: 'yuanxiao:runtime:get-snapshot',
+  runtimeRefresh: 'yuanxiao:runtime:refresh',
+  runtimeSaveConfiguration: 'yuanxiao:runtime:save-configuration',
   runtimeCancelConfigurationVerification:
-    'tangyuan:runtime:cancel-configuration-verification',
-  runtimeRestoreFromBackup: 'tangyuan:runtime:restore-from-backup',
-  runtimeResetConfiguration: 'tangyuan:runtime:reset-configuration',
-  runtimeSaveProvider: 'tangyuan:runtime:save-provider',
-  runtimeDeleteProvider: 'tangyuan:runtime:delete-provider',
-  sessionsList: 'tangyuan:sessions:list',
-  sessionsCreate: 'tangyuan:sessions:create',
-  sessionsSendMessage: 'tangyuan:sessions:send-message',
-  sessionsCancelRun: 'tangyuan:sessions:cancel-run',
-  agentsList: 'tangyuan:agents:list',
-  agentsUpdateConfig: 'tangyuan:agents:update-config',
-  agentsArchive: 'tangyuan:agents:archive',
-  agentsRecover: 'tangyuan:agents:recover',
-  agentsReconcile: 'tangyuan:agents:reconcile',
-  agentsClaimDirectory: 'tangyuan:agents:claim-directory',
-  agentsRebuildTangyuan: 'tangyuan:agents:rebuild-tangyuan',
-  sessionsGetModelInfo: 'tangyuan:sessions:get-model-info',
-  sessionsSetModel: 'tangyuan:sessions:set-model',
-  sessionsSetThinkingLevel: 'tangyuan:sessions:set-thinking-level',
-  profileGetSoul: 'tangyuan:profile:get-soul',
-  profileGetUser: 'tangyuan:profile:get-user',
-  profileUpdateSoul: 'tangyuan:profile:update-soul',
-  profileUpdateUser: 'tangyuan:profile:update-user',
-  skillsListAgent: 'tangyuan:skills:list-agent',
-  skillsListShared: 'tangyuan:skills:list-shared',
-  skillsInstall: 'tangyuan:skills:install',
-  skillsDelete: 'tangyuan:skills:delete',
-  skillsApproveOperation: 'tangyuan:skills:approve-operation',
-  skillsRejectOperation: 'tangyuan:skills:reject-operation',
-  skillsGetPendingApprovals: 'tangyuan:skills:get-pending-approvals',
-  skillsGetInstallRecords: 'tangyuan:skills:get-install-records',
-  openExternalLink: 'tangyuan:open-external-link',
-  sessionsApproveBash: 'tangyuan:sessions:approve-bash',
-  sessionsRejectBash: 'tangyuan:sessions:reject-bash',
-  sessionsGetPendingApprovals: 'tangyuan:sessions:get-pending-approvals',
-  sessionsAnswerClarification: 'tangyuan:sessions:answer-clarification',
-  sessionsCancelClarification: 'tangyuan:sessions:cancel-clarification',
+    'yuanxiao:runtime:cancel-configuration-verification',
+  runtimeRestoreFromBackup: 'yuanxiao:runtime:restore-from-backup',
+  runtimeResetConfiguration: 'yuanxiao:runtime:reset-configuration',
+  runtimeSaveProvider: 'yuanxiao:runtime:save-provider',
+  runtimeDeleteProvider: 'yuanxiao:runtime:delete-provider',
+  sessionsList: 'yuanxiao:sessions:list',
+  sessionsCreate: 'yuanxiao:sessions:create',
+  sessionsSendMessage: 'yuanxiao:sessions:send-message',
+  sessionsCancelRun: 'yuanxiao:sessions:cancel-run',
+  agentsList: 'yuanxiao:agents:list',
+  agentsUpdateConfig: 'yuanxiao:agents:update-config',
+  agentsArchive: 'yuanxiao:agents:archive',
+  agentsRecover: 'yuanxiao:agents:recover',
+  agentsReconcile: 'yuanxiao:agents:reconcile',
+  agentsClaimDirectory: 'yuanxiao:agents:claim-directory',
+  agentsRebuildYuanxiao: 'yuanxiao:agents:rebuild-yuanxiao',
+  sessionsGetModelInfo: 'yuanxiao:sessions:get-model-info',
+  sessionsSetModel: 'yuanxiao:sessions:set-model',
+  sessionsSetThinkingLevel: 'yuanxiao:sessions:set-thinking-level',
+  profileGetSoul: 'yuanxiao:profile:get-soul',
+  profileGetUser: 'yuanxiao:profile:get-user',
+  profileUpdateSoul: 'yuanxiao:profile:update-soul',
+  profileUpdateUser: 'yuanxiao:profile:update-user',
+  skillsListAgent: 'yuanxiao:skills:list-agent',
+  skillsListShared: 'yuanxiao:skills:list-shared',
+  skillsInstall: 'yuanxiao:skills:install',
+  skillsDelete: 'yuanxiao:skills:delete',
+  skillsApproveOperation: 'yuanxiao:skills:approve-operation',
+  skillsRejectOperation: 'yuanxiao:skills:reject-operation',
+  skillsGetPendingApprovals: 'yuanxiao:skills:get-pending-approvals',
+  skillsGetInstallRecords: 'yuanxiao:skills:get-install-records',
+  openExternalLink: 'yuanxiao:open-external-link',
+  sessionsApproveBash: 'yuanxiao:sessions:approve-bash',
+  sessionsRejectBash: 'yuanxiao:sessions:reject-bash',
+  sessionsGetPendingApprovals: 'yuanxiao:sessions:get-pending-approvals',
+  sessionsAnswerClarification: 'yuanxiao:sessions:answer-clarification',
+  sessionsCancelClarification: 'yuanxiao:sessions:cancel-clarification',
   sessionsGetPendingClarifications:
-    'tangyuan:sessions:get-pending-clarifications',
-  sessionsGetTranscript: 'tangyuan:sessions:get-transcript',
-  sessionsRetryMessage: 'tangyuan:sessions:retry-message',
-  sessionsFork: 'tangyuan:sessions:fork',
-  sessionsArchive: 'tangyuan:sessions:archive',
-  sessionsRecover: 'tangyuan:sessions:recover',
-  sessionsDelete: 'tangyuan:sessions:delete',
-  sessionsGetLastActive: 'tangyuan:sessions:get-last-active',
-  sessionsSetLastActive: 'tangyuan:sessions:set-last-active',
+    'yuanxiao:sessions:get-pending-clarifications',
+  sessionsGetTranscript: 'yuanxiao:sessions:get-transcript',
+  sessionsRetryMessage: 'yuanxiao:sessions:retry-message',
+  sessionsFork: 'yuanxiao:sessions:fork',
+  sessionsArchive: 'yuanxiao:sessions:archive',
+  sessionsRecover: 'yuanxiao:sessions:recover',
+  sessionsDelete: 'yuanxiao:sessions:delete',
+  sessionsGetLastActive: 'yuanxiao:sessions:get-last-active',
+  sessionsSetLastActive: 'yuanxiao:sessions:set-last-active',
 } as const
 
 /**
  * Main 进程向 Renderer 推送 Agent 标准事件时使用的 IPC channel。
  */
-export const DESKTOP_AGENT_EVENT_CHANNEL = 'tangyuan:agent:event'
+export const DESKTOP_AGENT_EVENT_CHANNEL = 'yuanxiao:agent:event'
 
 /**
  * 描述桌面端允许使用的 IPC channel 名称。
@@ -193,7 +193,7 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.agentsRecover]: RecoverAgentRequest
   [DESKTOP_IPC_CHANNELS.agentsReconcile]: undefined
   [DESKTOP_IPC_CHANNELS.agentsClaimDirectory]: ClaimAgentDirectoryRequest
-  [DESKTOP_IPC_CHANNELS.agentsRebuildTangyuan]: undefined
+  [DESKTOP_IPC_CHANNELS.agentsRebuildYuanxiao]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsGetModelInfo]: GetSessionModelInfoRequest
   [DESKTOP_IPC_CHANNELS.sessionsSetModel]: SetSessionModelRequest
   [DESKTOP_IPC_CHANNELS.sessionsSetThinkingLevel]: SetSessionThinkingLevelRequest
@@ -249,7 +249,7 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.agentsRecover]: recoverAgentRequestSchema,
   [DESKTOP_IPC_CHANNELS.agentsReconcile]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.agentsClaimDirectory]: claimAgentDirectoryRequestSchema,
-  [DESKTOP_IPC_CHANNELS.agentsRebuildTangyuan]: z.undefined(),
+  [DESKTOP_IPC_CHANNELS.agentsRebuildYuanxiao]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsGetModelInfo]: getSessionModelInfoRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsSetModel]: setSessionModelRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsSetThinkingLevel]:
@@ -328,7 +328,7 @@ export interface DesktopIpcResponseMap {
     unclaimedDirectories: UnclaimedDirectory[]
   }
   [DESKTOP_IPC_CHANNELS.agentsClaimDirectory]: AgentSummary
-  [DESKTOP_IPC_CHANNELS.agentsRebuildTangyuan]: AgentSummary
+  [DESKTOP_IPC_CHANNELS.agentsRebuildYuanxiao]: AgentSummary
   [DESKTOP_IPC_CHANNELS.sessionsGetModelInfo]: SessionModelInfo
   [DESKTOP_IPC_CHANNELS.sessionsSetModel]: SessionModelInfo
   [DESKTOP_IPC_CHANNELS.sessionsSetThinkingLevel]: SessionModelInfo
@@ -451,7 +451,7 @@ export const desktopIpcResponseSchemas = {
     archivedAt: z.string().nullable(),
     directoryStatus: z.enum(['healthy', 'damaged']),
   }),
-  [DESKTOP_IPC_CHANNELS.agentsRebuildTangyuan]: z.strictObject({
+  [DESKTOP_IPC_CHANNELS.agentsRebuildYuanxiao]: z.strictObject({
     agentId: nonEmptyIdentifierSchema,
     displayName: z.string(),
     status: z.enum(['active', 'archived']),
@@ -715,11 +715,11 @@ export interface DesktopPreloadApi {
   updateAgentConfig(request: UpdateAgentConfigRequest): Promise<AgentSummary>
 
   /**
-   * 归档指定的自定义 Agent（默认汤圆不可归档）。
+   * 归档指定的自定义 Agent（默认元宵不可归档）。
    *
    * @param request - 要归档的 Agent 标识。
    * @returns 归档后的 AgentSummary。
-   * @throws 当 Agent 是汤圆或配置保存失败时，Promise 会 reject。
+   * @throws 当 Agent 是元宵或配置保存失败时，Promise 会 reject。
    */
   archiveAgent(request: ArchiveAgentRequest): Promise<AgentSummary>
 
@@ -755,12 +755,12 @@ export interface DesktopPreloadApi {
   ): Promise<AgentSummary>
 
   /**
-   * 按固定模板重建默认汤圆的目录结构。
+   * 按固定模板重建默认元宵的目录结构。
    *
    * @returns 重建后的 AgentSummary。
    * @throws 当目录创建或文件写入失败时，Promise 会 reject。
    */
-  rebuildTangyuanHome(): Promise<AgentSummary>
+  rebuildYuanxiaoHome(): Promise<AgentSummary>
 
   /**
    * 读取当前 Session 使用的模型和 Thinking Level 信息。

@@ -154,7 +154,7 @@ async function findUserMessageId(
   content: string,
 ): Promise<string> {
   const transcript = await driver.getTranscript({
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId,
   })
   const entry = transcript.entries.find(
@@ -179,16 +179,16 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const parent = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '父会话',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       content: '第一个问题',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       content: '第二个问题',
     })
@@ -205,7 +205,7 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
 
     // 首条用户消息分叉：新会话历史为空，来源仍指向该消息。
     const firstMessageFork = await driver.forkSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       entryId: firstUserMessageId,
     })
@@ -215,37 +215,37 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
     })
     await expect(
       driver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: firstMessageFork.sessionId,
       }),
     ).resolves.toMatchObject({ entries: [] })
 
     // 同一条消息的两个分叉：各自独立，互不覆盖。
     const siblingOne = await driver.forkSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       entryId: secondUserMessageId,
     })
     const siblingTwo = await driver.forkSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       entryId: secondUserMessageId,
     })
     expect(siblingTwo.sessionId).not.toBe(siblingOne.sessionId)
 
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: siblingOne.sessionId,
       content: '第一个方案',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: siblingTwo.sessionId,
       content: '第二个方案',
     })
     await expect(
       driver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: siblingOne.sessionId,
       }),
     ).resolves.toMatchObject({
@@ -258,7 +258,7 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
     })
     await expect(
       driver.getTranscript({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: siblingTwo.sessionId,
       }),
     ).resolves.toMatchObject({
@@ -277,7 +277,7 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
       '第一个方案',
     )
     const grandchild = await driver.forkSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: siblingOne.sessionId,
       entryId: grandchildSourceId,
     })
@@ -293,7 +293,7 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
       userDataPath,
     })
     await expect(
-      restartedDriver.listSessions({ agentId: 'tangyuan' }),
+      restartedDriver.listSessions({ agentId: 'yuanxiao' }),
     ).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -338,7 +338,7 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
       userDataPath,
     })
     const rebuiltSessions = await rebuiltDriver.listSessions({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
     })
 
     expect(
@@ -393,11 +393,11 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const parent = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '父会话',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       content: '会被删掉的会话',
     })
@@ -406,7 +406,7 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
       parent.sessionId,
       '会被删掉的会话',
     )
-    const before = (await driver.listSessions({ agentId: 'tangyuan' })).length
+    const before = (await driver.listSessions({ agentId: 'yuanxiao' })).length
     const index = (await readJson(
       join(userDataPath, 'sessions/index.json'),
     )) as {
@@ -420,13 +420,13 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
 
     await expect(
       driver.forkSession({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: parent.sessionId,
         entryId: sourceId,
       }),
     ).rejects.toThrow()
     await expect(
-      driver.listSessions({ agentId: 'tangyuan' }),
+      driver.listSessions({ agentId: 'yuanxiao' }),
     ).resolves.toHaveLength(before)
   })
 })
@@ -441,24 +441,24 @@ describe('PiSdkDriver 会话运行配置', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const parent = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '父会话',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       content: '第一个问题',
     })
 
     // 父会话先换模型和 Thinking Level，分叉应继承这些「有效」取值而非创建时值。
     await driver.setSessionModel({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       providerId: 'anthropic',
       modelId: 'claude-opus-4-6',
     })
     await driver.setSessionThinkingLevel({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       level: 'high',
     })
@@ -469,14 +469,14 @@ describe('PiSdkDriver 会话运行配置', () => {
       '第一个问题',
     )
     const fork = await driver.forkSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       entryId: sourceId,
     })
 
     await expect(
       driver.getSessionModelInfo({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: fork.sessionId,
       }),
     ).resolves.toMatchObject({
@@ -487,20 +487,20 @@ describe('PiSdkDriver 会话运行配置', () => {
 
     // 分叉侧换配置不影响父会话。
     await driver.setSessionThinkingLevel({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: fork.sessionId,
       level: 'low',
     })
 
     await expect(
       driver.getSessionModelInfo({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: parent.sessionId,
       }),
     ).resolves.toMatchObject({ thinkingLevel: 'high' })
     await expect(
       driver.getSessionModelInfo({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: fork.sessionId,
       }),
     ).resolves.toMatchObject({ thinkingLevel: 'low' })
@@ -515,22 +515,22 @@ describe('PiSdkDriver 会话运行配置', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '换过模型的会话',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '第一个问题',
     })
     await driver.setSessionModel({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       providerId: 'anthropic',
       modelId: 'claude-opus-4-6',
     })
     await driver.setSessionThinkingLevel({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       level: 'medium',
     })
@@ -540,11 +540,11 @@ describe('PiSdkDriver 会话运行配置', () => {
       rootPath,
       userDataPath,
     })
-    await restartedDriver.listSessions({ agentId: 'tangyuan' })
+    await restartedDriver.listSessions({ agentId: 'yuanxiao' })
 
     await expect(
       restartedDriver.getSessionModelInfo({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
     ).resolves.toMatchObject({
@@ -563,22 +563,22 @@ describe('PiSdkDriver 会话运行配置', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '换过模型的会话',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '第一个问题',
     })
     await driver.setSessionModel({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       providerId: 'anthropic',
       modelId: 'claude-opus-4-6',
     })
     await driver.setSessionThinkingLevel({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       level: 'medium',
     })
@@ -589,11 +589,11 @@ describe('PiSdkDriver 会话运行配置', () => {
       rootPath,
       userDataPath,
     })
-    await rebuiltDriver.listSessions({ agentId: 'tangyuan' })
+    await rebuiltDriver.listSessions({ agentId: 'yuanxiao' })
 
     await expect(
       rebuiltDriver.getSessionModelInfo({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
     ).resolves.toMatchObject({

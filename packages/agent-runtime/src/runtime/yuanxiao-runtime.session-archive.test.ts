@@ -1,17 +1,17 @@
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
   type ListSessionsRequest,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { describe, expect, it, vi } from 'vitest'
-import { createTangyuanRuntimeForTesting } from './tangyuan-runtime'
+import { createYuanxiaoRuntimeForTesting } from './yuanxiao-runtime'
 import {
   createDeferred,
   createRuntimeDriver,
   createSessionDriver,
   createSessionSummary,
   createSnapshot,
-} from './tangyuan-runtime.test-helpers'
+} from './yuanxiao-runtime.test-helpers'
 
 function createSession(
   sessionId: string,
@@ -60,7 +60,7 @@ function createArchiveDriver(sessions: AgentSessionSummary[]) {
   return Object.assign(driver, { setSessionsArchived, addSession })
 }
 
-describe('TangyuanRuntime 会话谱系归档与恢复', () => {
+describe('YuanxiaoRuntime 会话谱系归档与恢复', () => {
   it('只归档目标及全部后代，并整棵恢复到原父子位置', async () => {
     const parent = createSession('parent')
     const child = createSession('child', {
@@ -78,14 +78,14 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
       grandchild,
       sibling,
     ])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(createSnapshot()),
       sessionDriver,
     })
 
     await expect(
       runtime.archiveSession({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: parent.sessionId,
         confirmActivityStop: false,
       }),
@@ -96,7 +96,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     })
     await expect(runtime.listSessions()).resolves.toEqual([sibling])
     await expect(
-      runtime.listSessions(TANGYUAN_DEFAULT_AGENT_ID, true),
+      runtime.listSessions(YUANXIAO_DEFAULT_AGENT_ID, true),
     ).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -116,7 +116,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     )
 
     const recovered = await runtime.recoverSession({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: parent.sessionId,
     })
     expect(recovered.map((session) => session.sessionId)).toEqual([
@@ -155,14 +155,14 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
         await cancelDeferred.promise
       }
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(createSnapshot()),
       sessionDriver,
     })
     await runtime.listSessions()
     const gateway = runtime.createToolApprovalGateway()
     const approval = gateway.requestBashApproval({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: child.sessionId,
       runId: 'run-child',
       command: 'bun run test',
@@ -170,7 +170,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
       riskDescription: '测试审批',
     })
     const clarification = gateway.requestClarification({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: child.sessionId,
       runId: 'run-child',
       question: '继续吗？',
@@ -180,7 +180,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
 
     await expect(
       runtime.archiveSession({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: parent.sessionId,
         confirmActivityStop: false,
       }),
@@ -200,13 +200,13 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     expect(runtime.getPendingClarifications()).toHaveLength(1)
 
     const archivePromise = runtime.archiveSession({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: parent.sessionId,
       confirmActivityStop: true,
     })
     await vi.waitFor(() => {
       expect(sessionDriver.cancelRun).toHaveBeenCalledWith({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: child.sessionId,
       })
     })
@@ -226,7 +226,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
       state: 'running' as const,
     }
     const sessionDriver = createArchiveDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(createSnapshot()),
       sessionDriver,
     })
@@ -256,7 +256,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
       await allowRunStart.promise
       sessionDriver.emit({
         type: 'attempt-started',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
         occurredAt: '2026-07-29T00:00:00.000Z',
@@ -266,14 +266,14 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     sessionDriver.cancelRun = vi.fn(async () => {
       sessionDriver.emit({
         type: 'turn-cancelled',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
         occurredAt: '2026-07-29T00:00:01.000Z',
       })
       allowRunFinish.resolve()
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(
         createSnapshot({
           providerId: 'anthropic',
@@ -285,7 +285,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     })
 
     const sendPromise = runtime.sendMessage({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       content: '开始运行',
     })
@@ -294,7 +294,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     })
 
     const archivePromise = runtime.archiveSession({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       confirmActivityStop: true,
     })
@@ -305,7 +305,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     await expect(archivePromise).resolves.toMatchObject({ status: 'archived' })
     await sendPromise
     expect(sessionDriver.cancelRun).toHaveBeenCalledWith({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
     })
   })
@@ -313,16 +313,16 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
   it('归档后不允许通过运行时 transcript 缓存打开会话', async () => {
     const session = createSession('session')
     const sessionDriver = createArchiveDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(createSnapshot()),
       sessionDriver,
     })
     sessionDriver.emit({
       type: 'message-appended',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       message: {
         messageId: 'message-1',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         role: 'user',
         content: '缓存内容',
@@ -332,20 +332,20 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     })
     await expect(
       runtime.getTranscript({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
       }),
     ).resolves.toMatchObject({ sessionId: session.sessionId })
 
     await runtime.archiveSession({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       confirmActivityStop: false,
     })
 
     await expect(
       runtime.getTranscript({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
       }),
     ).rejects.toThrow(/找不到|已归档/)
@@ -365,7 +365,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
       sessionDriver.addSession(child)
       return child
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(
         createSnapshot({
           providerId: 'anthropic',
@@ -377,7 +377,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     })
 
     const forkPromise = runtime.forkSession({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: parent.sessionId,
       entryId: 'parent-source',
     })
@@ -385,14 +385,14 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
       expect(sessionDriver.forkSession).toHaveBeenCalledOnce()
     })
     const archivePromise = runtime.archiveSession({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: parent.sessionId,
       confirmActivityStop: false,
     })
 
     await expect(
       runtime.sendMessage({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: sibling.sessionId,
         content: '兄弟会话继续运行',
       }),
@@ -422,7 +422,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
       target,
       sibling,
     ])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(
         createSnapshot({
           providerId: 'anthropic',
@@ -436,7 +436,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     for (const session of activeSessions) {
       sessionDriver.emit({
         type: 'attempt-started',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: `run-${session.sessionId}`,
         occurredAt: '2026-07-29T00:00:00.000Z',
@@ -444,12 +444,12 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     }
 
     void runtime.sendMessage({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: target.sessionId,
       content: '目标排队消息',
     })
     void runtime.sendMessage({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: sibling.sessionId,
       content: '兄弟排队消息',
     })
@@ -469,7 +469,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
     })
 
     await runtime.archiveSession({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: target.sessionId,
       confirmActivityStop: true,
     })
@@ -478,7 +478,7 @@ describe('TangyuanRuntime 会话谱系归档与恢复', () => {
   })
 })
 
-describe('TangyuanRuntime 会话谱系永久删除', () => {
+describe('YuanxiaoRuntime 会话谱系永久删除', () => {
   it('确认后级联删除目标及全部后代，不影响兄弟', async () => {
     const parent = createSession('parent')
     const child = createSession('child', {
@@ -499,14 +499,14 @@ describe('TangyuanRuntime 会话谱系永久删除', () => {
     sessionDriver.deleteSessions = vi.fn(async () => {
       // 模拟删除后会话不再出现在列表中
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(createSnapshot()),
       sessionDriver,
     })
 
     await expect(
       runtime.deleteSession({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: parent.sessionId,
         confirmActivityStop: false,
       }),
@@ -533,14 +533,14 @@ describe('TangyuanRuntime 会话谱系永久删除', () => {
     }
     const sessionDriver = createArchiveDriver([parent, child])
     sessionDriver.deleteSessions = vi.fn()
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(createSnapshot()),
       sessionDriver,
     })
 
     await expect(
       runtime.deleteSession({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: parent.sessionId,
         confirmActivityStop: false,
       }),
@@ -559,14 +559,14 @@ describe('TangyuanRuntime 会话谱系永久删除', () => {
     }
     const sessionDriver = createArchiveDriver([session])
     sessionDriver.deleteSessions = vi.fn()
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(createSnapshot()),
       sessionDriver,
     })
 
     await expect(
       runtime.deleteSession({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         confirmActivityStop: true,
       }),
@@ -597,27 +597,27 @@ describe('TangyuanRuntime 会话谱系永久删除', () => {
           (request.includeArchived || s.archivedAt === undefined),
       )
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(createSnapshot()),
       sessionDriver,
     })
 
     await runtime.deleteSession({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: parent.sessionId,
       confirmActivityStop: false,
     })
 
     await expect(
       runtime.getTranscript({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: child.sessionId,
       }),
     ).rejects.toThrow(/找不到会话/)
   })
 })
 
-describe('TangyuanRuntime 祖先谱系完整性检查', () => {
+describe('YuanxiaoRuntime 祖先谱系完整性检查', () => {
   it('祖先 transcript 不可读时后代标记为 lineageUnavailable', async () => {
     const grandparent = createSession('grandparent')
     const parent = createSession('parent', {
@@ -643,7 +643,7 @@ describe('TangyuanRuntime 祖先谱系完整性检查', () => {
       }
       return originalGetTranscript(request)
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(createSnapshot()),
       sessionDriver,
     })
@@ -679,7 +679,7 @@ describe('TangyuanRuntime 祖先谱系完整性检查', () => {
         updatedAt: '2026-07-29T00:00:00.000Z',
       }
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(
         createSnapshot({
           providerId: 'anthropic',
@@ -695,7 +695,7 @@ describe('TangyuanRuntime 祖先谱系完整性检查', () => {
 
     await expect(
       runtime.sendMessage({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: child.sessionId,
         content: 'test',
       }),
@@ -720,7 +720,7 @@ describe('TangyuanRuntime 祖先谱系完整性检查', () => {
         updatedAt: '2026-07-29T00:00:00.000Z',
       }
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(createSnapshot()),
       sessionDriver,
     })
@@ -729,7 +729,7 @@ describe('TangyuanRuntime 祖先谱系完整性检查', () => {
 
     await expect(
       runtime.getTranscript({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: child.sessionId,
       }),
     ).rejects.toThrow(/祖先.*丢失或损坏/)
@@ -754,7 +754,7 @@ describe('TangyuanRuntime 祖先谱系完整性检查', () => {
         updatedAt: '2026-07-29T00:00:00.000Z',
       }
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(createSnapshot()),
       sessionDriver,
     })
@@ -777,7 +777,7 @@ describe('TangyuanRuntime 祖先谱系完整性检查', () => {
     const session = createSession('root')
     const sessionDriver = createArchiveDriver([session])
     // getTranscript 不应被调用（根会话无祖先）
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver: createRuntimeDriver(createSnapshot()),
       sessionDriver,
     })

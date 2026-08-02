@@ -1,23 +1,23 @@
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   type RuntimeConfiguration,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { describe, expect, it, vi } from 'vitest'
-import { createTangyuanRuntimeForTesting } from './tangyuan-runtime'
+import { createYuanxiaoRuntimeForTesting } from './yuanxiao-runtime'
 import {
   createDeferred,
   createRuntimeDriver,
   createSessionDriver,
   createSessionSummary,
   createSnapshot,
-} from './tangyuan-runtime.test-helpers'
+} from './yuanxiao-runtime.test-helpers'
 
-describe('TangyuanRuntime', () => {
+describe('YuanxiaoRuntime', () => {
   it('coordinates runtime snapshot requests through the runtime driver', async () => {
     const snapshot = createSnapshot()
     const runtimeDriver = createRuntimeDriver(snapshot)
     const sessionDriver = createSessionDriver([])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -35,24 +35,24 @@ describe('TangyuanRuntime', () => {
       }),
     )
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
 
     await expect(
       runtime.createSession({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         title: '新会话',
       }),
     ).resolves.toEqual(session)
     await expect(runtime.listSessions()).resolves.toEqual([session])
     expect(sessionDriver.createSession).toHaveBeenCalledWith({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       title: '新会话',
     })
     expect(sessionDriver.listSessions).toHaveBeenCalledWith({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
     })
   })
   it('sends messages through the session driver only when runtime is ready', async () => {
@@ -67,7 +67,7 @@ describe('TangyuanRuntime', () => {
     const sessionDriver = createSessionDriver([session])
     sessionDriver.messages.set(session.sessionId, {
       sessionId: session.sessionId,
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       entries: [
         {
           kind: 'user-message',
@@ -79,14 +79,14 @@ describe('TangyuanRuntime', () => {
       ],
       updatedAt: '2026-07-08T00:00:00.000Z',
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
 
     await expect(
       runtime.sendMessage({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         content: '你好',
       }),
@@ -99,7 +99,7 @@ describe('TangyuanRuntime', () => {
     )
 
     expect(sessionDriver.sendMessage).toHaveBeenCalledWith({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       content: '你好',
     })
@@ -117,10 +117,10 @@ describe('TangyuanRuntime', () => {
     sessionDriver.sendMessage = vi.fn(async () => {
       sessionDriver.emit({
         type: 'message-appended',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         message: {
           messageId: 'message-agent-1',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: session.sessionId,
           role: 'agent',
           content: '',
@@ -130,14 +130,14 @@ describe('TangyuanRuntime', () => {
       })
       sessionDriver.emit({
         type: 'attempt-started',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
         occurredAt: '2026-07-08T00:00:01.000Z',
       })
       sessionDriver.emit({
         type: 'message-delta',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
         messageId: 'message-agent-1',
@@ -146,7 +146,7 @@ describe('TangyuanRuntime', () => {
       })
       sessionDriver.emit({
         type: 'message-delta',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
         messageId: 'message-agent-1',
@@ -155,12 +155,12 @@ describe('TangyuanRuntime', () => {
       })
       sessionDriver.emit({
         type: 'message-completed',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
         message: {
           messageId: 'message-agent-1',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: session.sessionId,
           role: 'agent',
           content: '你好',
@@ -170,20 +170,20 @@ describe('TangyuanRuntime', () => {
       })
       sessionDriver.emit({
         type: 'run-state-changed',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         state: 'completed',
         occurredAt: '2026-07-08T00:00:05.000Z',
       })
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
 
     await expect(
       runtime.sendMessage({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         content: '你好',
       }),
@@ -214,14 +214,14 @@ describe('TangyuanRuntime', () => {
     sessionDriver.sendMessage = vi.fn(async () => {
       sessionDriver.emit({
         type: 'attempt-started',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
         occurredAt: '2026-07-08T00:00:01.000Z',
       })
       sessionDriver.emit({
         type: 'activity-updated',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
         activity: {
@@ -233,7 +233,7 @@ describe('TangyuanRuntime', () => {
       })
       sessionDriver.emit({
         type: 'activity-updated',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
         activity: {
@@ -245,7 +245,7 @@ describe('TangyuanRuntime', () => {
       })
       sessionDriver.emit({
         type: 'turn-failed',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
         error: {
@@ -257,21 +257,21 @@ describe('TangyuanRuntime', () => {
       })
       throw new Error('模型服务暂时不可用')
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
 
     await expect(
       runtime.sendMessage({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         content: '你好',
       }),
     ).rejects.toThrow('模型服务暂时不可用')
     await expect(
       runtime.getTranscript({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
       }),
     ).resolves.toEqual(expect.objectContaining({ entries: [] }))
@@ -286,16 +286,16 @@ describe('TangyuanRuntime', () => {
       }),
     )
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
     sessionDriver.emit({
       type: 'message-appended',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       message: {
         messageId: 'message-agent-1',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         role: 'agent',
         content: '',
@@ -305,14 +305,14 @@ describe('TangyuanRuntime', () => {
     })
     sessionDriver.emit({
       type: 'attempt-started',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       occurredAt: '2026-07-08T00:00:01.000Z',
     })
     sessionDriver.emit({
       type: 'message-delta',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       messageId: 'message-agent-1',
@@ -322,7 +322,7 @@ describe('TangyuanRuntime', () => {
     sessionDriver.cancelRun = vi.fn(async () => {
       sessionDriver.emit({
         type: 'turn-cancelled',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
         occurredAt: '2026-07-08T00:00:03.000Z',
@@ -331,13 +331,13 @@ describe('TangyuanRuntime', () => {
 
     await expect(
       runtime.cancelRun({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
       }),
     ).resolves.toEqual(expect.objectContaining({ state: 'cancelled' }))
     await expect(
       runtime.getTranscript({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
       }),
     ).resolves.toEqual(
@@ -367,7 +367,7 @@ describe('TangyuanRuntime', () => {
     sessionDriver.sendMessage = vi.fn(async (request) => {
       sessionDriver.emit({
         type: 'attempt-started',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: request.sessionId,
         runId: `${request.sessionId}-run-1`,
         occurredAt: '2026-07-08T00:00:01.000Z',
@@ -380,19 +380,19 @@ describe('TangyuanRuntime', () => {
 
       sessionDriver.emit({
         type: 'run-state-changed',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: request.sessionId,
         state: 'completed',
         occurredAt: '2026-07-08T00:00:05.000Z',
       })
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
     await runtime.listSessions()
     const firstRun = runtime.sendMessage({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: sessionOne.sessionId,
       content: '第一条',
     })
@@ -400,14 +400,14 @@ describe('TangyuanRuntime', () => {
 
     await expect(
       runtime.sendMessage({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: sessionOne.sessionId,
         content: '重复发送',
       }),
     ).rejects.toThrow('当前会话正在运行')
     await expect(
       runtime.sendMessage({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: sessionTwo.sessionId,
         content: '另一个会话',
       }),
@@ -423,14 +423,14 @@ describe('TangyuanRuntime', () => {
   it('blocks sending messages when runtime configuration is missing', async () => {
     const runtimeDriver = createRuntimeDriver(createSnapshot())
     const sessionDriver = createSessionDriver([])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
 
     await expect(
       runtime.sendMessage({
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: 'session-1',
         content: '你好',
       }),
@@ -445,7 +445,7 @@ describe('TangyuanRuntime', () => {
     })
     const runtimeDriver = createRuntimeDriver(savedSnapshot)
     const sessionDriver = createSessionDriver([])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -467,7 +467,7 @@ describe('TangyuanRuntime', () => {
       .fn()
       .mockRejectedValue(new Error('验证失败'))
     const sessionDriver = createSessionDriver([])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -484,7 +484,7 @@ describe('TangyuanRuntime', () => {
     const snapshot = createSnapshot()
     const runtimeDriver = createRuntimeDriver(snapshot)
     const sessionDriver = createSessionDriver([])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -507,7 +507,7 @@ describe('TangyuanRuntime', () => {
     })
     const runtimeDriver = createRuntimeDriver(restoredSnapshot)
     const sessionDriver = createSessionDriver([])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -519,7 +519,7 @@ describe('TangyuanRuntime', () => {
     const resetSnapshot = createSnapshot()
     const runtimeDriver = createRuntimeDriver(resetSnapshot)
     const sessionDriver = createSessionDriver([])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -533,7 +533,7 @@ describe('TangyuanRuntime', () => {
     const runtimeDriver = createRuntimeDriver(snapshot)
     delete runtimeDriver.restoreFromBackup
     const sessionDriver = createSessionDriver([])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -547,7 +547,7 @@ describe('TangyuanRuntime', () => {
     const runtimeDriver = createRuntimeDriver(snapshot)
     delete runtimeDriver.resetConfiguration
     const sessionDriver = createSessionDriver([])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -565,7 +565,7 @@ describe('TangyuanRuntime', () => {
       content: '# Soul content',
       updatedAt: '2026-07-17T00:00:00.000Z',
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -585,7 +585,7 @@ describe('TangyuanRuntime', () => {
       content: '# User profile',
       updatedAt: '2026-07-17T00:00:00.000Z',
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -605,7 +605,7 @@ describe('TangyuanRuntime', () => {
       status: 'updated',
       version: 'sha256:new',
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -635,7 +635,7 @@ describe('TangyuanRuntime', () => {
       status: 'updated',
       version: 'sha256:new',
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })

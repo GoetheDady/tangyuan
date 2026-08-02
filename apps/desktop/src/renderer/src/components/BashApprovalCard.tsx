@@ -1,4 +1,4 @@
-import type { BashApprovalRequest } from '@tangyuan/contracts'
+import type { BashApprovalRequest } from '@yuanxiao/contracts'
 import {
   Ban,
   Check,

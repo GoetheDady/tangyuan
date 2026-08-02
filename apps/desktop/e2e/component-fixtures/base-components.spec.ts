@@ -1292,7 +1292,7 @@ test.describe('基础组件验收夹具', () => {
 
     const nameInput = page.getByLabel('显示名称')
     await expect(nameInput).toBeVisible()
-    await expect(nameInput).toHaveValue('汤圆')
+    await expect(nameInput).toHaveValue('元宵')
 
     const longValueInput = page.getByLabel('长值输入')
     await expect(longValueInput).toBeVisible()

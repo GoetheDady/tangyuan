@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcInvoke, IpcSubscribe } from './api'
-import { createTangyuanPreloadApi } from './api'
+import { createYuanxiaoPreloadApi } from './api'
 
 const invoke: IpcInvoke = (channel, ...payload) =>
   ipcRenderer.invoke(channel, ...payload)
@@ -17,7 +17,7 @@ const subscribe: IpcSubscribe = (channel, listener) => {
     ipcRenderer.off(channel, handler)
   }
 }
-const api = createTangyuanPreloadApi(invoke, subscribe)
+const api = createYuanxiaoPreloadApi(invoke, subscribe)
 
 if (process.contextIsolated) {
   try {

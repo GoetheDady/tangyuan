@@ -36,7 +36,7 @@ const semanticTokenNames = [
   'input-hover',
   'ring',
   'radius',
-  // 黑芝麻汤圆基础语义与交互状态。
+  // 黑芝麻元宵基础语义与交互状态。
   'info-soft',
   'info-border',
   'info-foreground',
@@ -83,7 +83,7 @@ const semanticTokenNames = [
 ] as const
 
 test.describe('Renderer 全局主题', () => {
-  test('暴露完整且向后兼容的黑芝麻汤圆语义 Token', async ({ page }) => {
+  test('暴露完整且向后兼容的黑芝麻元宵语义 Token', async ({ page }) => {
     const initScript = createPreloadApiInitScript(
       createReadyRuntimeSnapshot(),
       createTestSessions(1),
@@ -91,7 +91,7 @@ test.describe('Renderer 全局主题', () => {
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan')
+    await page.goto('/#/chat/yuanxiao')
     await page.waitForSelector('#composer')
 
     const result = await page.evaluate((tokenNames) => {

@@ -5,7 +5,7 @@ import {
   createDefaultSessionSummary,
   type AgentSessionSummary,
   type TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import {
@@ -54,7 +54,7 @@ function installLineageApi(): void {
   vi.mocked(window.api.getRuntimeSnapshot).mockResolvedValue(readyRuntime)
   vi.mocked(window.api.refreshRuntime).mockResolvedValue(readyRuntime)
   vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId: 'parent-session',
     updatedAt: '2026-07-28T00:02:00.000Z',
   })
@@ -112,7 +112,7 @@ function installLineageApi(): void {
 
     return {
       sessionId: request.sessionId,
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       entries: entriesBySession[request.sessionId] ?? [],
       updatedAt: '2026-07-28T00:02:00.000Z',
     } as never
@@ -127,7 +127,7 @@ describe('App 递归会话谱系与分叉来源提示', () => {
   })
 
   it('侧边栏按任意深度展示分叉谱系', async () => {
-    window.location.hash = '#/chat/tangyuan/parent-session'
+    window.location.hash = '#/chat/yuanxiao/parent-session'
 
     render(<App />)
 
@@ -146,7 +146,7 @@ describe('App 递归会话谱系与分叉来源提示', () => {
 
   it('分叉会话顶部展示来源提示，点击后跳回父会话的来源消息', async () => {
     const user = userEvent.setup()
-    window.location.hash = '#/chat/tangyuan/child-session'
+    window.location.hash = '#/chat/yuanxiao/child-session'
 
     render(<App />)
 
@@ -154,7 +154,7 @@ describe('App 递归会话谱系与分叉来源提示', () => {
     await user.click(screen.getByRole('button', { name: '查看来源消息' }))
 
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/chat/tangyuan/parent-session')
+      expect(window.location.hash).toBe('#/chat/yuanxiao/parent-session')
     })
     expect(
       await screen.findByRole('heading', { name: '父会话' }),
@@ -165,14 +165,14 @@ describe('App 递归会话谱系与分叉来源提示', () => {
       )
     })
     expect(window.api.setLastActiveSession).toHaveBeenCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'parent-session',
     })
   })
 
   it('从孙会话可逐级跳回上一层的来源消息', async () => {
     const user = userEvent.setup()
-    window.location.hash = '#/chat/tangyuan/grandchild-session'
+    window.location.hash = '#/chat/yuanxiao/grandchild-session'
 
     render(<App />)
 
@@ -180,7 +180,7 @@ describe('App 递归会话谱系与分叉来源提示', () => {
     await user.click(screen.getByRole('button', { name: '查看来源消息' }))
 
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/chat/tangyuan/child-session')
+      expect(window.location.hash).toBe('#/chat/yuanxiao/child-session')
     })
     await waitFor(() => {
       expect(screen.getByTestId('fork-source-message')).toHaveTextContent(
@@ -196,7 +196,7 @@ describe('App 递归会话谱系与分叉来源提示', () => {
       entryId: 'missing-entry',
     })
     vi.mocked(window.api.listSessions).mockResolvedValue([orphan])
-    window.location.hash = '#/chat/tangyuan/orphan-session'
+    window.location.hash = '#/chat/yuanxiao/orphan-session'
 
     render(<App />)
 
@@ -213,7 +213,7 @@ describe('App 递归会话谱系与分叉来源提示', () => {
 
   it('快速切换父会话与分叉时只保留最后一次选择', async () => {
     const user = userEvent.setup()
-    window.location.hash = '#/chat/tangyuan/parent-session'
+    window.location.hash = '#/chat/yuanxiao/parent-session'
 
     render(<App />)
 
@@ -248,7 +248,7 @@ describe('App 递归会话谱系与分叉来源提示', () => {
 
     await waitFor(() => {
       expect(window.api.setLastActiveSession).toHaveBeenLastCalledWith({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'child-session',
       })
     })
@@ -256,7 +256,7 @@ describe('App 递归会话谱系与分叉来源提示', () => {
 
     await act(async () => {
       parentTranscript.resolve({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'parent-session',
         entries: [
           {
@@ -275,17 +275,17 @@ describe('App 递归会话谱系与分叉来源提示', () => {
     expect(screen.getByText('最后选择的子会话内容')).toBeInTheDocument()
     expect(screen.queryByText('过期返回的父会话内容')).not.toBeInTheDocument()
     expect(window.api.setLastActiveSession).toHaveBeenLastCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'child-session',
     })
-    expect(window.location.hash).toBe('#/chat/tangyuan/child-session')
+    expect(window.location.hash).toBe('#/chat/yuanxiao/child-session')
   })
 
   it('较早会话的持久化延迟时最后激活记录仍以最后选择为准', async () => {
     const user = userEvent.setup()
     const releaseParentWrite = createDeferred<void>()
     let persistedSessionId: string | null = null
-    window.location.hash = '#/chat/tangyuan/parent-session'
+    window.location.hash = '#/chat/yuanxiao/parent-session'
 
     render(<App />)
 
@@ -308,7 +308,7 @@ describe('App 递归会话谱系与分叉来源提示', () => {
     await user.click(screen.getByRole('treeitem', { name: /父会话/ }))
     await waitFor(() => {
       expect(window.api.setLastActiveSession).toHaveBeenCalledWith({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'parent-session',
       })
     })

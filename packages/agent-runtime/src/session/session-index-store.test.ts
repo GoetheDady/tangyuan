@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type {
   ConfigEncryptionAdapter,
   InternalRuntimeConfig,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { ConfigStore, DirectoryLayout } from '../core'
 import {
   SessionIndexStore,
@@ -37,7 +37,7 @@ function createFakeGateway(
   }> = [],
 ): PiSdkGateway {
   return {
-    // 全局扫描返回的会话默认归属默认汤圆的 Agent Home。
+    // 全局扫描返回的会话默认归属默认元宵的 Agent Home。
     listSessions: async () =>
       sessions.map((session) => ({
         ...session,
@@ -57,7 +57,7 @@ function makeEntry(
     updatedAt: '2026-01-01',
     provider: 'openai',
     model: 'gpt-4',
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     lastMessagePreview: '',
     status: 'idle',
     ...overrides,
@@ -77,7 +77,7 @@ async function makeStore(
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'session-index-'))
   layout = new DirectoryLayout({
-    agentHomePath: join(dir, 'agents', 'tangyuan'),
+    agentHomePath: join(dir, 'agents', 'yuanxiao'),
     fsRoot: dir,
     userDataPath: dir,
   })
@@ -98,7 +98,7 @@ describe('SessionIndexStore.addSession / 摘要派生', () => {
     const summary = store.addSession(makeEntry())
 
     expect(summary).toEqual({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 's1',
       title: '会话一',
       state: 'idle',
@@ -106,7 +106,7 @@ describe('SessionIndexStore.addSession / 摘要派生', () => {
     })
     expect(store.hasSummary('s1')).toBe(true)
     expect(store.getEntry('s1').model).toBe('gpt-4')
-    expect(store.listSummaries('tangyuan')).toHaveLength(1)
+    expect(store.listSummaries('yuanxiao')).toHaveLength(1)
     expect(store.listSummaries('other')).toHaveLength(0)
   })
 
@@ -150,10 +150,10 @@ describe('SessionIndexStore 会话归档', () => {
 
     await store.setArchived(['parent', 'child'], '2026-07-29T03:00:00.000Z')
 
-    expect(store.listSummaries('tangyuan')).toEqual([
+    expect(store.listSummaries('yuanxiao')).toEqual([
       expect.objectContaining({ sessionId: 'sibling' }),
     ])
-    expect(store.listSummaries('tangyuan', true)).toEqual(
+    expect(store.listSummaries('yuanxiao', true)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           sessionId: 'parent',
@@ -169,7 +169,7 @@ describe('SessionIndexStore 会话归档', () => {
 
     const reloadedStore = await makeStore()
     await reloadedStore.load()
-    expect(reloadedStore.listSummaries('tangyuan')).toHaveLength(1)
+    expect(reloadedStore.listSummaries('yuanxiao')).toHaveLength(1)
     expect(reloadedStore.getSummary('child')).toMatchObject({
       archivedAt: '2026-07-29T03:00:00.000Z',
     })
@@ -240,8 +240,8 @@ describe('SessionIndexStore.load 重建', () => {
       schemaVersion: 2,
       providers: { openai: { apiKey: 'sk-x', updatedAt: 'now' } },
       agents: {
-        tangyuan: {
-          displayName: '汤圆',
+        yuanxiao: {
+          displayName: '元宵',
           defaultProviderId: 'openai',
           defaultModelId: 'gpt-4',
           status: 'active',
@@ -273,8 +273,8 @@ describe('SessionIndexStore.load 重建', () => {
       schemaVersion: 2,
       providers: { openai: { apiKey: 'sk-x', updatedAt: 'now' } },
       agents: {
-        tangyuan: {
-          displayName: '汤圆',
+        yuanxiao: {
+          displayName: '元宵',
           defaultProviderId: 'openai',
           defaultModelId: 'gpt-4',
           status: 'active',
@@ -316,8 +316,8 @@ describe('SessionIndexStore.load 重建', () => {
       schemaVersion: 2,
       providers: {},
       agents: {
-        tangyuan: {
-          displayName: '汤圆',
+        yuanxiao: {
+          displayName: '元宵',
           defaultProviderId: null,
           defaultModelId: null,
           status: 'active',
@@ -339,8 +339,8 @@ describe('SessionIndexStore.load 重建', () => {
         anthropic: { apiKey: 'sk-y', updatedAt: 'now' },
       },
       agents: {
-        tangyuan: {
-          displayName: '汤圆',
+        yuanxiao: {
+          displayName: '元宵',
           defaultProviderId: 'openai',
           defaultModelId: 'gpt-4',
           status: 'active',
@@ -378,8 +378,8 @@ describe('SessionIndexStore.load 重建', () => {
       schemaVersion: 2,
       providers: { openai: { apiKey: 'sk-x', updatedAt: 'now' } },
       agents: {
-        tangyuan: {
-          displayName: '汤圆',
+        yuanxiao: {
+          displayName: '元宵',
           defaultProviderId: 'openai',
           defaultModelId: 'gpt-4',
           status: 'active',
@@ -395,7 +395,7 @@ describe('SessionIndexStore.load 重建', () => {
     const store = await makeStore(failingGateway)
 
     await expect(store.load()).resolves.toEqual([])
-    expect(store.listSummaries('tangyuan')).toEqual([])
+    expect(store.listSummaries('yuanxiao')).toEqual([])
   })
 
   it('按 session header 工作目录归属 Agent，无法归属的会话不入索引', async () => {
@@ -403,8 +403,8 @@ describe('SessionIndexStore.load 重建', () => {
       schemaVersion: 2,
       providers: { openai: { apiKey: 'sk-x', updatedAt: 'now' } },
       agents: {
-        tangyuan: {
-          displayName: '汤圆',
+        yuanxiao: {
+          displayName: '元宵',
           defaultProviderId: 'openai',
           defaultModelId: 'gpt-4',
           status: 'active',
@@ -422,9 +422,9 @@ describe('SessionIndexStore.load 重建', () => {
     const store = await makeStore(
       createFakeGateway([
         {
-          sessionId: 'tangyuan-session',
+          sessionId: 'yuanxiao-session',
           sdkSessionFile: '/tmp/a.jsonl',
-          title: '汤圆会话',
+          title: '元宵会话',
           cwd: layout.agentHome(),
           createdAt: 'now',
           updatedAt: 'now',
@@ -451,8 +451,8 @@ describe('SessionIndexStore.load 重建', () => {
     await store.load()
 
     expect(
-      store.listSummaries('tangyuan').map((item) => item.sessionId),
-    ).toEqual(['tangyuan-session'])
+      store.listSummaries('yuanxiao').map((item) => item.sessionId),
+    ).toEqual(['yuanxiao-session'])
     expect(store.listSummaries('helper').map((item) => item.sessionId)).toEqual(
       ['helper-session'],
     )
@@ -464,8 +464,8 @@ describe('SessionIndexStore.load 重建', () => {
       schemaVersion: 2,
       providers: { openai: { apiKey: 'sk-x', updatedAt: 'now' } },
       agents: {
-        tangyuan: {
-          displayName: '汤圆',
+        yuanxiao: {
+          displayName: '元宵',
           defaultProviderId: 'openai',
           defaultModelId: 'gpt-4',
           status: 'active',
@@ -504,7 +504,7 @@ describe('SessionIndexStore.load 重建', () => {
 
     await store.load()
 
-    expect(store.listSummaries('tangyuan')).toEqual([])
+    expect(store.listSummaries('yuanxiao')).toEqual([])
     expect(
       store.listSummaries('retired').map((item) => item.sessionId),
     ).toEqual(expect.arrayContaining(['retired-root', 'retired-fork']))

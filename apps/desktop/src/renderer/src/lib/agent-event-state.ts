@@ -3,7 +3,7 @@ import type {
   AgentSummary,
   BashApprovalRequest,
   QuestionClarificationRequest,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
 /** 将 Agent 生命周期事件归并到 Agent 摘要集合。 */
 export function mergeAgentEventIntoAgents(

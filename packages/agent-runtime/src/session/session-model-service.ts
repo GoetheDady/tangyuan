@@ -3,7 +3,7 @@ import type {
   SessionModelInfo,
   SetSessionModelRequest,
   SetSessionThinkingLevelRequest,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import type { AgentSessionDriver } from '../driver'
 
 /**

@@ -6,14 +6,14 @@ export default defineConfig({
   main: {
     build: {
       externalizeDeps: {
-        exclude: ['@tangyuan/agent-runtime', '@tangyuan/contracts'],
+        exclude: ['@yuanxiao/agent-runtime', '@yuanxiao/contracts'],
       },
     },
   },
   preload: {
     build: {
       externalizeDeps: {
-        exclude: ['@tangyuan/contracts'],
+        exclude: ['@yuanxiao/contracts'],
       },
     },
   },
@@ -27,7 +27,7 @@ export default defineConfig({
     plugins: [react()],
     // 将 workspace 包从依赖预打包中排除，使 Vite 把它们当源码处理并启用 HMR。
     optimizeDeps: {
-      exclude: ['@tangyuan/contracts', '@tangyuan/agent-runtime'],
+      exclude: ['@yuanxiao/contracts', '@yuanxiao/agent-runtime'],
     },
     server: {
       host: '0.0.0.0',

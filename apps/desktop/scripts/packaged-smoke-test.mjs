@@ -2,13 +2,14 @@
 import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const scriptDir = fileURLToPath(new URL('.', import.meta.url))
 const appRoot = resolve(scriptDir, '..')
 const repoRoot = resolve(appRoot, '../..')
+const macExecutableName = 'yuanxiao'
 
 /**
  * 运行桌面端 macOS 打包冒烟测试。
@@ -23,7 +24,7 @@ async function main() {
     )
   }
 
-  const tempRoot = await mkdtemp(join(tmpdir(), 'tangyuan-packaged-smoke-'))
+  const tempRoot = await mkdtemp(join(tmpdir(), 'yuanxiao-packaged-smoke-'))
   const resultPath = join(tempRoot, 'result.json')
   const homePath = join(tempRoot, 'home')
 
@@ -36,11 +37,11 @@ async function main() {
     await runPackagedApp(executablePath, resultPath, {
       ...process.env,
       HOME: homePath,
-      TANGYUAN_DESKTOP_SMOKE_TEST_RESULT_PATH: resultPath,
+      YUANXIAO_DESKTOP_SMOKE_TEST_RESULT_PATH: resultPath,
     })
 
     const result = JSON.parse(await readFile(resultPath, 'utf8'))
-    const agentHomePath = join(homePath, '.tangyuan', 'agents', 'tangyuan')
+    const agentHomePath = join(homePath, '.yuanxiao', 'agents', 'yuanxiao')
 
     if (!result.ok) {
       throw new Error(`打包应用自检失败：${JSON.stringify(result)}`)
@@ -60,7 +61,7 @@ async function main() {
       ].join('\n'),
     )
   } finally {
-    if (process.env['TANGYUAN_KEEP_SMOKE_TEST_TEMP'] !== '1') {
+    if (process.env['YUANXIAO_KEEP_SMOKE_TEST_TEMP'] !== '1') {
       await rm(tempRoot, { recursive: true, force: true })
     }
   }
@@ -107,9 +108,9 @@ async function runCommand(command, args, cwd) {
  */
 function findPackagedAppBundle() {
   const candidates = [
-    join(appRoot, 'dist', 'mac-arm64', 'apps-desktop.app'),
-    join(appRoot, 'dist', 'mac', 'apps-desktop.app'),
-    join(appRoot, 'dist', 'mac-universal', 'apps-desktop.app'),
+    join(appRoot, 'dist', 'mac-arm64', '元宵.app'),
+    join(appRoot, 'dist', 'mac', '元宵.app'),
+    join(appRoot, 'dist', 'mac-universal', '元宵.app'),
   ]
   const appBundlePath = candidates.find((candidate) => existsSync(candidate))
 
@@ -128,12 +129,11 @@ function findPackagedAppBundle() {
  * @throws 当可执行文件不存在时抛出错误。
  */
 function resolveMacExecutablePath(appBundlePath) {
-  const executableName = basename(appBundlePath, '.app')
   const executablePath = join(
     appBundlePath,
     'Contents',
     'MacOS',
-    executableName,
+    macExecutableName,
   )
 
   if (!existsSync(executablePath)) {

@@ -21,6 +21,6 @@ for (const fixture of [
     await expect(
       page.getByRole('heading', { name: fixture.heading }),
     ).toHaveCount(0)
-    await expect(page).toHaveURL(/#\/chat\/tangyuan/)
+    await expect(page).toHaveURL(/#\/chat\/yuanxiao/)
   })
 }

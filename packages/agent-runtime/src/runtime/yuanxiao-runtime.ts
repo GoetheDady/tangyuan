@@ -1,8 +1,8 @@
-import { TangyuanRuntimeOrchestrator } from './tangyuan-runtime-orchestrator'
-import type { TangyuanRuntimeDependencies } from './tangyuan-runtime-dependencies'
+import { YuanxiaoRuntimeOrchestrator } from './yuanxiao-runtime-orchestrator'
+import type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencies'
 import { collectSessionSubtree } from '../session/session-archive-coordinator'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   type ArchiveSessionRequest,
   type ArchiveSessionResult,
   type DeleteSessionRequest,
@@ -35,14 +35,14 @@ import {
   type TranscriptSnapshot,
   type UpdateAgentConfigRequest,
   type UserProfileContent,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 
-export type { TangyuanRuntimeDependencies } from './tangyuan-runtime-dependencies'
+export type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencies'
 
 /**
  * Electron Main 调用运行时行为的唯一高层接口。
  */
-class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
+class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
   /**
    * 读取当前运行时快照并写入 Runtime 缓存。
    *
@@ -127,7 +127,7 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
    * @throws 当 AgentSessionDriver 读取失败时，Promise 会 reject。
    */
   async listSessions(
-    agentId: string = TANGYUAN_DEFAULT_AGENT_ID,
+    agentId: string = YUANXIAO_DEFAULT_AGENT_ID,
     includeArchived = false,
   ): Promise<AgentSessionSummary[]> {
     const driverSessions = await this.sessionDriver.listSessions({
@@ -215,7 +215,7 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
       }
     }
 
-    const fallbackSessions = await this.listSessions(TANGYUAN_DEFAULT_AGENT_ID)
+    const fallbackSessions = await this.listSessions(YUANXIAO_DEFAULT_AGENT_ID)
     let fallbackSession: AgentSessionSummary | undefined
 
     for (const session of fallbackSessions) {
@@ -345,7 +345,7 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
   }
 
   /**
-   * 归档指定的自定义 Agent（默认汤圆不可归档）。
+   * 归档指定的自定义 Agent（默认元宵不可归档）。
    *
    * @param agentId - Agent 标识。
    * @returns 归档后的 AgentSummary。
@@ -374,7 +374,7 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
    */
   async reconcileAgentDirectories(): Promise<{
     agents: AgentSummary[]
-    unclaimedDirectories: import('@tangyuan/contracts').UnclaimedDirectory[]
+    unclaimedDirectories: import('@yuanxiao/contracts').UnclaimedDirectory[]
   }> {
     return this.agentManager.reconcileDirectories()
   }
@@ -395,13 +395,13 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
   }
 
   /**
-   * 按固定模板重建默认汤圆的目录结构。
+   * 按固定模板重建默认元宵的目录结构。
    *
    * @returns 重建后的 AgentSummary。
    * @throws 当 AgentSessionDriver 不支持或重建失败时，Promise 会 reject。
    */
-  async rebuildTangyuanHome(): Promise<AgentSummary> {
-    return this.agentManager.rebuildTangyuanHome()
+  async rebuildYuanxiaoHome(): Promise<AgentSummary> {
+    return this.agentManager.rebuildYuanxiaoHome()
   }
 
   /**
@@ -1026,23 +1026,23 @@ class DefaultTangyuanRuntime extends TangyuanRuntimeOrchestrator {
 }
 
 /**
- * 使用可控 Driver 创建测试用 TangyuanRuntime。
+ * 使用可控 Driver 创建测试用 YuanxiaoRuntime。
  *
  * @param dependencies - 测试提供的运行时资源与会话 Driver。
- * @returns 通过公开 TangyuanRuntime 方法观察行为的测试实例。
+ * @returns 通过公开 YuanxiaoRuntime 方法观察行为的测试实例。
  * @throws 此方法不会主动抛出错误。
  */
-export function createTangyuanRuntimeForTesting(
-  dependencies: TangyuanRuntimeDependencies,
-): TangyuanRuntime {
-  return new DefaultTangyuanRuntime(dependencies)
+export function createYuanxiaoRuntimeForTesting(
+  dependencies: YuanxiaoRuntimeDependencies,
+): YuanxiaoRuntime {
+  return new DefaultYuanxiaoRuntime(dependencies)
 }
 
 /**
- * Electron Main 可以调用的 TangyuanRuntime 高层能力集合。
+ * Electron Main 可以调用的 YuanxiaoRuntime 高层能力集合。
  */
-export type TangyuanRuntime = Pick<
-  DefaultTangyuanRuntime,
+export type YuanxiaoRuntime = Pick<
+  DefaultYuanxiaoRuntime,
   | 'getRuntimeSnapshot'
   | 'refreshRuntime'
   | 'saveRuntimeConfiguration'
@@ -1072,7 +1072,7 @@ export type TangyuanRuntime = Pick<
   | 'recoverAgent'
   | 'reconcileAgentDirectories'
   | 'claimAgentDirectory'
-  | 'rebuildTangyuanHome'
+  | 'rebuildYuanxiaoHome'
   | 'getSessionModelInfo'
   | 'setSessionModel'
   | 'setSessionThinkingLevel'

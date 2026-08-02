@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import type { QuestionClarificationRequest } from '@tangyuan/contracts'
+import type { QuestionClarificationRequest } from '@yuanxiao/contracts'
 import { QuestionClarificationCard } from './QuestionClarificationCard'
 
 function createClarification(
@@ -10,7 +10,7 @@ function createClarification(
 ): QuestionClarificationRequest {
   return {
     clarificationId: 'clarification-1',
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId: 'session-1',
     runId: 'run-1',
     question: '你希望使用哪个数据库？',

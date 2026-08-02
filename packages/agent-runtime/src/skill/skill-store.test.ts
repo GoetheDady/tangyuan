@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SkillOperationParams } from '@tangyuan/contracts'
+import type { SkillOperationParams } from '@yuanxiao/contracts'
 import { DirectoryLayout } from '../core'
 import { SkillStore } from './skill-store'
 
@@ -36,7 +36,7 @@ async function makeSourceSkill(name: string): Promise<string> {
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'skill-store-'))
   layout = new DirectoryLayout({
-    agentHomePath: join(dir, 'agents', 'tangyuan'),
+    agentHomePath: join(dir, 'agents', 'yuanxiao'),
     fsRoot: dir,
     userDataPath: dir,
   })
@@ -53,7 +53,7 @@ describe('SkillStore.installSkill', () => {
     const params: SkillOperationParams = {
       operation: 'install',
       source: 'shared',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       skillName: 'demo',
       skillDirPath: src,
     }
@@ -80,7 +80,7 @@ describe('SkillStore.installSkill', () => {
       store.installSkill({
         operation: 'install',
         source: 'shared',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         skillName: 'bad',
         skillDirPath: bad,
       }),
@@ -92,7 +92,7 @@ describe('SkillStore.installSkill', () => {
       store.installSkill({
         operation: 'install',
         source: 'shared',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         skillName: 'x',
       }),
     ).rejects.toThrow(/需要提供 skillDirPath/)
@@ -105,7 +105,7 @@ describe('SkillStore.deleteSkill', () => {
     const base: SkillOperationParams = {
       operation: 'install',
       source: 'shared',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       skillName: 'demo',
       skillDirPath: src,
     }
@@ -122,7 +122,7 @@ describe('SkillStore.deleteSkill', () => {
       store.deleteSkill({
         operation: 'delete',
         source: 'shared',
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         skillName: 'ghost',
       }),
     ).rejects.toThrow(/不存在/)
@@ -135,7 +135,7 @@ describe('SkillStore.installSkill 更新', () => {
     const params: SkillOperationParams = {
       operation: 'install',
       source: 'shared',
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       skillName: 'demo',
       skillDirPath: src,
     }

@@ -13,7 +13,7 @@ const TOAST_GAP_PX = 8
 const TOAST_VISIBLE_COUNT = 3
 
 /**
- * 渲染 Renderer 唯一的 Sonner 通知队列，并应用黑芝麻汤圆主题默认值。
+ * 渲染 Renderer 唯一的 Sonner 通知队列，并应用黑芝麻元宵主题默认值。
  *
  * 页面仍可直接调用 `toast`；该组件只统一队列展示，不维护第二套 Toast 状态。
  *
@@ -61,12 +61,12 @@ function Toaster(): React.JSX.Element {
       toastOptions={{
         closeButtonAriaLabel: '关闭通知',
         classNames: {
-          toast: 'tangyuan-toast',
-          title: 'tangyuan-toast-title',
-          description: 'tangyuan-toast-description',
-          actionButton: 'tangyuan-toast-action',
-          cancelButton: 'tangyuan-toast-cancel',
-          closeButton: 'tangyuan-toast-close',
+          toast: 'yuanxiao-toast',
+          title: 'yuanxiao-toast-title',
+          description: 'yuanxiao-toast-description',
+          actionButton: 'yuanxiao-toast-action',
+          cancelButton: 'yuanxiao-toast-cancel',
+          closeButton: 'yuanxiao-toast-close',
         },
       }}
     />

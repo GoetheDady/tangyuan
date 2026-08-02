@@ -50,11 +50,11 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: 'Bootstrap 初始化',
     })
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '请开始初始化。',
     })
@@ -68,7 +68,7 @@ describe('PiSdkDriver', () => {
     })
 
     const resolvedHomePath = join(rootPath, homePath.slice(2))
-    const sharedProfilePath = join(rootPath, '.tangyuan/profile')
+    const sharedProfilePath = join(rootPath, '.yuanxiao/profile')
     await expect(
       readFile(join(resolvedHomePath, 'soul.md'), 'utf8'),
     ).resolves.toContain('# Soul')
@@ -121,13 +121,13 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: 'Bootstrap 初始化',
     })
 
     // 第一回合：bootstrap
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '请开始初始化。',
     })
@@ -146,7 +146,7 @@ describe('PiSdkDriver', () => {
 
     // 第二回合：正常对话
     await driver.sendMessage({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '记住我喜欢用 TypeScript。',
     })
@@ -168,7 +168,7 @@ describe('PiSdkDriver', () => {
 
     await expect(
       driver.createSession({
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         title: '新会话',
       }),
     ).rejects.toMatchObject({
@@ -186,7 +186,7 @@ describe('PiSdkDriver', () => {
       apiKey: 'sk-test-secret-7890',
     })
     const session = await driver.createSession({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '新会话',
     })
 
@@ -563,8 +563,8 @@ describe('PiSdkDriver', () => {
           },
         },
         agents: {
-          tangyuan: {
-            displayName: '汤圆',
+          yuanxiao: {
+            displayName: '元宵',
             defaultProviderId: 'anthropic',
             defaultModelId: 'claude-sonnet-4-5',
             status: 'active',
@@ -591,7 +591,7 @@ describe('PiSdkDriver', () => {
     await writeFile(configPath, 'corrupted {{{', 'utf8')
 
     await expect(
-      driver.createSession({ agentId: 'tangyuan', title: '新会话' }),
+      driver.createSession({ agentId: 'yuanxiao', title: '新会话' }),
     ).rejects.toMatchObject({
       code: 'configuration-missing',
       message: expect.stringContaining('配置文件已损坏'),
@@ -638,7 +638,7 @@ describe('PiSdkDriver', () => {
     expect(agent.defaultProviderId).toBe('anthropic')
     expect(agent.defaultModelId).toBe('claude-sonnet-4-5')
 
-    const homePath = join(rootPath, '.tangyuan/agents', agent.agentId)
+    const homePath = join(rootPath, '.yuanxiao/agents', agent.agentId)
     await expect(
       readFile(join(homePath, 'soul.md'), 'utf8'),
     ).resolves.toContain('代码助手')
@@ -712,7 +712,7 @@ describe('PiSdkDriver', () => {
     const agents = await restartedDriver.listAgents()
 
     expect(agents).toHaveLength(2)
-    expect(agents[0]).toMatchObject({ agentId: 'tangyuan' })
+    expect(agents[0]).toMatchObject({ agentId: 'yuanxiao' })
     expect(agents[1]).toMatchObject({
       agentId: created.agentId,
       displayName: '跨重启助手',

@@ -10,9 +10,9 @@ let layout: DirectoryLayout
 let store: LastActiveSessionStore
 
 beforeEach(async () => {
-  rootPath = await mkdtemp(join(tmpdir(), 'tangyuan-last-active-'))
+  rootPath = await mkdtemp(join(tmpdir(), 'yuanxiao-last-active-'))
   layout = new DirectoryLayout({
-    agentHomePath: join(rootPath, 'agents', 'tangyuan'),
+    agentHomePath: join(rootPath, 'agents', 'yuanxiao'),
     fsRoot: rootPath,
     userDataPath: rootPath,
   })
@@ -33,12 +33,12 @@ describe('LastActiveSessionStore · read', () => {
 
   it('读取已持久化的最后激活会话记录', async () => {
     await store.write({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'sess-1',
     })
 
     expect(await store.read()).toEqual({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'sess-1',
       updatedAt: '2026-07-08T00:00:00.000Z',
     })
@@ -84,13 +84,13 @@ describe('LastActiveSessionStore · write', () => {
     })
 
     const result = await fixedStore.write({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'sess-1',
     })
 
     expect(result.updatedAt).toBe(fixedNow)
     expect(await fixedStore.read()).toEqual({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'sess-1',
       updatedAt: fixedNow,
     })
@@ -100,7 +100,7 @@ describe('LastActiveSessionStore · write', () => {
 describe('LastActiveSessionStore · clear', () => {
   it('清除已存在的记录文件', async () => {
     await store.write({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'sess-1',
     })
 

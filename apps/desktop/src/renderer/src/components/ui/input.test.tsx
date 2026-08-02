@@ -28,7 +28,7 @@ describe('Input', () => {
         type="text"
         name="display-name"
         autoComplete="name"
-        defaultValue="汤圆"
+        defaultValue="元宵"
         placeholder="请输入名称"
         aria-label="显示名称"
       />,
@@ -39,7 +39,7 @@ describe('Input', () => {
     expect(input).toHaveAttribute('name', 'display-name')
     expect(input).toHaveAttribute('autocomplete', 'name')
     expect(input).toHaveAttribute('placeholder', '请输入名称')
-    expect(input).toHaveValue('汤圆')
+    expect(input).toHaveValue('元宵')
   })
 
   it('merges className without snapshotting full class string', () => {

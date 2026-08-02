@@ -8,7 +8,7 @@ import {
 const rendererBaseUrl = 'http://127.0.0.1:4173'
 
 /**
- * 汤圆桌面端 Renderer Playwright 测试配置。
+ * 元宵桌面端 Renderer Playwright 测试配置。
  *
  * 包含两个测试 project：
  * - chromium-renderer：结构、交互与无障碍自动回归

@@ -1,7 +1,7 @@
 import type {
   BashApprovalRequest,
   QuestionClarificationRequest,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import type { ToolApprovalGateway } from '../driver'
 import type { BashApprovalRegistry } from './bash-approval-registry'
 import type { ClarificationRegistry } from './clarification-registry'

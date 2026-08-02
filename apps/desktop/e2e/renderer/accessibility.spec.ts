@@ -37,9 +37,9 @@ test.describe('Renderer 基础无障碍', () => {
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan/session-1')
+    await page.goto('/#/chat/yuanxiao/session-1')
 
-    await expect(page.getByRole('heading', { name: '汤圆' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '元宵' })).toBeVisible()
     await expect(page.getByRole('heading', { name: /测试会话/ })).toBeVisible()
     await expect(page.getByRole('button', { name: '新建会话' })).toBeVisible()
     await expect(page.getByRole('button', { name: '发送' })).toBeDisabled()

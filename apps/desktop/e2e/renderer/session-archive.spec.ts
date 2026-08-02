@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { AgentSessionSummary } from '@tangyuan/contracts'
+import type { AgentSessionSummary } from '@yuanxiao/contracts'
 
 import {
   createPreloadApiInitScript,
@@ -14,14 +14,14 @@ test('预览活动会话后归档并恢复整棵会话谱系', async ({ page }) 
 
   const sessions: AgentSessionSummary[] = [
     {
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'parent-session',
       title: '父会话',
       state: 'running',
       updatedAt: '2026-07-29T08:00:00.000Z',
     },
     {
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'child-session',
       title: '子会话',
       state: 'queued',
@@ -29,7 +29,7 @@ test('预览活动会话后归档并恢复整棵会话谱系', async ({ page }) 
       forkedFrom: { sessionId: 'parent-session', entryId: 'source-message' },
     },
     {
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'sibling-session',
       title: '兄弟会话',
       state: 'idle',
@@ -42,14 +42,14 @@ test('预览活动会话后归档并恢复整棵会话谱系', async ({ page }) 
       sessions,
       [],
       {
-        agentId: 'tangyuan',
+        agentId: 'yuanxiao',
         sessionId: 'parent-session',
         updatedAt: '2026-07-29T08:00:00.000Z',
       },
     ),
   })
 
-  await page.goto('/#/chat/tangyuan/parent-session')
+  await page.goto('/#/chat/yuanxiao/parent-session')
   await page.getByRole('button', { name: '归档当前会话谱系' }).click()
 
   const dialog = page.getByRole('alertdialog')
@@ -61,7 +61,7 @@ test('预览活动会话后归档并恢复整棵会话谱系', async ({ page }) 
   await page.getByRole('button', { name: '归档当前会话谱系' }).click()
   await dialog.getByRole('button', { name: '停止活动并归档' }).click()
 
-  await expect(page).toHaveURL(/#\/chat\/tangyuan$/)
+  await expect(page).toHaveURL(/#\/chat\/yuanxiao$/)
   await expect(page.getByRole('treeitem', { name: /兄弟会话/ })).toBeVisible()
   await expect(page.getByRole('treeitem', { name: /父会话/ })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '已归档' })).toBeVisible()

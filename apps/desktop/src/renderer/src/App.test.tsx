@@ -5,7 +5,7 @@ import {
   createDefaultSessionSummary,
   type DesktopPreloadApi,
   type RuntimeSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import {
@@ -19,12 +19,12 @@ describe('App', () => {
   afterEach(resetAppTestEnvironment)
   beforeEach(installDefaultAppApi)
   it('在 Agent 详情设置页展示 Agent 灵魂编辑入口', async () => {
-    window.location.hash = '#/settings/agents/tangyuan'
+    window.location.hash = '#/settings/agents/yuanxiao'
 
     render(<App />)
 
     expect(await screen.findByLabelText('Agent 灵魂')).toBeInTheDocument()
-    expect(window.api.getSoul).toHaveBeenCalledWith({ agentId: 'tangyuan' })
+    expect(window.api.getSoul).toHaveBeenCalledWith({ agentId: 'yuanxiao' })
   })
   it('renders the setup page when configuration is missing', async () => {
     render(<App />)
@@ -58,7 +58,7 @@ describe('App', () => {
       status: 'active',
       defaultProviderId: 'anthropic',
       defaultModelId: 'claude-sonnet-4-5',
-      homePath: '~/.tangyuan/agents/agent-2',
+      homePath: '~/.yuanxiao/agents/agent-2',
       archivedAt: null,
       directoryStatus: 'healthy',
     })
@@ -141,14 +141,14 @@ describe('App', () => {
 
     expect(await screen.findAllByText('新会话')).toHaveLength(2)
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/chat/tangyuan/new-session')
+      expect(window.location.hash).toBe('#/chat/yuanxiao/new-session')
     })
     expect(window.api.createSession).toHaveBeenCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '新会话',
     })
     expect(window.api.getTranscript).not.toHaveBeenCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'unavailable-session',
     })
   })
@@ -166,7 +166,7 @@ describe('App', () => {
       status: 'active',
       defaultProviderId: 'anthropic',
       defaultModelId: 'claude-sonnet-4-5',
-      homePath: '~/.tangyuan/agents/agent-2',
+      homePath: '~/.yuanxiao/agents/agent-2',
       archivedAt: null,
       directoryStatus: 'healthy',
     })
@@ -224,7 +224,7 @@ describe('App', () => {
       status: 'active',
       defaultProviderId: 'anthropic',
       defaultModelId: 'claude-sonnet-4-5',
-      homePath: '~/.tangyuan/agents/agent-2',
+      homePath: '~/.yuanxiao/agents/agent-2',
       archivedAt: null,
       directoryStatus: 'healthy',
     })
@@ -310,7 +310,7 @@ describe('App', () => {
       apiKey: 'sk-test-secret-7890',
     })
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/chat/tangyuan')
+      expect(window.location.hash).toBe('#/chat/yuanxiao')
     })
     expect(
       screen.queryByDisplayValue('sk-test-secret-7890'),
@@ -340,11 +340,11 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: '验证并继续' }))
 
     expect(window.api.createSession).toHaveBeenCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: 'Bootstrap 初始化',
     })
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/chat/tangyuan')
+      expect(window.location.hash).toBe('#/chat/yuanxiao')
     })
   })
   it('allows users to cancel configuration verification', async () => {
@@ -401,7 +401,7 @@ describe('App', () => {
         ),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: 'auto-session',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           entries: [],
           updatedAt: '2026-01-01T00:00:00.000Z',
         }),
@@ -415,12 +415,12 @@ describe('App', () => {
         resetConfiguration: vi.fn(),
         listAgents: vi.fn().mockResolvedValue([
           {
-            agentId: 'tangyuan',
-            displayName: '汤圆',
+            agentId: 'yuanxiao',
+            displayName: '元宵',
             status: 'active' as const,
             defaultProviderId: null,
             defaultModelId: null,
-            homePath: '~/.tangyuan/agents/tangyuan',
+            homePath: '~/.yuanxiao/agents/yuanxiao',
             archivedAt: null,
           },
         ]),
@@ -442,7 +442,7 @@ describe('App', () => {
         deleteSession: vi.fn(),
         reconcileAgentDirectories: vi.fn(),
         claimAgentDirectory: vi.fn(),
-        rebuildTangyuanHome: vi.fn(),
+        rebuildYuanxiaoHome: vi.fn(),
         getSoul: vi.fn(),
         getUserProfile: vi.fn(),
         updateSoul: vi.fn(),
@@ -466,14 +466,14 @@ describe('App', () => {
     render(<App />)
 
     expect(
-      await screen.findByRole('heading', { name: '汤圆' }),
+      await screen.findByRole('heading', { name: '元宵' }),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: '配置接口密钥' }),
     ).not.toBeInTheDocument()
     expect(screen.queryByText('sk-t...7890')).not.toBeInTheDocument()
     expect(window.api.createSession).toHaveBeenCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: '新会话',
     })
   })
@@ -506,7 +506,7 @@ describe('App', () => {
         ),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: '',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           entries: [],
           updatedAt: '2026-01-01T00:00:00.000Z',
         }),
@@ -520,12 +520,12 @@ describe('App', () => {
         resetConfiguration: vi.fn(),
         listAgents: vi.fn().mockResolvedValue([
           {
-            agentId: 'tangyuan',
-            displayName: '汤圆',
+            agentId: 'yuanxiao',
+            displayName: '元宵',
             status: 'active' as const,
             defaultProviderId: null,
             defaultModelId: null,
-            homePath: '~/.tangyuan/agents/tangyuan',
+            homePath: '~/.yuanxiao/agents/yuanxiao',
             archivedAt: null,
           },
         ]),
@@ -547,7 +547,7 @@ describe('App', () => {
         deleteSession: vi.fn(),
         reconcileAgentDirectories: vi.fn(),
         claimAgentDirectory: vi.fn(),
-        rebuildTangyuanHome: vi.fn(),
+        rebuildYuanxiaoHome: vi.fn(),
         getSoul: vi.fn(),
         getUserProfile: vi.fn(),
         updateSoul: vi.fn(),
@@ -572,7 +572,7 @@ describe('App', () => {
 
     expect(await screen.findAllByText('Bootstrap 初始化')).toHaveLength(2)
     expect(window.api.createSession).toHaveBeenCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       title: 'Bootstrap 初始化',
     })
   })
@@ -602,7 +602,7 @@ describe('App', () => {
           }),
         ]),
         getLastActiveSession: vi.fn().mockResolvedValue({
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           sessionId: 'welcome',
           updatedAt: '2026-07-08T00:00:00.000Z',
         }),
@@ -610,13 +610,13 @@ describe('App', () => {
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
           sessionId: '',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           entries: [],
           updatedAt: '2026-01-01T00:00:00.000Z',
         }),
         sendMessage: vi.fn().mockResolvedValue({
           sessionId: 'welcome',
-          agentId: 'tangyuan',
+          agentId: 'yuanxiao',
           entries: [
             {
               kind: 'user-message',
@@ -647,12 +647,12 @@ describe('App', () => {
         resetConfiguration: vi.fn(),
         listAgents: vi.fn().mockResolvedValue([
           {
-            agentId: 'tangyuan',
-            displayName: '汤圆',
+            agentId: 'yuanxiao',
+            displayName: '元宵',
             status: 'active' as const,
             defaultProviderId: null,
             defaultModelId: null,
-            homePath: '~/.tangyuan/agents/tangyuan',
+            homePath: '~/.yuanxiao/agents/yuanxiao',
             archivedAt: null,
           },
         ]),
@@ -674,7 +674,7 @@ describe('App', () => {
         deleteSession: vi.fn(),
         reconcileAgentDirectories: vi.fn(),
         claimAgentDirectory: vi.fn(),
-        rebuildTangyuanHome: vi.fn(),
+        rebuildYuanxiaoHome: vi.fn(),
         getSoul: vi.fn(),
         getUserProfile: vi.fn(),
         updateSoul: vi.fn(),
@@ -695,7 +695,7 @@ describe('App', () => {
         getSkillInstallRecords: vi.fn(),
       } satisfies DesktopPreloadApi,
     })
-    window.location.hash = '#/chat/tangyuan'
+    window.location.hash = '#/chat/yuanxiao'
     render(<App />)
 
     await screen.findByText('大语言模型对话')
@@ -711,7 +711,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: '发送' }))
 
     expect(window.api.sendMessage).toHaveBeenCalledWith({
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'welcome',
       content: '你好',
     })

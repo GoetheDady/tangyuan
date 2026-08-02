@@ -5,7 +5,7 @@ import type {
   SessionModelInfo,
   TranscriptEntry,
   TranscriptSnapshot,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { useMemo, useState } from 'react'
 
 import { AssistantMessage } from '@/components/AssistantMessage'
@@ -275,14 +275,14 @@ const integratedEntries: TranscriptEntry[] = [
 
 const integratedTranscript: TranscriptSnapshot = {
   sessionId: 'fixture-session',
-  agentId: 'tangyuan',
+  agentId: 'yuanxiao',
   entries: integratedEntries,
   updatedAt: FIXED_END_TIME,
 }
 
 const longTranscript: TranscriptSnapshot = {
   sessionId: 'long-session',
-  agentId: 'tangyuan',
+  agentId: 'yuanxiao',
   updatedAt: FIXED_END_TIME,
   entries: Array.from({ length: 48 }, (_, index): TranscriptEntry => {
     if (index > 0 && index % 15 === 0) {
@@ -318,33 +318,33 @@ const longTranscript: TranscriptSnapshot = {
 const approvals: Record<'once' | 'always' | 'reject', BashApprovalRequest> = {
   once: {
     approvalId: 'approval-once',
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId: 'fixture-session',
     runId: 'run-approval-once',
-    command: 'bun run --filter apps-desktop test',
-    cwd: '/Users/gdsw/gdsw/tangyuan',
+    command: 'bun run --filter @yuanxiao/desktop test',
+    cwd: '/Users/gdsw/gdsw/yuanxiao',
     riskDescription: '命令会执行测试脚本，但不会写入生产数据。',
     status: 'pending',
     createdAt: FIXED_TIME,
   },
   always: {
     approvalId: 'approval-always',
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId: 'fixture-session',
     runId: 'run-approval-always',
     command: 'bun run typecheck',
-    cwd: '/Users/gdsw/gdsw/tangyuan',
+    cwd: '/Users/gdsw/gdsw/yuanxiao',
     riskDescription: '始终允许只对当前会话中的完全相同命令生效。',
     status: 'pending',
     createdAt: FIXED_TIME,
   },
   reject: {
     approvalId: 'approval-reject',
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId: 'fixture-session',
     runId: 'run-approval-reject',
     command: 'rm -rf ./out',
-    cwd: '/Users/gdsw/gdsw/tangyuan',
+    cwd: '/Users/gdsw/gdsw/yuanxiao',
     riskDescription: '命令会删除构建产物，应在确认无需保留后执行。',
     status: 'pending',
     createdAt: FIXED_TIME,
@@ -354,7 +354,7 @@ const approvals: Record<'once' | 'always' | 'reject', BashApprovalRequest> = {
 const clarifications: QuestionClarificationRequest[] = [
   {
     clarificationId: 'clarification-1',
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId: 'fixture-session',
     runId: 'run-clarification-1',
     question: '视觉基准应该覆盖哪种桌面宽度？',
@@ -365,7 +365,7 @@ const clarifications: QuestionClarificationRequest[] = [
   },
   {
     clarificationId: 'clarification-2',
-    agentId: 'tangyuan',
+    agentId: 'yuanxiao',
     sessionId: 'fixture-session',
     runId: 'run-clarification-2',
     question: '完成后是否立即运行完整 Renderer E2E？',
@@ -453,7 +453,7 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
                 value={composerValue}
                 onChange={setComposerValue}
                 onSubmit={() => setSubmitCount((value) => value + 1)}
-                placeholder="给汤圆发送消息"
+                placeholder="给元宵发送消息"
                 isRunning={false}
                 onCancel={() => setCancelCount((value) => value + 1)}
                 sessionModelInfo={currentModelInfo}
@@ -619,7 +619,7 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
                 value="按 Enter 发送，Shift+Enter 换行。"
                 onChange={() => undefined}
                 onSubmit={() => setSubmitCount((value) => value + 1)}
-                placeholder="给汤圆发送消息"
+                placeholder="给元宵发送消息"
                 isRunning={false}
                 onCancel={() => undefined}
                 sessionModelInfo={currentModelInfo}
@@ -638,7 +638,7 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
                 value="运行期间可以继续编辑下一条草稿。"
                 onChange={() => undefined}
                 onSubmit={() => undefined}
-                placeholder="给汤圆发送消息"
+                placeholder="给元宵发送消息"
                 isRunning
                 onCancel={() => setCancelCount((value) => value + 1)}
                 sessionModelInfo={currentModelInfo}

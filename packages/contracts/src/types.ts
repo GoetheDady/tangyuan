@@ -5,7 +5,7 @@ export type { AgentId } from './identifiers'
 /**
  * v1 默认 Agent 的稳定标识。
  */
-export const TANGYUAN_DEFAULT_AGENT_ID = 'tangyuan'
+export const YUANXIAO_DEFAULT_AGENT_ID = 'yuanxiao'
 
 /**
  * 当前配置文件的 schema 版本，用于顺序迁移。
@@ -358,7 +358,7 @@ export interface CancelClarificationRequest {
 }
 
 /**
- * 描述 Agent 运行过程中发给 TangyuanRuntime 和 Renderer 的标准事件。
+ * 描述 Agent 运行过程中发给 YuanxiaoRuntime 和 Renderer 的标准事件。
  */
 export type AgentEvent =
   | {

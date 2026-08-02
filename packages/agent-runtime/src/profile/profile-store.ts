@@ -9,12 +9,12 @@ import {
 } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   type AgentId,
   type ProfileUpdateResult,
   type SoulContent,
   type UserProfileContent,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import type { ConfigStore, DirectoryLayout } from '../core'
 import {
   extractAgentRuntimeConfig,
@@ -26,7 +26,7 @@ import {
 } from '../core'
 
 /** 追加到系统提示词的 profile 上下文标题。 */
-const PROFILE_CONTEXT_HEADER = '汤圆长期上下文'
+const PROFILE_CONTEXT_HEADER = '元宵长期上下文'
 
 /**
  * 描述默认 Agent Home 中 profile/bootstrap 文件的当前状态。
@@ -99,15 +99,15 @@ export class ProfileStore {
 
     if (!(await pathExists(soulPath))) {
       const displayName =
-        agentId === TANGYUAN_DEFAULT_AGENT_ID ? '汤圆' : agentId
+        agentId === YUANXIAO_DEFAULT_AGENT_ID ? '元宵' : agentId
       const soulContent = [
         `# ${displayName}`,
         '',
         `创建时间：${this.now()}`,
         '',
         '## 身份',
-        agentId === TANGYUAN_DEFAULT_AGENT_ID
-          ? '汤圆是默认 Agent，负责凭据管理和创建其他 Agent。'
+        agentId === YUANXIAO_DEFAULT_AGENT_ID
+          ? '元宵是默认 Agent，负责凭据管理和创建其他 Agent。'
           : `${displayName} 是用户创建的 Agent。`,
         '',
         '## 规则',
@@ -119,18 +119,18 @@ export class ProfileStore {
   }
 
   /**
-   * 从旧 tangyuan Agent 目录迁移 user.md 到共享 profile 路径。
+   * 从旧 yuanxiao Agent 目录迁移 user.md 到共享 profile 路径。
    *
    * @returns 无返回值。
    * @throws 当文件读取、复制或写入失败时，Promise 会 reject。
    */
   async migrateLegacyUserProfile(): Promise<void> {
     const legacyUserPath = join(
-      this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID),
+      this.layout.agentHome(YUANXIAO_DEFAULT_AGENT_ID),
       'user.md',
     )
     const legacyHistoryPath = join(
-      this.layout.agentHome(TANGYUAN_DEFAULT_AGENT_ID),
+      this.layout.agentHome(YUANXIAO_DEFAULT_AGENT_ID),
       'user.history',
     )
     const targetPath = this.layout.userProfile()
@@ -317,7 +317,7 @@ export class ProfileStore {
       await this.migrateLegacyUserProfile()
     }
 
-    const apiKey = await this.readAgentApiKey(TANGYUAN_DEFAULT_AGENT_ID)
+    const apiKey = await this.readAgentApiKey(YUANXIAO_DEFAULT_AGENT_ID)
 
     return this.writeProfile({
       target: 'user',
@@ -497,12 +497,12 @@ export class ProfileStore {
    * soul.md 与 user.md 同时存在且内容非空时注入 profile；否则注入
    * bootstrap 初始化指令与 bootstrap.md 全文。
    *
-   * @param agentId - Agent 标识；默认为 tangyuan。
+   * @param agentId - Agent 标识；默认为 yuanxiao。
    * @returns 可追加到系统提示词的 profile / bootstrap 上下文字符串。
    * @throws 当 profile 文件读取失败时，Promise 会 reject。
    */
   async buildSystemPromptContext(
-    agentId: AgentId = TANGYUAN_DEFAULT_AGENT_ID,
+    agentId: AgentId = YUANXIAO_DEFAULT_AGENT_ID,
   ): Promise<string> {
     const absoluteHomePath = this.layout.agentHome(agentId)
     const soulPath = join(absoluteHomePath, 'soul.md')
@@ -636,13 +636,13 @@ export class ProfileStore {
     return [
       '# Bootstrap',
       '',
-      '1. 用户希望汤圆怎么称呼自己。',
-      '2. 用户希望汤圆默认使用什么语言、语气和沟通密度。',
-      '3. 用户主要希望汤圆帮助完成哪些工作。',
+      '1. 用户希望元宵怎么称呼自己。',
+      '2. 用户希望元宵默认使用什么语言、语气和沟通密度。',
+      '3. 用户主要希望元宵帮助完成哪些工作。',
       '4. 哪些操作必须先征求用户确认。',
       '5. 哪些目录、文件、信息永远不能触碰或泄露。',
-      '6. 用户希望汤圆如何记录长期偏好和项目经验。',
-      '7. 汤圆在失败、不确定或缺少上下文时应该如何处理。',
+      '6. 用户希望元宵如何记录长期偏好和项目经验。',
+      '7. 元宵在失败、不确定或缺少上下文时应该如何处理。',
       '8. 哪些规则必须写入 soul.md 并长期遵守。',
       '',
     ].join('\n')

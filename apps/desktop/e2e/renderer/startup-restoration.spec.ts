@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { AgentSessionSummary } from '@tangyuan/contracts'
+import type { AgentSessionSummary } from '@yuanxiao/contracts'
 import {
   createPreloadApiInitScript,
   createReadyRuntimeSnapshot,
@@ -13,13 +13,13 @@ test('启动时恢复最后激活的自定义 Agent 分叉会话', async ({ page
     status: 'active',
     defaultProviderId: 'anthropic',
     defaultModelId: 'claude-sonnet-4-5',
-    homePath: '~/.tangyuan/agents/agent-2',
+    homePath: '~/.yuanxiao/agents/agent-2',
     archivedAt: null,
     directoryStatus: 'healthy',
   })
   const sessions: AgentSessionSummary[] = [
     {
-      agentId: 'tangyuan',
+      agentId: 'yuanxiao',
       sessionId: 'default-session',
       title: '默认会话',
       state: 'idle',

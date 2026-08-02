@@ -1,33 +1,33 @@
 import { type AgentEvent } from '../index'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   agentEventSchema,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import { describe, expect, it } from 'vitest'
-import { createTangyuanRuntimeForTesting } from './tangyuan-runtime'
+import { createYuanxiaoRuntimeForTesting } from './yuanxiao-runtime'
 import {
   createReadySnapshot,
   createRuntimeDriver,
   createSessionDriver,
   createSessionSummary,
-} from './tangyuan-runtime.test-helpers'
+} from './yuanxiao-runtime.test-helpers'
 
 describe('transcript turn/step tracking', () => {
   it('getTranscript returns cached snapshot with entries after message-appended', async () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
 
     sessionDriver.emit({
       type: 'message-appended',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       message: {
         messageId: 'user-msg',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         role: 'user',
         content: 'hello',
@@ -38,10 +38,10 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'message-appended',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       message: {
         messageId: 'agent-msg',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         role: 'agent',
         content: '',
@@ -51,7 +51,7 @@ describe('transcript turn/step tracking', () => {
     })
 
     const snapshot = await runtime.getTranscript({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
     })
 
@@ -66,7 +66,7 @@ describe('transcript turn/step tracking', () => {
     const sessionDriver = createSessionDriver([session])
     sessionDriver.messages.set(session.sessionId, {
       sessionId: session.sessionId,
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       entries: [
         {
           kind: 'user-message',
@@ -78,13 +78,13 @@ describe('transcript turn/step tracking', () => {
       ],
       updatedAt: '2026-07-21T00:00:00.000Z',
     })
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
 
     const snapshot = await runtime.getTranscript({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
     })
 
@@ -98,14 +98,14 @@ describe('transcript turn/step tracking', () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
 
     // No events emitted → no cached snapshot
     const first = await runtime.getTranscript({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
     })
     // Fallback from messages: no cached snapshot exists
@@ -114,10 +114,10 @@ describe('transcript turn/step tracking', () => {
     // Now emit message-appended → creates cached snapshot
     sessionDriver.emit({
       type: 'message-appended',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       message: {
         messageId: 'u1',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         role: 'user',
         content: 'test',
@@ -127,7 +127,7 @@ describe('transcript turn/step tracking', () => {
     })
 
     const second = await runtime.getTranscript({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
     })
     // Cached snapshot now available
@@ -138,7 +138,7 @@ describe('transcript turn/step tracking', () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -146,10 +146,10 @@ describe('transcript turn/step tracking', () => {
     // Emit message-appended events to create transcript entries (simulating PiSdkDriver)
     sessionDriver.emit({
       type: 'message-appended',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       message: {
         messageId: 'user-msg',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         role: 'user',
         content: '分析一下',
@@ -160,10 +160,10 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'message-appended',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       message: {
         messageId: 'msg-1',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         role: 'agent',
         content: '',
@@ -174,7 +174,7 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'attempt-started',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       occurredAt: '2026-07-21T00:00:01.000Z',
@@ -182,7 +182,7 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'message-delta',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       messageId: 'msg-1',
@@ -193,7 +193,7 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'message-delta',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       messageId: 'msg-1',
@@ -203,12 +203,12 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'message-completed',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       message: {
         messageId: 'msg-1',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         role: 'agent',
         content: '分析结果：没有问题。',
@@ -218,7 +218,7 @@ describe('transcript turn/step tracking', () => {
     })
 
     const snapshot = await runtime.getTranscript({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
     })
 
@@ -244,17 +244,17 @@ describe('transcript turn/step tracking', () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
 
     sessionDriver.emit({
       type: 'message-appended',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       message: {
         messageId: 'user-msg',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         role: 'user',
         content: '搜索文件',
@@ -265,10 +265,10 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'message-appended',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       message: {
         messageId: 'msg-1',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         role: 'agent',
         content: '',
@@ -279,7 +279,7 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'attempt-started',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       occurredAt: '2026-07-21T00:00:01.000Z',
@@ -287,7 +287,7 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'activity-updated',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       activity: { kind: 'tool', state: 'running', label: '正在搜索' },
@@ -296,7 +296,7 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'activity-updated',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       activity: { kind: 'tool', state: 'completed', label: '搜索完成' },
@@ -304,7 +304,7 @@ describe('transcript turn/step tracking', () => {
     })
 
     const snapshot = await runtime.getTranscript({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
     })
 
@@ -322,17 +322,17 @@ describe('transcript turn/step tracking', () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
 
     sessionDriver.emit({
       type: 'message-appended',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       message: {
         messageId: 'user-msg',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         role: 'user',
         content: '搜索文件',
@@ -343,10 +343,10 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'message-appended',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       message: {
         messageId: 'msg-1',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         role: 'agent',
         content: '',
@@ -357,7 +357,7 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'attempt-started',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       occurredAt: '2026-07-21T00:00:01.000Z',
@@ -365,7 +365,7 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'message-delta',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       messageId: 'msg-1',
@@ -376,14 +376,14 @@ describe('transcript turn/step tracking', () => {
 
     sessionDriver.emit({
       type: 'turn-cancelled',
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: 'run-1',
       occurredAt: '2026-07-21T00:00:02.000Z',
     })
 
     const snapshot = await runtime.getTranscript({
-      agentId: TANGYUAN_DEFAULT_AGENT_ID,
+      agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
     })
 
@@ -402,7 +402,7 @@ describe('transcript turn/step tracking', () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -419,10 +419,10 @@ describe('transcript turn/step tracking', () => {
     expect(() => {
       sessionDriver.emit({
         type: 'message-appended',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         message: {
           messageId: 'user-msg',
-          agentId: TANGYUAN_DEFAULT_AGENT_ID,
+          agentId: YUANXIAO_DEFAULT_AGENT_ID,
           sessionId: session.sessionId,
           role: 'user',
           content: '你好',
@@ -445,7 +445,7 @@ describe('transcript turn/step tracking', () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
-    const runtime = createTangyuanRuntimeForTesting({
+    const runtime = createYuanxiaoRuntimeForTesting({
       runtimeDriver,
       sessionDriver,
     })
@@ -462,7 +462,7 @@ describe('transcript turn/step tracking', () => {
     expect(() => {
       sessionDriver.emit({
         type: 'turn-started',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
         turnIndex: 0,
@@ -473,7 +473,7 @@ describe('transcript turn/step tracking', () => {
     expect(() => {
       sessionDriver.emit({
         type: 'turn-ended',
-        agentId: TANGYUAN_DEFAULT_AGENT_ID,
+        agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: 'run-1',
         turnIndex: 0,

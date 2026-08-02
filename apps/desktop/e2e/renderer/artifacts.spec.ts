@@ -38,7 +38,7 @@ test.describe('页面人工截图 artifact', () => {
     )
 
     await page.addInitScript({ content: initScript })
-    await page.goto('/#/chat/tangyuan/session-1')
+    await page.goto('/#/chat/yuanxiao/session-1')
     await expect(page.getByRole('textbox', { name: '消息' })).toBeVisible()
 
     await page.screenshot({

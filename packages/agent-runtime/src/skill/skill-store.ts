@@ -14,12 +14,12 @@ import { constants as fsConstants } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
-  TANGYUAN_DEFAULT_AGENT_ID,
+  YUANXIAO_DEFAULT_AGENT_ID,
   type AgentId,
   type SkillInstallRecord,
   type SkillOperationParams,
   type SkillSummary,
-} from '@tangyuan/contracts'
+} from '@yuanxiao/contracts'
 import type { DirectoryLayout } from '../core'
 
 /**
@@ -117,7 +117,7 @@ export class SkillStore {
       await import('@earendil-works/pi-coding-agent')
 
     const loader = new DefaultResourceLoader({
-      cwd: this.layout.workspace(TANGYUAN_DEFAULT_AGENT_ID),
+      cwd: this.layout.workspace(YUANXIAO_DEFAULT_AGENT_ID),
       agentDir: this.layout.agentHome(),
       noSkills: true,
       additionalSkillPaths: [sharedSkillsPath],
@@ -157,7 +157,7 @@ export class SkillStore {
     const skillTargetDir = join(targetDir, params.skillName)
 
     // 使用安全临时目录进行原子替换
-    const tempRoot = join(tmpdir(), 'tangyuan-skill-')
+    const tempRoot = join(tmpdir(), 'yuanxiao-skill-')
     const tempDir = await mkdtemp(tempRoot)
     const tempSkillDir = join(tempDir, params.skillName)
 
@@ -172,7 +172,7 @@ export class SkillStore {
           skillTargetDir,
           join(
             targetDir,
-            `.tangyuan-trash`,
+            `.yuanxiao-trash`,
             `${params.skillName}-${this.now().replace(/:/g, '-')}`,
           ),
         )
@@ -181,7 +181,7 @@ export class SkillStore {
       }
 
       // 确保 trash 目录存在
-      await mkdir(join(targetDir, '.tangyuan-trash'), { recursive: true })
+      await mkdir(join(targetDir, '.yuanxiao-trash'), { recursive: true })
 
       await rename(tempSkillDir, skillTargetDir)
     } catch (error) {
@@ -226,7 +226,7 @@ export class SkillStore {
     }
 
     // 移动到 trash 目录（保留可恢复信息）
-    const trashDir = join(targetDir, '.tangyuan-trash')
+    const trashDir = join(targetDir, '.yuanxiao-trash')
     await mkdir(trashDir, { recursive: true })
 
     const trashName = `${params.skillName}-${this.now().replace(/:/g, '-')}`
@@ -272,7 +272,7 @@ export class SkillStore {
   }
 
   /**
-   * 将 Pi SDK Skill 和诊断信息映射为汤圆的 SkillSummary 列表。
+   * 将 Pi SDK Skill 和诊断信息映射为元宵的 SkillSummary 列表。
    *
    * @param skills - Pi SDK 解析出的 Skill 列表（已按 first-wins 排序）。
    * @param diagnostics - Pi SDK 的加载诊断信息（包含冲突）。
@@ -283,7 +283,7 @@ export class SkillStore {
     skills: LoadedSkill[],
     diagnostics: SkillDiagnostic[],
   ): SkillSummary[] {
-    const agentSkillsPath = this.layout.agentSkills(TANGYUAN_DEFAULT_AGENT_ID)
+    const agentSkillsPath = this.layout.agentSkills(YUANXIAO_DEFAULT_AGENT_ID)
     const sharedSkillsPath = this.layout.sharedSkills()
 
     // 从 diagnostics 中提取冲突信息（按 loserPath 索引）
@@ -297,7 +297,7 @@ export class SkillStore {
         diagnostic.collision?.resourceType === 'skill'
       ) {
         const loserSource = diagnostic.collision.loserPath.startsWith(
-          agentSkillsPath.replace(TANGYUAN_DEFAULT_AGENT_ID, ''),
+          agentSkillsPath.replace(YUANXIAO_DEFAULT_AGENT_ID, ''),
         )
           ? 'agent'
           : diagnostic.collision.loserPath.startsWith(sharedSkillsPath)
@@ -312,7 +312,7 @@ export class SkillStore {
 
     return skills.map((skill) => {
       const source: 'shared' | 'agent' = skill.filePath.startsWith(
-        agentSkillsPath.replace(TANGYUAN_DEFAULT_AGENT_ID, ''),
+        agentSkillsPath.replace(YUANXIAO_DEFAULT_AGENT_ID, ''),
       )
         ? 'agent'
         : skill.filePath.startsWith(sharedSkillsPath)

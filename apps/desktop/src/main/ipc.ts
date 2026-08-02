@@ -6,11 +6,11 @@ import {
   type AgentEvent,
   type DesktopIpcChannel,
   type DesktopIpcResponse,
-} from '@tangyuan/contracts'
-import type { TangyuanRuntime } from '@tangyuan/agent-runtime'
+} from '@yuanxiao/contracts'
+import type { YuanxiaoRuntime } from '@yuanxiao/agent-runtime'
 
 /**
- * 描述 TangyuanRuntime IPC 注册所需的 Electron ipcMain 子集。
+ * 描述 YuanxiaoRuntime IPC 注册所需的 Electron ipcMain 子集。
  */
 export interface IpcMainLike {
   /**
@@ -41,7 +41,7 @@ export type AgentEventBroadcaster = (event: AgentEvent) => void
 export type OpenExternalLinkHandler = (url: string) => Promise<void>
 
 /**
- * 把允许的 IPC channel 连接到 TangyuanRuntime。
+ * 把允许的 IPC channel 连接到 YuanxiaoRuntime。
  *
  * @param ipcMain - Electron ipcMain 或测试替身。
  * @param runtime - Main 侧唯一运行时入口。
@@ -52,7 +52,7 @@ export type OpenExternalLinkHandler = (url: string) => Promise<void>
  */
 export function registerDesktopAppIpc(
   ipcMain: IpcMainLike,
-  runtime: TangyuanRuntime,
+  runtime: YuanxiaoRuntime,
   broadcastAgentEvent?: AgentEventBroadcaster,
   openExternalLink?: OpenExternalLinkHandler,
 ): void {
@@ -354,15 +354,15 @@ export function registerDesktopAppIpc(
     },
   )
   ipcMain.handle(
-    DESKTOP_IPC_CHANNELS.agentsRebuildTangyuan,
+    DESKTOP_IPC_CHANNELS.agentsRebuildYuanxiao,
     async (_event, payload) => {
       parseDesktopIpcRequest(
-        DESKTOP_IPC_CHANNELS.agentsRebuildTangyuan,
+        DESKTOP_IPC_CHANNELS.agentsRebuildYuanxiao,
         payload,
       )
       return parseDesktopIpcResponse(
-        DESKTOP_IPC_CHANNELS.agentsRebuildTangyuan,
-        await runtime.rebuildTangyuanHome(),
+        DESKTOP_IPC_CHANNELS.agentsRebuildYuanxiao,
+        await runtime.rebuildYuanxiaoHome(),
       )
     },
   )
