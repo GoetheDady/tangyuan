@@ -1,6 +1,3 @@
-import { homedir } from 'node:os'
-import { join } from 'node:path'
-import { RealPiSdkGateway } from '../runtime/gateway'
 import { DefaultProfileModule } from '../runtime/default-profile-module'
 import { DefaultRuntimeConfiguration } from '../runtime/runtime-configuration'
 import { ConfigStore, DirectoryLayout } from '../core'
@@ -17,11 +14,19 @@ import {
   type AgentId,
   type AgentRunState,
   type AgentSessionSummary,
+  type AgentEventSubscription,
   type ConfigEncryptionAdapter,
+  type GetSessionModelInfoRequest,
   type ProfileUpdateResult,
   type RuntimeConfiguration,
+  type SessionModelInfo,
+  type SetSessionModelRequest,
+  type SetSessionThinkingLevelRequest,
   type TranscriptSnapshot,
 } from '@yuanxiao/contracts'
+import { createDefaultStores } from '../stores'
+import type { DefaultStores } from '../stores'
+import { EventBus } from '../stores/event-bus'
 import type {
   DriverEvent,
   InternalMessage,
@@ -48,6 +53,8 @@ export abstract class PiSdkDriverState {
   protected readonly profileModule: DefaultProfileModule
   protected readonly gateway: PiSdkGateway
   protected readonly encryptionAdapter: ConfigEncryptionAdapter | null
+  /** 内部事件唯一通道：Store 与 Driver 自身事件都经 EventBus 汇聚。 */
+  protected readonly eventBus: EventBus
   protected readonly listeners = new Set<AgentEventListener>()
   protected readonly transcriptCache = new Map<string, TranscriptSnapshot>()
   protected readonly sessionHandles = new Map<string, PiSdkSessionHandle>()
@@ -65,58 +72,35 @@ export abstract class PiSdkDriverState {
    * @returns PiSdkDriver 实例。
    * @throws 此构造方法不会主动抛出错误。
    */
-  constructor(options: PiSdkDriverOptions = {}) {
-    this.now = options.now ?? (() => new Date().toISOString())
-    this.agentHomePath = options.agentHomePath ?? '~/.yuanxiao/agents/yuanxiao'
-    this.fsRoot = options.fsRoot ?? homedir()
-    this.userDataPath = options.userDataPath ?? join(this.fsRoot, '.yuanxiao')
-    this.layout = new DirectoryLayout({
-      agentHomePath: this.agentHomePath,
-      fsRoot: this.fsRoot,
-      userDataPath: this.userDataPath,
+  constructor(options: PiSdkDriverOptions = {}, stores?: DefaultStores) {
+    // 生产代码由 createDefaultStores 创建并注入；未注入时（如 Driver 单测）
+    // 也走同一工厂，保证只有一套 Store 装配逻辑。
+    const resolved = stores ?? createDefaultStores(options)
+    this.now = resolved.now
+    this.agentHomePath = resolved.agentHomePath
+    this.fsRoot = resolved.fsRoot
+    this.userDataPath = resolved.userDataPath
+    this.layout = resolved.layout
+    this.gateway = resolved.gateway
+    this.encryptionAdapter = resolved.encryptionAdapter
+    this.configStore = resolved.configStore
+    this.agentRegistry = resolved.agentRegistry
+    this.skillStore = resolved.skillStore
+    this.profileStore = resolved.profileStore
+    this.sessionIndexStore = resolved.sessionIndexStore
+    this.messageStore = resolved.messageStore
+    this.configurationModule = resolved.configurationModule
+    this.profileModule = resolved.profileModule
+    this.eventBus = resolved.eventBus
+
+    // EventBus 是内部事件唯一通道：订阅后把 Store 发出的事件转发给公开订阅者
+    this.eventBus.subscribe((event) => {
+      for (const listener of this.listeners) {
+        ;(listener as AgentEventListener)(event as AgentEvent)
+      }
     })
-    this.gateway = options.gateway ?? new RealPiSdkGateway()
-    this.encryptionAdapter = options.encryptionAdapter ?? null
-    this.configStore = new ConfigStore({
-      layout: this.layout,
-      encryptionAdapter: this.encryptionAdapter,
-      now: this.now,
-    })
-    this.agentRegistry = new AgentRegistry({
-      layout: this.layout,
-      configStore: this.configStore,
-      now: this.now,
-      emit: (event) => this.emit(event),
-      agentHomePath: this.agentHomePath,
-    })
-    this.skillStore = new SkillStore({
-      layout: this.layout,
-      now: this.now,
-    })
-    this.profileStore = new ProfileStore({
-      layout: this.layout,
-      configStore: this.configStore,
-      now: this.now,
-    })
-    this.sessionIndexStore = new SessionIndexStore({
-      layout: this.layout,
-      configStore: this.configStore,
-      gateway: this.gateway,
-    })
-    this.messageStore = new MessageStore({ now: this.now })
-    this.configurationModule = new DefaultRuntimeConfiguration({
-      agentHomePath: this.agentHomePath,
-      agentRegistry: this.agentRegistry,
-      configStore: this.configStore,
-      gateway: this.gateway,
-      now: this.now,
-      profileStore: this.profileStore,
-    })
-    this.profileModule = new DefaultProfileModule({
-      emit: (event) => this.emit(event),
-      layout: this.layout,
-      now: this.now,
-      profileStore: this.profileStore,
+    // Profile 变更后的会话上下文刷新绑定到 Driver 持有的活跃 session
+    resolved.profileModule.setRefreshContextHandlers({
       refreshAgentContext: (agentId) =>
         this.refreshAgentProfileContext(agentId),
       refreshAllContexts: () => this.refreshAllProfileContext(),
@@ -603,11 +587,343 @@ export abstract class PiSdkDriverState {
    * @returns 无返回值。
    * @throws 订阅者回调抛出的错误会透传给调用方。
    */
+
   protected emit(event: DriverEvent): void {
-    for (const listener of this.listeners) {
-      // DriverEvent is a superset of AgentEvent; listeners only process
-      // the subset of events that belong to the public AgentEvent union.
-      ;(listener as AgentEventListener)(event as AgentEvent)
+    // DriverEvent is a superset of AgentEvent；订阅端只处理属于公开
+    // AgentEvent 联合的子集。经 EventBus 汇聚后统一转发给公开订阅者。
+    this.eventBus.emit(event as AgentEvent)
+  }
+
+  // ─── 配置模块委托（原 PiSdkDriverFacade） ─────────
+
+  async getSnapshot(): Promise<import('@yuanxiao/contracts').RuntimeSnapshot> {
+    return this.configurationModule.getSnapshot()
+  }
+
+  async refresh(): Promise<import('@yuanxiao/contracts').RuntimeSnapshot> {
+    return this.configurationModule.refresh()
+  }
+
+  async saveConfiguration(
+    configuration: import('@yuanxiao/contracts').RuntimeConfiguration,
+  ): Promise<import('@yuanxiao/contracts').RuntimeSnapshot> {
+    return this.configurationModule.saveConfiguration(configuration)
+  }
+
+  async cancelConfigurationVerification(
+    request: import('@yuanxiao/contracts').CancelConfigurationVerificationRequest,
+  ): Promise<import('@yuanxiao/contracts').RuntimeSnapshot> {
+    return this.configurationModule.cancelConfigurationVerification(request)
+  }
+
+  async restoreFromBackup(): Promise<
+    import('@yuanxiao/contracts').RuntimeSnapshot
+  > {
+    return this.configurationModule.restoreFromBackup()
+  }
+
+  async resetConfiguration(): Promise<void> {
+    return this.configurationModule.resetConfiguration()
+  }
+
+  async saveProvider(
+    config: import('@yuanxiao/contracts').ProviderConfiguration,
+  ): Promise<import('@yuanxiao/contracts').RuntimeSnapshot> {
+    return this.configurationModule.saveProvider(config)
+  }
+
+  async deleteProvider(
+    request: import('@yuanxiao/contracts').DeleteProviderRequest,
+  ): Promise<import('@yuanxiao/contracts').RuntimeSnapshot> {
+    return this.configurationModule.deleteProvider(request)
+  }
+
+  // ─── Agent 模块委托 ─────────────────────────────
+
+  async listAgents(): Promise<import('@yuanxiao/contracts').AgentSummary[]> {
+    return this.agentRegistry.listAgents()
+  }
+
+  async createAgent(
+    displayName: string,
+  ): Promise<import('@yuanxiao/contracts').AgentSummary> {
+    return this.agentRegistry.createAgent(displayName)
+  }
+
+  async updateAgentConfig(
+    agentId: string,
+    patch: Partial<
+      Pick<
+        import('@yuanxiao/contracts').AgentConfig,
+        'defaultProviderId' | 'defaultModelId'
+      >
+    >,
+  ): Promise<import('@yuanxiao/contracts').AgentSummary> {
+    return this.agentRegistry.updateAgentConfig(agentId, patch)
+  }
+
+  async archiveAgent(
+    agentId: string,
+  ): Promise<import('@yuanxiao/contracts').AgentSummary> {
+    return this.agentRegistry.archiveAgent(agentId)
+  }
+
+  async recoverAgent(
+    agentId: string,
+  ): Promise<import('@yuanxiao/contracts').AgentSummary> {
+    return this.agentRegistry.recoverAgent(agentId)
+  }
+
+  async reconcileAgentDirectories(): Promise<{
+    agents: import('@yuanxiao/contracts').AgentSummary[]
+    unclaimedDirectories: import('@yuanxiao/contracts').UnclaimedDirectory[]
+  }> {
+    return this.agentRegistry.reconcileAgentDirectories()
+  }
+
+  async claimAgentDirectory(
+    agentId: string,
+    displayName: string,
+  ): Promise<import('@yuanxiao/contracts').AgentSummary> {
+    return this.agentRegistry.claimAgentDirectory(agentId, displayName)
+  }
+
+  async rebuildYuanxiaoHome(): Promise<
+    import('@yuanxiao/contracts').AgentSummary
+  > {
+    return this.agentRegistry.rebuildYuanxiaoHome()
+  }
+
+  // ─── Profile 模块委托 ───────────────────────────
+
+  async getSoul(
+    agentId: string,
+  ): Promise<import('@yuanxiao/contracts').SoulContent> {
+    return this.profileModule.getSoul(agentId)
+  }
+
+  async getUserProfile(): Promise<
+    import('@yuanxiao/contracts').UserProfileContent
+  > {
+    return this.profileModule.getUserProfile()
+  }
+
+  async updateSoul(
+    agentId: string,
+    content: string,
+    expectedVersion: string,
+  ): Promise<import('@yuanxiao/contracts').ProfileUpdateResult> {
+    return this.profileModule.updateSoul(agentId, content, expectedVersion)
+  }
+
+  async updateUserProfile(
+    content: string,
+    expectedVersion: string,
+  ): Promise<import('@yuanxiao/contracts').ProfileUpdateResult> {
+    return this.profileModule.updateUserProfile(content, expectedVersion)
+  }
+
+  // ─── Skill 模块委托 ─────────────────────────────
+
+  async listAgentSkills(
+    agentId: string,
+  ): Promise<import('@yuanxiao/contracts').SkillSummary[]> {
+    return this.skillStore.listAgentSkills(agentId)
+  }
+
+  async listSharedSkills(): Promise<
+    import('@yuanxiao/contracts').SkillSummary[]
+  > {
+    return this.skillStore.listSharedSkills()
+  }
+
+  async installSkill(
+    params: import('@yuanxiao/contracts').SkillOperationParams,
+  ): Promise<import('@yuanxiao/contracts').SkillSummary[]> {
+    return this.skillStore.installSkill(params)
+  }
+
+  async deleteSkill(
+    params: import('@yuanxiao/contracts').SkillOperationParams,
+  ): Promise<import('@yuanxiao/contracts').SkillSummary[]> {
+    return this.skillStore.deleteSkill(params)
+  }
+
+  async getSkillInstallRecords(): Promise<
+    import('@yuanxiao/contracts').SkillInstallRecord[]
+  > {
+    return this.skillStore.getSkillInstallRecords()
+  }
+
+  /**
+   * 订阅标准 Agent 事件。
+   *
+   * @param listener - 接收标准事件的回调。
+   * @returns 可取消订阅的句柄。
+   * @throws 此方法不会主动抛出错误。
+   */
+  subscribe(listener: AgentEventListener): AgentEventSubscription {
+    this.listeners.add(listener)
+
+    return {
+      unsubscribe: () => {
+        this.listeners.delete(listener)
+      },
     }
+  }
+
+  /**
+   * 重新加载指定 Agent 所有活跃 session 的 ResourceLoader。
+   *
+   * 用于 Agent 专属 Skill 变更后刷新该 Agent 的会话。
+   *
+   * @param agentId - Agent 标识。
+   * @returns 无返回值。
+   * @throws 当某个 session 的 reload 失败时，Promise 会 reject。
+   */
+  async reloadAgentSessions(agentId: string): Promise<void> {
+    const promises: Promise<void>[] = []
+
+    for (const [sessionId, handle] of this.sessionHandles) {
+      const indexEntry = this.sessionIndexStore.getEntryOrNull(sessionId)
+      if (indexEntry?.agentId === agentId && handle.reload) {
+        promises.push(handle.reload())
+      }
+    }
+
+    await Promise.all(promises)
+  }
+
+  /**
+   * 重新加载全部活跃 session 的 ResourceLoader。
+   *
+   * 用于共享 Skill 变更后刷新所有 Agent 的会话。
+   *
+   * @returns 无返回值。
+   * @throws 当某个 session 的 reload 失败时，Promise 会 reject。
+   */
+  async reloadAllSessions(): Promise<void> {
+    const promises: Promise<void>[] = []
+
+    for (const handle of this.sessionHandles.values()) {
+      if (handle.reload) {
+        promises.push(handle.reload())
+      }
+    }
+
+    await Promise.all(promises)
+  }
+
+  /**
+   * 读取当前 Session 的模型和 Thinking Level 信息。
+   *
+   * @param request - Agent 和 Session 标识。
+   * @returns Session 模型信息。
+   * @throws 当 Session 不存在或读取失败时，Promise 会 reject。
+   */
+  async getSessionModelInfo(
+    request: GetSessionModelInfoRequest,
+  ): Promise<SessionModelInfo> {
+    this.assertKnownSession(request.sessionId, request.agentId)
+    const handle = await this.ensureSessionHandle(request.sessionId)
+
+    if (!handle.getModelInfo) {
+      throw new AgentRuntimeError({
+        code: 'driver-unavailable',
+        message: '当前会话不支持读取模型信息。',
+        recoverable: true,
+      })
+    }
+
+    return handle.getModelInfo()
+  }
+
+  /**
+   * 切换当前 Session 的 Provider 和 Model。
+   *
+   * @param request - Agent、Session 标识和目标 Provider/Model。
+   * @returns 切换后的模型信息。
+   * @throws 当 Session 不存在或模型切换失败时，Promise 会 reject。
+   */
+  async setSessionModel(
+    request: SetSessionModelRequest,
+  ): Promise<SessionModelInfo> {
+    this.assertKnownSession(request.sessionId, request.agentId)
+    const handle = await this.ensureSessionHandle(request.sessionId)
+
+    if (!handle.setModel) {
+      throw new AgentRuntimeError({
+        code: 'driver-unavailable',
+        message: '当前会话不支持切换模型。',
+        recoverable: true,
+      })
+    }
+
+    // 读取目标 Provider 的 API Key 用于跨 Provider 切换
+    const indexEntry = this.sessionIndexStore.getEntry(request.sessionId)
+    const configuration = await this.configStore.readRequired(
+      indexEntry.agentId,
+    )
+    const targetApiKey =
+      request.providerId !== (indexEntry.provider || configuration.providerId)
+        ? await this.configStore.readProviderApiKey(request.providerId)
+        : undefined
+
+    await handle.setModel(request.providerId, request.modelId, targetApiKey)
+    await this.sessionIndexStore.updateEntry(request.sessionId, {
+      provider: request.providerId,
+      model: request.modelId,
+    })
+
+    if (!handle.getModelInfo) {
+      throw new AgentRuntimeError({
+        code: 'driver-unavailable',
+        message: '当前会话不支持读取模型信息。',
+        recoverable: true,
+      })
+    }
+
+    return handle.getModelInfo()
+  }
+
+  /**
+   * 切换当前 Session 的 Thinking Level。
+   *
+   * @param request - Agent、Session 标识和目标 Thinking Level。
+   * @returns 切换后的模型信息。
+   * @throws 当 Session 不存在或不支持 Thinking 时，Promise 会 reject。
+   */
+  async setSessionThinkingLevel(
+    request: SetSessionThinkingLevelRequest,
+  ): Promise<SessionModelInfo> {
+    this.assertKnownSession(request.sessionId, request.agentId)
+    const handle = await this.ensureSessionHandle(request.sessionId)
+
+    if (!handle.setThinkingLevel) {
+      throw new AgentRuntimeError({
+        code: 'driver-unavailable',
+        message: '当前会话不支持切换 Thinking Level。',
+        recoverable: true,
+      })
+    }
+
+    await handle.setThinkingLevel(request.level)
+
+    if (!handle.getModelInfo) {
+      throw new AgentRuntimeError({
+        code: 'driver-unavailable',
+        message: '当前会话不支持读取模型信息。',
+        recoverable: true,
+      })
+    }
+
+    const info = await handle.getModelInfo()
+    // Thinking Level 属于会话运行配置：持久化后重新打开会话才能恢复，
+    // 而不是静默回退到 Agent 默认配置。
+    await this.sessionIndexStore.updateEntry(request.sessionId, {
+      thinkingLevel: request.level,
+    })
+
+    return info
   }
 }

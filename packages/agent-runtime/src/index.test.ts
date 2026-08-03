@@ -1,15 +1,20 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createDefaultSessionSummary } from '@yuanxiao/contracts'
 import {
   AgentRuntimeError,
   type AgentEvent,
   type PiSdkPromptOptions,
+  createYuanxiaoRuntime,
   createYuanxiaoRuntimeForTesting,
 } from './index'
 import {
   cleanupTempDirs,
   createDeferred,
   createDriver,
+  createFakeEncryptionAdapter,
   createPiSdkGateway,
 } from './driver/pi-sdk-driver.test-helpers'
 
@@ -181,5 +186,49 @@ describe('YuanxiaoRuntime', () => {
         ].includes(event.type),
       ),
     ).toBe(false)
+  })
+})
+
+describe('createYuanxiaoRuntime · 生产组合', () => {
+  it('Driver 与 Runtime 共享同一套 Store：Profile 更新会刷新已打开会话的上下文', async () => {
+    const rootPath = await mkdtemp(join(tmpdir(), 'yuanxiao-runtime-compose-'))
+    try {
+      const gateway = createPiSdkGateway()
+      const runtime = createYuanxiaoRuntime({
+        agentHomePath: join(rootPath, 'agents', 'yuanxiao'),
+        fsRoot: rootPath,
+        userDataPath: rootPath,
+        gateway,
+        encryptionAdapter: createFakeEncryptionAdapter(),
+      })
+
+      await runtime.saveRuntimeConfiguration({
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        apiKey: 'sk-test-secret-7890',
+      })
+      await runtime.createSession({
+        agentId: 'yuanxiao',
+        title: '上下文刷新测试',
+      })
+      const handle = gateway.sessionHandles.at(-1)
+      expect(handle).toBeDefined()
+      const contextsBefore = handle!.systemPromptContexts.length
+
+      const soul = await runtime.getSoul('yuanxiao')
+      await runtime.updateSoul(
+        'yuanxiao',
+        '# Soul\n只说中文，并且保持简洁。',
+        soul.version,
+      )
+
+      // Runtime 的 profiles 模块与 Driver 共用同一份 profileStore/EventBus，
+      // updateSoul 必须触发 Driver 对活跃会话的系统提示词上下文刷新。
+      expect(handle!.systemPromptContexts.length).toBeGreaterThan(
+        contextsBefore,
+      )
+    } finally {
+      await rm(rootPath, { recursive: true, force: true })
+    }
   })
 })

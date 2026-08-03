@@ -6,26 +6,17 @@ import type {
   QuestionClarificationRequest,
   SessionModelInfo,
 } from '@yuanxiao/contracts'
-import { MessageSquarePlus, Settings } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router'
+import { Navigate, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { useStore } from 'zustand'
 
-import { BashApprovalCard } from '@/components/BashApprovalCard'
-import { ForkSourceNotice } from '@/components/ForkSourceNotice'
-import { QuestionClarificationCard } from '@/components/QuestionClarificationCard'
+import { ChatSidebar } from '@/components/ChatSidebar'
+import { ConversationArea } from '@/components/ConversationArea'
 import {
-  ArchivedSessionList,
-  SessionArchiveButton,
   SessionArchiveDialog,
-  SessionDeleteButton,
   SessionDeleteDialog,
 } from '@/components/SessionArchiveControls'
-import { SessionLineageTree } from '@/components/SessionLineageTree'
-import { Button } from '@/components/ui/button'
-import { Composer } from '@/components/Composer'
-import { TranscriptMessages } from '@/components/TranscriptMessages'
 import { useSessionArchive } from '@/hooks/useSessionArchive'
 import type { WorkbenchStoreApi } from '@/stores/workbench-store'
 
@@ -33,10 +24,6 @@ import type { WorkbenchStoreApi } from '@/stores/workbench-store'
 const EMPTY_SESSIONS: AgentSessionSummary[] = []
 const EMPTY_APPROVALS: BashApprovalRequest[] = []
 const EMPTY_CLARIFICATIONS: QuestionClarificationRequest[] = []
-
-function getAgentInitial(displayName: string): string {
-  return Array.from(displayName.trim())[0] ?? '汤'
-}
 
 /**
  * 聊天页路由守卫：运行时未就绪时重定向到控制台。
@@ -86,7 +73,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     sessionId: string
   }>()
   const navigate = useNavigate()
-  const location = useLocation()
   const runtime = useStore(store, (state) => state.runtime)
   const agents = useStore(store, (state) => state.agents)
   const composerText = useStore(store, (state) => state.composerDraft)
@@ -569,47 +555,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     }
   }
 
-  const sessionGroups = useMemo(() => {
-    const today = new Date().toDateString()
-    const knownSessionIds = new Set(
-      sessions.map((session) => session.sessionId),
-    )
-    // 父会话已不在列表里的分叉也作为根展示，避免整条谱系不可见。
-    const rootSessions = sessions.filter(
-      (session) =>
-        !session.forkedFrom ||
-        !knownSessionIds.has(session.forkedFrom.sessionId),
-    )
-
-    const groups = [
-      {
-        label: '今天',
-        sessions: rootSessions.filter(
-          (session) => new Date(session.updatedAt).toDateString() === today,
-        ),
-      },
-      {
-        label: '更早',
-        sessions: rootSessions.filter(
-          (session) => new Date(session.updatedAt).toDateString() !== today,
-        ),
-      },
-    ]
-
-    return groups.filter((group) => group.sessions.length > 0)
-  }, [sessions])
-
-  /**
-   * 选中侧边栏的会话并同步路由。
-   *
-   * @param session - 被选中的会话摘要。
-   * @returns 无返回值。
-   */
-  function handleSelectSession(session: AgentSessionSummary): void {
-    setForkSourceMessageId(null)
-    navigate(`/chat/${activeAgentId}/${session.sessionId}`, { replace: true })
-  }
-
   /**
    * 跳回当前分叉会话的父会话，并定位到分叉来源消息。
    *
@@ -624,291 +569,116 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     })
   }
 
-  /**
-   * 切换到指定 Agent 并加载其会话列表。
-   *
-   * @param nextAgentId - 要切换到的 Agent 标识。
-   * @returns 无返回值。
-   */
-  function handleAgentChange(nextAgentId: string): void {
-    navigate(`/chat/${nextAgentId}`, { replace: true })
-  }
-
   return (
     <main className="bg-background text-foreground h-full overflow-hidden">
       <h1 className="sr-only">{activeAgentDisplayName}</h1>
       <p className="sr-only">大语言模型对话</p>
       <div className="grid h-full min-h-0 grid-cols-[296px_minmax(0,1fr)]">
-        <aside
-          data-testid="chat-sidebar"
-          className="border-split bg-sidebar grid min-h-0 grid-cols-[80px_216px] border-r"
-        >
-          <nav
-            aria-label="Agent 切换"
-            data-testid="chat-agent-rail"
-            className="window-no-drag border-split bg-sidebar relative z-50 flex min-h-0 flex-col items-center gap-2.5 border-r px-2.5 py-2"
-          >
-            <div aria-hidden="true" className="h-9 shrink-0" />
-
-            {agents
-              .filter((agent) => agent.status === 'active')
-              .map((agent) => {
-                const isActive = agent.agentId === activeAgentId
-                return (
-                  <button
-                    key={agent.agentId}
-                    type="button"
-                    aria-label={`切换到 Agent ${agent.displayName}`}
-                    aria-current={isActive ? 'page' : undefined}
-                    title={agent.displayName}
-                    className={`window-no-drag text-label focus-visible:ring-ring/50 grid size-9 shrink-0 place-items-center rounded-[10px] border font-semibold transition-colors focus-visible:ring-[3px] focus-visible:outline-none ${
-                      isActive
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border bg-card text-foreground hover:bg-background'
-                    }`}
-                    onClick={() => {
-                      handleAgentChange(agent.agentId)
-                    }}
-                  >
-                    {getAgentInitial(agent.displayName)}
-                  </button>
-                )
-              })}
-
-            <div className="min-h-0 flex-1" />
-            <button
-              type="button"
-              aria-label="设置"
-              title="设置"
-              className="window-no-drag text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:ring-ring/50 grid size-9 shrink-0 cursor-pointer place-items-center rounded-[10px] transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
-              onClick={() => {
-                navigate(
-                  `/settings/providers?redirect=${encodeURIComponent(location.pathname)}`,
-                )
-              }}
-            >
-              <Settings size={16} aria-hidden="true" />
-            </button>
-          </nav>
-
-          <section
-            data-testid="chat-session-pane"
-            className="bg-background/50 flex min-h-0 min-w-0 flex-col"
-          >
-            <div className="window-no-drag relative z-50 p-[8px_10px_10px]">
-              <Button
-                className="text-label h-9 w-full gap-1.5 rounded-lg px-2 font-semibold"
-                onClick={() => {
-                  void createSession()
-                }}
-              >
-                <MessageSquarePlus
-                  data-icon="inline-start"
-                  size={14}
-                  aria-hidden="true"
-                />
-                新建会话
-              </Button>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-              {sessionGroups.length > 0 ? (
-                <div
-                  role="tree"
-                  aria-label="会话谱系"
-                  className="flex flex-col gap-0.5"
-                >
-                  {sessionGroups.map((group) => (
-                    <div
-                      key={group.label}
-                      role="group"
-                      aria-label={group.label}
-                    >
-                      <p className="text-muted-foreground flex h-5 items-center px-2.5 font-mono text-[8px] font-semibold">
-                        {group.label}
-                      </p>
-                      <SessionLineageTree
-                        sessions={sessions}
-                        rootSessions={group.sessions}
-                        selectedSessionId={selectedSession?.sessionId ?? null}
-                        pendingApprovalSessionIds={pendingApprovalSessionIds}
-                        onSelect={handleSelectSession}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-caption text-muted-foreground px-2.5 py-3">
-                  <p className="font-medium">暂无会话</p>
-                  <p className="mt-1 text-[10px]">新建会话后会显示在这里</p>
-                </div>
-              )}
-            </div>
-            <ArchivedSessionList
-              sessions={sessionArchive.archivedSessions}
-              recoveringSessionId={sessionArchive.recoveringSessionId}
-              onRecover={(session) => {
-                void sessionArchive.recoverSession(session)
-              }}
-            />
-          </section>
-        </aside>
-
-        <section
-          data-testid="chat-main"
-          className="bg-background flex min-h-0 min-w-0 flex-col overflow-hidden"
-        >
-          <header
-            data-testid="chat-header"
-            className="border-border flex h-12 shrink-0 items-center border-b px-[18px]"
-          >
-            <h2 className="text-section-heading min-w-0 flex-1 truncate font-semibold">
-              {selectedSession?.title ?? '新对话'}
-            </h2>
-            {selectedSession && (
-              <>
-                <SessionArchiveButton
-                  disabled={sessionArchive.isArchiving}
-                  onArchive={() => {
-                    void sessionArchive.archiveSelectedSession(false)
-                  }}
-                />
-                <SessionDeleteButton
-                  disabled={sessionArchive.isDeleting}
-                  onDelete={() => {
-                    sessionArchive.requestDeleteSelectedSession()
-                  }}
-                />
-              </>
-            )}
-          </header>
-
-          <div className="flex min-h-0 flex-1 flex-col">
-            {selectedSession?.forkedFrom && (
-              <ForkSourceNotice
-                parentSessionTitle={parentSession?.title ?? null}
-                isParentAvailable={parentSession !== null}
-                onViewSource={() => {
-                  void viewForkSource()
-                }}
-              />
-            )}
-            <TranscriptMessages
-              key={selectedSession?.sessionId ?? 'no-session'}
-              transcript={selectedTranscript}
-              isStreaming={isSelectedSessionRunning}
-              isAwaitingResponse={isAwaitingResponse}
-              sessionId={selectedSession?.sessionId ?? null}
-              forkSourceMessageId={forkSourceMessageId}
-              onRetry={(userMessageId) => {
-                void retryMessage(userMessageId)
-              }}
-              onFork={(userMessageId) => {
-                void forkSession(userMessageId)
-              }}
-            />
-          </div>
-
-          {selectedSession && sessionPendingApprovals.length > 0 && (
-            <div className="bg-background shrink-0 px-4 py-2">
-              <div className="mx-auto max-w-[720px] space-y-2">
-                {sessionPendingApprovals
-                  .filter(
-                    (approval) =>
-                      approval.sessionId === selectedSession.sessionId &&
-                      approval.status === 'pending',
-                  )
-                  .map((approval) => (
-                    <BashApprovalCard
-                      key={approval.approvalId}
-                      approval={approval}
-                      onApproveOnce={async (approvalId) => {
-                        await window.api.approveBash({ approvalId })
-                      }}
-                      onApproveAlways={async (approvalId) => {
-                        allowCommandForProcess(
-                          approval.sessionId,
-                          approval.command,
-                        )
-                        await window.api.approveBash({ approvalId })
-                      }}
-                      onReject={async (approvalId) => {
-                        await window.api.rejectBash({ approvalId })
-                      }}
-                    />
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {selectedSession && sessionPendingClarifications.length > 0 && (
-            <div className="bg-background shrink-0 px-4 py-2">
-              <div className="mx-auto max-w-[720px] space-y-2">
-                {sessionPendingClarifications
-                  .filter(
-                    (clarification) =>
-                      clarification.sessionId === selectedSession.sessionId &&
-                      clarification.status === 'pending',
-                  )
-                  .map((clarification) => (
-                    <QuestionClarificationCard
-                      key={clarification.clarificationId}
-                      clarification={clarification}
-                      onAnswer={async (clarificationId, answer) => {
-                        await window.api.answerClarification({
-                          clarificationId,
-                          answer,
-                        })
-                      }}
-                      onCancel={async (clarificationId) => {
-                        await window.api.cancelClarification({
-                          clarificationId,
-                        })
-                      }}
-                    />
-                  ))}
-              </div>
-            </div>
-          )}
-
-          <footer
-            data-testid="chat-composer-area"
-            className="bg-background shrink-0 px-4 pt-[5px] pb-[6px]"
-          >
-            <Composer
-              value={composerText}
-              onChange={updateComposerDraft}
-              onSubmit={() => {
-                void sendMessage()
-              }}
-              placeholder={
-                selectedSession
-                  ? '继续输入...'
-                  : `给${activeAgentDisplayName}发送消息...`
-              }
-              isRunning={
-                isSelectedSessionRunning ||
-                isSendingMessage ||
-                isCancellingSelectedSession
-              }
-              onCancel={() => {
-                void cancelRun()
-              }}
-              disabled={!selectedSession}
-              sessionModelInfo={selectedSession ? sessionModelInfo : null}
-              isLoadingModelInfo={isLoadingModelInfo}
-              isSwitchingModel={isSwitchingModel}
-              providers={runtime?.providers ?? []}
-              selectableModels={selectableModels}
-              onModelChange={(providerId, modelId) => {
-                void handleSessionModelChange(providerId, modelId)
-              }}
-              onThinkingLevelChange={(level) => {
-                void handleThinkingLevelChange(level)
-              }}
-            />
-          </footer>
-        </section>
+        <ChatSidebar
+          agents={agents}
+          activeAgentId={activeAgentId}
+          sessions={sessions}
+          selectedSessionId={selectedSession?.sessionId ?? null}
+          pendingApprovalSessionIds={pendingApprovalSessionIds}
+          archivedSessions={sessionArchive.archivedSessions}
+          recoveringSessionId={sessionArchive.recoveringSessionId}
+          onAgentChange={(nextAgentId) => {
+            navigate(`/chat/${nextAgentId}`, { replace: true })
+          }}
+          onCreateSession={() => {
+            void createSession()
+          }}
+          onSelectSession={(session) => {
+            setForkSourceMessageId(null)
+            navigate(`/chat/${activeAgentId}/${session.sessionId}`, {
+              replace: true,
+            })
+          }}
+          onRecoverSession={(session) => {
+            void sessionArchive.recoverSession(session)
+          }}
+        />
+        <ConversationArea
+          selectedSession={selectedSession}
+          parentSession={parentSession}
+          forkSourceMessageId={forkSourceMessageId}
+          transcript={selectedTranscript}
+          isStreaming={isSelectedSessionRunning}
+          isAwaitingResponse={isAwaitingResponse}
+          pendingApprovals={sessionPendingApprovals}
+          pendingClarifications={sessionPendingClarifications}
+          activeAgentDisplayName={activeAgentDisplayName}
+          composer={{
+            value: composerText,
+            onChange: updateComposerDraft,
+            onSubmit: () => {
+              void sendMessage()
+            },
+            onCancel: () => {
+              void cancelRun()
+            },
+            isRunning:
+              isSelectedSessionRunning ||
+              isSendingMessage ||
+              isCancellingSelectedSession,
+            disabled: !selectedSession,
+            sessionModelInfo: selectedSession ? sessionModelInfo : null,
+            isLoadingModelInfo,
+            isSwitchingModel,
+            providers: runtime?.providers ?? [],
+            selectableModels,
+            onModelChange: (providerId, modelId) => {
+              void handleSessionModelChange(providerId, modelId)
+            },
+            onThinkingLevelChange: (level) => {
+              void handleThinkingLevelChange(level)
+            },
+          }}
+          actions={{
+            onRetry: (userMessageId) => {
+              void retryMessage(userMessageId)
+            },
+            onFork: (userMessageId) => {
+              void forkSession(userMessageId)
+            },
+            onViewForkSource: () => {
+              viewForkSource()
+            },
+            onArchive: () => {
+              void sessionArchive.archiveSelectedSession(false)
+            },
+            onDelete: () => {
+              sessionArchive.requestDeleteSelectedSession()
+            },
+          }}
+          archive={{
+            isArchiving: sessionArchive.isArchiving,
+            isDeleting: sessionArchive.isDeleting,
+          }}
+          approvals={{
+            onApproveOnce: (approvalId) => {
+              void window.api.approveBash({ approvalId })
+            },
+            onApproveAlways: (approval) => {
+              allowCommandForProcess(approval.sessionId, approval.command)
+              void window.api.approveBash({ approvalId: approval.approvalId })
+            },
+            onReject: (approvalId) => {
+              void window.api.rejectBash({ approvalId })
+            },
+          }}
+          clarifications={{
+            onAnswer: (clarificationId, answer) => {
+              void window.api.answerClarification({
+                clarificationId,
+                answer,
+              })
+            },
+            onCancel: (clarificationId) => {
+              void window.api.cancelClarification({ clarificationId })
+            },
+          }}
+        />
       </div>
       <SessionArchiveDialog
         activities={sessionArchive.archivePreview?.affectedActivities ?? []}

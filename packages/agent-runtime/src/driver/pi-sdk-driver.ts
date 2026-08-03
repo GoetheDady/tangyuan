@@ -5,6 +5,7 @@ import type {
   PersistedSessionIndexEntry,
 } from '../session/session-index-store'
 import { AgentRuntimeError } from '../core'
+import { DefaultRuntimeConfiguration } from '../runtime/runtime-configuration'
 import {
   isAbortError,
   mapPiSdkStreamEventToActivity,
@@ -30,12 +31,15 @@ import type {
   PiSdkSessionHandle,
 } from './pi-sdk-driver-contracts'
 import type { SessionModule } from '../runtime/runtime-modules'
-import { PiSdkDriverFacade } from './pi-sdk-driver-facade'
+import { PiSdkDriverState } from './pi-sdk-driver-state'
 
 /**
  * Pi Agent SDK 的 v1 适配器骨架。
  */
-export class PiSdkDriver extends PiSdkDriverFacade implements SessionModule {
+export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
+  static maskApiKey(apiKey: string): string {
+    return DefaultRuntimeConfiguration.maskApiKey(apiKey)
+  }
   /**
    * 读取指定 Agent 的会话摘要列表。
    *
@@ -150,7 +154,7 @@ export class PiSdkDriver extends PiSdkDriverFacade implements SessionModule {
 
     if (request.agentId === YUANXIAO_DEFAULT_AGENT_ID) {
       createSessionRequest.onCreateAgent = async (displayName: string) =>
-        this.createAgent(displayName)
+        this.agentRegistry.createAgent(displayName)
     }
 
     const handle = await this.gateway.createSession(createSessionRequest)

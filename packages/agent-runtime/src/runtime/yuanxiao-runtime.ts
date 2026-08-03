@@ -1,6 +1,27 @@
-import { YuanxiaoRuntimeResources } from './yuanxiao-runtime-resources'
+import { YuanxiaoRuntimeOrchestrator } from './yuanxiao-runtime-orchestrator'
 import type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencies'
 import { collectSessionSubtree } from '../session/session-archive-coordinator'
+import type { ToolApprovalGateway } from '../driver'
+import { createToolApprovalGateway } from '../approval'
+import type { RuntimeServices } from './runtime-services'
+import type {
+  BashApprovalRequest,
+  QuestionClarificationRequest,
+  SkillApprovalRequest,
+  SkillInstallRecord,
+  SkillOperationParams,
+  SkillSummary,
+  AgentSummary,
+  GetSessionModelInfoRequest,
+  ProfileUpdateResult,
+  SessionModelInfo,
+  SetSessionModelRequest,
+  SetSessionThinkingLevelRequest,
+  SoulContent,
+  UnclaimedDirectory,
+  UpdateAgentConfigRequest,
+  UserProfileContent,
+} from '@yuanxiao/contracts'
 import {
   YUANXIAO_DEFAULT_AGENT_ID,
   type ArchiveSessionRequest,
@@ -32,7 +53,164 @@ export type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencie
 /**
  * Electron Main 调用运行时行为的唯一高层接口。
  */
-class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeResources {
+class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
+  async approveBash(approvalId: string): Promise<void> {
+    this.bashApprovals.approve(approvalId)
+  }
+
+  async rejectBash(approvalId: string): Promise<void> {
+    this.bashApprovals.reject(approvalId)
+  }
+
+  getPendingApprovals(): BashApprovalRequest[] {
+    return this.bashApprovals.list()
+  }
+
+  async answerClarification(
+    clarificationId: string,
+    answer: string,
+  ): Promise<void> {
+    this.clarifications.answer(clarificationId, answer)
+  }
+
+  async cancelClarification(clarificationId: string): Promise<void> {
+    this.clarifications.cancel(clarificationId)
+  }
+
+  getPendingClarifications(): QuestionClarificationRequest[] {
+    return this.clarifications.list()
+  }
+
+  async installSkill(params: SkillOperationParams): Promise<SkillSummary[]> {
+    return this.skillService.install(params)
+  }
+
+  async deleteSkill(params: SkillOperationParams): Promise<SkillSummary[]> {
+    return this.skillService.delete(params)
+  }
+
+  async approveSkillOperation(approvalId: string): Promise<void> {
+    this.skillService.approveOperation(approvalId)
+  }
+
+  async rejectSkillOperation(approvalId: string): Promise<void> {
+    this.skillService.rejectOperation(approvalId)
+  }
+
+  getPendingSkillApprovals(): SkillApprovalRequest[] {
+    return this.skillService.getPendingApprovals()
+  }
+
+  async getSkillInstallRecords(): Promise<SkillInstallRecord[]> {
+    return this.skillService.getInstallRecords()
+  }
+
+  createToolApprovalGateway(): ToolApprovalGateway {
+    return createToolApprovalGateway({
+      bashApprovals: this.bashApprovals,
+      clarifications: this.clarifications,
+      resolveRunId: (sessionId) => this.activeRunIds.get(sessionId) || '',
+      now: () => new Date().toISOString(),
+    })
+  }
+
+  async listAgents(): Promise<AgentSummary[]> {
+    return this.agentManager.list()
+  }
+
+  async createAgent(displayName: string): Promise<AgentSummary> {
+    return this.agentManager.create(displayName)
+  }
+
+  async updateAgentConfig(
+    request: UpdateAgentConfigRequest,
+  ): Promise<AgentSummary> {
+    return this.agentManager.updateConfig(request)
+  }
+
+  async archiveAgent(agentId: string): Promise<AgentSummary> {
+    return this.agentManager.archive(agentId)
+  }
+
+  async recoverAgent(agentId: string): Promise<AgentSummary> {
+    return this.agentManager.recover(agentId)
+  }
+
+  async reconcileAgentDirectories(): Promise<{
+    agents: AgentSummary[]
+    unclaimedDirectories: UnclaimedDirectory[]
+  }> {
+    return this.agentManager.reconcileDirectories()
+  }
+
+  async claimAgentDirectory(
+    agentId: string,
+    displayName: string,
+  ): Promise<AgentSummary> {
+    return this.agentManager.claimDirectory(agentId, displayName)
+  }
+
+  async rebuildYuanxiaoHome(): Promise<AgentSummary> {
+    return this.agentManager.rebuildYuanxiaoHome()
+  }
+
+  async getSessionModelInfo(
+    request: GetSessionModelInfoRequest,
+  ): Promise<SessionModelInfo> {
+    return this.sessionModelService.getInfo(request)
+  }
+
+  async setSessionModel(
+    request: SetSessionModelRequest,
+  ): Promise<SessionModelInfo> {
+    return this.sessionModelService.setModel(request)
+  }
+
+  async setSessionThinkingLevel(
+    request: SetSessionThinkingLevelRequest,
+  ): Promise<SessionModelInfo> {
+    return this.sessionModelService.setThinkingLevel(request)
+  }
+
+  async listAgentSkills(agentId: string): Promise<SkillSummary[]> {
+    return this.skillService.listAgentSkills(agentId)
+  }
+
+  async listSharedSkills(): Promise<SkillSummary[]> {
+    return this.skillService.listSharedSkills()
+  }
+
+  async reloadAgentSessions(agentId: string): Promise<void> {
+    return this.sessions.reloadAgentSessions(agentId)
+  }
+
+  async reloadAllSessions(): Promise<void> {
+    return this.sessions.reloadAllSessions()
+  }
+
+  async getSoul(agentId: string): Promise<SoulContent> {
+    return this.identityService.getSoul(agentId)
+  }
+
+  async getUserProfile(): Promise<UserProfileContent> {
+    return this.identityService.getUserProfile()
+  }
+
+  async updateSoul(
+    agentId: string,
+    content: string,
+    expectedVersion: string,
+  ): Promise<ProfileUpdateResult> {
+    return this.identityService.updateSoul(agentId, content, expectedVersion)
+  }
+
+  async updateUserProfile(
+    content: string,
+    expectedVersion: string,
+  ): Promise<ProfileUpdateResult> {
+    return this.identityService.updateUserProfile(content, expectedVersion)
+  }
+
   /**
    * 读取当前运行时快照并写入 Runtime 缓存。
    *
@@ -128,7 +306,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeResources {
       ...session,
       state: this.activeRunIds.has(session.sessionId)
         ? ('running' as const)
-        : this.runQueue.some((q) => q.request.sessionId === session.sessionId)
+        : this.runScheduler.hasQueued(session.sessionId)
           ? ('queued' as const)
           : session.state,
     }))
@@ -373,27 +551,27 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeResources {
 
     if (
       this.activeRunIds.has(request.sessionId) ||
-      this.isRunStarting(request.sessionId) ||
+      this.runScheduler.isRunStarting(request.sessionId) ||
       session?.state === 'running'
     ) {
       throw new Error('当前会话正在运行，请等待完成或先取消本次响应。')
     }
 
     // 检查会话是否已在队列中
-    if (this.runQueue.some((q) => q.request.sessionId === request.sessionId)) {
+    if (this.runScheduler.hasQueued(request.sessionId)) {
       throw new Error('当前会话已在排队中，请等待或取消排队。')
     }
 
     // 达到并发上限时入队
-    if (!this.hasRunCapacity()) {
-      return this.enqueueRun(request)
+    if (!this.runScheduler.hasRunCapacity()) {
+      return this.runScheduler.enqueueRun(request)
     }
 
-    this.beginRunStart(request.sessionId)
+    this.runScheduler.beginRunStart(request.sessionId)
     try {
       await this.sessions.sendMessage(request)
     } finally {
-      this.completeRunStart(request.sessionId)
+      this.runScheduler.completeRunStart(request.sessionId)
     }
 
     return this.getTranscript({
@@ -415,11 +593,11 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeResources {
     const retrySession = this.sessionCache.find(request.sessionId)
     if (retrySession) this.assertLineageAvailable(retrySession)
 
-    this.beginRunStart(request.sessionId)
+    this.runScheduler.beginRunStart(request.sessionId)
     try {
       await this.sessions.retryMessage(request)
     } finally {
-      this.completeRunStart(request.sessionId)
+      this.runScheduler.completeRunStart(request.sessionId)
     }
 
     return this.getTranscript({
@@ -497,7 +675,9 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeResources {
       }
 
       await Promise.all(
-        affectedSessionIds.map((sessionId) => this.waitForRunStart(sessionId)),
+        affectedSessionIds.map((sessionId) =>
+          this.runScheduler.waitForRunStart(sessionId),
+        ),
       )
       const currentSessions = await this.listSessions(request.agentId, true)
       const currentSubtree = collectSessionSubtree(
@@ -531,7 +711,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeResources {
       }
     } finally {
       archiveLease.release()
-      this.dequeueNext()
+      this.runScheduler.dequeueNext()
     }
   }
 
@@ -600,7 +780,9 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeResources {
       }
 
       await Promise.all(
-        affectedSessionIds.map((sessionId) => this.waitForRunStart(sessionId)),
+        affectedSessionIds.map((sessionId) =>
+          this.runScheduler.waitForRunStart(sessionId),
+        ),
       )
       const currentSessions = await this.listSessions(request.agentId, true)
       const currentSubtree = collectSessionSubtree(
@@ -640,7 +822,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeResources {
       }
     } finally {
       archiveLease.release()
-      this.dequeueNext()
+      this.runScheduler.dequeueNext()
     }
   }
 
@@ -661,7 +843,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeResources {
       const kinds: SessionLineageActivityKind[] = []
       if (
         session.state === 'running' ||
-        this.isRunStarting(session.sessionId)
+        this.runScheduler.isRunStarting(session.sessionId)
       ) {
         kinds.push('running')
       }
@@ -700,34 +882,14 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeResources {
     this.rejectSessionPendingApprovals(request.sessionId)
 
     // 先检查队列中的待处理请求
-    const queueIndex = this.runQueue.findIndex(
-      (q) => q.request.sessionId === request.sessionId,
-    )
-
-    if (queueIndex >= 0) {
-      const [queued] = this.runQueue.splice(queueIndex, 1)
-      const now = new Date().toISOString()
-      this.emit({
-        type: 'run-state-changed',
-        agentId: request.agentId,
-        sessionId: request.sessionId,
-        state: 'cancelled',
-        occurredAt: now,
-      })
-      this.upsertSessionState(request.sessionId, 'cancelled', now)
-      queued!.resolve({
-        agentId: request.agentId,
-        sessionId: request.sessionId,
-        entries: [],
-        updatedAt: now,
-      })
+    if (this.runScheduler.cancelQueued(request.sessionId, request.agentId)) {
       return (
         this.sessionCache.find(request.sessionId) ?? {
           agentId: request.agentId,
           sessionId: request.sessionId,
           title: '',
           state: 'cancelled',
-          updatedAt: now,
+          updatedAt: new Date().toISOString(),
         }
       )
     }
@@ -754,8 +916,9 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeResources {
  */
 export function createYuanxiaoRuntimeForTesting(
   dependencies: YuanxiaoRuntimeDependencies,
+  services?: RuntimeServices,
 ): YuanxiaoRuntime {
-  return new DefaultYuanxiaoRuntime(dependencies)
+  return new DefaultYuanxiaoRuntime(dependencies, services)
 }
 
 /**

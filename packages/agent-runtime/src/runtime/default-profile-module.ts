@@ -35,8 +35,8 @@ export class DefaultProfileModule implements ProfileModule {
   private readonly layout: ProfilePaths
   private readonly now: () => string
   private readonly profileStore: ProfilePersistence
-  private readonly refreshAgentContext: (agentId: AgentId) => Promise<void>
-  private readonly refreshAllContexts: () => Promise<void>
+  private refreshAgentContext: (agentId: AgentId) => Promise<void>
+  private refreshAllContexts: () => Promise<void>
 
   constructor(dependencies: DefaultProfileModuleDependencies) {
     this.emit = dependencies.emit
@@ -45,6 +45,20 @@ export class DefaultProfileModule implements ProfileModule {
     this.profileStore = dependencies.profileStore
     this.refreshAgentContext = dependencies.refreshAgentContext
     this.refreshAllContexts = dependencies.refreshAllContexts
+  }
+
+  /**
+   * 绑定会话上下文刷新回调。
+   *
+   * Driver 在注入 Store 后调用，将 Profile 变更后的刷新动作接到
+   * 自身持有的活跃 session handle 上；未绑定时保持无操作。
+   */
+  setRefreshContextHandlers(handlers: {
+    refreshAgentContext: (agentId: AgentId) => Promise<void>
+    refreshAllContexts: () => Promise<void>
+  }): void {
+    this.refreshAgentContext = handlers.refreshAgentContext
+    this.refreshAllContexts = handlers.refreshAllContexts
   }
 
   async getSoul(agentId: AgentId): Promise<SoulContent> {

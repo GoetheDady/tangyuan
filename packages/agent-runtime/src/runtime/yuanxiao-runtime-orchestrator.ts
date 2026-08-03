@@ -12,12 +12,13 @@ import { AgentManager, IdentityService } from '../agent'
 import { SkillService } from '../skill'
 import { SessionModelService } from '../session/session-model-service'
 import { SessionArchiveCoordinator } from '../session/session-archive-coordinator'
+import { createRuntimeServices } from './runtime-services'
+import type { RuntimeServices } from './runtime-services'
+import { RunScheduler } from './run-scheduler'
 import {
-  YUANXIAO_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
   type CancelRunRequest,
   type GetSessionMessagesRequest,
-  type SendMessageRequest,
   type TranscriptSnapshot,
 } from '@yuanxiao/contracts'
 
@@ -65,11 +66,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
   protected readonly identityService: IdentityService
   protected readonly sessionModelService: SessionModelService
   protected readonly sessionCache = new SessionCache()
-  protected runQueue: Array<{
-    request: SendMessageRequest
-    resolve: (value: TranscriptSnapshot) => void
-    reject: (error: Error) => void
-  }> = []
+  protected readonly runScheduler: RunScheduler
   protected readonly bashApprovals: BashApprovalRegistry
   protected readonly skillService: SkillService
   protected readonly clarifications: ClarificationRegistry
@@ -81,7 +78,10 @@ export abstract class YuanxiaoRuntimeOrchestrator {
    * @returns YuanxiaoRuntime 实例。
    * @throws 此构造方法不会主动抛出错误。
    */
-  constructor(dependencies: YuanxiaoRuntimeDependencies) {
+  constructor(
+    dependencies: YuanxiaoRuntimeDependencies,
+    services?: RuntimeServices,
+  ) {
     this.sessions = dependencies.sessions
     this.lastActiveSessionStore = dependencies.lastActiveSessionStore ?? {
       read: async () => null,
@@ -91,32 +91,29 @@ export abstract class YuanxiaoRuntimeOrchestrator {
       }),
       clear: async () => undefined,
     }
-    this.transcriptEmitter = new TranscriptEmitter(this.emit.bind(this))
-    this.snapshotStore = new RuntimeSnapshotStore({
-      configuration: dependencies.configuration,
+    const created =
+      services ??
+      createRuntimeServices(dependencies, this.emit.bind(this), () =>
+        new Date().toISOString(),
+      )
+    this.transcriptEmitter = created.transcriptEmitter
+    this.snapshotStore = created.snapshotStore
+    this.agentManager = created.agentManager
+    this.identityService = created.identityService
+    this.sessionModelService = created.sessionModelService
+    this.bashApprovals = created.bashApprovals
+    this.skillService = created.skillService
+    this.clarifications = created.clarifications
+    this.runScheduler = new RunScheduler({
+      emit: this.emit.bind(this),
+      upsertSessionState: (sessionId, state, updatedAt) =>
+        this.upsertSessionState(sessionId, state, updatedAt),
+      isArchiving: (sessionId) =>
+        this.sessionArchiveCoordinator.isArchiving(sessionId),
+      sendMessage: (request) => this.sessions.sendMessage(request),
+      getTranscript: (request) => this.getTranscript(request),
+      activeRunCount: () => this.activeRunIds.size,
     })
-    this.agentManager = new AgentManager({
-      agents: dependencies.agents,
-      snapshotStore: this.snapshotStore,
-    })
-    this.identityService = new IdentityService({
-      profiles: dependencies.profiles,
-      snapshotStore: this.snapshotStore,
-    })
-    this.sessionModelService = new SessionModelService({
-      sessions: dependencies.sessions,
-    })
-    const emit = this.emit.bind(this)
-    const now = () => new Date().toISOString()
-    this.bashApprovals = new BashApprovalRegistry({ emit, now })
-    this.skillService = new SkillService({
-      skills: dependencies.skills,
-      sessions: dependencies.sessions,
-      defaultAgentId: YUANXIAO_DEFAULT_AGENT_ID,
-      emit,
-      now,
-    })
-    this.clarifications = new ClarificationRegistry({ emit, now })
     this.sessions.subscribe((event) => {
       this.applyAgentEvent(event)
       // 内部驱动事件（message-appended/message-delta/message-completed/
@@ -145,7 +142,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
           event.state !== 'running' &&
           event.state !== 'queued')
       ) {
-        this.dequeueNext()
+        this.runScheduler.dequeueNext()
       }
     })
   }
@@ -157,10 +154,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
   abstract getTranscript(
     request: GetSessionMessagesRequest,
   ): Promise<TranscriptSnapshot>
-
-  protected abstract dequeueNext(): void
-
-  protected abstract completeRunStart(sessionId: string): void
 
   /**
    * 订阅 Runtime 转发的 Agent 标准事件。
@@ -191,16 +184,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     this.rejectAllPendingSkillApprovals()
 
     // 清空队列
-    const queue = [...this.runQueue]
-    this.runQueue.length = 0
-    for (const queued of queue) {
-      queued.resolve({
-        agentId: YUANXIAO_DEFAULT_AGENT_ID,
-        sessionId: queued.request.sessionId,
-        entries: [],
-        updatedAt: new Date().toISOString(),
-      })
-    }
+    this.runScheduler.drainAll()
 
     const runningSessions = this.sessionCache
       .list()
@@ -281,7 +265,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     }
 
     if (driverEvent.type === 'attempt-started') {
-      this.completeRunStart(driverEvent.sessionId)
+      this.runScheduler.completeRunStart(driverEvent.sessionId)
       this.activeRunIds.set(driverEvent.sessionId, driverEvent.runId)
       this.upsertSessionState(
         driverEvent.sessionId,
