@@ -18,6 +18,8 @@ export interface WorkbenchState {
   /** 启动时恢复的最后激活会话，只用于初始路由重定向。 */
   activeSession: AgentSessionSummary | null
   sessionsByAgentId: Record<string, AgentSessionSummary[]>
+  /** 按 Agent 分片的已归档会话列表，与活跃会话同源（都来自 includeArchived 查询）。 */
+  archivedSessionsByAgentId: Record<string, AgentSessionSummary[]>
   transcriptsBySessionId: Record<string, TranscriptSnapshot>
   sendingBySessionId: Record<string, boolean>
   pendingApprovalsBySessionId: Record<string, BashApprovalRequest[]>
@@ -34,6 +36,10 @@ export interface WorkbenchActions {
   loadRuntimeSnapshot(snapshot: RuntimeSnapshot): void
   setActiveSession(session: AgentSessionSummary | null): void
   replaceAgentSessions(agentId: string, sessions: AgentSessionSummary[]): void
+  replaceArchivedSessions(
+    agentId: string,
+    sessions: AgentSessionSummary[],
+  ): void
   applyAgentEvent(event: AgentEvent): void
   applyTranscriptEvents(
     events: Extract<AgentEvent, { type: 'transcript-delta' }>[],
@@ -42,9 +48,7 @@ export interface WorkbenchActions {
   clearTranscript(sessionId: string): void
   beginSending(sessionId: string): void
   finishSending(sessionId: string): void
-  addPendingApproval(approval: BashApprovalRequest): void
   resolvePendingApproval(sessionId: string, approvalId: string): void
-  addPendingClarification(clarification: QuestionClarificationRequest): void
   resolvePendingClarification(sessionId: string, clarificationId: string): void
   clearSessionRequests(sessionId: string): void
   updateComposerDraft(value: string): void
@@ -65,6 +69,7 @@ function createInitialState(): WorkbenchState {
     agents: [],
     activeSession: null,
     sessionsByAgentId: {},
+    archivedSessionsByAgentId: {},
     transcriptsBySessionId: {},
     sendingBySessionId: {},
     pendingApprovalsBySessionId: {},
@@ -92,6 +97,15 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
       set((state) => ({
         sessionsByAgentId: {
           ...state.sessionsByAgentId,
+          [agentId]: sessions,
+        },
+      }))
+    },
+
+    replaceArchivedSessions: (agentId, sessions) => {
+      set((state) => ({
+        archivedSessionsByAgentId: {
+          ...state.archivedSessionsByAgentId,
           [agentId]: sessions,
         },
       }))
@@ -158,19 +172,6 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
       }))
     },
 
-    addPendingApproval: (approval) => {
-      set((state) => {
-        const next = appendSessionValue(
-          state.pendingApprovalsBySessionId,
-          approval.sessionId,
-          approval,
-        )
-        return {
-          pendingApprovalsBySessionId: next,
-        }
-      })
-    },
-
     resolvePendingApproval: (sessionId, approvalId) => {
       set((state) => {
         const next = removeSessionValue(
@@ -182,16 +183,6 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
           pendingApprovalsBySessionId: next,
         }
       })
-    },
-
-    addPendingClarification: (clarification) => {
-      set((state) => ({
-        pendingClarificationsBySessionId: appendSessionValue(
-          state.pendingClarificationsBySessionId,
-          clarification.sessionId,
-          clarification,
-        ),
-      }))
     },
 
     resolvePendingClarification: (sessionId, clarificationId) => {
@@ -255,14 +246,18 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
   }
 }
 
-function appendSessionValue<T>(
-  valuesBySessionId: Record<string, T[]>,
-  sessionId: string,
-  value: T,
-): Record<string, T[]> {
+/**
+ * 把一次 includeArchived 会话查询结果按归档状态拆成活跃与归档两个列表。
+ *
+ * @param sessions - 查询返回的全部会话摘要。
+ * @returns 活跃与归档两个分片；两者都保持原顺序。
+ */
+export function partitionSessionsByArchive(
+  sessions: readonly AgentSessionSummary[],
+): { active: AgentSessionSummary[]; archived: AgentSessionSummary[] } {
   return {
-    ...valuesBySessionId,
-    [sessionId]: [...(valuesBySessionId[sessionId] ?? []), value],
+    active: sessions.filter((session) => session.archivedAt === undefined),
+    archived: sessions.filter((session) => session.archivedAt !== undefined),
   }
 }
 

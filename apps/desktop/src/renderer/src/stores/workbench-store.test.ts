@@ -11,7 +11,10 @@ import { createRuntimeSnapshot } from '@yuanxiao/contracts'
 import { describe, expect, it } from 'vitest'
 
 import { computePendingApprovalSessionIds } from '../lib/agent-event-state'
-import { createWorkbenchStore } from './workbench-store'
+import {
+  createWorkbenchStore,
+  partitionSessionsByArchive,
+} from './workbench-store'
 
 const NOW = '2026-07-29T10:00:00.000Z'
 
@@ -387,10 +390,34 @@ describe('createWorkbenchStore', () => {
 
     store.getState().beginSending('session-1')
     store.getState().beginSending('session-2')
-    store.getState().addPendingApproval(firstApproval)
-    store.getState().addPendingApproval(secondApproval)
-    store.getState().addPendingClarification(firstClarification)
-    store.getState().addPendingClarification(secondClarification)
+    store.getState().applyAgentEvent({
+      type: 'approval-required',
+      agentId: firstApproval.agentId,
+      sessionId: firstApproval.sessionId,
+      approval: firstApproval,
+      occurredAt: NOW,
+    })
+    store.getState().applyAgentEvent({
+      type: 'approval-required',
+      agentId: secondApproval.agentId,
+      sessionId: secondApproval.sessionId,
+      approval: secondApproval,
+      occurredAt: NOW,
+    })
+    store.getState().applyAgentEvent({
+      type: 'clarification-required',
+      agentId: firstClarification.agentId,
+      sessionId: firstClarification.sessionId,
+      clarification: firstClarification,
+      occurredAt: NOW,
+    })
+    store.getState().applyAgentEvent({
+      type: 'clarification-required',
+      agentId: secondClarification.agentId,
+      sessionId: secondClarification.sessionId,
+      clarification: secondClarification,
+      occurredAt: NOW,
+    })
     store.getState().finishSending('session-1')
     store
       .getState()
@@ -414,6 +441,39 @@ describe('createWorkbenchStore', () => {
         store.getState().pendingApprovalsBySessionId,
       ),
     ).toEqual([])
+  })
+
+  it('归档会话按 Agent 分片维护，与活跃会话互不覆盖', () => {
+    const store = createWorkbenchStore()
+    const archivedA = {
+      ...createSession('yuanxiao', 'archived-a'),
+      archivedAt: NOW,
+    }
+    const archivedB = {
+      ...createSession('researcher', 'archived-b'),
+      archivedAt: NOW,
+    }
+
+    store.getState().replaceArchivedSessions('yuanxiao', [archivedA])
+    store.getState().replaceArchivedSessions('researcher', [archivedB])
+
+    expect(store.getState().archivedSessionsByAgentId).toEqual({
+      yuanxiao: [archivedA],
+      researcher: [archivedB],
+    })
+  })
+
+  it('partitionSessionsByArchive 按 archivedAt 拆分一次查询结果', () => {
+    const archived = {
+      ...createSession('yuanxiao', 'archived'),
+      archivedAt: NOW,
+    }
+    const active = createSession('yuanxiao', 'active')
+
+    expect(partitionSessionsByArchive([archived, active])).toEqual({
+      active: [active],
+      archived: [archived],
+    })
   })
 
   it('composer 草稿和进程内始终允许命令只通过语义 action 修改', () => {

@@ -105,6 +105,7 @@ describe('聊天路由状态', () => {
     ).toBeInTheDocument()
     expect(window.api.listSessions).toHaveBeenCalledWith({
       agentId: 'researcher',
+      includeArchived: true,
     })
     expect(window.api.getTranscript).toHaveBeenCalledWith({
       agentId: 'researcher',

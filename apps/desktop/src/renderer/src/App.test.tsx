@@ -99,7 +99,10 @@ describe('App', () => {
     await waitFor(() => {
       expect(window.location.hash).toBe('#/chat/agent-2/fork-session')
     })
-    expect(window.api.listSessions).toHaveBeenCalledWith({ agentId: 'agent-2' })
+    expect(window.api.listSessions).toHaveBeenCalledWith({
+      agentId: 'agent-2',
+      includeArchived: true,
+    })
     expect(window.api.getTranscript).toHaveBeenCalledWith({
       agentId: 'agent-2',
       sessionId: 'fork-session',
@@ -210,7 +213,10 @@ describe('App', () => {
         sessionId: 'agent-session',
       })
     })
-    expect(window.api.listSessions).toHaveBeenCalledWith({ agentId: 'agent-2' })
+    expect(window.api.listSessions).toHaveBeenCalledWith({
+      agentId: 'agent-2',
+      includeArchived: true,
+    })
   })
   it('聊天主界面的三栏背景从左到右逐级变浅', async () => {
     const readyRuntime = createReadyRuntimeSnapshot({

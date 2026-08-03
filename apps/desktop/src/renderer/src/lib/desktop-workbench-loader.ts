@@ -37,13 +37,24 @@ export async function loadSessionsForReadyRuntime(
   runtime: RuntimeSnapshot,
 ): Promise<{
   sessions: AgentSessionSummary[]
+  archivedSessions: AgentSessionSummary[]
   activeSession: AgentSessionSummary
   transcript: TranscriptSnapshot | null
 }> {
   const lastActiveSession = await api.getLastActiveSession()
   const activeAgentId =
     lastActiveSession?.agentId ?? runtime.activeAgent.agentId
-  let nextSessions = await api.listSessions({ agentId: activeAgentId })
+  // 一次 includeArchived 查询同时取活跃与归档列表，按归档状态分片。
+  const allSessions = await api.listSessions({
+    agentId: activeAgentId,
+    includeArchived: true,
+  })
+  const archivedSessions = allSessions.filter(
+    (session) => session.archivedAt !== undefined,
+  )
+  let nextSessions = allSessions.filter(
+    (session) => session.archivedAt === undefined,
+  )
   let activeSession: AgentSessionSummary | null = null
   let transcript: TranscriptSnapshot | null = null
 
@@ -103,7 +114,12 @@ export async function loadSessionsForReadyRuntime(
     })
   }
 
-  return { sessions: nextSessions, activeSession, transcript }
+  return {
+    sessions: nextSessions,
+    archivedSessions,
+    activeSession,
+    transcript,
+  }
 }
 
 /** 并行读取 Renderer 首屏需要的运行时和会话数据。 */
@@ -111,6 +127,7 @@ export async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   runtime: RuntimeSnapshot
   agents: AgentSummary[]
   sessions: AgentSessionSummary[]
+  archivedSessions: AgentSessionSummary[]
   activeSession: AgentSessionSummary | null
   transcript: TranscriptSnapshot | null
   sessionLoadError: string | null
@@ -123,6 +140,7 @@ export async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
       runtime,
       agents,
       sessions: [],
+      archivedSessions: [],
       activeSession: null,
       transcript: null,
       sessionLoadError: null,
@@ -130,12 +148,13 @@ export async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
   }
 
   try {
-    const { sessions, activeSession, transcript } =
+    const { sessions, archivedSessions, activeSession, transcript } =
       await loadSessionsForReadyRuntime(api, runtime)
     return {
       runtime,
       agents,
       sessions,
+      archivedSessions,
       activeSession,
       transcript,
       sessionLoadError: null,
@@ -145,6 +164,7 @@ export async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
       runtime,
       agents,
       sessions: [],
+      archivedSessions: [],
       activeSession: null,
       transcript: null,
       sessionLoadError:

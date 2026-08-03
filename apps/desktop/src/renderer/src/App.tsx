@@ -119,6 +119,7 @@ function DesktopRoutes(): React.JSX.Element {
           snapshot.activeSession?.agentId ??
           snapshot.runtime.activeAgent.agentId
         store.replaceAgentSessions(activeAgentId, snapshot.sessions)
+        store.replaceArchivedSessions(activeAgentId, snapshot.archivedSessions)
         if (snapshot.transcript) {
           store.openTranscript(snapshot.transcript)
         }
@@ -176,12 +177,13 @@ function DesktopRoutes(): React.JSX.Element {
       store.loadRuntimeSnapshot(nextRuntime)
 
       try {
-        const { sessions, activeSession, transcript } =
+        const { sessions, archivedSessions, activeSession, transcript } =
           await loadSessionsForReadyRuntime(window.api, nextRuntime)
         store.setActiveSession(activeSession)
         const activeAgentId =
           activeSession?.agentId ?? nextRuntime.activeAgent.agentId
         store.replaceAgentSessions(activeAgentId, sessions)
+        store.replaceArchivedSessions(activeAgentId, archivedSessions)
         if (transcript) {
           store.openTranscript(transcript)
         }

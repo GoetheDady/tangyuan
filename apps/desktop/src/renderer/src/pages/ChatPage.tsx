@@ -20,7 +20,10 @@ import {
 } from '@/components/SessionArchiveControls'
 import { useSessionArchive } from '@/hooks/useSessionArchive'
 import { computePendingApprovalSessionIds } from '@/lib/agent-event-state'
-import type { WorkbenchStoreApi } from '@/stores/workbench-store'
+import {
+  partitionSessionsByArchive,
+  type WorkbenchStoreApi,
+} from '@/stores/workbench-store'
 
 /** 未加载时的稳定空列表，避免 selector 每次返回新引用引发重渲染循环。 */
 const EMPTY_SESSIONS: AgentSessionSummary[] = []
@@ -91,6 +94,10 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     store,
     (state) => state.replaceAgentSessions,
   )
+  const replaceArchivedSessions = useStore(
+    store,
+    (state) => state.replaceArchivedSessions,
+  )
   const clearSessionRequests = useStore(
     store,
     (state) => state.clearSessionRequests,
@@ -112,6 +119,13 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
           activeAgentId,
         )
       : true,
+  )
+  const archivedSessions = useStore(
+    store,
+    (state) =>
+      (activeAgentId
+        ? state.archivedSessionsByAgentId[activeAgentId]
+        : undefined) ?? EMPTY_SESSIONS,
   )
   const transcript = useStore(store, (state) =>
     sessionId ? (state.transcriptsBySessionId[sessionId] ?? null) : null,
@@ -202,13 +216,16 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
   }, [sessionId, activeAgentId])
 
   // 当前 Agent 的会话列表尚未加载时按需读取；结果按 Agent 落盘，互不覆盖。
+  // 一次 includeArchived 查询同时填充活跃与归档两个分片，避免重复 IPC。
   useEffect(() => {
     if (hasLoadedAgentSessions) return
 
     void window.api
-      .listSessions({ agentId: activeAgentId })
-      .then((nextSessions) => {
-        store.getState().replaceAgentSessions(activeAgentId, nextSessions)
+      .listSessions({ agentId: activeAgentId, includeArchived: true })
+      .then((allSessions) => {
+        const { active, archived } = partitionSessionsByArchive(allSessions)
+        store.getState().replaceAgentSessions(activeAgentId, active)
+        store.getState().replaceArchivedSessions(activeAgentId, archived)
       })
       .catch((error: unknown) => {
         toast.error(
@@ -326,8 +343,10 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
   const sessionArchive = useSessionArchive({
     agentId: activeAgentId,
     selectedSession,
-    onSessionsChange: (nextSessions) => {
-      replaceAgentSessions(activeAgentId, nextSessions)
+    onListsRefreshed: (agentId, allSessions) => {
+      const { active, archived } = partitionSessionsByArchive(allSessions)
+      replaceAgentSessions(agentId, active)
+      replaceArchivedSessions(agentId, archived)
     },
     onArchived: (target, result) => {
       clearSessionRequestsForSessions(result.affectedSessionIds)
@@ -588,7 +607,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
           sessions={sessions}
           selectedSessionId={selectedSession?.sessionId ?? null}
           pendingApprovalSessionIds={pendingApprovalSessionIds}
-          archivedSessions={sessionArchive.archivedSessions}
+          archivedSessions={archivedSessions}
           recoveringSessionId={sessionArchive.recoveringSessionId}
           onAgentChange={(nextAgentId) => {
             navigate(`/chat/${nextAgentId}`, { replace: true })

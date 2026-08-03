@@ -3,19 +3,19 @@ import type {
   ArchiveSessionResult,
   DeleteSessionResult,
 } from '@yuanxiao/contracts'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 interface UseSessionArchiveOptions {
   agentId: string
   selectedSession: AgentSessionSummary | null
-  onSessionsChange(sessions: AgentSessionSummary[]): void
+  /** 归档/删除/恢复后按 Agent 刷新会话列表（含已归档，由调用方分片入 store）。 */
+  onListsRefreshed(agentId: string, allSessions: AgentSessionSummary[]): void
   onArchived(target: AgentSessionSummary, result: ArchiveSessionResult): void
   onDeleted(target: AgentSessionSummary, result: DeleteSessionResult): void
 }
 
 export function useSessionArchive(options: UseSessionArchiveOptions): {
-  archivedSessions: AgentSessionSummary[]
   archivePreview: ArchiveSessionResult | null
   deletePreview: DeleteSessionResult | null
   isArchiving: boolean
@@ -29,10 +29,6 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
   cancelArchive(): void
   cancelDelete(): void
 } {
-  const [archivedSessionState, setArchivedSessionState] = useState<{
-    agentId: string
-    sessions: AgentSessionSummary[]
-  }>({ agentId: options.agentId, sessions: [] })
   const [archiveTarget, setArchiveTarget] =
     useState<AgentSessionSummary | null>(null)
   const [archivePreview, setArchivePreview] =
@@ -48,58 +44,22 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
     null,
   )
   const activeAgentIdRef = useRef(options.agentId)
-  const archivedSessions =
-    archivedSessionState.agentId === options.agentId
-      ? archivedSessionState.sessions
-      : []
 
   useLayoutEffect(() => {
     activeAgentIdRef.current = options.agentId
   }, [options.agentId])
 
-  useEffect(() => {
-    let isMounted = true
-
-    void window.api
-      .listSessions({ agentId: options.agentId, includeArchived: true })
-      .then((sessions) => {
-        if (isMounted) {
-          setArchivedSessionState({
-            agentId: options.agentId,
-            sessions: sessions.filter(
-              (session) => session.archivedAt !== undefined,
-            ),
-          })
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setArchivedSessionState({ agentId: options.agentId, sessions: [] })
-        }
-      })
-
-    return () => {
-      isMounted = false
-    }
-  }, [options.agentId])
-
   async function refreshSessionLists(agentId: string): Promise<boolean> {
     if (activeAgentIdRef.current !== agentId) return false
 
-    const [sessions, allSessions] = await Promise.all([
-      window.api.listSessions({ agentId }),
-      window.api.listSessions({ agentId, includeArchived: true }),
-    ])
+    const allSessions = await window.api.listSessions({
+      agentId,
+      includeArchived: true,
+    })
 
     if (activeAgentIdRef.current !== agentId) return false
 
-    options.onSessionsChange(sessions)
-    setArchivedSessionState({
-      agentId,
-      sessions: allSessions.filter(
-        (session) => session.archivedAt !== undefined,
-      ),
-    })
+    options.onListsRefreshed(agentId, allSessions)
     return true
   }
 
@@ -200,7 +160,6 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
   }
 
   return {
-    archivedSessions,
     archivePreview,
     deletePreview,
     isArchiving,
