@@ -91,16 +91,19 @@ Pi Agent SDK 的能力清单、支持顺序和暂不支持项见 `docs/pi-agent-
 flowchart TD
   UI["Renderer UI<br/>桌面界面"] --> Preload["Preload API<br/>安全暴露给界面的接口"]
   Preload --> Main["Electron Main<br/>主进程"]
-  Main --> AppStore["DesktopAppStore<br/>应用状态中心"]
-  AppStore --> AgentHome["Agent Home<br/>~/.yuanxiao/agents/yuanxiao"]
+  Main --> Runtime["YuanxiaoRuntime<br/>唯一高层运行时接口"]
+  Runtime --> AgentHome["Agent Home<br/>~/.yuanxiao/agents/yuanxiao"]
   AgentHome --> Soul["soul.md<br/>Agent 核心规则"]
   AgentHome --> Bootstrap["bootstrap.md<br/>首次初始化模板"]
-  AppStore --> SessionDriver["AgentSessionDriver<br/>会话驱动接口"]
-  AppStore --> RuntimeDriver["RuntimeResourceDriver<br/>模型和设置资源接口"]
-  SessionDriver --> PiDriver["PiSdkDriver<br/>Pi SDK 适配层"]
-  RuntimeDriver --> PiDriver
-  PiDriver --> PiSDK["Pi Agent SDK<br/>真实 Agent 执行层"]
-  AppStore --> Storage["Local Storage<br/>本地配置和会话索引"]
+  Runtime --> ConfigModule["RuntimeConfigurationModule<br/>配置与资源快照"]
+  Runtime --> SessionModule["SessionModule<br/>会话生命周期与执行"]
+  Runtime --> AgentModule["AgentLifecycleModule<br/>Agent 生命周期"]
+  Runtime --> ProfileModule["ProfileModule<br/>身份资料"]
+  Runtime --> SkillModule["SkillModule<br/>Skills"]
+  SessionModule --> PiGateway["PiSdkGateway<br/>外部 SDK seam"]
+  ConfigModule --> PiGateway
+  PiGateway --> PiSDK["Pi Agent SDK<br/>真实 Agent 执行层"]
+  Runtime --> Storage["Local Storage<br/>本地配置和会话索引"]
   PiSDK --> SdkSessions["Pi SDK Sessions<br/>原生会话持久化"]
 ```
 
@@ -139,68 +142,48 @@ Renderer UI 只调用 Preload API，不直接访问 Pi SDK。
 - `setProviderApiKey`
 - `selectModel`
 
-#### DesktopAppStore
+#### YuanxiaoRuntime
 
 职责：
 
-- 管理当前会话状态。
-- 管理运行时资源状态。
-- 统一处理来自 Renderer 的操作。
-- 把 Pi SDK 事件转换成 UI 可以消费的状态。
-- 持久化设置和会话记录。
+- 作为 Electron Main 和 IPC 唯一依赖的高层运行时接口。
+- 组合配置、Session、Agent 生命周期、Profile、Skill 五个必需职责模块。
+- 管理会话缓存、运行调度、审批和统一事件转换。
+- 保持 Renderer/IPC 契约不受内部模块调整影响。
 
-`AppStore` 不是数据库。它是应用内的状态中心，负责把 UI 操作、SDK 事件、本地存储串起来。
+`YuanxiaoRuntime` 是深模块，不是数据库或 SDK 的一对一包装。
 
-#### AgentSessionDriver
-
-职责：
-
-- 定义统一会话接口。
-- 屏蔽底层 SDK 差异。
-- 为未来替换 Agent Runtime 留出空间。
-
-第一阶段只实现一个具体版本：
-
-- `PiSdkDriver`
-
-未来可以增加：
-
-- `CustomRuntimeDriver`
-- `RemoteAgentDriver`
-- `LocalCliDriver`
-
-#### RuntimeResourceDriver
+#### Runtime 内部职责模块
 
 职责：
 
-- 管理 Provider。
-- 管理模型列表。
-- 管理 API Key 或认证状态。
-- 管理基础设置。
-- 生成 `RuntimeSnapshot`。
+- `RuntimeConfigurationModule`：配置验证、持久化、恢复与资源快照。
+- `SessionModule`：会话生命周期、执行、模型切换与事件订阅。
+- `AgentLifecycleModule`：Agent 创建、配置、归档和目录对账。
+- `ProfileModule`：Agent 灵魂与共享用户画像。
+- `SkillModule`：Skill 列表、安装、删除和安装记录。
 
-`RuntimeSnapshot` 是运行时资源快照。它表示某个时刻应用知道的模型、Provider、设置和能力清单。
+这些能力在 Runtime 组装时全部必需，不通过 optional 方法表达运行期能力缺失。
 
-第一阶段的 `RuntimeSnapshot` 只需要包含：
+#### PiSdkGateway
 
-- Provider 列表。
-- 当前选中的 Provider。
-- 模型列表。
-- 当前选中的模型。
-- API Key 是否已配置。
-- 基础设置。
+职责：
+
+- 隔离真正外部的 Pi Agent SDK。
+- 生产使用真实 SDK adapter，测试使用本地假 adapter。
+- 不为假设中的其他 Agent 引擎建立公开替换接口。
 
 #### PiSdkDriver
 
 职责：
 
-- 调用 Pi Agent SDK 创建会话。
-- 把用户消息发送给 Pi Agent SDK。
-- 监听 Pi Agent SDK 的事件。
+- 实现 `SessionModule` 的 Pi 会话生命周期与执行。
+- 通过 `PiSdkGateway` 调用 Pi Agent SDK。
 - 把 SDK 事件转换成统一事件格式。
 - 处理取消、错误、重试等基础流程。
+- 为旧的直接调用保留兼容门面；生产 Runtime 不经该门面注入其他职责。
 
-Pi SDK 只出现在这个模块内部。其他模块不直接 import Pi SDK。
+产品模块不直接依赖 Pi SDK 会话对象。
 
 ### 推荐目录结构
 
@@ -214,7 +197,7 @@ Pi SDK 只出现在这个模块内部。其他模块不直接 import Pi SDK。
       renderer/
   packages/
     agent-runtime/
-    shared/
+    contracts/
   docs/
     mvp-roadmap.md
     pi-agent-sdk-capability-plan.md
@@ -223,8 +206,8 @@ Pi SDK 只出现在这个模块内部。其他模块不直接 import Pi SDK。
 目录含义：
 
 - `apps/desktop`：桌面应用本体。
-- `packages/agent-runtime`：会话驱动接口、运行时资源接口和 Pi Agent SDK 适配实现。Pi SDK 只允许出现在这个包内部。
-- `packages/shared`：前后端共享类型。
+- `packages/agent-runtime`：`YuanxiaoRuntime`、内部职责模块和 Pi Agent SDK adapter 实现。
+- `packages/contracts`：Main、Preload、Renderer 共享的 IPC 类型与 schema。
 - `docs`：产品和架构文档。
 
 ### 第一阶段验收标准
@@ -270,25 +253,23 @@ Pi SDK 只出现在这个模块内部。其他模块不直接 import Pi SDK。
 
 #### API Key 安全风险
 
-风险：API Key 如果直接存明文文件，容易泄露。
+风险：API Key 持久化或错误输出处理不当会造成泄露。
 
 处理方式：
 
-- 第一阶段 MVP 使用 Electron `userData` 下的本地 config JSON 明文保存。
+- config JSON 中只保存由 Electron `safeStorage` adapter 生成的密文。
 - UI 默认遮罩 API Key。
 - 日志、错误、测试 fixture 禁止输出真实 API Key。
-- 系统级安全存储后续作为独立安全 issue 处理。
-
-**config JSON 明文保存** 是 MVP 取舍，不是长期安全方案。
+- 加解密仅发生在 Main 进程，Renderer 不接触明文持久化结构。
 
 #### UI 和 SDK 耦合风险
 
-风险：如果 Renderer 直接调用 Pi SDK，后面替换 Runtime 会非常痛苦。
+风险：如果 Renderer 或业务模块直接调用 Pi SDK，SDK 细节会扩散到产品契约。
 
 处理方式：
 
 - 强制所有会话操作都走 Preload API。
-- 强制所有 SDK 调用都在 `PiSdkDriver` 内。
+- 强制所有真实 SDK 调用都通过 `PiSdkGateway` adapter。
 
 ### 第一阶段下一步任务
 
@@ -297,7 +278,7 @@ Pi SDK 只出现在这个模块内部。其他模块不直接 import Pi SDK。
 3. 创建 Electron Main/Preload/Renderer 三层。
 4. 创建默认 Agent Home 初始化逻辑。
 5. 创建 `agent-runtime` 包。
-6. 定义 `AgentSessionDriver`、`RuntimeResourceDriver` 和统一事件类型。
+6. 定义 `YuanxiaoRuntime`、内部职责模块和统一事件类型。
 7. 接入 Pi Agent SDK 的最小会话流程。
 8. 实现基础设置、API Key 保存和真实验证。
 9. 使用 Pi SDK 工具实现 bootstrap 问答、`soul.md` / `user.md` 写入和 `bootstrap.md` 删除。
@@ -315,7 +296,7 @@ Pi SDK 只出现在这个模块内部。其他模块不直接 import Pi SDK。
 - 项目目录：`/Users/gdsw/gdsw/yuanxiao`。
 - 第一阶段目标：跑通 Electron + Pi Agent SDK 的真实会话闭环。
 - 第一阶段后端：只实现 `PiSdkDriver`。
-- 架构边界：保留 `AgentSessionDriver` 抽象，UI 不直接依赖 Pi SDK。
+- 架构边界：UI 只依赖 `YuanxiaoRuntime` 的 IPC 契约；内部仅为真实外部依赖保留 adapter seam。
 
 待讨论：
 

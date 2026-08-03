@@ -9,210 +9,33 @@ import {
   isAbortError,
   mapPiSdkStreamEventToActivity,
   sanitizeErrorMessage,
-  normalizeRuntimeConfiguration,
-  buildInternalConfigForSave,
-  buildInternalConfigForProviderSave,
-  buildInternalConfigForProviderDelete,
   createMessagePreview,
 } from '../core'
 import {
   YUANXIAO_DEFAULT_AGENT_ID,
   type AgentId,
   type AgentSessionSummary,
-  type CancelConfigurationVerificationRequest,
   type CancelRunRequest,
   type CreateSessionRequest,
-  type DeleteProviderRequest,
   type ForkSessionRequest,
   type GetSessionMessagesRequest,
   type ListSessionsRequest,
-  type ProviderConfiguration,
   type RuntimeConfiguration,
-  type RuntimeSnapshot,
   type SendMessageRequest,
   type TranscriptSnapshot,
 } from '@yuanxiao/contracts'
 import type {
-  AgentSessionDriver,
   InternalMessage,
   PiSdkCreateSessionRequest,
   PiSdkSessionHandle,
-  RuntimeResourceDriver,
 } from './pi-sdk-driver-contracts'
-
-import { PiSdkDriverResources } from './pi-sdk-driver-resources'
-
-const CONFIGURATION_VERIFICATION_PROMPT = 'Reply with OK.'
+import type { SessionModule } from '../runtime/runtime-modules'
+import { PiSdkDriverFacade } from './pi-sdk-driver-facade'
 
 /**
  * Pi Agent SDK 的 v1 适配器骨架。
  */
-export class PiSdkDriver
-  extends PiSdkDriverResources
-  implements AgentSessionDriver, RuntimeResourceDriver
-{
-  /**
-   * 读取当前运行时资源快照。
-   *
-   * @returns 当前 RuntimeSnapshot。
-   * @throws 当默认 Agent Home 初始化失败时，Promise 会 reject。
-   */
-  async getSnapshot(): Promise<RuntimeSnapshot> {
-    return this.readRuntimeSnapshot()
-  }
-
-  /**
-   * 刷新运行时资源。
-   *
-   * @returns 刷新后的 RuntimeSnapshot。
-   * @throws 当默认 Agent Home 初始化失败时，Promise 会 reject。
-   */
-  async refresh(): Promise<RuntimeSnapshot> {
-    return this.readRuntimeSnapshot()
-  }
-
-  /**
-   * 使用真实 Pi SDK 验证 Provider/API Key/Model 后保存配置。
-   *
-   * @param configuration - 用户输入的模型服务、模型和接口密钥。
-   * @returns 保存后的 RuntimeSnapshot，API Key 只包含脱敏展示值。
-   * @throws 当配置缺失、SDK 验证失败或写入失败时，Promise 会 reject。
-   */
-  async saveConfiguration(
-    configuration: RuntimeConfiguration,
-  ): Promise<RuntimeSnapshot> {
-    const normalizedConfiguration = normalizeRuntimeConfiguration(configuration)
-    const controller = new AbortController()
-    this.configurationVerificationController = controller
-
-    try {
-      await this.gateway.verifyConfiguration({
-        ...normalizedConfiguration,
-        prompt: CONFIGURATION_VERIFICATION_PROMPT,
-        signal: controller.signal,
-      })
-    } catch (error) {
-      if (isAbortError(error) || controller.signal.aborted) {
-        throw new AgentRuntimeError({
-          code: 'run-cancelled',
-          message: '已取消配置验证。',
-          recoverable: true,
-        })
-      }
-
-      throw new AgentRuntimeError({
-        code: 'provider-verification-failed',
-        message: `配置验证失败：${sanitizeErrorMessage(error, normalizedConfiguration.apiKey)}`,
-        recoverable: true,
-      })
-    } finally {
-      if (this.configurationVerificationController === controller) {
-        this.configurationVerificationController = null
-      }
-    }
-
-    const readResult = await this.configStore.read()
-    const internalConfig = buildInternalConfigForSave(
-      readResult.config,
-      normalizedConfiguration,
-      this.now(),
-    )
-    await this.configStore.write(internalConfig)
-    return this.readRuntimeSnapshot()
-  }
-
-  /**
-   * 取消当前配置验证。
-   *
-   * @param request - 取消请求；v1 只维护一个当前验证，verificationId 用于日志和未来扩展。
-   * @returns 当前 RuntimeSnapshot。
-   * @throws 当快照读取失败时，Promise 会 reject。
-   */
-  async cancelConfigurationVerification(
-    request: CancelConfigurationVerificationRequest,
-  ): Promise<RuntimeSnapshot> {
-    void request
-    this.configurationVerificationController?.abort()
-    this.configurationVerificationController = null
-
-    return this.readRuntimeSnapshot()
-  }
-
-  async saveProvider(config: ProviderConfiguration): Promise<RuntimeSnapshot> {
-    const providerId = config.providerId.trim()
-    const apiKey = config.apiKey.trim()
-
-    if (!providerId || !apiKey) {
-      throw new AgentRuntimeError({
-        code: 'configuration-missing',
-        message: '请填写 Provider（模型服务）和 API Key（接口密钥）。',
-        recoverable: true,
-      })
-    }
-
-    const resources = await this.gateway.listProvidersAndModels()
-    const firstModel = resources.models.find((m) => m.providerId === providerId)
-    if (!firstModel) {
-      throw new AgentRuntimeError({
-        code: 'configuration-missing',
-        message: `未找到 Provider "${providerId}" 的可用模型。`,
-        recoverable: true,
-      })
-    }
-
-    const controller = new AbortController()
-    this.configurationVerificationController = controller
-
-    try {
-      await this.gateway.verifyConfiguration({
-        providerId,
-        modelId: firstModel.modelId,
-        apiKey,
-        prompt: CONFIGURATION_VERIFICATION_PROMPT,
-        signal: controller.signal,
-      })
-    } catch (error) {
-      if (isAbortError(error) || controller.signal.aborted) {
-        throw new AgentRuntimeError({
-          code: 'run-cancelled',
-          message: '已取消配置验证。',
-          recoverable: true,
-        })
-      }
-      throw new AgentRuntimeError({
-        code: 'provider-verification-failed',
-        message: `配置验证失败：${sanitizeErrorMessage(error, apiKey)}`,
-        recoverable: true,
-      })
-    } finally {
-      if (this.configurationVerificationController === controller) {
-        this.configurationVerificationController = null
-      }
-    }
-
-    const readResult = await this.configStore.read()
-    const internalConfig = buildInternalConfigForProviderSave(
-      readResult.config,
-      providerId,
-      apiKey,
-      this.now(),
-    )
-    await this.configStore.write(internalConfig)
-    return this.readRuntimeSnapshot()
-  }
-
-  async deleteProvider(
-    request: DeleteProviderRequest,
-  ): Promise<RuntimeSnapshot> {
-    const readResult = await this.configStore.read()
-    const internalConfig = buildInternalConfigForProviderDelete(
-      readResult.config,
-      request.providerId,
-    )
-    await this.configStore.write(internalConfig)
-    return this.readRuntimeSnapshot()
-  }
-
+export class PiSdkDriver extends PiSdkDriverFacade implements SessionModule {
   /**
    * 读取指定 Agent 的会话摘要列表。
    *

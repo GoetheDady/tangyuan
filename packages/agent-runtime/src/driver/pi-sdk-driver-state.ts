@@ -1,6 +1,8 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { RealPiSdkGateway } from '../runtime/gateway'
+import { DefaultProfileModule } from '../runtime/default-profile-module'
+import { DefaultRuntimeConfiguration } from '../runtime/runtime-configuration'
 import { ConfigStore, DirectoryLayout } from '../core'
 import { AgentRegistry } from '../agent'
 import { SkillStore } from '../skill'
@@ -42,6 +44,8 @@ export abstract class PiSdkDriverState {
   protected readonly profileStore: ProfileStore
   protected readonly sessionIndexStore: SessionIndexStore
   protected readonly messageStore: MessageStore
+  protected readonly configurationModule: DefaultRuntimeConfiguration
+  protected readonly profileModule: DefaultProfileModule
   protected readonly gateway: PiSdkGateway
   protected readonly encryptionAdapter: ConfigEncryptionAdapter | null
   protected readonly listeners = new Set<AgentEventListener>()
@@ -52,7 +56,6 @@ export abstract class PiSdkDriverState {
   protected readonly pendingProfileRefreshes = new Set<string>()
   protected readonly activeRunIds = new Map<string, string>()
   protected readonly runSequenceBySession = new Map<string, number>()
-  protected configurationVerificationController: AbortController | null = null
   protected toolApprovalGateway: ToolApprovalGateway | undefined
 
   /**
@@ -101,19 +104,45 @@ export abstract class PiSdkDriverState {
       gateway: this.gateway,
     })
     this.messageStore = new MessageStore({ now: this.now })
+    this.configurationModule = new DefaultRuntimeConfiguration({
+      agentHomePath: this.agentHomePath,
+      agentRegistry: this.agentRegistry,
+      configStore: this.configStore,
+      gateway: this.gateway,
+      now: this.now,
+      profileStore: this.profileStore,
+    })
+    this.profileModule = new DefaultProfileModule({
+      emit: (event) => this.emit(event),
+      layout: this.layout,
+      now: this.now,
+      profileStore: this.profileStore,
+      refreshAgentContext: (agentId) =>
+        this.refreshAgentProfileContext(agentId),
+      refreshAllContexts: () => this.refreshAllProfileContext(),
+    })
     this.toolApprovalGateway = options.toolApprovalGateway
   }
 
-  protected abstract updateSoul(
-    agentId: AgentId,
-    content: string,
-    expectedVersion: string,
-  ): Promise<ProfileUpdateResult>
+  /** 返回 Runtime 使用的 Agent 生命周期模块。 */
+  getAgentLifecycleModule(): AgentRegistry {
+    return this.agentRegistry
+  }
 
-  protected abstract updateUserProfile(
-    content: string,
-    expectedVersion: string,
-  ): Promise<ProfileUpdateResult>
+  /** 返回 Runtime 使用的 Skill 持久化模块。 */
+  getSkillModule(): SkillStore {
+    return this.skillStore
+  }
+
+  /** 返回 Runtime 使用的配置模块。 */
+  getConfigurationModule(): DefaultRuntimeConfiguration {
+    return this.configurationModule
+  }
+
+  /** 返回 Runtime 使用的 Profile 模块。 */
+  getProfileModule(): DefaultProfileModule {
+    return this.profileModule
+  }
 
   /**
    * 确保指定会话已从索引加载到内存。
@@ -320,21 +349,6 @@ export abstract class PiSdkDriverState {
     return crypto.randomUUID()
   }
 
-  /** 广播 profile 更新时间，不向消息流追加系统消息。 */
-  protected emitProfileUpdated(
-    target: 'soul' | 'user',
-    updatedAt: string,
-    eventAgentId: AgentId = YUANXIAO_DEFAULT_AGENT_ID,
-  ): void {
-    this.emit({
-      type: 'profile-updated',
-      agentId: eventAgentId,
-      target,
-      updatedAt,
-      occurredAt: this.now(),
-    })
-  }
-
   /**
    * 重算身份上下文并刷新到指定 Agent 的所有活跃会话。
    *
@@ -391,7 +405,11 @@ export abstract class PiSdkDriverState {
       const expectedVersion =
         this.sessionSoulVersions.get(sessionId) ??
         (await this.profileStore.readSoul(agentId)).version
-      const result = await this.updateSoul(agentId, content, expectedVersion)
+      const result = await this.profileModule.updateSoul(
+        agentId,
+        content,
+        expectedVersion,
+      )
 
       if (result.status !== 'rejected') {
         this.sessionSoulVersions.set(sessionId, result.version)
@@ -409,7 +427,10 @@ export abstract class PiSdkDriverState {
       const expectedVersion =
         this.sessionUserProfileVersions.get(sessionId) ??
         (await this.profileStore.readUserProfile()).version
-      const result = await this.updateUserProfile(content, expectedVersion)
+      const result = await this.profileModule.updateUserProfile(
+        content,
+        expectedVersion,
+      )
 
       if (result.status !== 'rejected') {
         this.sessionUserProfileVersions.set(sessionId, result.version)

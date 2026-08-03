@@ -3,14 +3,14 @@ import type {
   SoulContent,
   UserProfileContent,
 } from '@yuanxiao/contracts'
-import type { AgentSessionDriver } from '../driver'
 import type { RuntimeSnapshotStore } from '../runtime/runtime-snapshot-store'
+import type { ProfileModule } from '../runtime/runtime-modules'
 
 /**
  * 创建 IdentityService 所需的依赖。
  */
 export interface IdentityServiceDependencies {
-  sessionDriver: AgentSessionDriver
+  profiles: ProfileModule
   snapshotStore: RuntimeSnapshotStore
 }
 
@@ -19,11 +19,11 @@ export interface IdentityServiceDependencies {
  * 这一族操作。内容实际更新后刷新运行时快照缓存以获取最新的 profile 时间戳。
  */
 export class IdentityService {
-  private readonly sessionDriver: AgentSessionDriver
+  private readonly profiles: ProfileModule
   private readonly snapshotStore: RuntimeSnapshotStore
 
   constructor(dependencies: IdentityServiceDependencies) {
-    this.sessionDriver = dependencies.sessionDriver
+    this.profiles = dependencies.profiles
     this.snapshotStore = dependencies.snapshotStore
   }
 
@@ -32,26 +32,20 @@ export class IdentityService {
    *
    * @param agentId - Agent 标识。
    * @returns Agent 的 soul 内容和更新时间。
-   * @throws 当 Driver 不支持或读取失败时，Promise 会 reject。
+   * @throws 当 Profile 模块读取失败时，Promise 会 reject。
    */
   async getSoul(agentId: string): Promise<SoulContent> {
-    if (!this.sessionDriver.getSoul) {
-      throw new Error('当前运行时不支持读取 Agent soul。')
-    }
-    return this.sessionDriver.getSoul(agentId)
+    return this.profiles.getSoul(agentId)
   }
 
   /**
    * 读取共享 user profile 内容。
    *
    * @returns 共享 user profile 内容和更新时间。
-   * @throws 当 Driver 不支持或读取失败时，Promise 会 reject。
+   * @throws 当 Profile 模块读取失败时，Promise 会 reject。
    */
   async getUserProfile(): Promise<UserProfileContent> {
-    if (!this.sessionDriver.getUserProfile) {
-      throw new Error('当前运行时不支持读取 user profile。')
-    }
-    return this.sessionDriver.getUserProfile()
+    return this.profiles.getUserProfile()
   }
 
   /**
@@ -61,18 +55,14 @@ export class IdentityService {
    * @param content - 新 soul 内容。
    * @param expectedVersion - 调用方最后观察到的内容版本。
    * @returns profile 维护结果。
-   * @throws 当 Driver 不支持或操作失败时，Promise 会 reject。
+   * @throws 当 Profile 模块更新失败时，Promise 会 reject。
    */
   async updateSoul(
     agentId: string,
     content: string,
     expectedVersion: string,
   ): Promise<ProfileUpdateResult> {
-    if (!this.sessionDriver.updateSoul) {
-      throw new Error('当前运行时不支持更新 Agent soul。')
-    }
-
-    const result = await this.sessionDriver.updateSoul(
+    const result = await this.profiles.updateSoul(
       agentId,
       content,
       expectedVersion,
@@ -91,17 +81,13 @@ export class IdentityService {
    * @param content - 新 user profile 内容。
    * @param expectedVersion - 调用方最后观察到的内容版本。
    * @returns profile 维护结果。
-   * @throws 当 Driver 不支持或操作失败时，Promise 会 reject。
+   * @throws 当 Profile 模块更新失败时，Promise 会 reject。
    */
   async updateUserProfile(
     content: string,
     expectedVersion: string,
   ): Promise<ProfileUpdateResult> {
-    if (!this.sessionDriver.updateUserProfile) {
-      throw new Error('当前运行时不支持更新 user profile。')
-    }
-
-    const result = await this.sessionDriver.updateUserProfile(
+    const result = await this.profiles.updateUserProfile(
       content,
       expectedVersion,
     )

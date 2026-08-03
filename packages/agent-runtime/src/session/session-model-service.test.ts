@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentSessionDriver } from '../index'
+import type { SessionModule } from '../runtime/runtime-modules'
 import { SessionModelService } from './session-model-service'
 
-function createService(driver: Partial<AgentSessionDriver>) {
+function createService(driver: Partial<SessionModule>) {
   return new SessionModelService({
-    sessionDriver: driver as AgentSessionDriver,
+    sessions: driver as SessionModule,
   })
 }
 
@@ -21,18 +21,5 @@ describe('SessionModelService', () => {
     expect(await service.setThinkingLevel({} as never)).toEqual({
       modelId: 'm3',
     })
-  })
-
-  it('缺少能力时各方法抛错', async () => {
-    const service = createService({})
-    await expect(service.getInfo({} as never)).rejects.toThrow(
-      '不支持读取 Session 模型信息',
-    )
-    await expect(service.setModel({} as never)).rejects.toThrow(
-      '不支持切换 Session 模型',
-    )
-    await expect(service.setThinkingLevel({} as never)).rejects.toThrow(
-      '不支持切换 Thinking Level',
-    )
   })
 })

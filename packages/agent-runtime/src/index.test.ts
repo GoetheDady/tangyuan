@@ -90,8 +90,11 @@ describe('YuanxiaoRuntime', () => {
     })
     const { driver } = await createDriver({ gateway })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: driver,
-      sessionDriver: driver,
+      configuration: driver.getConfigurationModule(),
+      sessions: driver,
+      agents: driver.getAgentLifecycleModule(),
+      profiles: driver.getProfileModule(),
+      skills: driver.getSkillModule(),
     })
     const events: AgentEvent[] = []
     runtime.subscribe((event) => {

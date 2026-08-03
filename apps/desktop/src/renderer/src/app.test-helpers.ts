@@ -5,6 +5,7 @@ import {
   type RuntimeSnapshot,
 } from '@yuanxiao/contracts'
 import { vi } from 'vitest'
+import { resetDesktopWorkbenchLoadForTest } from './lib/desktop-workbench-loader'
 
 export function installDefaultAppApi(): void {
   window.location.hash = '#/'
@@ -189,6 +190,7 @@ export function installDefaultAppApi(): void {
 
 export function resetAppTestEnvironment(): void {
   vi.restoreAllMocks()
+  resetDesktopWorkbenchLoadForTest()
   window.location.hash = '#/'
 }
 

@@ -18,8 +18,11 @@ describe('transcript turn/step tracking', () => {
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     sessionDriver.emit({
@@ -79,8 +82,11 @@ describe('transcript turn/step tracking', () => {
       updatedAt: '2026-07-21T00:00:00.000Z',
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     const snapshot = await runtime.getTranscript({
@@ -99,8 +105,11 @@ describe('transcript turn/step tracking', () => {
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     // No events emitted → no cached snapshot
@@ -139,8 +148,11 @@ describe('transcript turn/step tracking', () => {
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     // Emit message-appended events to create transcript entries (simulating PiSdkDriver)
@@ -245,8 +257,11 @@ describe('transcript turn/step tracking', () => {
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     sessionDriver.emit({
@@ -323,8 +338,11 @@ describe('transcript turn/step tracking', () => {
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     sessionDriver.emit({
@@ -403,8 +421,11 @@ describe('transcript turn/step tracking', () => {
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     // 复刻 ipc.ts 的行为：每条公开事件都会被 agentEventSchema 校验后广播给渲染层。
@@ -446,8 +467,11 @@ describe('transcript turn/step tracking', () => {
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     // 复刻 ipc.ts 的行为：每条公开事件都会被 agentEventSchema 校验后广播给渲染层。

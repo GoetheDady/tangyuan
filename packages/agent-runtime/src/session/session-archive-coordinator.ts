@@ -7,7 +7,7 @@ export interface SessionArchiveLease {
   release(): void
 }
 
-/** 协调会话归档门闩与归档开始前已经进入 Driver 的分叉操作。 */
+/** 协调会话归档门闩与归档开始前已经进入 Session 模块的分叉操作。 */
 export class SessionArchiveCoordinator {
   private readonly archivingSessionIds = new Set<string>()
   private readonly pendingForksBySourceSession = new Map<

@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentEvent, SkillOperationParams } from '@yuanxiao/contracts'
-import type { AgentSessionDriver } from '../index'
+import type { SessionModule, SkillModule } from '../runtime/runtime-modules'
 import { SkillService } from './skill-service'
 
 const DEFAULT_AGENT = 'yuanxiao'
 
-function createService(driver: Partial<AgentSessionDriver>) {
+function createService(driver: Partial<SessionModule & SkillModule>) {
   const events: AgentEvent[] = []
   const service = new SkillService({
-    sessionDriver: driver as AgentSessionDriver,
+    skills: driver as SkillModule,
+    sessions: driver as SessionModule,
     defaultAgentId: DEFAULT_AGENT,
     emit: (event) => events.push(event),
     now: () => '2024-01-01T00:00:00.000Z',
@@ -104,13 +105,6 @@ describe('SkillService', () => {
 
     expect(deleteSkill).toHaveBeenCalledTimes(1)
     expect(reloadAgentSessions).toHaveBeenCalledWith('a1')
-  })
-
-  it('getInstallRecords 缺少能力时抛错', async () => {
-    const { service } = createService({})
-    await expect(service.getInstallRecords()).rejects.toThrow(
-      '不支持读取 Skill 安装记录',
-    )
   })
 
   it('rejectAllApprovals 清空待审批', async () => {

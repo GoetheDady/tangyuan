@@ -5,14 +5,15 @@ import type {
   SkillOperationParams,
   SkillSummary,
 } from '@yuanxiao/contracts'
-import type { AgentSessionDriver } from '../driver'
+import type { SessionModule, SkillModule } from '../runtime/runtime-modules'
 import { SkillApprovalRegistry } from './skill-approval-registry'
 
 /**
  * 创建 SkillService 所需的依赖。
  */
 export interface SkillServiceDependencies {
-  sessionDriver: AgentSessionDriver
+  skills: SkillModule
+  sessions: SessionModule
   defaultAgentId: string
   emit: (event: AgentEvent) => void
   now: () => string
@@ -21,17 +22,19 @@ export interface SkillServiceDependencies {
 /**
  * Skill 管理服务：承载「Skill 如何列出、安装/删除（含权限校验、审批、
  * 按来源 reload 会话）、读取安装记录」这一族操作，并持有 Skill 审批登记表。
- * 编排 sessionDriver 与 SkillApprovalRegistry，安装/删除后按 Skill 来源
+ * 编排 SessionModule 与 SkillApprovalRegistry，安装/删除后按 Skill 来源
  * 决定刷新范围（共享 → 全部 session；专属 → 目标 Agent 的 session）。
  */
 export class SkillService {
-  private readonly sessionDriver: AgentSessionDriver
+  private readonly skills: SkillModule
+  private readonly sessions: SessionModule
   private readonly defaultAgentId: string
   private readonly approvals: SkillApprovalRegistry
   private readonly now: () => string
 
   constructor(dependencies: SkillServiceDependencies) {
-    this.sessionDriver = dependencies.sessionDriver
+    this.skills = dependencies.skills
+    this.sessions = dependencies.sessions
     this.defaultAgentId = dependencies.defaultAgentId
     this.now = dependencies.now
     this.approvals = new SkillApprovalRegistry({
@@ -45,26 +48,20 @@ export class SkillService {
    *
    * @param agentId - Agent 标识。
    * @returns Skill 摘要列表。
-   * @throws 当 Driver 不支持或读取失败时，Promise 会 reject。
+   * @throws 当 Skill 模块读取失败时，Promise 会 reject。
    */
   async listAgentSkills(agentId: string): Promise<SkillSummary[]> {
-    if (!this.sessionDriver.listAgentSkills) {
-      throw new Error('当前运行时不支持读取 Agent Skills。')
-    }
-    return this.sessionDriver.listAgentSkills(agentId)
+    return this.skills.listAgentSkills(agentId)
   }
 
   /**
    * 列出共享 Skill 列表。
    *
    * @returns 共享 Skill 摘要列表。
-   * @throws 当 Driver 不支持或读取失败时，Promise 会 reject。
+   * @throws 当 Skill 模块读取失败时，Promise 会 reject。
    */
   async listSharedSkills(): Promise<SkillSummary[]> {
-    if (!this.sessionDriver.listSharedSkills) {
-      throw new Error('当前运行时不支持读取共享 Skills。')
-    }
-    return this.sessionDriver.listSharedSkills()
+    return this.skills.listSharedSkills()
   }
 
   /**
@@ -72,15 +69,12 @@ export class SkillService {
    *
    * @param params - 操作参数。
    * @returns 更新后的 Skill 摘要列表。
-   * @throws 当权限不足、用户拒绝、校验失败或 Driver 不支持时，Promise 会 reject。
+   * @throws 当权限不足、用户拒绝、校验或 Skill 模块安装失败时，Promise 会 reject。
    */
   async install(params: SkillOperationParams): Promise<SkillSummary[]> {
     this.validatePermission(params)
-    if (!this.sessionDriver.installSkill) {
-      throw new Error('当前运行时不支持安装 Skill。')
-    }
     await this.requireApproval(params)
-    const result = await this.sessionDriver.installSkill(params)
+    const result = await this.skills.installSkill(params)
     await this.reloadAfterOperation(params)
     return result
   }
@@ -90,15 +84,12 @@ export class SkillService {
    *
    * @param params - 操作参数。
    * @returns 更新后的 Skill 摘要列表。
-   * @throws 当权限不足、用户拒绝或 Driver 不支持时，Promise 会 reject。
+   * @throws 当权限不足、用户拒绝或 Skill 模块删除失败时，Promise 会 reject。
    */
   async delete(params: SkillOperationParams): Promise<SkillSummary[]> {
     this.validatePermission(params)
-    if (!this.sessionDriver.deleteSkill) {
-      throw new Error('当前运行时不支持删除 Skill。')
-    }
     await this.requireApproval(params)
-    const result = await this.sessionDriver.deleteSkill(params)
+    const result = await this.skills.deleteSkill(params)
     await this.reloadAfterOperation(params)
     return result
   }
@@ -107,13 +98,10 @@ export class SkillService {
    * 读取 Skill 安装记录。
    *
    * @returns 安装记录列表。
-   * @throws 当 Driver 不支持或读取失败时，Promise 会 reject。
+   * @throws 当 Skill 模块读取失败时，Promise 会 reject。
    */
   async getInstallRecords(): Promise<SkillInstallRecord[]> {
-    if (!this.sessionDriver.getSkillInstallRecords) {
-      throw new Error('当前运行时不支持读取 Skill 安装记录。')
-    }
-    return this.sessionDriver.getSkillInstallRecords()
+    return this.skills.getSkillInstallRecords()
   }
 
   /**
@@ -215,15 +203,9 @@ export class SkillService {
     params: SkillOperationParams,
   ): Promise<void> {
     if (params.source === 'shared') {
-      if (!this.sessionDriver.reloadAllSessions) {
-        throw new Error('当前运行时不支持重新加载全部 session。')
-      }
-      await this.sessionDriver.reloadAllSessions()
+      await this.sessions.reloadAllSessions()
     } else if (params.targetAgentId) {
-      if (!this.sessionDriver.reloadAgentSessions) {
-        throw new Error('当前运行时不支持重新加载 Agent session。')
-      }
-      await this.sessionDriver.reloadAgentSessions(params.targetAgentId)
+      await this.sessions.reloadAgentSessions(params.targetAgentId)
     }
   }
 }

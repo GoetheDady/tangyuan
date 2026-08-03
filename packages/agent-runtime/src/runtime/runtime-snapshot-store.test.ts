@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { RuntimeSnapshot } from '@yuanxiao/contracts'
-import type { RuntimeResourceDriver } from '../index'
+import type { RuntimeConfigurationModule } from './runtime-modules'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
 
 function makeSnapshot(
@@ -10,19 +10,26 @@ function makeSnapshot(
 }
 
 function createDriver(
-  overrides: Partial<RuntimeResourceDriver> = {},
-): RuntimeResourceDriver {
+  overrides: Partial<RuntimeConfigurationModule> = {},
+): RuntimeConfigurationModule {
+  const snapshot = makeSnapshot()
   return {
-    getSnapshot: vi.fn(async () => makeSnapshot()),
-    refresh: vi.fn(async () => makeSnapshot()),
+    getSnapshot: vi.fn(async () => snapshot),
+    refresh: vi.fn(async () => snapshot),
+    saveConfiguration: vi.fn(async () => snapshot),
+    cancelConfigurationVerification: vi.fn(async () => snapshot),
+    restoreFromBackup: vi.fn(async () => snapshot),
+    resetConfiguration: vi.fn(async () => undefined),
+    saveProvider: vi.fn(async () => snapshot),
+    deleteProvider: vi.fn(async () => snapshot),
     ...overrides,
-  } as RuntimeResourceDriver
+  }
 }
 
 describe('RuntimeSnapshotStore', () => {
   it('getOrLoad 首次读取 Driver，之后命中缓存', async () => {
     const driver = createDriver()
-    const store = new RuntimeSnapshotStore({ runtimeDriver: driver })
+    const store = new RuntimeSnapshotStore({ configuration: driver })
 
     await store.getOrLoad()
     await store.getOrLoad()
@@ -32,7 +39,7 @@ describe('RuntimeSnapshotStore', () => {
 
   it('reload 每次都读取 Driver 并刷新缓存', async () => {
     const driver = createDriver()
-    const store = new RuntimeSnapshotStore({ runtimeDriver: driver })
+    const store = new RuntimeSnapshotStore({ configuration: driver })
 
     await store.reload()
     await store.getOrLoad()
@@ -42,18 +49,11 @@ describe('RuntimeSnapshotStore', () => {
 
   it('refresh 走 Driver.refresh', async () => {
     const driver = createDriver()
-    const store = new RuntimeSnapshotStore({ runtimeDriver: driver })
+    const store = new RuntimeSnapshotStore({ configuration: driver })
 
     await store.refresh()
 
     expect(driver.refresh).toHaveBeenCalledTimes(1)
-  })
-
-  it('saveConfiguration 缺少能力时抛错', async () => {
-    const store = new RuntimeSnapshotStore({ runtimeDriver: createDriver() })
-    await expect(store.saveConfiguration({} as never)).rejects.toThrow(
-      '不支持保存配置',
-    )
   })
 
   it('saveConfiguration 保存后缓存被写入', async () => {
@@ -61,7 +61,7 @@ describe('RuntimeSnapshotStore', () => {
     const driver = createDriver({
       saveConfiguration: vi.fn(async () => saved),
     })
-    const store = new RuntimeSnapshotStore({ runtimeDriver: driver })
+    const store = new RuntimeSnapshotStore({ configuration: driver })
 
     const result = await store.saveConfiguration({} as never)
     expect(result).toBe(saved)
@@ -70,26 +70,13 @@ describe('RuntimeSnapshotStore', () => {
     expect(driver.getSnapshot).not.toHaveBeenCalled()
   })
 
-  it('resetConfiguration 缺少能力时抛错', async () => {
-    const store = new RuntimeSnapshotStore({ runtimeDriver: createDriver() })
-    await expect(store.resetConfiguration()).rejects.toThrow('不支持配置重置')
-  })
-
   it('resetConfiguration 重置后重载缓存', async () => {
     const driver = createDriver({ resetConfiguration: vi.fn(async () => {}) })
-    const store = new RuntimeSnapshotStore({ runtimeDriver: driver })
+    const store = new RuntimeSnapshotStore({ configuration: driver })
 
     await store.resetConfiguration()
 
     expect(driver.resetConfiguration).toHaveBeenCalledTimes(1)
     expect(driver.getSnapshot).toHaveBeenCalledTimes(1)
-  })
-
-  it('restoreFromBackup 与 cancelConfigurationVerification 缺少能力时抛错', async () => {
-    const store = new RuntimeSnapshotStore({ runtimeDriver: createDriver() })
-    await expect(store.restoreFromBackup()).rejects.toThrow('不支持配置恢复')
-    await expect(
-      store.cancelConfigurationVerification({} as never),
-    ).rejects.toThrow('不支持取消配置验证')
   })
 })

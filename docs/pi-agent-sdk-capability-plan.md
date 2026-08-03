@@ -18,12 +18,23 @@
 - 第一版直接使用 Pi Agent SDK，不做产品级 FakeDriver。
 - 测试中允许 mock Pi SDK，避免快速测试依赖真实模型调用。
 - Renderer 不直接导入 Pi Agent SDK。
-- Pi Agent SDK 只允许出现在 `PiSdkDriver` 所在运行时模块内部。
+- Pi Agent SDK 通过 `PiSdkGateway` adapter 接入运行时；产品模块不直接依赖 SDK 会话对象。
 - 所有 SDK 事件进入 UI 前必须转成元宵自己的统一事件。
 - 每项 SDK 能力必须有独立 issue、验收标准和测试方式。
 - 涉及文件、命令、写入、工具执行的能力默认保守开启。
 - v1 只实现默认 Agent：`yuanxiao`。
 - 架构命名和数据结构必须为后续多 Agent 预留 `agentId`。
+
+## 当前 Runtime 组装规则
+
+- Electron Main 和 IPC 只依赖 `YuanxiaoRuntime` 高层接口。
+- Runtime 内部必须显式组合配置、Session、Agent 生命周期、Profile、Skill 五个职责模块；不使用巨型 optional Driver 能力集合。
+- 配置由 `DefaultRuntimeConfiguration` 集中负责验证、持久化、恢复和快照生成。
+- Profile 由 `DefaultProfileModule` 集中负责文件写入后的事件广播与活跃会话上下文刷新。
+- Agent 与 Skill 直接使用 `AgentRegistry`、`SkillStore`，不经 `PiSdkDriver` 浅转发后再注入 Runtime。
+- `PiSdkDriver` 当前只作为 Pi Session 执行实现和旧公开调用的兼容门面，不是 Runtime 的统一依赖容器。
+- 仅为真实外部依赖保留 adapter seam：`PiSdkGateway`、`ConfigEncryptionAdapter`、时钟与路径根。
+- 单元测试通过职责模块接口验证行为；生产组合测试使用临时目录、假 `PiSdkGateway` 和假加密 adapter 组装真实 Runtime。
 
 ## Agent Home 与 Bootstrap
 
@@ -147,17 +158,17 @@ Pi Agent SDK 至少包含这些能力：
 | 流式事件                          | `AgentSession.subscribe()`                            | v1 必须支持                                                   |
 | 取消运行                          | `AgentSession.abort()`                                | v1 必须支持                                                   |
 | 模型控制                          | `setModel()`、`ModelRegistry`                         | v1 必须支持基础选择                                           |
-| API Key / 认证                    | `AuthStorage`                                         | v1 使用本地 config JSON 明文存储                              |
+| API Key / 认证                    | `AuthStorage`                                         | config JSON 保存 `safeStorage` adapter 生成的密文             |
 | 会话状态                          | `messages`、`isStreaming`、`agent.state`              | v1 映射为元宵会话状态                                         |
 | 内置工具                          | `read`、`bash`、`edit`、`write`、`grep`、`find`、`ls` | v1 使用只读工具，并为 Agent profile 文件开放 `edit` / `write` |
 | 自定义工具                        | `defineTool()`                                        | v1 不支持                                                     |
-| Skills                            | `DefaultResourceLoader`、`skillsOverride`             | v1 不支持                                                     |
+| Skills                            | `DefaultResourceLoader`、`skillsOverride`             | 已支持共享与 Agent 专属 Skill 分层                            |
 | Extensions                        | `ResourceLoader`、extension runtime                   | v1 不支持                                                     |
 | Prompt Templates / Slash Commands | prompts、templates                                    | v1 不支持                                                     |
 | Context Files                     | AGENTS/context files                                  | v1 只保留架构兼容，不做 UI                                    |
 | Session Management                | persistent/open/list/fork/import                      | v1 使用 Pi SDK 原生 session 持久化                            |
 | Compaction                        | `compact()`、compaction events                        | v1 不支持                                                     |
-| Thinking Level                    | `setThinkingLevel()`                                  | v1 可后置                                                     |
+| Thinking Level                    | `setThinkingLevel()`                                  | 已支持会话级切换与恢复                                        |
 | Images                            | prompt images                                         | v1 不支持                                                     |
 | RPC / JSON Event Stream           | SDK 运行模式                                          | v1 不支持                                                     |
 
@@ -223,7 +234,7 @@ v1 使用本地 config JSON 保存配置，包括 API Key。
 规则：
 
 - config JSON 放在 Electron `app.getPath("userData")` 下。
-- API Key MVP 阶段明文保存。
+- API Key 通过 Main 进程注入的 `ConfigEncryptionAdapter` 加密后保存。
 - UI 默认遮罩 API Key。
 - 日志、错误、测试 fixture 禁止打印真实 API Key。
 - 后续安全方案另开 issue，不阻塞 v1。
@@ -386,12 +397,12 @@ v1 策略：
 - 自动 Memory 写入。
 - Skill 自进化。
 
-## 支持顺序
+## 历史 v1 支持顺序
 
 建议 issue 顺序：
 
 1. 初始化 bun workspace、Electron Vite、React、TypeScript。
-2. 定义 `AgentSessionDriver`、统一事件类型和 `RuntimeSnapshot`。
+2. 定义 `YuanxiaoRuntime`、统一事件类型和 `RuntimeSnapshot`。
 3. 实现默认 Agent Home 初始化和固定 `bootstrap.md`。
 4. 实现 config JSON 存储，保存 Provider、Model、API Key。
 5. 实现配置保存前的真实 SDK 验证。

@@ -59,8 +59,11 @@ describe('YuanxiaoRuntime · 最后激活会话', () => {
       sessions.filter((session) => session.agentId === agentId),
     )
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(snapshot),
-      sessionDriver,
+      configuration: createRuntimeDriver(snapshot),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
       lastActiveSessionStore: {
         read: vi.fn().mockResolvedValue(savedRecord),
         write: vi.fn(),
@@ -93,8 +96,11 @@ describe('YuanxiaoRuntime · 最后激活会话', () => {
       updatedAt: '2026-07-28T13:00:00.000Z',
     }
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(snapshot),
-      sessionDriver,
+      configuration: createRuntimeDriver(snapshot),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
       lastActiveSessionStore: {
         read: vi.fn().mockResolvedValue(savedRecord),
         write: vi.fn().mockResolvedValue(fallbackRecord),
@@ -153,8 +159,11 @@ describe('YuanxiaoRuntime · 最后激活会话', () => {
       updatedAt: '2026-07-28T13:00:00.000Z',
     }
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(snapshot),
-      sessionDriver,
+      configuration: createRuntimeDriver(snapshot),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
       lastActiveSessionStore: {
         read: vi.fn().mockResolvedValue(savedRecord),
         write: vi.fn().mockResolvedValue(fallbackRecord),
@@ -196,8 +205,11 @@ describe('YuanxiaoRuntime · 最后激活会话', () => {
       updatedAt: '2026-07-28T13:00:00.000Z',
     }
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(snapshot),
-      sessionDriver,
+      configuration: createRuntimeDriver(snapshot),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
       lastActiveSessionStore: {
         read: vi.fn().mockResolvedValue(savedRecord),
         write: vi.fn().mockResolvedValue(fallbackRecord),
@@ -231,8 +243,11 @@ describe('YuanxiaoRuntime · 最后激活会话', () => {
       updatedAt: '2026-07-28T14:00:00.000Z',
     }
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(snapshot),
-      sessionDriver,
+      configuration: createRuntimeDriver(snapshot),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
       lastActiveSessionStore: {
         read: vi.fn().mockResolvedValue(null),
         write: vi.fn().mockResolvedValue(nextRecord),

@@ -1,10 +1,11 @@
+import type { AgentEvent, DriverEvent, AgentEventListener } from '../index'
 import type {
-  AgentEvent,
-  DriverEvent,
-  AgentEventListener,
-  AgentSessionDriver,
-  RuntimeResourceDriver,
-} from '../index'
+  AgentLifecycleModule,
+  ProfileModule,
+  RuntimeConfigurationModule,
+  SessionModule,
+  SkillModule,
+} from './runtime-modules'
 import {
   YUANXIAO_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
@@ -87,15 +88,15 @@ export function createSnapshot(
 }
 
 /**
- * 创建可观察调用次数的 RuntimeResourceDriver 测试替身。
+ * 创建可观察调用次数的 RuntimeConfigurationModule 测试替身。
  *
  * @param snapshot - Driver 方法需要返回的运行时快照。
- * @returns 一个只用于单元测试的 RuntimeResourceDriver。
+ * @returns 一个只用于单元测试的 RuntimeConfigurationModule。
  * @throws 此测试辅助方法不会抛出错误。
  */
 export function createRuntimeDriver(
   snapshot: RuntimeSnapshot,
-): RuntimeResourceDriver {
+): RuntimeConfigurationModule {
   return {
     getSnapshot: vi.fn().mockResolvedValue(snapshot),
     refresh: vi.fn().mockResolvedValue(snapshot),
@@ -103,22 +104,27 @@ export function createRuntimeDriver(
     cancelConfigurationVerification: vi.fn().mockResolvedValue(snapshot),
     restoreFromBackup: vi.fn().mockResolvedValue(snapshot),
     resetConfiguration: vi.fn().mockResolvedValue(undefined),
+    saveProvider: vi.fn().mockResolvedValue(snapshot),
+    deleteProvider: vi.fn().mockResolvedValue(snapshot),
   }
 }
 
 /**
- * 创建可观察调用参数的 AgentSessionDriver 测试替身。
+ * 创建可观察调用参数的 Session/Agent/Profile/Skill 组合测试替身。
  *
  * @param sessions - Driver 方法需要返回的会话摘要列表。
- * @returns 一个只用于单元测试的 AgentSessionDriver。
+ * @returns 一个只用于单元测试的窄模块组合替身。
  * @throws 此测试辅助方法不会抛出错误。
  */
 export function createSessionDriver(
   sessions: AgentSessionSummary[],
-): AgentSessionDriver & {
-  emit(event: AgentEvent | DriverEvent): void
-  messages: Map<string, TranscriptSnapshot>
-} {
+): SessionModule &
+  AgentLifecycleModule &
+  ProfileModule &
+  SkillModule & {
+    emit(event: AgentEvent | DriverEvent): void
+    messages: Map<string, TranscriptSnapshot>
+  } {
   const [firstSession] = sessions
   let currentSessions = [...sessions]
   let currentListener: AgentEventListener | null = null
@@ -138,6 +144,63 @@ export function createSessionDriver(
     ),
     sendMessage: vi.fn().mockResolvedValue(undefined),
     cancelRun: vi.fn().mockResolvedValue(undefined),
+    retryMessage: vi.fn().mockResolvedValue(undefined),
+    forkSession: vi.fn(async () => {
+      throw new Error('测试未配置 forkSession。')
+    }),
+    setSessionsArchived: vi.fn(async () => currentSessions),
+    deleteSessions: vi.fn().mockResolvedValue(undefined),
+    getSessionAttempts: vi.fn(() => []),
+    getSessionModelInfo: vi.fn(async () => {
+      throw new Error('测试未配置 getSessionModelInfo。')
+    }),
+    setSessionModel: vi.fn(async () => {
+      throw new Error('测试未配置 setSessionModel。')
+    }),
+    setSessionThinkingLevel: vi.fn(async () => {
+      throw new Error('测试未配置 setSessionThinkingLevel。')
+    }),
+    reloadAgentSessions: vi.fn().mockResolvedValue(undefined),
+    reloadAllSessions: vi.fn().mockResolvedValue(undefined),
+    createAgent: vi.fn(async () => {
+      throw new Error('测试未配置 createAgent。')
+    }),
+    updateAgentConfig: vi.fn(async () => {
+      throw new Error('测试未配置 updateAgentConfig。')
+    }),
+    archiveAgent: vi.fn(async () => {
+      throw new Error('测试未配置 archiveAgent。')
+    }),
+    recoverAgent: vi.fn(async () => {
+      throw new Error('测试未配置 recoverAgent。')
+    }),
+    reconcileAgentDirectories: vi.fn(async () => ({
+      agents: [],
+      unclaimedDirectories: [],
+    })),
+    claimAgentDirectory: vi.fn(async () => {
+      throw new Error('测试未配置 claimAgentDirectory。')
+    }),
+    rebuildYuanxiaoHome: vi.fn(async () => {
+      throw new Error('测试未配置 rebuildYuanxiaoHome。')
+    }),
+    getSoul: vi.fn(async () => {
+      throw new Error('测试未配置 getSoul。')
+    }),
+    getUserProfile: vi.fn(async () => {
+      throw new Error('测试未配置 getUserProfile。')
+    }),
+    updateSoul: vi.fn(async () => {
+      throw new Error('测试未配置 updateSoul。')
+    }),
+    updateUserProfile: vi.fn(async () => {
+      throw new Error('测试未配置 updateUserProfile。')
+    }),
+    listAgentSkills: vi.fn().mockResolvedValue([]),
+    listSharedSkills: vi.fn().mockResolvedValue([]),
+    installSkill: vi.fn().mockResolvedValue([]),
+    deleteSkill: vi.fn().mockResolvedValue([]),
+    getSkillInstallRecords: vi.fn().mockResolvedValue([]),
     subscribe: vi.fn((listener: AgentEventListener) => {
       currentListener = listener
 

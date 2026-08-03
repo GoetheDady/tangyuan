@@ -669,7 +669,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
               type="button"
               aria-label="设置"
               title="设置"
-              className="window-no-drag text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:ring-ring/50 grid size-9 shrink-0 place-items-center rounded-[10px] transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
+              className="window-no-drag text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:ring-ring/50 grid size-9 shrink-0 cursor-pointer place-items-center rounded-[10px] transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
               onClick={() => {
                 navigate(
                   `/settings/providers?redirect=${encodeURIComponent(location.pathname)}`,

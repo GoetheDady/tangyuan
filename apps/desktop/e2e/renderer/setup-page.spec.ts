@@ -82,6 +82,45 @@ test.describe('初始化配置页面', () => {
     await expect(page.getByRole('button', { name: '验证并继续' })).toBeEnabled()
   })
 
+  test('鼠标选择 Provider 后关闭动画不拦截 API Key 点击', async ({ page }) => {
+    const runtime = createMissingConfigSnapshot({
+      providers: [
+        { providerId: 'anthropic', displayName: 'Anthropic' },
+        { providerId: 'deepseek', displayName: 'DeepSeek' },
+      ],
+      models: [],
+    })
+    const initScript = createPreloadApiInitScript(runtime)
+
+    await page.addInitScript({ content: initScript })
+    await page.goto('/#/setup')
+    await page.addStyleTag({
+      content: ':root { --duration-fast: 1000ms !important; }',
+    })
+
+    const apiKeyInput = page.locator(apiKeyInputSelector)
+    const inputBox = await apiKeyInput.boundingBox()
+    expect(inputBox).not.toBeNull()
+
+    await page.locator(providerSelectSelector).click()
+    await page.getByRole('option', { name: 'DeepSeek' }).click()
+    await page.mouse.click(
+      inputBox!.x + inputBox!.width / 2,
+      inputBox!.y + inputBox!.height / 2,
+    )
+
+    await expect(apiKeyInput).toBeFocused()
+
+    const closingContent = page.locator(
+      '[data-slot="select-content"][data-state="closed"]',
+    )
+    await expect(closingContent).toHaveCSS(
+      'animation-name',
+      'select-content-drop-out',
+    )
+    await expect(closingContent).toHaveCSS('pointer-events', 'none')
+  })
+
   test('显示安全提示', async ({ page }) => {
     const runtime = createMissingConfigSnapshot()
     const initScript = createPreloadApiInitScript(runtime)

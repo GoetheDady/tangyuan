@@ -465,8 +465,20 @@
   }
 
   [data-slot='select-content'][data-state='closed'] {
+    pointer-events: none !important;
     animation: select-content-drop-out var(--duration-fast) var(--ease-standard)
       both;
+  }
+
+  /* Radix 在退出动画结束前保留 Portal、Popper wrapper 和 body 指针锁。 */
+  [data-radix-popper-content-wrapper]:has(
+    > [data-slot='select-content'][data-state='closed']
+  ) {
+    pointer-events: none !important;
+  }
+
+  body:has([data-slot='select-content'][data-state='closed']) {
+    pointer-events: auto !important;
   }
 }
 

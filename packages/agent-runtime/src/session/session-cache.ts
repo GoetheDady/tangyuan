@@ -10,7 +10,7 @@ export class SessionCache {
   private sessions: AgentSessionSummary[] = []
 
   /**
-   * 整体替换会话列表（用于从 Driver 刷新）。
+   * 整体替换会话列表（用于从 Session 模块刷新）。
    *
    * @param sessions - 新的会话摘要列表（调用方已完成运行状态回填）。
    */

@@ -1,4 +1,4 @@
-import { YuanxiaoRuntimeOrchestrator } from './yuanxiao-runtime-orchestrator'
+import { YuanxiaoRuntimeResources } from './yuanxiao-runtime-resources'
 import type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencies'
 import { collectSessionSubtree } from '../session/session-archive-coordinator'
 import {
@@ -8,33 +8,23 @@ import {
   type DeleteSessionRequest,
   type DeleteSessionResult,
   type AgentSessionSummary,
-  type AgentSummary,
   type CancelConfigurationVerificationRequest,
   type CancelRunRequest,
   type CreateSessionRequest,
   type DeleteProviderRequest,
   type ForkSessionRequest,
   type GetSessionMessagesRequest,
-  type GetSessionModelInfoRequest,
   type LastActiveSession,
-  type ProfileUpdateResult,
   type ProviderConfiguration,
   type RecoverSessionRequest,
   type RetryRunRequest,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
   type SendMessageRequest,
-  type SessionModelInfo,
   type SessionLineageActivity,
   type SessionLineageActivityKind,
-  type SetSessionModelRequest,
-  type SetSessionThinkingLevelRequest,
   type SetLastActiveSessionRequest,
-  type SkillSummary,
-  type SoulContent,
   type TranscriptSnapshot,
-  type UpdateAgentConfigRequest,
-  type UserProfileContent,
 } from '@yuanxiao/contracts'
 
 export type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencies'
@@ -42,12 +32,12 @@ export type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencie
 /**
  * Electron Main 调用运行时行为的唯一高层接口。
  */
-class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
+class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeResources {
   /**
    * 读取当前运行时快照并写入 Runtime 缓存。
    *
    * @returns 当前 RuntimeSnapshot。
-   * @throws 当 RuntimeResourceDriver 读取失败时，Promise 会 reject。
+   * @throws 当配置模块读取失败时，Promise 会 reject。
    */
   async getRuntimeSnapshot(): Promise<RuntimeSnapshot> {
     return this.snapshotStore.reload()
@@ -57,7 +47,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    * 刷新运行时资源并写入 Runtime 缓存。
    *
    * @returns 刷新后的 RuntimeSnapshot。
-   * @throws 当 RuntimeResourceDriver 刷新失败时，Promise 会 reject。
+   * @throws 当配置模块刷新失败时，Promise 会 reject。
    */
   async refreshRuntime(): Promise<RuntimeSnapshot> {
     return this.snapshotStore.refresh()
@@ -68,7 +58,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    *
    * @param configuration - Provider、模型和 API Key。
    * @returns 保存后的 RuntimeSnapshot。
-   * @throws 当 RuntimeResourceDriver 缺少保存能力或验证失败时，Promise 会 reject。
+   * @throws 当配置验证或保存失败时，Promise 会 reject。
    */
   async saveRuntimeConfiguration(
     configuration: RuntimeConfiguration,
@@ -91,7 +81,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    *
    * @param request - 需要取消的验证标识。
    * @returns 取消后的 RuntimeSnapshot。
-   * @throws 当 RuntimeResourceDriver 缺少取消能力或取消失败时，Promise 会 reject。
+   * @throws 当取消配置验证失败时，Promise 会 reject。
    */
   async cancelRuntimeConfigurationVerification(
     request: CancelConfigurationVerificationRequest,
@@ -103,7 +93,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    * 从最近的备份恢复配置文件。
    *
    * @returns 恢复后的 RuntimeSnapshot。
-   * @throws 当 RuntimeResourceDriver 缺少恢复能力或恢复失败时，Promise 会 reject。
+   * @throws 当配置恢复失败时，Promise 会 reject。
    */
   async restoreFromBackup(): Promise<RuntimeSnapshot> {
     return this.snapshotStore.restoreFromBackup()
@@ -113,7 +103,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    * 删除配置文件和备份（不删除 Agent 数据、用户资料或 Pi session）。
    *
    * @returns 重置后的 RuntimeSnapshot。
-   * @throws 当 RuntimeResourceDriver 缺少重置能力或重置失败时，Promise 会 reject。
+   * @throws 当配置重置失败时，Promise 会 reject。
    */
   async resetConfiguration(): Promise<RuntimeSnapshot> {
     return this.snapshotStore.resetConfiguration()
@@ -124,13 +114,13 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    *
    * @param agentId - 要读取会话的 Agent 标识，默认为默认 Agent。
    * @returns 会话摘要列表。
-   * @throws 当 AgentSessionDriver 读取失败时，Promise 会 reject。
+   * @throws 当 Session 模块读取失败时，Promise 会 reject。
    */
   async listSessions(
     agentId: string = YUANXIAO_DEFAULT_AGENT_ID,
     includeArchived = false,
   ): Promise<AgentSessionSummary[]> {
-    const driverSessions = await this.sessionDriver.listSessions({
+    const driverSessions = await this.sessions.listSessions({
       agentId,
       ...(includeArchived ? { includeArchived: true } : {}),
     })
@@ -161,7 +151,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
               lineageCache.set(ancestorId, false)
             } else {
               try {
-                await this.sessionDriver.getTranscript({
+                await this.sessions.getTranscript({
                   agentId: ancestor.agentId,
                   sessionId: ancestor.sessionId,
                 })
@@ -263,7 +253,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
       visitedSessionIds.add(candidate.sessionId)
 
       try {
-        await this.sessionDriver.getTranscript({
+        await this.sessions.getTranscript({
           agentId: candidate.agentId,
           sessionId: candidate.sessionId,
         })
@@ -311,257 +301,18 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
   }
 
   /**
-   * 列出所有已配置的 Agent 摘要。
-   *
-   * @returns Agent 摘要列表。
-   * @throws 当 RuntimeResourceDriver 读取配置失败时，Promise 会 reject。
-   */
-  async listAgents(): Promise<AgentSummary[]> {
-    return this.agentManager.list()
-  }
-
-  /**
-   * 创建一个新 Agent。
-   *
-   * @param displayName - 新 Agent 的展示名称。
-   * @returns 新创建的 Agent 摘要。
-   * @throws 当 AgentSessionDriver 不支持创建或创建失败时，Promise 会 reject。
-   */
-  async createAgent(displayName: string): Promise<AgentSummary> {
-    return this.agentManager.create(displayName)
-  }
-
-  /**
-   * 更新指定 Agent 的默认 Provider 和 Model 配置。
-   *
-   * @param request - Agent 标识和要更新的配置字段。
-   * @returns 更新后的 AgentSummary。
-   * @throws 当 AgentSessionDriver 不支持或更新失败时，Promise 会 reject。
-   */
-  async updateAgentConfig(
-    request: UpdateAgentConfigRequest,
-  ): Promise<AgentSummary> {
-    return this.agentManager.updateConfig(request)
-  }
-
-  /**
-   * 归档指定的自定义 Agent（默认元宵不可归档）。
-   *
-   * @param agentId - Agent 标识。
-   * @returns 归档后的 AgentSummary。
-   * @throws 当 AgentSessionDriver 不支持或归档失败时，Promise 会 reject。
-   */
-  async archiveAgent(agentId: string): Promise<AgentSummary> {
-    return this.agentManager.archive(agentId)
-  }
-
-  /**
-   * 恢复已归档的 Agent 到活跃状态。
-   *
-   * @param agentId - Agent 标识。
-   * @returns 恢复后的 AgentSummary。
-   * @throws 当 AgentSessionDriver 不支持或恢复失败时，Promise 会 reject。
-   */
-  async recoverAgent(agentId: string): Promise<AgentSummary> {
-    return this.agentManager.recover(agentId)
-  }
-
-  /**
-   * 执行目录对账：对照配置检查 Agent 目录存在性，扫描发现未归属目录。
-   *
-   * @returns 对账报告。
-   * @throws 当 AgentSessionDriver 不支持或对账失败时，Promise 会 reject。
-   */
-  async reconcileAgentDirectories(): Promise<{
-    agents: AgentSummary[]
-    unclaimedDirectories: import('@yuanxiao/contracts').UnclaimedDirectory[]
-  }> {
-    return this.agentManager.reconcileDirectories()
-  }
-
-  /**
-   * 认领未归属的 Agent 目录。
-   *
-   * @param agentId - 目录名称（作为 agentId）。
-   * @param displayName - Agent 展示名称。
-   * @returns 认领后的 AgentSummary。
-   * @throws 当 AgentSessionDriver 不支持或认领失败时，Promise 会 reject。
-   */
-  async claimAgentDirectory(
-    agentId: string,
-    displayName: string,
-  ): Promise<AgentSummary> {
-    return this.agentManager.claimDirectory(agentId, displayName)
-  }
-
-  /**
-   * 按固定模板重建默认元宵的目录结构。
-   *
-   * @returns 重建后的 AgentSummary。
-   * @throws 当 AgentSessionDriver 不支持或重建失败时，Promise 会 reject。
-   */
-  async rebuildYuanxiaoHome(): Promise<AgentSummary> {
-    return this.agentManager.rebuildYuanxiaoHome()
-  }
-
-  /**
-   * 读取当前 Session 的模型和 Thinking Level 信息。
-   *
-   * @param request - Agent 和 Session 标识。
-   * @returns Session 模型信息。
-   * @throws 当 AgentSessionDriver 不支持或读取失败时，Promise 会 reject。
-   */
-  async getSessionModelInfo(
-    request: GetSessionModelInfoRequest,
-  ): Promise<SessionModelInfo> {
-    return this.sessionModelService.getInfo(request)
-  }
-
-  /**
-   * 切换当前 Session 的 Provider 和 Model。
-   *
-   * @param request - Agent、Session 标识和目标 Provider/Model。
-   * @returns 切换后的模型信息。
-   * @throws 当 AgentSessionDriver 不支持或切换失败时，Promise 会 reject。
-   */
-  async setSessionModel(
-    request: SetSessionModelRequest,
-  ): Promise<SessionModelInfo> {
-    return this.sessionModelService.setModel(request)
-  }
-
-  /**
-   * 切换当前 Session 的 Thinking Level。
-   *
-   * @param request - Agent、Session 标识和目标 Thinking Level。
-   * @returns 切换后的模型信息。
-   * @throws 当 AgentSessionDriver 不支持或切换失败时，Promise 会 reject。
-   */
-  async setSessionThinkingLevel(
-    request: SetSessionThinkingLevelRequest,
-  ): Promise<SessionModelInfo> {
-    return this.sessionModelService.setThinkingLevel(request)
-  }
-
-  /**
-   * 列出指定 Agent 实际生效的 Skill 列表（含冲突诊断）。
-   *
-   * @param agentId - Agent 标识。
-   * @returns Skill 摘要列表。
-   * @throws 当 AgentSessionDriver 不支持或读取失败时，Promise 会 reject。
-   */
-  async listAgentSkills(agentId: string): Promise<SkillSummary[]> {
-    return this.skillService.listAgentSkills(agentId)
-  }
-
-  /**
-   * 列出共享 Skill 列表。
-   *
-   * @returns 共享 Skill 摘要列表。
-   * @throws 当 AgentSessionDriver 不支持或读取失败时，Promise 会 reject。
-   */
-  async listSharedSkills(): Promise<SkillSummary[]> {
-    return this.skillService.listSharedSkills()
-  }
-
-  /**
-   * 重新加载指定 Agent 所有活跃 session 的 ResourceLoader。
-   *
-   * 用于 Agent 专属 Skill 变更后刷新该 Agent 的会话。
-   *
-   * @param agentId - Agent 标识。
-   * @returns 无返回值。
-   * @throws 当 AgentSessionDriver 不支持或 reload 失败时，Promise 会 reject。
-   */
-  async reloadAgentSessions(agentId: string): Promise<void> {
-    if (!this.sessionDriver.reloadAgentSessions) {
-      throw new Error('当前运行时不支持重新加载 Agent session。')
-    }
-
-    return this.sessionDriver.reloadAgentSessions(agentId)
-  }
-
-  /**
-   * 重新加载全部活跃 session 的 ResourceLoader。
-   *
-   * 用于共享 Skill 变更后刷新所有 Agent 的会话。
-   *
-   * @returns 无返回值。
-   * @throws 当 AgentSessionDriver 不支持或 reload 失败时，Promise 会 reject。
-   */
-  async reloadAllSessions(): Promise<void> {
-    if (!this.sessionDriver.reloadAllSessions) {
-      throw new Error('当前运行时不支持重新加载全部 session。')
-    }
-
-    return this.sessionDriver.reloadAllSessions()
-  }
-
-  /**
-   * 读取指定 Agent 的 soul 内容。
-   *
-   * @param agentId - Agent 标识。
-   * @returns Agent 的 soul 内容和更新时间。
-   * @throws 当 AgentSessionDriver 不支持或读取失败时，Promise 会 reject。
-   */
-  async getSoul(agentId: string): Promise<SoulContent> {
-    return this.identityService.getSoul(agentId)
-  }
-
-  /**
-   * 读取共享 user profile 内容。
-   *
-   * @returns 共享 user profile 内容和更新时间。
-   * @throws 当 AgentSessionDriver 不支持或读取失败时，Promise 会 reject。
-   */
-  async getUserProfile(): Promise<UserProfileContent> {
-    return this.identityService.getUserProfile()
-  }
-
-  /**
-   * 更新指定 Agent 的 soul 内容。
-   *
-   * @param agentId - 目标 Agent 标识。
-   * @param content - 新 soul 内容。
-   * @returns profile 维护结果。
-   * @throws 当 AgentSessionDriver 不支持或操作失败时，Promise 会 reject。
-   */
-  async updateSoul(
-    agentId: string,
-    content: string,
-    expectedVersion: string,
-  ): Promise<ProfileUpdateResult> {
-    return this.identityService.updateSoul(agentId, content, expectedVersion)
-  }
-
-  /**
-   * 更新共享 user profile 内容。
-   *
-   * @param content - 新 user profile 内容。
-   * @param expectedVersion - 调用方最后观察到的内容版本。
-   * @returns profile 维护结果。
-   * @throws 当 AgentSessionDriver 不支持或操作失败时，Promise 会 reject。
-   */
-  async updateUserProfile(
-    content: string,
-    expectedVersion: string,
-  ): Promise<ProfileUpdateResult> {
-    return this.identityService.updateUserProfile(content, expectedVersion)
-  }
-
-  /**
    * 创建会话并把结果合并到 Runtime 缓存。
    *
    * @param request - 新会话所属 Agent 和标题。
    * @returns 创建后的会话摘要。
-   * @throws 当 AgentSessionDriver 创建失败时，Promise 会 reject。
+   * @throws 当 Session 模块创建失败时，Promise 会 reject。
    */
   async createSession(
     request: CreateSessionRequest,
   ): Promise<AgentSessionSummary> {
     await this.assertRuntimeReady()
 
-    const session = await this.sessionDriver.createSession(request)
+    const session = await this.sessions.createSession(request)
     this.sessionCache.upsert(session)
     return session
   }
@@ -570,11 +321,11 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    * 读取指定会话的结构化 transcript 快照。
    *
    * 优先使用 TranscriptEmitter 缓存的快照（含 turns/steps）；
-   * 缓存未命中时通过 Driver 加载。
+   * 缓存未命中时通过 Session 模块加载。
    *
    * @param request - 会话所属 Agent 和会话标识。
    * @returns 结构化会话快照。
-   * @throws 当 AgentSessionDriver 读取失败时，Promise 会 reject。
+   * @throws 当 Session 模块读取失败时，Promise 会 reject。
    */
   async getTranscript(
     request: GetSessionMessagesRequest,
@@ -596,18 +347,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
       return cached
     }
 
-    // 回退：通过 Driver 加载结构化 transcript
-    if (this.sessionDriver.getTranscript) {
-      return this.sessionDriver.getTranscript(request)
-    }
-
-    // 最终回退：返回空快照
-    return {
-      sessionId: request.sessionId,
-      agentId: request.agentId,
-      entries: [],
-      updatedAt: new Date().toISOString(),
-    }
+    return this.sessions.getTranscript(request)
   }
 
   /**
@@ -615,7 +355,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    *
    * @param request - 会话所属 Agent、会话标识和用户消息内容。
    * @returns 发送完成后的当前会话消息列表。
-   * @throws 当运行时缺少配置、会话不存在或 AgentSessionDriver 发送失败时，Promise 会 reject。
+   * @throws 当运行时缺少配置、会话不存在或 Session 模块发送失败时，Promise 会 reject。
    */
   async sendMessage(request: SendMessageRequest): Promise<TranscriptSnapshot> {
     this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
@@ -651,7 +391,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
 
     this.beginRunStart(request.sessionId)
     try {
-      await this.sessionDriver.sendMessage(request)
+      await this.sessions.sendMessage(request)
     } finally {
       this.completeRunStart(request.sessionId)
     }
@@ -667,13 +407,9 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    *
    * @param request - 会话定位信息和要重试的原始用户消息标识。
    * @returns 重试完成后的结构化会话快照。
-   * @throws 当 Driver 不支持重试或执行失败时，Promise 会 reject。
+   * @throws 当 Session 模块重试执行失败时，Promise 会 reject。
    */
   async retryMessage(request: RetryRunRequest): Promise<TranscriptSnapshot> {
-    if (!this.sessionDriver.retryMessage) {
-      throw new Error('当前运行时不支持重试消息。')
-    }
-
     this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
 
     const retrySession = this.sessionCache.find(request.sessionId)
@@ -681,7 +417,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
 
     this.beginRunStart(request.sessionId)
     try {
-      await this.sessionDriver.retryMessage(request)
+      await this.sessions.retryMessage(request)
     } finally {
       this.completeRunStart(request.sessionId)
     }
@@ -697,17 +433,13 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    *
    * @param request - Agent 标识、会话标识和分叉起始节点。
    * @returns 新分支的会话摘要。
-   * @throws 当 Driver 不支持或分叉失败时，Promise 会 reject。
+   * @throws 当 Session 模块分叉失败时，Promise 会 reject。
    */
   async forkSession(request: ForkSessionRequest): Promise<AgentSessionSummary> {
-    if (!this.sessionDriver.forkSession) {
-      throw new Error('当前运行时不支持分叉会话。')
-    }
-
     this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
     const forkSourceSession = this.sessionCache.find(request.sessionId)
     if (forkSourceSession) this.assertLineageAvailable(forkSourceSession)
-    const pendingFork = this.sessionDriver.forkSession(request)
+    const pendingFork = this.sessions.forkSession(request)
     return this.sessionArchiveCoordinator.trackFork(
       request.sessionId,
       pendingFork,
@@ -786,11 +518,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
         })
       }
 
-      if (!this.sessionDriver.setSessionsArchived) {
-        throw new Error('当前运行时不支持归档会话。')
-      }
-
-      await this.sessionDriver.setSessionsArchived(
+      await this.sessions.setSessionsArchived(
         affectedSessionIds,
         new Date().toISOString(),
       )
@@ -818,11 +546,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
       request.sessionId,
     )
 
-    if (!this.sessionDriver.setSessionsArchived) {
-      throw new Error('当前运行时不支持恢复会话。')
-    }
-
-    const recovered = await this.sessionDriver.setSessionsArchived(
+    const recovered = await this.sessions.setSessionsArchived(
       subtree.map((session) => session.sessionId),
       null,
     )
@@ -897,11 +621,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
         })
       }
 
-      if (!this.sessionDriver.deleteSessions) {
-        throw new Error('当前运行时不支持永久删除会话。')
-      }
-
-      await this.sessionDriver.deleteSessions(affectedSessionIds)
+      await this.sessions.deleteSessions(affectedSessionIds)
 
       const lastActive = await this.lastActiveSessionStore.read()
       if (lastActive && affectedSessionIds.includes(lastActive.sessionId)) {
@@ -973,7 +693,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    *
    * @param request - 会话所属 Agent 和会话标识。
    * @returns 取消后的会话摘要。
-   * @throws 当会话不存在或 AgentSessionDriver 取消失败时，Promise 会 reject。
+   * @throws 当会话不存在或 Session 模块取消失败时，Promise 会 reject。
    */
   async cancelRun(request: CancelRunRequest): Promise<AgentSessionSummary> {
     // 自动拒绝该 session 的所有待审批请求
@@ -1012,7 +732,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
       )
     }
 
-    await this.sessionDriver.cancelRun(request)
+    await this.sessions.cancelRun(request)
     this.activeRunIds.delete(request.sessionId)
     await this.listSessions(request.agentId)
     const session = this.sessionCache.find(request.sessionId)
@@ -1026,9 +746,9 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
 }
 
 /**
- * 使用可控 Driver 创建测试用 YuanxiaoRuntime。
+ * 使用可控职责模块创建测试用 YuanxiaoRuntime。
  *
- * @param dependencies - 测试提供的运行时资源与会话 Driver。
+ * @param dependencies - 测试提供的 Runtime 职责模块。
  * @returns 通过公开 YuanxiaoRuntime 方法观察行为的测试实例。
  * @throws 此方法不会主动抛出错误。
  */

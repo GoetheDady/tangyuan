@@ -1,10 +1,4 @@
-import type {
-  AgentSessionSummary,
-  AgentSummary,
-  DesktopPreloadApi,
-  RuntimeSnapshot,
-  TranscriptSnapshot,
-} from '@yuanxiao/contracts'
+import type { RuntimeSnapshot } from '@yuanxiao/contracts'
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import {
   HashRouter,
@@ -21,6 +15,10 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { WindowShell } from '@/components/WindowShell'
 import { createAgentEventBridge } from '@/lib/agent-event-bridge'
+import {
+  loadDesktopWorkbenchOnce,
+  loadSessionsForReadyRuntime,
+} from '@/lib/desktop-workbench-loader'
 import { ChatGuard, LoadingScreen } from '@/pages/ChatPage'
 import { ConsoleProviderPage } from '@/pages/ConsoleProviderPage'
 import { ConsoleAgentListPage } from '@/pages/ConsoleAgentListPage'
@@ -110,7 +108,7 @@ function DesktopRoutes(): React.JSX.Element {
   useEffect(() => {
     let isMounted = true
 
-    void loadDesktopWorkbench(window.api)
+    void loadDesktopWorkbenchOnce(window.api)
       .then((snapshot) => {
         if (!isMounted) return
 
@@ -123,6 +121,9 @@ function DesktopRoutes(): React.JSX.Element {
         store.replaceAgentSessions(activeAgentId, snapshot.sessions)
         if (snapshot.transcript) {
           store.openTranscript(snapshot.transcript)
+        }
+        if (snapshot.sessionLoadError) {
+          toast.error(`无法恢复会话：${snapshot.sessionLoadError}`)
         }
 
         // 启动重定向由 StartupRedirect 组件在根路由 '/' 上处理。
@@ -171,16 +172,25 @@ function DesktopRoutes(): React.JSX.Element {
 
   const handleConfigurationSaved = useCallback(
     async (nextRuntime: RuntimeSnapshot): Promise<void> => {
-      const { sessions, activeSession, transcript } =
-        await loadSessionsForReadyRuntime(window.api, nextRuntime)
       const store = workbenchStore.getState()
       store.loadRuntimeSnapshot(nextRuntime)
-      store.setActiveSession(activeSession)
-      const activeAgentId =
-        activeSession?.agentId ?? nextRuntime.activeAgent.agentId
-      store.replaceAgentSessions(activeAgentId, sessions)
-      if (transcript) {
-        store.openTranscript(transcript)
+
+      try {
+        const { sessions, activeSession, transcript } =
+          await loadSessionsForReadyRuntime(window.api, nextRuntime)
+        store.setActiveSession(activeSession)
+        const activeAgentId =
+          activeSession?.agentId ?? nextRuntime.activeAgent.agentId
+        store.replaceAgentSessions(activeAgentId, sessions)
+        if (transcript) {
+          store.openTranscript(transcript)
+        }
+      } catch (error) {
+        toast.error(
+          `配置已保存，但无法打开会话：${
+            error instanceof Error ? error.message : '未知错误'
+          }`,
+        )
       }
     },
     [workbenchStore],
@@ -256,105 +266,6 @@ function StartupRedirect(props: {
   }
 
   return <Navigate to="/setup" replace />
-}
-
-/**
- * 在运行时就绪后加载会话数据：优先恢复上次激活的会话，无则新建。
- *
- * @param api - Preload 暴露给 Renderer 的桌面 API。
- * @param runtime - 状态为 ready 的运行时快照。
- * @returns 会话列表、激活会话和 transcript 快照。
- * @throws 当任一 Preload API 请求失败时，Promise 会 reject。
- */
-async function loadSessionsForReadyRuntime(
-  api: DesktopPreloadApi,
-  runtime: RuntimeSnapshot,
-): Promise<{
-  sessions: AgentSessionSummary[]
-  activeSession: AgentSessionSummary
-  transcript: TranscriptSnapshot | null
-}> {
-  const lastActiveSession = await api.getLastActiveSession()
-  const activeAgentId =
-    lastActiveSession?.agentId ?? runtime.activeAgent.agentId
-  let nextSessions = await api.listSessions({ agentId: activeAgentId })
-  let activeSession: AgentSessionSummary | null = null
-  let transcript: TranscriptSnapshot | null = null
-
-  if (lastActiveSession) {
-    activeSession =
-      nextSessions.find(
-        (session) => session.sessionId === lastActiveSession.sessionId,
-      ) ??
-      nextSessions[0] ??
-      null
-    transcript = activeSession
-      ? await api.getTranscript({
-          agentId: activeSession.agentId,
-          sessionId: activeSession.sessionId,
-        })
-      : null
-  }
-
-  if (!activeSession) {
-    activeSession = await api.createSession({
-      agentId: activeAgentId,
-      title: runtime.activeAgent.profile.bootstrapRequired
-        ? 'Bootstrap 初始化'
-        : '新会话',
-    })
-    nextSessions = [
-      activeSession,
-      ...nextSessions.filter(
-        (session) => session.sessionId !== activeSession!.sessionId,
-      ),
-    ]
-    transcript = await api.getTranscript({
-      agentId: activeSession.agentId,
-      sessionId: activeSession.sessionId,
-    })
-  }
-
-  if (!lastActiveSession) {
-    await api.setLastActiveSession({
-      agentId: activeSession.agentId,
-      sessionId: activeSession.sessionId,
-    })
-  }
-
-  return { sessions: nextSessions, activeSession, transcript }
-}
-
-/**
- * 并行读取 Renderer 首屏需要的运行时和会话数据。
- *
- * @param api - Preload 暴露给 Renderer 的桌面 API。
- * @returns 运行时快照和会话摘要列表。
- * @throws 当任一 Preload API 请求失败时，Promise 会 reject。
- */
-async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
-  runtime: RuntimeSnapshot
-  agents: AgentSummary[]
-  sessions: AgentSessionSummary[]
-  activeSession: AgentSessionSummary | null
-  transcript: TranscriptSnapshot | null
-}> {
-  const runtime = await api.getRuntimeSnapshot()
-  const agents = runtime.agents
-
-  if (runtime.status !== 'ready') {
-    return {
-      runtime,
-      agents,
-      sessions: [],
-      activeSession: null,
-      transcript: null,
-    }
-  }
-
-  const { sessions, activeSession, transcript } =
-    await loadSessionsForReadyRuntime(api, runtime)
-  return { runtime, agents, sessions, activeSession, transcript }
 }
 
 export default App

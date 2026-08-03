@@ -50,7 +50,7 @@ export { PiSdkDriver } from './driver'
 /**
  * 创建 Electron Main 使用的默认 YuanxiaoRuntime。
  *
- * @returns 内部使用同一个 Pi SDK Driver 管理资源与会话的运行时实例。
+ * @returns 由配置、Session、Agent、Profile、Skill 职责模块组合的运行时实例。
  * @throws 此方法不会主动抛出错误；具体初始化错误会由运行时异步方法返回。
  */
 export function createYuanxiaoRuntime(
@@ -92,8 +92,11 @@ export function createYuanxiaoRuntime(
   const lastActiveSessionStore = new LastActiveSessionStore({ layout, now })
 
   const runtime = createYuanxiaoRuntimeForTesting({
-    runtimeDriver: driver,
-    sessionDriver: driver,
+    configuration: driver.getConfigurationModule(),
+    sessions: driver,
+    agents: driver.getAgentLifecycleModule(),
+    profiles: driver.getProfileModule(),
+    skills: driver.getSkillModule(),
     lastActiveSessionStore,
   })
 

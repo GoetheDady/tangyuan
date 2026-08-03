@@ -18,8 +18,11 @@ describe('YuanxiaoRuntime', () => {
     const runtimeDriver = createRuntimeDriver(snapshot)
     const sessionDriver = createSessionDriver([])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(runtime.getRuntimeSnapshot()).resolves.toEqual(snapshot)
@@ -36,8 +39,11 @@ describe('YuanxiaoRuntime', () => {
     )
     const sessionDriver = createSessionDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(
@@ -80,8 +86,11 @@ describe('YuanxiaoRuntime', () => {
       updatedAt: '2026-07-08T00:00:00.000Z',
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(
@@ -177,8 +186,11 @@ describe('YuanxiaoRuntime', () => {
       })
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(
@@ -258,8 +270,11 @@ describe('YuanxiaoRuntime', () => {
       throw new Error('模型服务暂时不可用')
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(
@@ -287,8 +302,11 @@ describe('YuanxiaoRuntime', () => {
     )
     const sessionDriver = createSessionDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
     sessionDriver.emit({
       type: 'message-appended',
@@ -387,8 +405,11 @@ describe('YuanxiaoRuntime', () => {
       })
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
     await runtime.listSessions()
     const firstRun = runtime.sendMessage({
@@ -424,8 +445,11 @@ describe('YuanxiaoRuntime', () => {
     const runtimeDriver = createRuntimeDriver(createSnapshot())
     const sessionDriver = createSessionDriver([])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(
@@ -446,8 +470,11 @@ describe('YuanxiaoRuntime', () => {
     const runtimeDriver = createRuntimeDriver(savedSnapshot)
     const sessionDriver = createSessionDriver([])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
     const configuration: RuntimeConfiguration = {
       providerId: 'anthropic',
@@ -468,8 +495,11 @@ describe('YuanxiaoRuntime', () => {
       .mockRejectedValue(new Error('验证失败'))
     const sessionDriver = createSessionDriver([])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(
@@ -485,8 +515,11 @@ describe('YuanxiaoRuntime', () => {
     const runtimeDriver = createRuntimeDriver(snapshot)
     const sessionDriver = createSessionDriver([])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(
@@ -508,8 +541,11 @@ describe('YuanxiaoRuntime', () => {
     const runtimeDriver = createRuntimeDriver(restoredSnapshot)
     const sessionDriver = createSessionDriver([])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(runtime.restoreFromBackup()).resolves.toEqual(restoredSnapshot)
@@ -520,41 +556,16 @@ describe('YuanxiaoRuntime', () => {
     const runtimeDriver = createRuntimeDriver(resetSnapshot)
     const sessionDriver = createSessionDriver([])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(runtime.resetConfiguration()).resolves.toEqual(resetSnapshot)
     expect(runtimeDriver.resetConfiguration).toHaveBeenCalledOnce()
     expect(runtimeDriver.getSnapshot).toHaveBeenCalled()
-  })
-  it('rejects restoreFromBackup when the runtime driver does not support it', async () => {
-    const snapshot = createSnapshot()
-    const runtimeDriver = createRuntimeDriver(snapshot)
-    delete runtimeDriver.restoreFromBackup
-    const sessionDriver = createSessionDriver([])
-    const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
-    })
-
-    await expect(runtime.restoreFromBackup()).rejects.toThrow(
-      '当前运行时不支持配置恢复',
-    )
-  })
-  it('rejects resetConfiguration when the runtime driver does not support it', async () => {
-    const snapshot = createSnapshot()
-    const runtimeDriver = createRuntimeDriver(snapshot)
-    delete runtimeDriver.resetConfiguration
-    const sessionDriver = createSessionDriver([])
-    const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
-    })
-
-    await expect(runtime.resetConfiguration()).rejects.toThrow(
-      '当前运行时不支持配置重置',
-    )
   })
   it('reads soul content through the session driver', async () => {
     const snapshot = createSnapshot()
@@ -566,8 +577,11 @@ describe('YuanxiaoRuntime', () => {
       updatedAt: '2026-07-17T00:00:00.000Z',
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(runtime.getSoul('agent-1')).resolves.toEqual({
@@ -586,8 +600,11 @@ describe('YuanxiaoRuntime', () => {
       updatedAt: '2026-07-17T00:00:00.000Z',
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(runtime.getUserProfile()).resolves.toEqual({
@@ -606,8 +623,11 @@ describe('YuanxiaoRuntime', () => {
       version: 'sha256:new',
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(
@@ -636,8 +656,11 @@ describe('YuanxiaoRuntime', () => {
       version: 'sha256:new',
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(

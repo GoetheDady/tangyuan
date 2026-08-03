@@ -18,8 +18,11 @@ describe('bash 审批事件', () => {
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     const received: AgentEvent[] = []
@@ -70,8 +73,11 @@ describe('bash 审批事件', () => {
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     // 启动 run
@@ -115,8 +121,11 @@ describe('bash 审批事件', () => {
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver,
-      sessionDriver,
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     // 复刻 ipc.ts：每条公开事件都经 agentEventSchema 校验后广播。

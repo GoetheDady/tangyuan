@@ -47,8 +47,11 @@ describe('YuanxiaoRuntime', () => {
         })
       })
       const runtime = createYuanxiaoRuntimeForTesting({
-        runtimeDriver,
-        sessionDriver,
+        configuration: runtimeDriver,
+        sessions: sessionDriver,
+        agents: sessionDriver,
+        profiles: sessionDriver,
+        skills: sessionDriver,
       })
       await runtime.listSessions()
 
@@ -117,8 +120,11 @@ describe('YuanxiaoRuntime', () => {
         })
       })
       const runtime = createYuanxiaoRuntimeForTesting({
-        runtimeDriver,
-        sessionDriver,
+        configuration: runtimeDriver,
+        sessions: sessionDriver,
+        agents: sessionDriver,
+        profiles: sessionDriver,
+        skills: sessionDriver,
       })
       await runtime.listSessions()
 
@@ -208,8 +214,11 @@ describe('YuanxiaoRuntime', () => {
         })
       })
       const runtime = createYuanxiaoRuntimeForTesting({
-        runtimeDriver,
-        sessionDriver,
+        configuration: runtimeDriver,
+        sessions: sessionDriver,
+        agents: sessionDriver,
+        profiles: sessionDriver,
+        skills: sessionDriver,
       })
       await runtime.listSessions()
 
@@ -296,8 +305,11 @@ describe('YuanxiaoRuntime', () => {
         })
       })
       const runtime = createYuanxiaoRuntimeForTesting({
-        runtimeDriver,
-        sessionDriver,
+        configuration: runtimeDriver,
+        sessions: sessionDriver,
+        agents: sessionDriver,
+        profiles: sessionDriver,
+        skills: sessionDriver,
       })
       await runtime.listSessions()
 
@@ -396,8 +408,11 @@ describe('YuanxiaoRuntime', () => {
         })
       })
       const runtime = createYuanxiaoRuntimeForTesting({
-        runtimeDriver,
-        sessionDriver,
+        configuration: runtimeDriver,
+        sessions: sessionDriver,
+        agents: sessionDriver,
+        profiles: sessionDriver,
+        skills: sessionDriver,
       })
       await runtime.listSessions()
 
@@ -498,8 +513,11 @@ describe('YuanxiaoRuntime', () => {
         })
       })
       const runtime = createYuanxiaoRuntimeForTesting({
-        runtimeDriver,
-        sessionDriver,
+        configuration: runtimeDriver,
+        sessions: sessionDriver,
+        agents: sessionDriver,
+        profiles: sessionDriver,
+        skills: sessionDriver,
       })
       await runtime.listSessions()
 
@@ -591,8 +609,11 @@ describe('YuanxiaoRuntime', () => {
         })
       })
       const runtime = createYuanxiaoRuntimeForTesting({
-        runtimeDriver,
-        sessionDriver,
+        configuration: runtimeDriver,
+        sessions: sessionDriver,
+        agents: sessionDriver,
+        profiles: sessionDriver,
+        skills: sessionDriver,
       })
       await runtime.listSessions()
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentSessionDriver } from '../index'
+import type { ProfileModule } from '../runtime/runtime-modules'
 import type { RuntimeSnapshotStore } from '../runtime/runtime-snapshot-store'
 import { IdentityService } from './identity-service'
 
@@ -11,10 +11,10 @@ function createStore() {
   }
 }
 
-function createService(driver: Partial<AgentSessionDriver>) {
+function createService(driver: Partial<ProfileModule>) {
   const snapshotStore = createStore()
   const service = new IdentityService({
-    sessionDriver: driver as AgentSessionDriver,
+    profiles: driver as ProfileModule,
     snapshotStore,
   })
   return { service, snapshotStore }
@@ -28,11 +28,6 @@ describe('IdentityService', () => {
     })
     expect(await service.getSoul('a1')).toEqual({ content: 's' })
     expect(await service.getUserProfile()).toEqual({ content: 'u' })
-  })
-
-  it('getSoul 缺少能力时抛错', async () => {
-    const { service } = createService({})
-    await expect(service.getSoul('a1')).rejects.toThrow('不支持读取 Agent soul')
   })
 
   it('updateSoul 透传观察版本并在实际更新后刷新快照', async () => {

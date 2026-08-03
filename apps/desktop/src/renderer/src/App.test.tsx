@@ -120,6 +120,7 @@ describe('App', () => {
         updatedAt: '2026-07-28T09:00:00.000Z',
       }),
       forkedFrom: { sessionId: 'missing-parent', entryId: 'message-1' },
+      lineageUnavailable: true,
     }
     const newSession = createDefaultSessionSummary({
       sessionId: 'new-session',
@@ -346,6 +347,27 @@ describe('App', () => {
     await waitFor(() => {
       expect(window.location.hash).toBe('#/chat/yuanxiao')
     })
+  })
+  it('配置保存成功后会话初始化失败不误报为模型服务连接失败', async () => {
+    const user = userEvent.setup()
+    window.api.listSessions = vi
+      .fn()
+      .mockRejectedValue(new Error('会话索引不可读'))
+    render(<App />)
+
+    const modelTrigger = await screen.findByTestId('setup-model-select')
+    const apiKeyInput = await screen.findByTestId('setup-api-key-input')
+
+    await user.click(modelTrigger)
+    await user.click(screen.getByRole('option', { name: 'Claude Sonnet 4.5' }))
+    await user.type(apiKeyInput, 'sk-test-secret-7890')
+    await user.click(screen.getByRole('button', { name: '验证并继续' }))
+
+    await waitFor(() => {
+      expect(window.location.hash).toBe('#/chat/yuanxiao')
+    })
+    expect(screen.queryByText('无法连接模型服务')).not.toBeInTheDocument()
+    expect(await screen.findByText(/配置已保存，但无法打开会话/)).toBeVisible()
   })
   it('allows users to cancel configuration verification', async () => {
     const user = userEvent.setup()

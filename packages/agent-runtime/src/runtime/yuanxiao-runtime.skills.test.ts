@@ -12,8 +12,11 @@ describe('YuanxiaoRuntime', () => {
       const runtimeDriver = createRuntimeDriver(createSnapshot())
       const sessionDriver = createSessionDriver([])
       const runtime = createYuanxiaoRuntimeForTesting({
-        runtimeDriver,
-        sessionDriver,
+        configuration: runtimeDriver,
+        sessions: sessionDriver,
+        agents: sessionDriver,
+        profiles: sessionDriver,
+        skills: sessionDriver,
       })
 
       await expect(
@@ -30,8 +33,11 @@ describe('YuanxiaoRuntime', () => {
       const runtimeDriver = createRuntimeDriver(createSnapshot())
       const sessionDriver = createSessionDriver([])
       const runtime = createYuanxiaoRuntimeForTesting({
-        runtimeDriver,
-        sessionDriver,
+        configuration: runtimeDriver,
+        sessions: sessionDriver,
+        agents: sessionDriver,
+        profiles: sessionDriver,
+        skills: sessionDriver,
       })
 
       await expect(
@@ -48,8 +54,11 @@ describe('YuanxiaoRuntime', () => {
       const runtimeDriver = createRuntimeDriver(createSnapshot())
       const sessionDriver = createSessionDriver([])
       const runtime = createYuanxiaoRuntimeForTesting({
-        runtimeDriver,
-        sessionDriver,
+        configuration: runtimeDriver,
+        sessions: sessionDriver,
+        agents: sessionDriver,
+        profiles: sessionDriver,
+        skills: sessionDriver,
       })
 
       await expect(
@@ -64,49 +73,15 @@ describe('YuanxiaoRuntime', () => {
       ).rejects.toThrow('无权管理')
     })
 
-    it('rejects install when session driver does not support it', async () => {
-      const runtimeDriver = createRuntimeDriver(createSnapshot())
-      const sessionDriver = createSessionDriver([])
-      const runtime = createYuanxiaoRuntimeForTesting({
-        runtimeDriver,
-        sessionDriver,
-      })
-
-      await expect(
-        runtime.installSkill({
-          operation: 'install',
-          source: 'shared',
-          agentId: 'yuanxiao',
-          skillName: 'test-skill',
-        }),
-      ).rejects.toThrow('当前运行时不支持安装 Skill')
-    })
-
-    it('rejects delete when session driver does not support it', async () => {
-      const runtimeDriver = createRuntimeDriver(createSnapshot())
-      const sessionDriver = createSessionDriver([])
-      const runtime = createYuanxiaoRuntimeForTesting({
-        runtimeDriver,
-        sessionDriver,
-      })
-
-      await expect(
-        runtime.deleteSkill({
-          operation: 'delete',
-          source: 'agent',
-          agentId: 'agent-1',
-          targetAgentId: 'agent-1',
-          skillName: 'test-skill',
-        }),
-      ).rejects.toThrow('当前运行时不支持删除 Skill')
-    })
-
     it('returns empty pending skill approvals initially', () => {
       const runtimeDriver = createRuntimeDriver(createSnapshot())
       const sessionDriver = createSessionDriver([])
       const runtime = createYuanxiaoRuntimeForTesting({
-        runtimeDriver,
-        sessionDriver,
+        configuration: runtimeDriver,
+        sessions: sessionDriver,
+        agents: sessionDriver,
+        profiles: sessionDriver,
+        skills: sessionDriver,
       })
 
       expect(runtime.getPendingSkillApprovals()).toEqual([])

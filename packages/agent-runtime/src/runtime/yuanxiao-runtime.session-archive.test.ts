@@ -79,8 +79,11 @@ describe('YuanxiaoRuntime 会话谱系归档与恢复', () => {
       sibling,
     ])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(createSnapshot()),
-      sessionDriver,
+      configuration: createRuntimeDriver(createSnapshot()),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(
@@ -156,8 +159,11 @@ describe('YuanxiaoRuntime 会话谱系归档与恢复', () => {
       }
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(createSnapshot()),
-      sessionDriver,
+      configuration: createRuntimeDriver(createSnapshot()),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
     await runtime.listSessions()
     const gateway = runtime.createToolApprovalGateway()
@@ -227,8 +233,11 @@ describe('YuanxiaoRuntime 会话谱系归档与恢复', () => {
     }
     const sessionDriver = createArchiveDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(createSnapshot()),
-      sessionDriver,
+      configuration: createRuntimeDriver(createSnapshot()),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(
@@ -274,14 +283,17 @@ describe('YuanxiaoRuntime 会话谱系归档与恢复', () => {
       allowRunFinish.resolve()
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(
+      configuration: createRuntimeDriver(
         createSnapshot({
           providerId: 'anthropic',
           modelId: 'claude-sonnet-4-5',
           maskedValue: 'sk-t...7890',
         }),
       ),
-      sessionDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     const sendPromise = runtime.sendMessage({
@@ -314,8 +326,11 @@ describe('YuanxiaoRuntime 会话谱系归档与恢复', () => {
     const session = createSession('session')
     const sessionDriver = createArchiveDriver([session])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(createSnapshot()),
-      sessionDriver,
+      configuration: createRuntimeDriver(createSnapshot()),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
     sessionDriver.emit({
       type: 'message-appended',
@@ -366,14 +381,17 @@ describe('YuanxiaoRuntime 会话谱系归档与恢复', () => {
       return child
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(
+      configuration: createRuntimeDriver(
         createSnapshot({
           providerId: 'anthropic',
           modelId: 'claude-sonnet-4-5',
           maskedValue: 'sk-t...7890',
         }),
       ),
-      sessionDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     const forkPromise = runtime.forkSession({
@@ -423,14 +441,17 @@ describe('YuanxiaoRuntime 会话谱系归档与恢复', () => {
       sibling,
     ])
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(
+      configuration: createRuntimeDriver(
         createSnapshot({
           providerId: 'anthropic',
           modelId: 'claude-sonnet-4-5',
           maskedValue: 'sk-t...7890',
         }),
       ),
-      sessionDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
     await runtime.listSessions()
     for (const session of activeSessions) {
@@ -500,8 +521,11 @@ describe('YuanxiaoRuntime 会话谱系永久删除', () => {
       // 模拟删除后会话不再出现在列表中
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(createSnapshot()),
-      sessionDriver,
+      configuration: createRuntimeDriver(createSnapshot()),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(
@@ -534,8 +558,11 @@ describe('YuanxiaoRuntime 会话谱系永久删除', () => {
     const sessionDriver = createArchiveDriver([parent, child])
     sessionDriver.deleteSessions = vi.fn()
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(createSnapshot()),
-      sessionDriver,
+      configuration: createRuntimeDriver(createSnapshot()),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(
@@ -560,8 +587,11 @@ describe('YuanxiaoRuntime 会话谱系永久删除', () => {
     const sessionDriver = createArchiveDriver([session])
     sessionDriver.deleteSessions = vi.fn()
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(createSnapshot()),
-      sessionDriver,
+      configuration: createRuntimeDriver(createSnapshot()),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await expect(
@@ -598,8 +628,11 @@ describe('YuanxiaoRuntime 会话谱系永久删除', () => {
       )
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(createSnapshot()),
-      sessionDriver,
+      configuration: createRuntimeDriver(createSnapshot()),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await runtime.deleteSession({
@@ -644,8 +677,11 @@ describe('YuanxiaoRuntime 祖先谱系完整性检查', () => {
       return originalGetTranscript(request)
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(createSnapshot()),
-      sessionDriver,
+      configuration: createRuntimeDriver(createSnapshot()),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     const sessions = await runtime.listSessions()
@@ -680,14 +716,17 @@ describe('YuanxiaoRuntime 祖先谱系完整性检查', () => {
       }
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(
+      configuration: createRuntimeDriver(
         createSnapshot({
           providerId: 'anthropic',
           modelId: 'claude-sonnet-4-5',
           maskedValue: 'sk-t...7890',
         }),
       ),
-      sessionDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     // 先列出会话以设置 lineageUnavailable
@@ -721,8 +760,11 @@ describe('YuanxiaoRuntime 祖先谱系完整性检查', () => {
       }
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(createSnapshot()),
-      sessionDriver,
+      configuration: createRuntimeDriver(createSnapshot()),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     await runtime.listSessions()
@@ -755,8 +797,11 @@ describe('YuanxiaoRuntime 祖先谱系完整性检查', () => {
       }
     })
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(createSnapshot()),
-      sessionDriver,
+      configuration: createRuntimeDriver(createSnapshot()),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     // 第一次：父链损坏，后代不可用
@@ -778,8 +823,11 @@ describe('YuanxiaoRuntime 祖先谱系完整性检查', () => {
     const sessionDriver = createArchiveDriver([session])
     // getTranscript 不应被调用（根会话无祖先）
     const runtime = createYuanxiaoRuntimeForTesting({
-      runtimeDriver: createRuntimeDriver(createSnapshot()),
-      sessionDriver,
+      configuration: createRuntimeDriver(createSnapshot()),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
     })
 
     const sessions = await runtime.listSessions()

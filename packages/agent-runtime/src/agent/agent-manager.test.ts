@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentSessionDriver } from '../index'
+import type { AgentLifecycleModule } from '../runtime/runtime-modules'
 import type { RuntimeSnapshotStore } from '../runtime/runtime-snapshot-store'
 import { AgentManager } from './agent-manager'
 
@@ -16,10 +16,10 @@ function createSnapshotStore(): RuntimeSnapshotStore & {
   }
 }
 
-function createManager(driver: Partial<AgentSessionDriver>) {
+function createManager(driver: Partial<AgentLifecycleModule>) {
   const snapshotStore = createSnapshotStore()
   const manager = new AgentManager({
-    sessionDriver: driver as AgentSessionDriver,
+    agents: driver as AgentLifecycleModule,
     snapshotStore,
   })
   return { manager, snapshotStore }
@@ -41,12 +41,6 @@ describe('AgentManager', () => {
 
     expect(result).toBe(summary)
     expect(snapshotStore.reload).toHaveBeenCalledTimes(1)
-  })
-
-  it('create 缺少能力时抛错且不刷新', async () => {
-    const { manager, snapshotStore } = createManager({})
-    await expect(manager.create('x')).rejects.toThrow('不支持创建 Agent')
-    expect(snapshotStore.reload).not.toHaveBeenCalled()
   })
 
   it('updateConfig 只透传已定义的字段', async () => {

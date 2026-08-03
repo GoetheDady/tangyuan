@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 const createAgentSession = vi.fn()
+let sessionFileSequence = 0
 const createReadToolDefinition = vi.fn((_cwd: string) => ({
   name: 'read',
   label: 'read',
@@ -26,8 +27,28 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
     inMemory: () => ({ find: vi.fn(() => ({ id: 'model' })) }),
   },
   SessionManager: {
-    create: vi.fn(() => ({ getSessionFile: () => '/tmp/session.json' })),
-    open: vi.fn(() => ({ getSessionFile: () => '/tmp/session.json' })),
+    create: vi.fn(
+      (_cwd: string, sessionDir: string, options?: { id?: string }) => {
+        const sessionId = options?.id ?? 'session'
+        const sessionFile = join(
+          sessionDir,
+          `gateway-test-${process.pid}-${sessionFileSequence++}-${sessionId}.jsonl`,
+        )
+        return {
+          getSessionFile: () => sessionFile,
+          getHeader: () => ({
+            type: 'session',
+            version: 3,
+            id: sessionId,
+            timestamp: '2026-01-01T00:00:00.000Z',
+            cwd: _cwd,
+          }),
+        }
+      },
+    ),
+    open: vi.fn((sessionFile: string) => ({
+      getSessionFile: () => sessionFile,
+    })),
   },
   SettingsManager: {
     inMemory: () => ({}),

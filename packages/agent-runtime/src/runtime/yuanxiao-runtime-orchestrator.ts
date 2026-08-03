@@ -2,16 +2,10 @@ import type {
   AgentEvent,
   AgentEventListener,
   AgentEventSubscription,
-  AgentSessionDriver,
   DriverEvent,
-  ToolApprovalGateway,
 } from '../driver'
 import { TranscriptEmitter } from '../session/transcript-emitter'
-import {
-  BashApprovalRegistry,
-  ClarificationRegistry,
-  createToolApprovalGateway,
-} from '../approval'
+import { BashApprovalRegistry, ClarificationRegistry } from '../approval'
 import { SessionCache } from '../session/session-cache'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
 import { AgentManager, IdentityService } from '../agent'
@@ -21,15 +15,9 @@ import { SessionArchiveCoordinator } from '../session/session-archive-coordinato
 import {
   YUANXIAO_DEFAULT_AGENT_ID,
   type AgentSessionSummary,
-  type BashApprovalRequest,
-  type QuestionClarificationRequest,
   type CancelRunRequest,
   type GetSessionMessagesRequest,
   type SendMessageRequest,
-  type SkillApprovalRequest,
-  type SkillInstallRecord,
-  type SkillOperationParams,
-  type SkillSummary,
   type TranscriptSnapshot,
 } from '@yuanxiao/contracts'
 
@@ -60,10 +48,10 @@ function isInternalDriverEvent(event: AgentEvent | DriverEvent): boolean {
 
 import type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencies'
 import type { LastActiveSessionStore } from '../session/last-active-session-store'
+import type { SessionModule } from './runtime-modules'
 
 export abstract class YuanxiaoRuntimeOrchestrator {
-  protected static readonly MAX_CONCURRENT_RUNS = 4
-  protected readonly sessionDriver: AgentSessionDriver
+  protected readonly sessions: SessionModule
   protected readonly lastActiveSessionStore: Pick<
     LastActiveSessionStore,
     'read' | 'write' | 'clear'
@@ -71,10 +59,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
   protected readonly listeners = new Set<AgentEventListener>()
   protected readonly activeRunIds = new Map<string, string>()
   protected readonly sessionArchiveCoordinator = new SessionArchiveCoordinator()
-  private readonly pendingRunStarts = new Map<
-    string,
-    { promise: Promise<void>; resolve(): void }
-  >()
   protected readonly transcriptEmitter: TranscriptEmitter
   protected readonly snapshotStore: RuntimeSnapshotStore
   protected readonly agentManager: AgentManager
@@ -93,12 +77,12 @@ export abstract class YuanxiaoRuntimeOrchestrator {
   /**
    * 创建默认 YuanxiaoRuntime。
    *
-   * @param dependencies - Runtime 和会话 Driver。
+   * @param dependencies - Runtime 所需的职责模块。
    * @returns YuanxiaoRuntime 实例。
    * @throws 此构造方法不会主动抛出错误。
    */
   constructor(dependencies: YuanxiaoRuntimeDependencies) {
-    this.sessionDriver = dependencies.sessionDriver
+    this.sessions = dependencies.sessions
     this.lastActiveSessionStore = dependencies.lastActiveSessionStore ?? {
       read: async () => null,
       write: async (record) => ({
@@ -109,30 +93,31 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     }
     this.transcriptEmitter = new TranscriptEmitter(this.emit.bind(this))
     this.snapshotStore = new RuntimeSnapshotStore({
-      runtimeDriver: dependencies.runtimeDriver,
+      configuration: dependencies.configuration,
     })
     this.agentManager = new AgentManager({
-      sessionDriver: dependencies.sessionDriver,
+      agents: dependencies.agents,
       snapshotStore: this.snapshotStore,
     })
     this.identityService = new IdentityService({
-      sessionDriver: dependencies.sessionDriver,
+      profiles: dependencies.profiles,
       snapshotStore: this.snapshotStore,
     })
     this.sessionModelService = new SessionModelService({
-      sessionDriver: dependencies.sessionDriver,
+      sessions: dependencies.sessions,
     })
     const emit = this.emit.bind(this)
     const now = () => new Date().toISOString()
     this.bashApprovals = new BashApprovalRegistry({ emit, now })
     this.skillService = new SkillService({
-      sessionDriver: dependencies.sessionDriver,
+      skills: dependencies.skills,
+      sessions: dependencies.sessions,
       defaultAgentId: YUANXIAO_DEFAULT_AGENT_ID,
       emit,
       now,
     })
     this.clarifications = new ClarificationRegistry({ emit, now })
-    this.sessionDriver.subscribe((event) => {
+    this.sessions.subscribe((event) => {
       this.applyAgentEvent(event)
       // 内部驱动事件（message-appended/message-delta/message-completed/
       // activity-updated）已由 applyAgentEvent 翻译为 transcript-delta，
@@ -173,6 +158,10 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     request: GetSessionMessagesRequest,
   ): Promise<TranscriptSnapshot>
 
+  protected abstract dequeueNext(): void
+
+  protected abstract completeRunStart(sessionId: string): void
+
   /**
    * 订阅 Runtime 转发的 Agent 标准事件。
    *
@@ -194,7 +183,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
    * 取消所有仍处于 running 状态的会话。
    *
    * @returns 无返回值。
-   * @throws 当底层 Driver 取消失败时，Promise 会 reject。
+   * @throws 当 Session 模块取消失败时，Promise 会 reject。
    */
   async cancelAllActiveRuns(): Promise<void> {
     // 自动拒绝所有待审批请求
@@ -232,153 +221,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
   }
 
   /**
-   * 批准指定 Bash 审批请求，使命令继续执行。
-   *
-   * @param approvalId - 审批标识。
-   * @returns 无返回值。
-   * @throws 当审批不存在或已过期时抛出错误。
-   */
-  async approveBash(approvalId: string): Promise<void> {
-    this.bashApprovals.approve(approvalId)
-  }
-
-  /**
-   * 拒绝指定 Bash 审批请求，向 Agent 返回拒绝结果。
-   *
-   * @param approvalId - 审批标识。
-   * @returns 无返回值。
-   * @throws 当审批不存在或已过期时抛出错误。
-   */
-  async rejectBash(approvalId: string): Promise<void> {
-    this.bashApprovals.reject(approvalId)
-  }
-
-  /**
-   * 读取所有待审批的 Bash 请求。
-   *
-   * @returns 待审批请求列表。
-   * @throws 此方法不会主动抛出错误。
-   */
-  getPendingApprovals(): BashApprovalRequest[] {
-    return this.bashApprovals.list()
-  }
-
-  /**
-   * 提交澄清问题的答案，使 Agent 从断点继续执行。
-   *
-   * @param clarificationId - 澄清标识。
-   * @param answer - 用户选择的答案（预设选项或自定义输入）。
-   * @returns 无返回值。
-   * @throws 当澄清不存在或已过期时抛出错误。
-   */
-  async answerClarification(
-    clarificationId: string,
-    answer: string,
-  ): Promise<void> {
-    this.clarifications.answer(clarificationId, answer)
-  }
-
-  /**
-   * 取消澄清问题，以取消结果结束工具调用。
-   *
-   * @param clarificationId - 澄清标识。
-   * @returns 无返回值。
-   * @throws 当澄清不存在或已过期时抛出错误。
-   */
-  async cancelClarification(clarificationId: string): Promise<void> {
-    this.clarifications.cancel(clarificationId)
-  }
-
-  /**
-   * 读取所有待回答的澄清请求。
-   *
-   * @returns 待回答澄清请求列表。
-   * @throws 此方法不会主动抛出错误。
-   */
-  getPendingClarifications(): QuestionClarificationRequest[] {
-    return this.clarifications.list()
-  }
-
-  /**
-   * 安装或更新 Skill（含权限校验和审批）。
-   *
-   * @param params - 操作参数。
-   * @returns 更新后的 Skill 摘要列表。
-   * @throws 当权限不足、校验失败或 Driver 不支持时，Promise 会 reject。
-   */
-  async installSkill(params: SkillOperationParams): Promise<SkillSummary[]> {
-    return this.skillService.install(params)
-  }
-
-  /**
-   * 删除 Skill（含权限校验和审批）。
-   *
-   * @param params - 操作参数。
-   * @returns 更新后的 Skill 摘要列表。
-   * @throws 当权限不足或 Driver 不支持时，Promise 会 reject。
-   */
-  async deleteSkill(params: SkillOperationParams): Promise<SkillSummary[]> {
-    return this.skillService.delete(params)
-  }
-
-  /**
-   * 批准指定 Skill 操作审批请求。
-   *
-   * @param approvalId - 审批标识。
-   * @returns 无返回值。
-   * @throws 当审批不存在或已过期时抛出错误。
-   */
-  async approveSkillOperation(approvalId: string): Promise<void> {
-    this.skillService.approveOperation(approvalId)
-  }
-
-  /**
-   * 拒绝指定 Skill 操作审批请求。
-   *
-   * @param approvalId - 审批标识。
-   * @returns 无返回值。
-   * @throws 当审批不存在或已过期时抛出错误。
-   */
-  async rejectSkillOperation(approvalId: string): Promise<void> {
-    this.skillService.rejectOperation(approvalId)
-  }
-
-  /**
-   * 读取所有待审批的 Skill 操作请求。
-   *
-   * @returns 待审批 Skill 操作请求列表。
-   * @throws 此方法不会主动抛出错误。
-   */
-  getPendingSkillApprovals(): SkillApprovalRequest[] {
-    return this.skillService.getPendingApprovals()
-  }
-
-  /**
-   * 读取 Skill 安装记录。
-   *
-   * @returns 安装记录列表。
-   * @throws 当 Driver 不支持或读取失败时，Promise 会 reject。
-   */
-  async getSkillInstallRecords(): Promise<SkillInstallRecord[]> {
-    return this.skillService.getInstallRecords()
-  }
-
-  /**
-   * 创建工具审批与路径校验网关。
-   *
-   * @returns 供 PiSdkDriver 注入到自定义工具中的 ToolApprovalGateway 实例。
-   * @throws 此方法不会主动抛出错误。
-   */
-  createToolApprovalGateway(): ToolApprovalGateway {
-    return createToolApprovalGateway({
-      bashApprovals: this.bashApprovals,
-      clarifications: this.clarifications,
-      resolveRunId: (sessionId) => this.activeRunIds.get(sessionId) || '',
-      now: () => new Date().toISOString(),
-    })
-  }
-
-  /**
    * 确认运行时快照已经满足会话启动条件。
    *
    * @returns 无返回值。
@@ -395,11 +237,11 @@ export abstract class YuanxiaoRuntimeOrchestrator {
   }
 
   /**
-   * 从当前缓存或 Driver 会话列表中查找会话摘要。
+   * 从当前缓存或 Session 模块的会话列表中查找会话摘要。
    *
    * @param sessionId - 需要查找的会话标识。
    * @returns 找到时返回会话摘要，否则返回 undefined。
-   * @throws 当 Driver 读取会话列表失败时，Promise 会 reject。
+   * @throws 当 Session 模块读取会话列表失败时，Promise 会 reject。
    */
   protected async findSession(
     sessionId: string,
@@ -570,120 +412,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     updatedAt: string,
   ): void {
     this.sessionCache.updateState(sessionId, state, updatedAt)
-  }
-
-  /**
-   * 将请求加入调度队列并广播 queued 状态。
-   *
-   * @param request - 需要排队等待的消息发送请求。
-   * @returns 排队完成后 resolve 的 Promise，含结构化会话快照。
-   * @throws 此方法不会主动抛出错误。
-   */
-  protected enqueueRun(
-    request: SendMessageRequest,
-  ): Promise<TranscriptSnapshot> {
-    const now = new Date().toISOString()
-    this.emit({
-      type: 'run-state-changed',
-      agentId: request.agentId,
-      sessionId: request.sessionId,
-      state: 'queued',
-      occurredAt: now,
-    })
-    this.upsertSessionState(request.sessionId, 'queued', now)
-
-    return new Promise<TranscriptSnapshot>((resolve, reject) => {
-      this.runQueue.push({ request, resolve, reject })
-    })
-  }
-
-  /**
-   * 从队列头部取出下一个请求并启动执行。
-   *
-   * 由 run 结束事件触发，确保始终只有一个 slot 释放时启动一个新 run。
-   *
-   * @returns 无返回值。
-   * @throws 此方法不会主动抛出错误。
-   */
-  protected dequeueNext(): void {
-    if (!this.hasRunCapacity()) return
-
-    const queueIndex = this.runQueue.findIndex(
-      (candidate) =>
-        !this.sessionArchiveCoordinator.isArchiving(
-          candidate.request.sessionId,
-        ),
-    )
-    const [queued] = queueIndex >= 0 ? this.runQueue.splice(queueIndex, 1) : []
-    if (!queued) {
-      return
-    }
-
-    const { request, resolve, reject } = queued
-    const now = new Date().toISOString()
-
-    this.emit({
-      type: 'run-state-changed',
-      agentId: request.agentId,
-      sessionId: request.sessionId,
-      state: 'running',
-      occurredAt: now,
-    })
-    this.upsertSessionState(request.sessionId, 'running', now)
-
-    this.beginRunStart(request.sessionId)
-    this.sessionDriver
-      .sendMessage(request)
-      .then(async () =>
-        resolve(
-          await this.getTranscript({
-            agentId: request.agentId,
-            sessionId: request.sessionId,
-          }),
-        ),
-      )
-      .catch(reject)
-      .finally(() => {
-        this.completeRunStart(request.sessionId)
-      })
-  }
-
-  /** 标记一次消息运行已进入 Driver 启动阶段。 */
-  protected beginRunStart(sessionId: string): void {
-    if (this.pendingRunStarts.has(sessionId)) return
-
-    let resolve!: () => void
-    const promise = new Promise<void>((innerResolve) => {
-      resolve = innerResolve
-    })
-    this.pendingRunStarts.set(sessionId, { promise, resolve })
-  }
-
-  /** 标记 Driver 已经可以取消该运行，或启动已经结束。 */
-  protected completeRunStart(sessionId: string): void {
-    const pending = this.pendingRunStarts.get(sessionId)
-    if (!pending) return
-
-    this.pendingRunStarts.delete(sessionId)
-    pending.resolve()
-  }
-
-  /** 等待尚在 Driver 初始化阶段的运行进入可取消状态。 */
-  protected async waitForRunStart(sessionId: string): Promise<void> {
-    await this.pendingRunStarts.get(sessionId)?.promise
-  }
-
-  /** 判断会话是否正在进入 Driver 运行态。 */
-  protected isRunStarting(sessionId: string): boolean {
-    return this.pendingRunStarts.has(sessionId)
-  }
-
-  /** 判断全局运行槽是否仍可接纳一个正在启动或运行中的会话。 */
-  protected hasRunCapacity(): boolean {
-    return (
-      this.activeRunIds.size + this.pendingRunStarts.size <
-      YuanxiaoRuntimeOrchestrator.MAX_CONCURRENT_RUNS
-    )
   }
 
   /**

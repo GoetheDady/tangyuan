@@ -476,16 +476,40 @@ export class RealPiSdkGateway implements PiSdkGateway {
       throw new Error(`找不到模型 ${request.providerId}/${request.modelId}`)
     }
 
-    const sessionManager =
-      mode === 'create'
-        ? SessionManager.create(request.cwd, dirname(request.sdkSessionFile), {
-            id: request.sessionId,
-          })
-        : SessionManager.open(
-            request.sdkSessionFile,
-            dirname(request.sdkSessionFile),
-            request.cwd,
-          )
+    let sessionManager: import('@earendil-works/pi-coding-agent').SessionManager
+
+    if (mode === 'create') {
+      const createdSession = SessionManager.create(
+        request.cwd,
+        dirname(request.sdkSessionFile),
+        { id: request.sessionId },
+      )
+      const sessionFile = createdSession.getSessionFile()
+      const header = createdSession.getHeader()
+
+      if (!sessionFile || !header) {
+        throw new Error('无法初始化会话文件。')
+      }
+
+      // Pi SDK 默认等第一条 assistant 消息出现后才创建 JSONL。元宵会在
+      // createSession 返回后立即读取空 transcript，因此先持久化 header，
+      // 再重新打开，使 SDK 的 flushed 状态与磁盘保持一致。
+      await writeFile(sessionFile, `${JSON.stringify(header)}\n`, {
+        encoding: 'utf8',
+        flag: 'wx',
+      })
+      sessionManager = SessionManager.open(
+        sessionFile,
+        dirname(sessionFile),
+        request.cwd,
+      )
+    } else {
+      sessionManager = SessionManager.open(
+        request.sdkSessionFile,
+        dirname(request.sdkSessionFile),
+        request.cwd,
+      )
+    }
 
     // 身份上下文片段（soul/user 或 bootstrap）。appendSystemPromptOverride
     // 是同步签名，无法在其中读文件；因此由 runtime 先异步算好、
