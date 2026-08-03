@@ -4,11 +4,9 @@ import type {
   BashApprovalRequest,
   ModelDescriptor,
   QuestionClarificationRequest,
-  SessionModelInfo,
 } from '@yuanxiao/contracts'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
-import { toast } from 'sonner'
 import { useStore } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -18,6 +16,7 @@ import {
   SessionArchiveDialog,
   SessionDeleteDialog,
 } from '@/components/SessionArchiveControls'
+import { useChatSessionActions } from '@/hooks/useChatSessionActions'
 import { useSessionArchive } from '@/hooks/useSessionArchive'
 import { computePendingApprovalSessionIds } from '@/lib/agent-event-state'
 import {
@@ -89,7 +88,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     store,
     (state) => state.allowCommandForProcess,
   )
-  const openTranscript = useStore(store, (state) => state.openTranscript)
   const replaceAgentSessions = useStore(
     store,
     (state) => state.replaceAgentSessions,
@@ -102,8 +100,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     store,
     (state) => state.clearSessionRequests,
   )
-  const beginSending = useStore(store, (state) => state.beginSending)
-  const finishSending = useStore(store, (state) => state.finishSending)
   const activeAgentId = agentId ?? runtime?.activeAgent.agentId ?? 'yuanxiao'
 
   const sessions = useStore(
@@ -111,14 +107,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     (state) =>
       (activeAgentId ? state.sessionsByAgentId[activeAgentId] : undefined) ??
       EMPTY_SESSIONS,
-  )
-  const hasLoadedAgentSessions = useStore(store, (state) =>
-    activeAgentId
-      ? Object.prototype.hasOwnProperty.call(
-          state.sessionsByAgentId,
-          activeAgentId,
-        )
-      : true,
   )
   const archivedSessions = useStore(
     store,
@@ -171,94 +159,16 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     }
   }, [agentId, activeAgentId, sessionId, navigate])
 
-  const [sessionModelInfo, setSessionModelInfo] =
-    useState<SessionModelInfo | null>(null)
-  const [isLoadingModelInfo, setIsLoadingModelInfo] = useState(false)
-  const [isSwitchingModel, setIsSwitchingModel] = useState(false)
-  const [cancellingSessionId, setCancellingSessionId] = useState<string | null>(
-    null,
-  )
-  const openSessionRequestIdRef = useRef(0)
-  const persistLastActiveSessionQueueRef = useRef<Promise<void>>(
-    Promise.resolve(),
-  )
+  const sessionActions = useChatSessionActions({
+    store,
+    activeAgentId,
+    sessionId,
+  })
   /** 跳转后需要在父会话中定位的分叉来源消息（双 id 并存：运行期 messageId + SDK entry id）。 */
   const [forkSource, setForkSource] = useState<{
     messageId: string
     sdkEntryId?: string
   } | null>(null)
-
-  // 当 URL 中的 session 变化时加载模型信息
-  useEffect(() => {
-    if (!sessionId || !activeAgentId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- 依赖变化时同步重置状态是预期行为
-      setSessionModelInfo(null)
-      return
-    }
-
-    setIsLoadingModelInfo(true)
-
-    void window.api
-      .getSessionModelInfo({
-        agentId: activeAgentId,
-        sessionId,
-      })
-      .then((info) => {
-        setSessionModelInfo(info)
-      })
-      .catch(() => {
-        // 模型信息不可用时静默处理
-        setSessionModelInfo(null)
-      })
-      .finally(() => {
-        setIsLoadingModelInfo(false)
-      })
-  }, [sessionId, activeAgentId])
-
-  // 当前 Agent 的会话列表尚未加载时按需读取；结果按 Agent 落盘，互不覆盖。
-  // 一次 includeArchived 查询同时填充活跃与归档两个分片，避免重复 IPC。
-  useEffect(() => {
-    if (hasLoadedAgentSessions) return
-
-    void window.api
-      .listSessions({ agentId: activeAgentId, includeArchived: true })
-      .then((allSessions) => {
-        const { active, archived } = partitionSessionsByArchive(allSessions)
-        store.getState().replaceAgentSessions(activeAgentId, active)
-        store.getState().replaceArchivedSessions(activeAgentId, archived)
-      })
-      .catch((error: unknown) => {
-        toast.error(
-          error instanceof Error ? error.message : '加载 Agent 会话失败',
-        )
-      })
-    // 只在首次进入或 Agent 切换时触发一次；由 hasLoadedAgentSessions 收敛。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAgentId, hasLoadedAgentSessions])
-
-  // URL sessionId 是当前显示会话的事实来源：每次路由变化都按需读取
-  // transcript 并持久化最后激活会话，且只接纳最后一次请求的结果，
-  // 避免快速切换时旧结果覆盖新会话。
-  useEffect(() => {
-    if (!sessionId || !activeAgentId) return
-
-    const requestId = ++openSessionRequestIdRef.current
-    void window.api
-      .getTranscript({ agentId: activeAgentId, sessionId })
-      .then((nextTranscript) => {
-        if (requestId !== openSessionRequestIdRef.current) return
-
-        store.getState().openTranscript(nextTranscript)
-        void persistLastActiveSession(activeAgentId, sessionId)
-      })
-      .catch((error) => {
-        if (requestId !== openSessionRequestIdRef.current) return
-
-        toast.error(error instanceof Error ? error.message : '读取会话消息失败')
-      })
-    // 路由变化即会话切换；每次切换都重新读取最新 transcript。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, activeAgentId])
 
   const selectableModels = useMemo<ModelDescriptor[]>(() => {
     if (!runtime) return []
@@ -269,48 +179,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     )
   }, [runtime])
 
-  async function handleSessionModelChange(
-    providerId: string,
-    modelId: string,
-  ): Promise<void> {
-    if (!sessionId || !activeAgentId) return
-
-    setIsSwitchingModel(true)
-
-    try {
-      const info = await window.api.setSessionModel({
-        agentId: activeAgentId,
-        sessionId,
-        providerId,
-        modelId,
-      })
-      setSessionModelInfo(info)
-      toast.success(`已切换到 ${info.displayName}`)
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : '切换模型失败')
-    } finally {
-      setIsSwitchingModel(false)
-    }
-  }
-
-  async function handleThinkingLevelChange(level: string): Promise<void> {
-    if (!sessionId || !activeAgentId) return
-
-    try {
-      const info = await window.api.setSessionThinkingLevel({
-        agentId: activeAgentId,
-        sessionId,
-        level,
-      })
-      setSessionModelInfo(info)
-      toast.success(`已切换到 Thinking Level: ${level}`)
-    } catch (error: unknown) {
-      toast.error(
-        error instanceof Error ? error.message : '切换 Thinking Level 失败',
-      )
-    }
-  }
-
   const selectedSession = useMemo(() => {
     if (sessionId) {
       return sessions.find((session) => session.sessionId === sessionId) ?? null
@@ -319,7 +187,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
   }, [sessions, sessionId])
   const isSelectedSessionRunning = selectedSession?.state === 'running'
   const isCancellingSelectedSession =
-    cancellingSessionId === selectedSession?.sessionId
+    sessionActions.cancellingSessionId === selectedSession?.sessionId
   // 响应等待提示信号：正在发送、排队或运行中。具体是否展示占位
   // 由 TranscriptMessages 根据本次执行尝试是否已有可见回复内容判定。
   const isAwaitingResponse =
@@ -329,11 +197,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
   const selectedTranscript =
     transcript?.sessionId === selectedSession?.sessionId ? transcript : null
 
-  const setIsSendingMessage = (value: boolean): void => {
-    if (!sessionId) return
-    if (value) beginSending(sessionId)
-    else finishSending(sessionId)
-  }
   const clearSessionRequestsForSessions = (sessionIds: string[]): void => {
     for (const sessionId of sessionIds) {
       clearSessionRequests(sessionId)
@@ -374,216 +237,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
    * @returns 无返回值。
    * @throws Preload API 错误会被捕获并通过 toast 反馈。
    */
-  function persistLastActiveSession(
-    agentId: string,
-    sessionId: string,
-  ): Promise<void> {
-    persistLastActiveSessionQueueRef.current =
-      persistLastActiveSessionQueueRef.current
-        .then(async () => {
-          await window.api.setLastActiveSession({ agentId, sessionId })
-        })
-        .catch((error) => {
-          toast.error(
-            error instanceof Error ? error.message : '无法记录最后打开的会话',
-          )
-        })
-
-    return persistLastActiveSessionQueueRef.current
-  }
-
-  /**
-   * 创建默认 Agent 的新会话并放到列表顶部。
-   *
-   * @returns 无返回值。
-   * @throws Preload API 错误会被捕获并通过 toast 反馈。
-   */
-  const createSession = async (): Promise<void> => {
-    try {
-      const session = await window.api.createSession({
-        agentId: activeAgentId,
-        title: '新会话',
-      })
-      const currentSessions =
-        store.getState().sessionsByAgentId[activeAgentId] ?? []
-      replaceAgentSessions(activeAgentId, [
-        session,
-        ...currentSessions.filter(
-          (candidate) => candidate.sessionId !== session.sessionId,
-        ),
-      ])
-      navigate(`/chat/${activeAgentId}/${session.sessionId}`, { replace: true })
-      await persistLastActiveSession(session.agentId, session.sessionId)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '创建会话失败')
-    }
-  }
-
-  /**
-   * 向当前会话发送用户消息。
-   *
-   * @returns 无返回值。
-   * @throws Preload API 错误会被捕获并通过 toast 反馈。
-   */
-  const sendMessage = async (): Promise<void> => {
-    const content = composerText.trim()
-
-    if (!selectedSession) {
-      toast.error('请先创建一个新会话。')
-      return
-    }
-
-    if (!content) {
-      return
-    }
-
-    updateComposerDraft('')
-    setIsSendingMessage(true)
-
-    try {
-      const nextTranscript = await window.api.sendMessage({
-        agentId: selectedSession.agentId,
-        sessionId: selectedSession.sessionId,
-        content,
-      })
-      openTranscript(nextTranscript)
-      replaceAgentSessions(
-        selectedSession.agentId,
-        await window.api.listSessions({ agentId: selectedSession.agentId }),
-      )
-      navigate(`/chat/${activeAgentId}/${selectedSession.sessionId}`, {
-        replace: true,
-      })
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '发送消息失败')
-    } finally {
-      setIsSendingMessage(false)
-    }
-  }
-
-  /**
-   * 重试一条失败的用户消息，复用原始请求并创建新的执行尝试。
-   *
-   * @param userMessageId - 要重试的原始用户消息标识。
-   * @returns 无返回值。
-   * @throws Preload API 错误会被捕获并通过 toast 反馈。
-   */
-  const retryMessage = async (userMessageId: string): Promise<void> => {
-    if (!selectedSession) {
-      toast.error('请先选择一个会话。')
-      return
-    }
-
-    setIsSendingMessage(true)
-
-    try {
-      const nextTranscript = await window.api.retryMessage({
-        agentId: selectedSession.agentId,
-        sessionId: selectedSession.sessionId,
-        userMessageId,
-      })
-      openTranscript(nextTranscript)
-      replaceAgentSessions(
-        selectedSession.agentId,
-        await window.api.listSessions({ agentId: selectedSession.agentId }),
-      )
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '重试消息失败')
-    } finally {
-      setIsSendingMessage(false)
-    }
-  }
-
-  /**
-   * 在当前会话的某个用户消息节点分叉出新分支。
-   *
-   * @param userMessageId - 分叉起始节点（用户消息标识）。
-   * @returns 无返回值。
-   * @throws Preload API 错误会被捕获并通过 toast 反馈。
-   */
-  const forkSession = async (userMessageId: string): Promise<void> => {
-    if (!selectedSession) {
-      toast.error('请先选择一个会话。')
-      return
-    }
-
-    const sourceEntry = selectedTranscript?.entries.find(
-      (entry) =>
-        entry.kind === 'user-message' && entry.messageId === userMessageId,
-    )
-    const sourceMessageContent =
-      sourceEntry?.kind === 'user-message' ? sourceEntry.content : ''
-
-    try {
-      const childSession = await window.api.forkSession({
-        agentId: selectedSession.agentId,
-        sessionId: selectedSession.sessionId,
-        entryId: userMessageId,
-      })
-      const [nextSessions, childTranscript] = await Promise.all([
-        window.api.listSessions({ agentId: childSession.agentId }),
-        window.api.getTranscript({
-          agentId: childSession.agentId,
-          sessionId: childSession.sessionId,
-        }),
-      ])
-      replaceAgentSessions(childSession.agentId, nextSessions)
-      openTranscript(childTranscript)
-      updateComposerDraft(sourceMessageContent)
-      navigate(`/chat/${activeAgentId}/${childSession.sessionId}`, {
-        replace: true,
-      })
-      await persistLastActiveSession(
-        childSession.agentId,
-        childSession.sessionId,
-      )
-      toast.success('已创建分叉会话')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '分叉会话失败')
-    }
-  }
-
-  /**
-   * 取消当前会话正在运行的模型响应。
-   *
-   * @returns 无返回值。
-   * @throws Preload API 错误会被捕获并通过 toast 反馈。
-   */
-  const cancelRun = async (): Promise<void> => {
-    if (!selectedSession || cancellingSessionId === selectedSession.sessionId) {
-      return
-    }
-
-    const targetSessionId = selectedSession.sessionId
-    setCancellingSessionId(targetSessionId)
-    try {
-      await window.api.cancelRun({
-        agentId: selectedSession.agentId,
-        sessionId: selectedSession.sessionId,
-      })
-      finishSending(selectedSession.sessionId)
-      // 刷新 sessions 以同步取消后的状态，避免仅依赖异步推送事件
-      replaceAgentSessions(
-        selectedSession.agentId,
-        await window.api.listSessions({ agentId: selectedSession.agentId }),
-      )
-      toast.success('已停止生成')
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : '取消运行失败')
-      // 即使取消失败，也要重置 isSendingMessage，防止 UI 卡住
-      finishSending(selectedSession.sessionId)
-    } finally {
-      setCancellingSessionId((current) =>
-        current === targetSessionId ? null : current,
-      )
-    }
-  }
-
-  /**
-   * 跳回当前分叉会话的父会话，并定位到分叉来源消息。
-   *
-   * @returns 无返回值。
-   */
   function viewForkSource(): void {
     if (!parentSession || !selectedSession?.forkedFrom) return
 
@@ -613,7 +266,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
             navigate(`/chat/${nextAgentId}`, { replace: true })
           }}
           onCreateSession={() => {
-            void createSession()
+            void sessionActions.createSession()
           }}
           onSelectSession={(session) => {
             setForkSource(null)
@@ -639,34 +292,36 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
             value: composerText,
             onChange: updateComposerDraft,
             onSubmit: () => {
-              void sendMessage()
+              void sessionActions.sendMessage()
             },
             onCancel: () => {
-              void cancelRun()
+              void sessionActions.cancelRun()
             },
             isRunning:
               isSelectedSessionRunning ||
               isSendingMessage ||
               isCancellingSelectedSession,
             disabled: !selectedSession,
-            sessionModelInfo: selectedSession ? sessionModelInfo : null,
-            isLoadingModelInfo,
-            isSwitchingModel,
+            sessionModelInfo: selectedSession
+              ? sessionActions.sessionModelInfo
+              : null,
+            isLoadingModelInfo: sessionActions.isLoadingModelInfo,
+            isSwitchingModel: sessionActions.isSwitchingModel,
             providers: runtime?.providers ?? [],
             selectableModels,
             onModelChange: (providerId, modelId) => {
-              void handleSessionModelChange(providerId, modelId)
+              void sessionActions.handleSessionModelChange(providerId, modelId)
             },
             onThinkingLevelChange: (level) => {
-              void handleThinkingLevelChange(level)
+              void sessionActions.handleThinkingLevelChange(level)
             },
           }}
           actions={{
             onRetry: (userMessageId) => {
-              void retryMessage(userMessageId)
+              void sessionActions.retryMessage(userMessageId)
             },
             onFork: (userMessageId) => {
-              void forkSession(userMessageId)
+              void sessionActions.forkSession(userMessageId)
             },
             onViewForkSource: () => {
               viewForkSource()
