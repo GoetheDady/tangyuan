@@ -75,6 +75,7 @@ describe('RealPiSdkGateway independent fork', () => {
     const forked = await new RealPiSdkGateway().createBranchedSession({
       sdkSessionFile: parentSessionFile!,
       entryId: sourceMessageId,
+      messageId: sourceMessageId,
     })
 
     expect(forked.sessionId).not.toBe(parentSessionId)
@@ -90,7 +91,11 @@ describe('RealPiSdkGateway independent fork', () => {
       expect.objectContaining({
         type: 'custom',
         customType: 'yuanxiao:fork-source',
-        data: { sessionId: parentSessionId, entryId: sourceMessageId },
+        data: {
+          sessionId: parentSessionId,
+          entryId: sourceMessageId,
+          sdkEntryId: sourceMessageId,
+        },
       }),
     ])
     await expect(
@@ -99,7 +104,10 @@ describe('RealPiSdkGateway independent fork', () => {
       expect.arrayContaining([
         expect.objectContaining({
           sessionId: forked.sessionId,
-          forkedFrom: { sessionId: parentSessionId, entryId: sourceMessageId },
+          forkedFrom: expect.objectContaining({
+            sessionId: parentSessionId,
+            entryId: sourceMessageId,
+          }),
         }),
       ]),
     )
@@ -145,6 +153,7 @@ describe('RealPiSdkGateway independent fork', () => {
     const forked = await new RealPiSdkGateway().createBranchedSession({
       sdkSessionFile: parentSessionFile!,
       entryId: sourceMessageId,
+      messageId: sourceMessageId,
     })
 
     const child = SessionManager.open(forked.sdkSessionFile, sessionDir)
@@ -152,7 +161,11 @@ describe('RealPiSdkGateway independent fork', () => {
       expect.objectContaining({
         type: 'custom',
         customType: 'yuanxiao:fork-source',
-        data: { sessionId: parent.getSessionId(), entryId: sourceMessageId },
+        data: {
+          sessionId: parent.getSessionId(),
+          entryId: sourceMessageId,
+          sdkEntryId: sourceMessageId,
+        },
       }),
     ])
   })
@@ -192,6 +205,7 @@ describe('RealPiSdkGateway independent fork', () => {
     const forked = await new RealPiSdkGateway().createBranchedSession({
       sdkSessionFile: parent.getSessionFile()!,
       entryId: sourceMessageId,
+      messageId: sourceMessageId,
     })
     const child = SessionManager.open(forked.sdkSessionFile, sessionDir)
 
@@ -245,6 +259,7 @@ describe('RealPiSdkGateway independent fork', () => {
     const child = await new RealPiSdkGateway().createBranchedSession({
       sdkSessionFile: parent.getSessionFile()!,
       entryId: firstMessageId,
+      messageId: firstMessageId,
     })
     const childSession = SessionManager.open(child.sdkSessionFile, sessionDir)
     const childMessageId = childSession.appendMessage({
@@ -256,6 +271,7 @@ describe('RealPiSdkGateway independent fork', () => {
     const grandchild = await new RealPiSdkGateway().createBranchedSession({
       sdkSessionFile: child.sdkSessionFile,
       entryId: childMessageId,
+      messageId: childMessageId,
     })
 
     await expect(stat(grandchild.sdkSessionFile)).resolves.toBeDefined()
@@ -279,7 +295,11 @@ describe('RealPiSdkGateway independent fork', () => {
         ),
     ).toEqual([
       expect.objectContaining({
-        data: { sessionId: child.sessionId, entryId: childMessageId },
+        data: {
+          sessionId: child.sessionId,
+          entryId: childMessageId,
+          sdkEntryId: childMessageId,
+        },
       }),
     ])
     await expect(
@@ -288,7 +308,10 @@ describe('RealPiSdkGateway independent fork', () => {
       expect.arrayContaining([
         expect.objectContaining({
           sessionId: grandchild.sessionId,
-          forkedFrom: { sessionId: child.sessionId, entryId: childMessageId },
+          forkedFrom: expect.objectContaining({
+            sessionId: child.sessionId,
+            entryId: childMessageId,
+          }),
         }),
       ]),
     )
@@ -331,10 +354,12 @@ describe('RealPiSdkGateway independent fork', () => {
     const first = await new RealPiSdkGateway().createBranchedSession({
       sdkSessionFile: parentSessionFile,
       entryId: sourceMessageId,
+      messageId: sourceMessageId,
     })
     const second = await new RealPiSdkGateway().createBranchedSession({
       sdkSessionFile: parentSessionFile,
       entryId: sourceMessageId,
+      messageId: sourceMessageId,
     })
 
     expect(second.sessionId).not.toBe(first.sessionId)
@@ -377,17 +402,17 @@ describe('RealPiSdkGateway independent fork', () => {
       expect.arrayContaining([
         expect.objectContaining({
           sessionId: first.sessionId,
-          forkedFrom: {
+          forkedFrom: expect.objectContaining({
             sessionId: parent.getSessionId(),
             entryId: sourceMessageId,
-          },
+          }),
         }),
         expect.objectContaining({
           sessionId: second.sessionId,
-          forkedFrom: {
+          forkedFrom: expect.objectContaining({
             sessionId: parent.getSessionId(),
             entryId: sourceMessageId,
-          },
+          }),
         }),
       ]),
     )
@@ -448,6 +473,7 @@ describe('RealPiSdkGateway independent fork', () => {
     const child = await new RealPiSdkGateway().createBranchedSession({
       sdkSessionFile: parent.getSessionFile()!,
       entryId: parentSourceId,
+      messageId: parentSourceId,
     })
     // 子会话追加一问一答，使递归分叉的保留路径含 assistant 回复（Pi SDK 会自行落盘）。
     const childSession = SessionManager.open(child.sdkSessionFile, sessionDir)
@@ -457,6 +483,7 @@ describe('RealPiSdkGateway independent fork', () => {
     const grandchild = await new RealPiSdkGateway().createBranchedSession({
       sdkSessionFile: child.sdkSessionFile,
       entryId: childSourceId,
+      messageId: childSourceId,
     })
 
     const grandchildSession = SessionManager.open(
@@ -474,7 +501,11 @@ describe('RealPiSdkGateway independent fork', () => {
         ),
     ).toEqual([
       expect.objectContaining({
-        data: { sessionId: child.sessionId, entryId: childSourceId },
+        data: {
+          sessionId: child.sessionId,
+          entryId: childSourceId,
+          sdkEntryId: childSourceId,
+        },
       }),
     ])
     // 来源记录不参与模型上下文；上下文只包含保留的对话历史。
@@ -512,6 +543,7 @@ describe('RealPiSdkGateway independent fork', () => {
       new RealPiSdkGateway().createBranchedSession({
         sdkSessionFile: parent.getSessionFile()!,
         entryId: sourceMessageId,
+        messageId: sourceMessageId,
       }),
     ).rejects.toThrow('来源会话尚无可读取的历史记录，无法分叉。')
   })

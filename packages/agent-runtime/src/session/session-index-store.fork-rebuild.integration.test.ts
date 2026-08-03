@@ -110,6 +110,7 @@ describe('SessionIndexStore 从真实 Pi session 重建会话谱系', () => {
     const child = await gateway.createBranchedSession({
       sdkSessionFile: parent.sessionFile,
       entryId: parent.secondUserMessageId,
+      messageId: parent.secondUserMessageId,
     })
     const childSession = SessionManager.open(
       child.sdkSessionFile,
@@ -123,11 +124,13 @@ describe('SessionIndexStore 从真实 Pi session 重建会话谱系', () => {
     const grandchild = await gateway.createBranchedSession({
       sdkSessionFile: child.sdkSessionFile,
       entryId: childUserMessageId,
+      messageId: childUserMessageId,
     })
     // 同源第二个分叉，验证互不覆盖。
     const sibling = await gateway.createBranchedSession({
       sdkSessionFile: parent.sessionFile,
       entryId: parent.secondUserMessageId,
+      messageId: parent.secondUserMessageId,
     })
 
     const store = new SessionIndexStore({ layout, configStore, gateway })
@@ -181,6 +184,7 @@ describe('SessionIndexStore 从真实 Pi session 重建会话谱系', () => {
     const child = await gateway.createBranchedSession({
       sdkSessionFile: parent.sessionFile,
       entryId: parent.firstUserMessageId,
+      messageId: parent.firstUserMessageId,
     })
 
     const store = new SessionIndexStore({ layout, configStore, gateway })

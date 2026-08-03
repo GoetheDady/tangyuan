@@ -73,6 +73,10 @@ export interface SessionModule {
   reloadAgentSessions(agentId: AgentId): Promise<void>
   reloadAllSessions(): Promise<void>
   subscribe(listener: AgentEventListener): AgentEventSubscription
+  /** 返回指定会话当前活跃运行的 runId；无活跃运行时返回 undefined。 */
+  getActiveRunId(sessionId: string): string | undefined
+  /** 返回当前全部活跃运行的数量。 */
+  getActiveRunCount(): number
 }
 
 /** Agent 生命周期与目录对账能力。 */

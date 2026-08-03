@@ -172,6 +172,7 @@ export const agentSessionSummarySchema = z.strictObject({
     .strictObject({
       sessionId: nonEmptyIdentifierSchema,
       entryId: nonEmptyIdentifierSchema,
+      sdkEntryId: nonEmptyIdentifierSchema.optional(),
     })
     .optional(),
   lineageUnavailable: z.boolean().optional(),

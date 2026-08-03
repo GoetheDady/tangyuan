@@ -316,7 +316,8 @@ export function isForkSource(value: unknown): value is ForkSource {
   return (
     isRecord(value) &&
     typeof value.sessionId === 'string' &&
-    typeof value.entryId === 'string'
+    typeof value.entryId === 'string' &&
+    (value.sdkEntryId === undefined || typeof value.sdkEntryId === 'string')
   )
 }
 

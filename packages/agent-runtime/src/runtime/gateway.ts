@@ -295,7 +295,8 @@ export class RealPiSdkGateway implements PiSdkGateway {
     )
     forkedSession.appendCustomEntry(YUANXIAO_FORK_SOURCE_ENTRY_TYPE, {
       sessionId: parentSessionId,
-      entryId: request.entryId,
+      entryId: request.messageId,
+      sdkEntryId: request.entryId,
     })
 
     return {

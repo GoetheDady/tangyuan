@@ -241,6 +241,16 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
     return this.sessionIndexStore.getAttempts(sessionId)
   }
 
+  /** 返回指定会话当前活跃运行的 runId；无活跃运行时返回 undefined。 */
+  getActiveRunId(sessionId: string): string | undefined {
+    return this.activeRunIds.get(sessionId)
+  }
+
+  /** 返回当前全部活跃运行的数量。 */
+  getActiveRunCount(): number {
+    return this.activeRunIds.size
+  }
+
   /**
    * 从指定会话的某个用户消息创建独立分叉会话。
    *
@@ -291,12 +301,14 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
     const forkedSession = await this.gateway.createBranchedSession({
       sdkSessionFile: parentEntry.sdkSessionFile,
       entryId: sdkEntryId,
+      messageId: request.entryId,
     })
     const now = this.now()
     const title = `${parentEntry.title}（分叉）`
     const forkedFrom = {
       sessionId: request.sessionId,
       entryId: request.entryId,
+      ...(sdkEntryId !== request.entryId ? { sdkEntryId } : {}),
     }
     const childEntry: PersistedSessionIndexEntry = {
       sessionId: forkedSession.sessionId,

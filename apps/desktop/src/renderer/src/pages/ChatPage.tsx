@@ -168,10 +168,11 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
   const persistLastActiveSessionQueueRef = useRef<Promise<void>>(
     Promise.resolve(),
   )
-  /** 跳转后需要在父会话中定位的分叉来源消息标识。 */
-  const [forkSourceMessageId, setForkSourceMessageId] = useState<string | null>(
-    null,
-  )
+  /** 跳转后需要在父会话中定位的分叉来源消息（双 id 并存：运行期 messageId + SDK entry id）。 */
+  const [forkSource, setForkSource] = useState<{
+    messageId: string
+    sdkEntryId?: string
+  } | null>(null)
 
   // 当 URL 中的 session 变化时加载模型信息
   useEffect(() => {
@@ -567,7 +568,10 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
   function viewForkSource(): void {
     if (!parentSession || !selectedSession?.forkedFrom) return
 
-    setForkSourceMessageId(selectedSession.forkedFrom.entryId)
+    setForkSource({
+      messageId: selectedSession.forkedFrom.entryId,
+      sdkEntryId: selectedSession.forkedFrom.sdkEntryId,
+    })
     navigate(`/chat/${activeAgentId}/${parentSession.sessionId}`, {
       replace: true,
     })
@@ -593,7 +597,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
             void createSession()
           }}
           onSelectSession={(session) => {
-            setForkSourceMessageId(null)
+            setForkSource(null)
             navigate(`/chat/${activeAgentId}/${session.sessionId}`, {
               replace: true,
             })
@@ -605,7 +609,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
         <ConversationArea
           selectedSession={selectedSession}
           parentSession={parentSession}
-          forkSourceMessageId={forkSourceMessageId}
+          forkSource={forkSource}
           transcript={selectedTranscript}
           isStreaming={isSelectedSessionRunning}
           isAwaitingResponse={isAwaitingResponse}

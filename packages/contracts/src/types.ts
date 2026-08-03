@@ -235,10 +235,16 @@ export type TranscriptDelta =
 
 /**
  * 描述独立分叉会话的来源。
+ *
+ * entryId 恒为公开 transcript 中对应用户消息的 messageId（实时路径由
+ * messageStore 生成，冷读路径为 SDK entry id）；sdkEntryId 记录同一消息在
+ * Pi JSONL 文件中的真实 entry id，用于两种命名空间并存时的定位。
  */
 export interface ForkSource {
   sessionId: string
   entryId: string
+  /** Pi JSONL 文件中的真实 entry id；旧记录可能缺失。 */
+  sdkEntryId?: string
 }
 
 /**

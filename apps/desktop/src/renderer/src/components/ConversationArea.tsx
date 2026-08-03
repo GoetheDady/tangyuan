@@ -40,7 +40,7 @@ export interface ConversationAreaProps {
   /** 当前分叉会话的父会话（不可用时为 null）。 */
   parentSession: AgentSessionSummary | null
   /** 跳转后在父会话中定位的分叉来源消息标识。 */
-  forkSourceMessageId: string | null
+  forkSource?: { messageId: string; sdkEntryId?: string } | null
   /** 当前会话的 transcript（会话不匹配时由组件忽略）。 */
   transcript: TranscriptSnapshot | null
   /** 模型是否正在流式输出。 */
@@ -159,7 +159,7 @@ export function ConversationArea(
           isStreaming={props.isStreaming}
           isAwaitingResponse={props.isAwaitingResponse}
           sessionId={selectedSession?.sessionId ?? null}
-          forkSourceMessageId={props.forkSourceMessageId}
+          forkSource={props.forkSource}
           onRetry={(userMessageId) => {
             props.actions.onRetry(userMessageId)
           }}

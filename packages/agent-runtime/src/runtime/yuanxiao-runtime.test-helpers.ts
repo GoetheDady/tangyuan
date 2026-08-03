@@ -129,6 +129,7 @@ export function createSessionDriver(
   let currentSessions = [...sessions]
   let currentListener: AgentEventListener | null = null
   const messages = new Map<string, TranscriptSnapshot>()
+  const activeRunIds = new Map<string, string>()
 
   return {
     listSessions: vi.fn(async () => currentSessions),
@@ -151,6 +152,8 @@ export function createSessionDriver(
     setSessionsArchived: vi.fn(async () => currentSessions),
     deleteSessions: vi.fn().mockResolvedValue(undefined),
     getSessionAttempts: vi.fn(() => []),
+    getActiveRunId: vi.fn((sessionId: string) => activeRunIds.get(sessionId)),
+    getActiveRunCount: vi.fn(() => activeRunIds.size),
     getSessionModelInfo: vi.fn(async () => {
       throw new Error('测试未配置 getSessionModelInfo。')
     }),
@@ -210,6 +213,14 @@ export function createSessionDriver(
     }),
     messages,
     emit: (event: AgentEvent | DriverEvent) => {
+      if (event.type === 'attempt-started') {
+        activeRunIds.set(event.sessionId, event.runId)
+      } else if (
+        event.type === 'turn-cancelled' ||
+        event.type === 'turn-failed'
+      ) {
+        activeRunIds.delete(event.sessionId)
+      }
       if (event.type === 'session-created') {
         currentSessions = [
           event.session,
@@ -220,6 +231,9 @@ export function createSessionDriver(
       }
 
       if (event.type === 'run-state-changed') {
+        if (event.state !== 'running') {
+          activeRunIds.delete(event.sessionId)
+        }
         currentSessions = currentSessions.map((session) =>
           session.sessionId === event.sessionId
             ? { ...session, state: event.state, updatedAt: event.occurredAt }

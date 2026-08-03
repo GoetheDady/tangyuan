@@ -21,7 +21,7 @@ function renderConversationArea(
     <ConversationArea
       selectedSession={session}
       parentSession={null}
-      forkSourceMessageId={null}
+      forkSource={null}
       transcript={null}
       isStreaming={false}
       isAwaitingResponse={false}

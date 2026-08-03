@@ -212,6 +212,7 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
     expect(firstMessageFork.forkedFrom).toEqual({
       sessionId: parent.sessionId,
       entryId: firstUserMessageId,
+      sdkEntryId: expect.any(String),
     })
     await expect(
       runtime.getTranscript({
@@ -284,6 +285,7 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
     expect(grandchild.forkedFrom).toEqual({
       sessionId: siblingOne.sessionId,
       entryId: grandchildSourceId,
+      sdkEntryId: expect.any(String),
     })
     // 孙分叉只继承到分叉点为止的历史：不含「第一个方案」之后的任何内容。
     await expect(
@@ -311,31 +313,31 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
         }),
         expect.objectContaining({
           sessionId: firstMessageFork.sessionId,
-          forkedFrom: {
+          forkedFrom: expect.objectContaining({
             sessionId: parent.sessionId,
             entryId: firstUserMessageId,
-          },
+          }),
         }),
         expect.objectContaining({
           sessionId: siblingOne.sessionId,
-          forkedFrom: {
+          forkedFrom: expect.objectContaining({
             sessionId: parent.sessionId,
             entryId: secondUserMessageId,
-          },
+          }),
         }),
         expect.objectContaining({
           sessionId: siblingTwo.sessionId,
-          forkedFrom: {
+          forkedFrom: expect.objectContaining({
             sessionId: parent.sessionId,
             entryId: secondUserMessageId,
-          },
+          }),
         }),
         expect.objectContaining({
           sessionId: grandchild.sessionId,
-          forkedFrom: {
+          forkedFrom: expect.objectContaining({
             sessionId: siblingOne.sessionId,
             entryId: grandchildSourceId,
-          },
+          }),
         }),
       ]),
     )
@@ -381,28 +383,32 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
           sessionId: firstMessageFork.sessionId,
           forkedFrom: {
             sessionId: parent.sessionId,
-            entryId: rebuiltFirstUserMessageId,
+            entryId: firstUserMessageId,
+            sdkEntryId: rebuiltFirstUserMessageId,
           },
         },
         {
           sessionId: siblingOne.sessionId,
           forkedFrom: {
             sessionId: parent.sessionId,
-            entryId: rebuiltSecondUserMessageId,
+            entryId: secondUserMessageId,
+            sdkEntryId: rebuiltSecondUserMessageId,
           },
         },
         {
           sessionId: siblingTwo.sessionId,
           forkedFrom: {
             sessionId: parent.sessionId,
-            entryId: rebuiltSecondUserMessageId,
+            entryId: secondUserMessageId,
+            sdkEntryId: rebuiltSecondUserMessageId,
           },
         },
         {
           sessionId: grandchild.sessionId,
           forkedFrom: {
             sessionId: siblingOne.sessionId,
-            entryId: rebuiltGrandchildSourceId,
+            entryId: grandchildSourceId,
+            sdkEntryId: rebuiltGrandchildSourceId,
           },
         },
       ]),

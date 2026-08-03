@@ -59,7 +59,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     'read' | 'write' | 'clear'
   >
   protected readonly listeners = new Set<AgentEventListener>()
-  protected readonly activeRunIds = new Map<string, string>()
   protected readonly sessionArchiveCoordinator = new SessionArchiveCoordinator()
   protected readonly transcriptEmitter: TranscriptEmitter
   protected readonly snapshotStore: RuntimeSnapshotStore
@@ -113,7 +112,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
         this.sessionArchiveCoordinator.isArchiving(sessionId),
       sendMessage: (request) => this.sessions.sendMessage(request),
       getTranscript: (request) => this.getTranscript(request),
-      activeRunCount: () => this.activeRunIds.size,
+      activeRunCount: () => this.sessions.getActiveRunCount(),
     })
     this.sessions.subscribe((event) => {
       this.applyAgentEvent(event)
@@ -192,7 +191,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
       .filter(
         (session) =>
           session.state === 'running' ||
-          this.activeRunIds.has(session.sessionId),
+          this.sessions.getActiveRunId(session.sessionId) !== undefined,
       )
 
     await Promise.all(
@@ -274,7 +273,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
 
     if (driverEvent.type === 'attempt-started') {
       this.runScheduler.completeRunStart(driverEvent.sessionId)
-      this.activeRunIds.set(driverEvent.sessionId, driverEvent.runId)
       this.upsertSessionState(
         driverEvent.sessionId,
         'running',
@@ -333,7 +331,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     }
 
     if (driverEvent.type === 'turn-cancelled') {
-      this.activeRunIds.delete(driverEvent.sessionId)
       this.upsertSessionState(
         driverEvent.sessionId,
         'cancelled',
@@ -349,7 +346,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     }
 
     if (driverEvent.type === 'turn-failed') {
-      this.activeRunIds.delete(driverEvent.sessionId)
       this.upsertSessionState(
         driverEvent.sessionId,
         'failed',
@@ -371,10 +367,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
         driverEvent.state,
         driverEvent.occurredAt,
       )
-
-      if (driverEvent.state !== 'running') {
-        this.activeRunIds.delete(driverEvent.sessionId)
-      }
     }
   }
 

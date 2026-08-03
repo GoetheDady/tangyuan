@@ -142,7 +142,10 @@ export interface PiSdkReadMessagesRequest {
  */
 export interface PiSdkCreateBranchedSessionRequest {
   sdkSessionFile: string
+  /** SDK 文件中的真实 entry id，用于确定分叉点。 */
   entryId: string
+  /** 公开 transcript 的 messageId，随分叉来源记录持久化。 */
+  messageId: string
 }
 
 /**

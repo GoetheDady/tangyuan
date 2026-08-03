@@ -111,7 +111,8 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     return createToolApprovalGateway({
       bashApprovals: this.bashApprovals,
       clarifications: this.clarifications,
-      resolveRunId: (sessionId) => this.activeRunIds.get(sessionId) || '',
+      resolveRunId: (sessionId) =>
+        this.sessions.getActiveRunId(sessionId) ?? '',
       now: () => new Date().toISOString(),
     })
   }
@@ -306,11 +307,12 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     })
     const sessions = driverSessions.map((session) => ({
       ...session,
-      state: this.activeRunIds.has(session.sessionId)
-        ? ('running' as const)
-        : this.runScheduler.hasQueued(session.sessionId)
-          ? ('queued' as const)
-          : session.state,
+      state:
+        this.sessions.getActiveRunId(session.sessionId) !== undefined
+          ? ('running' as const)
+          : this.runScheduler.hasQueued(session.sessionId)
+            ? ('queued' as const)
+            : session.state,
     }))
     // 对非归档会话检查祖先谱系完整性
     if (!includeArchived) {
@@ -517,7 +519,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     if (session) this.assertLineageAvailable(session)
 
     if (
-      this.activeRunIds.has(request.sessionId) ||
+      this.sessions.getActiveRunId(request.sessionId) !== undefined ||
       this.runScheduler.isRunStarting(request.sessionId) ||
       session?.state === 'running'
     ) {
@@ -793,7 +795,6 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
 
       for (const id of affectedSessionIds) {
         this.sessionCache.remove(id)
-        this.activeRunIds.delete(id)
       }
 
       return {
@@ -879,7 +880,6 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     }
 
     await this.sessions.cancelRun(request)
-    this.activeRunIds.delete(request.sessionId)
     await this.listSessions(request.agentId)
     const session = this.sessionCache.find(request.sessionId)
 
