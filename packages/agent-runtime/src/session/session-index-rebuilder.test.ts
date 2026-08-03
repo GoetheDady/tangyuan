@@ -74,7 +74,7 @@ function fakeGateway(
     cwd?: string
     createdAt: string
     updatedAt: string
-    forkedFrom?: { sessionId: string; entryId: string }
+    forkedFrom?: { sessionId: string; entryId: string; sdkEntryId?: string }
     provider?: string
     model?: string
     thinkingLevel?: string
@@ -193,6 +193,54 @@ describe('SessionIndexRebuilder.rebuild', () => {
     ])
     // 执行记录不可从 Pi session 重建，索引重建后随旧索引一起丢失
     expect(entries[0]?.attempts).toBeUndefined()
+  })
+
+  it('旧索引单 id 来源在重建时用 Pi session 投影补齐 sdkEntryId', async () => {
+    await mkdir(join(dir, 'sessions'), { recursive: true })
+    await writeFile(
+      layout.sessionIndex(),
+      JSON.stringify({
+        sessions: [
+          {
+            sessionId: 's1',
+            sdkSessionFile: '/tmp/s1.jsonl',
+            title: '旧标题',
+            createdAt: 'old',
+            updatedAt: 'old',
+            provider: '',
+            model: '',
+            agentId: 'yuanxiao',
+            lastMessagePreview: '',
+            status: 'idle',
+            forkedFrom: { sessionId: 'p1', entryId: 'msg-1' },
+          },
+        ],
+      }),
+      'utf8',
+    )
+    const rebuilder = createRebuilder(
+      fakeGateway([
+        {
+          sessionId: 's1',
+          sdkSessionFile: '/tmp/s1.jsonl',
+          title: '新标题',
+          createdAt: 'new',
+          updatedAt: 'new',
+          forkedFrom: {
+            sessionId: 'p1',
+            entryId: 'msg-1',
+            sdkEntryId: 'sdk-e1',
+          },
+        },
+      ]),
+    )
+
+    const entries = await rebuilder.rebuild()
+    expect(entries).toEqual([
+      expect.objectContaining({
+        forkedFrom: { sessionId: 'p1', entryId: 'msg-1', sdkEntryId: 'sdk-e1' },
+      }),
+    ])
   })
 
   it('无法归属到已知 Agent 的会话不进入索引', async () => {

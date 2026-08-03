@@ -12,6 +12,9 @@ import { createStore, type StoreApi } from 'zustand/vanilla'
 
 import { projectAgentEvent } from '@/lib/agent-event-projection'
 
+/** 未加载时的稳定空会话列表，避免 selector 每次返回新引用引发重渲染循环。 */
+export const EMPTY_SESSIONS: AgentSessionSummary[] = []
+
 export interface WorkbenchState {
   runtime: RuntimeSnapshot | null
   agents: AgentSummary[]

@@ -3,7 +3,7 @@ import { dirname } from 'node:path'
 import type { AgentRunState, AgentSessionSummary } from '@yuanxiao/contracts'
 import type { ConfigStore, DirectoryLayout } from '../core'
 import type { PiSdkGateway } from '../driver'
-import { AgentRuntimeError, isNotFoundError } from '../core'
+import { AgentRuntimeError } from '../core'
 import {
   normalizePersistedIndexEntry,
   SessionIndexRebuilder,
@@ -27,6 +27,15 @@ export interface SessionIndexStoreDependencies {
   layout: DirectoryLayout
   configStore: ConfigStore
   gateway: PiSdkGateway
+}
+
+/**
+ * 与执行尝试同时生效的会话展示状态（运行状态、更新时间与可选的消息预览）。
+ */
+export interface AttemptSessionUpdate {
+  status: AgentRunState
+  updatedAt: string
+  lastMessagePreview?: string
 }
 
 /**
@@ -61,12 +70,8 @@ export class SessionIndexStore {
     let rawIndex: string
     try {
       rawIndex = await readFile(indexPath, 'utf8')
-    } catch (error) {
-      // 索引缺失（或不可读）时从 Pi SDK 原生 session 重建
-      if (isNotFoundError(error)) {
-        return this.rebuildIndex()
-      }
-
+    } catch {
+      // 索引缺失或不可读时从 Pi SDK 原生 session 重建
       return this.rebuildIndex()
     }
 
@@ -353,11 +358,7 @@ export class SessionIndexStore {
   async upsertAttempt(
     sessionId: string,
     attempt: PersistedAttemptEntry,
-    sessionUpdate: {
-      status: AgentRunState
-      updatedAt: string
-      lastMessagePreview?: string
-    },
+    sessionUpdate: AttemptSessionUpdate,
   ): Promise<void> {
     const currentEntry = this.getEntry(sessionId)
     const existingAttempts = currentEntry.attempts ?? []

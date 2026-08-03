@@ -1,5 +1,4 @@
 import type {
-  AgentSessionSummary,
   AgentSummary,
   BashApprovalRequest,
   ModelDescriptor,
@@ -20,12 +19,11 @@ import { useChatSessionActions } from '@/hooks/useChatSessionActions'
 import { useSessionArchive } from '@/hooks/useSessionArchive'
 import { computePendingApprovalSessionIds } from '@/lib/agent-event-state'
 import {
+  EMPTY_SESSIONS,
   partitionSessionsByArchive,
   type WorkbenchStoreApi,
 } from '@/stores/workbench-store'
 
-/** 未加载时的稳定空列表，避免 selector 每次返回新引用引发重渲染循环。 */
-const EMPTY_SESSIONS: AgentSessionSummary[] = []
 const EMPTY_APPROVALS: BashApprovalRequest[] = []
 const EMPTY_CLARIFICATIONS: QuestionClarificationRequest[] = []
 

@@ -337,6 +337,62 @@ describe('TranscriptMessages', () => {
     expect(onFork).toHaveBeenCalledWith('fork-source')
   })
 
+  it('forkSource 按 messageId 匹配来源消息并标记高亮', () => {
+    defineMockApi()
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, messageId: 'msg-1', content: '来源' }),
+      createUserMessageEntry({ index: 1, messageId: 'msg-2', content: '其他' }),
+    ])
+
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+        forkSource={{ messageId: 'msg-1' }}
+      />,
+    )
+
+    expect(screen.getByTestId('fork-source-message')).toHaveTextContent('来源')
+  })
+
+  it('forkSource 按 sdkEntryId 候选匹配冷读来源消息', () => {
+    defineMockApi()
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, messageId: 'msg-1', content: '来源' }),
+      createUserMessageEntry({ index: 1, messageId: 'msg-2', content: '其他' }),
+    ])
+
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+        forkSource={{ messageId: '不在本会话', sdkEntryId: 'msg-1' }}
+      />,
+    )
+
+    expect(screen.getByTestId('fork-source-message')).toHaveTextContent('来源')
+  })
+
+  it('forkSource 两个候选都不匹配时不标记任何消息', () => {
+    defineMockApi()
+    const transcript = createTranscriptSnapshot([
+      createUserMessageEntry({ index: 0, messageId: 'msg-1', content: '来源' }),
+    ])
+
+    render(
+      <TranscriptMessages
+        transcript={transcript}
+        isStreaming={false}
+        sessionId="session-1"
+        forkSource={{ messageId: '不在本会话' }}
+      />,
+    )
+
+    expect(screen.queryByTestId('fork-source-message')).not.toBeInTheDocument()
+  })
+
   it('renders many structured entries without crashing', () => {
     defineMockApi()
     const entries: TranscriptEntry[] = Array.from(

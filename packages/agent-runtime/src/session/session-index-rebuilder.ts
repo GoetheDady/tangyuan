@@ -102,8 +102,16 @@ export class SessionIndexRebuilder {
       const model =
         session.model || oldEntry?.model || (runtimeConfig?.modelId ?? '')
       const thinkingLevel = session.thinkingLevel ?? oldEntry?.thinkingLevel
-      // 索引已有来源优先；否则从 Pi session 的来源记录投影。
-      const forkedFrom = oldEntry?.forkedFrom ?? session.forkedFrom
+      // 索引已有来源优先；旧单 id 来源缺 sdkEntryId 时用 Pi session 投影补齐，
+      // 使重建后两种命名空间都能定位来源消息。
+      const oldForkedFrom = oldEntry?.forkedFrom
+      const sdkForkedFrom = session.forkedFrom
+      const forkedFrom =
+        oldForkedFrom !== undefined &&
+        oldForkedFrom?.sdkEntryId === undefined &&
+        sdkForkedFrom?.sdkEntryId !== undefined
+          ? { ...oldForkedFrom, sdkEntryId: sdkForkedFrom.sdkEntryId }
+          : (oldForkedFrom ?? sdkForkedFrom)
 
       allEntries.push({
         sessionId: session.sessionId,

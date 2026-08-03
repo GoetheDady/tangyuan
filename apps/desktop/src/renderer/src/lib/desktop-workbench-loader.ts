@@ -5,6 +5,7 @@ import type {
   RuntimeSnapshot,
   TranscriptSnapshot,
 } from '@yuanxiao/contracts'
+import { partitionSessionsByArchive } from '@/stores/workbench-store'
 
 /**
  * Renderer 启动快照 single-flight。
@@ -49,12 +50,9 @@ export async function loadSessionsForReadyRuntime(
     agentId: activeAgentId,
     includeArchived: true,
   })
-  const archivedSessions = allSessions.filter(
-    (session) => session.archivedAt !== undefined,
-  )
-  let nextSessions = allSessions.filter(
-    (session) => session.archivedAt === undefined,
-  )
+  const { active: activeSessions, archived: archivedSessions } =
+    partitionSessionsByArchive(allSessions)
+  let nextSessions = activeSessions
   let activeSession: AgentSessionSummary | null = null
   let transcript: TranscriptSnapshot | null = null
 

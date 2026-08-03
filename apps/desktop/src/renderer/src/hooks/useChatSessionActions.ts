@@ -9,12 +9,10 @@ import { toast } from 'sonner'
 import { useStore } from 'zustand'
 
 import {
+  EMPTY_SESSIONS,
   partitionSessionsByArchive,
   type WorkbenchStoreApi,
 } from '@/stores/workbench-store'
-
-/** 未加载时的稳定空列表，避免 selector 每次返回新引用引发重渲染循环。 */
-const EMPTY_SESSIONS: AgentSessionSummary[] = []
 
 /** 会话操作组合层所需的 store 与路由上下文。 */
 export interface UseChatSessionActionsOptions {

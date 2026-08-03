@@ -88,4 +88,50 @@ describe('desktop workbench loader', () => {
       sessionLoadError: '会话索引不可读',
     })
   })
+
+  it('一次 includeArchived 查询按归档状态分片返回活跃与归档列表', async () => {
+    const runtime = createReadyRuntimeSnapshot({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-5',
+      maskedValue: 'sk-t...7890',
+      profileInitialized: true,
+    })
+    const activeSession = createDefaultSessionSummary({
+      sessionId: 'active-session',
+      title: '活跃会话',
+      updatedAt: '2026-08-03T08:00:00.000Z',
+    })
+    const archivedSession = {
+      ...createDefaultSessionSummary({
+        sessionId: 'archived-session',
+        title: '归档会话',
+        updatedAt: '2026-08-03T07:00:00.000Z',
+      }),
+      archivedAt: '2026-08-03T06:00:00.000Z',
+    }
+    const listSessions = vi
+      .fn()
+      .mockResolvedValue([archivedSession, activeSession])
+    const api = createApi({
+      getLastActiveSession: vi.fn().mockResolvedValue(null),
+      listSessions,
+      createSession: vi.fn().mockResolvedValue(activeSession),
+      getTranscript: vi.fn().mockResolvedValue({
+        agentId: 'yuanxiao',
+        sessionId: activeSession.sessionId,
+        entries: [],
+        updatedAt: '2026-08-03T09:00:00.000Z',
+      }),
+      setLastActiveSession: vi.fn().mockResolvedValue(null),
+    })
+
+    const result = await loadSessionsForReadyRuntime(api, runtime)
+
+    expect(listSessions).toHaveBeenCalledWith({
+      agentId: 'yuanxiao',
+      includeArchived: true,
+    })
+    expect(result.sessions).toEqual([activeSession])
+    expect(result.archivedSessions).toEqual([archivedSession])
+  })
 })
