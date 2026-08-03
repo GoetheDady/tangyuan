@@ -10,15 +10,7 @@ import type {
 import { applyTranscriptDelta } from '@yuanxiao/contracts'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 
-import {
-  getAgentEventSessionId,
-  mergeAgentEventIntoSessions,
-} from '@/lib/agent-event-session-state'
-import {
-  mergeAgentEventIntoAgents,
-  mergeAgentEventIntoPendingApprovals,
-  mergeAgentEventIntoPendingClarifications,
-} from '@/lib/agent-event-state'
+import { projectAgentEvent } from '@/lib/agent-event-projection'
 
 export interface WorkbenchState {
   runtime: RuntimeSnapshot | null
@@ -36,8 +28,6 @@ export interface WorkbenchState {
   composerDraft: string
   isInitializing: boolean
   alwaysAllowedCommandsBySessionId: Record<string, string[]>
-  /** 有 pending 审批的会话 ID 列表，由 approval 变更自动派生。 */
-  pendingApprovalSessionIds: string[]
 }
 
 export interface WorkbenchActions {
@@ -82,7 +72,6 @@ function createInitialState(): WorkbenchState {
     composerDraft: '',
     isInitializing: true,
     alwaysAllowedCommandsBySessionId: {},
-    pendingApprovalSessionIds: [],
   }
 }
 
@@ -109,96 +98,7 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
     },
 
     applyAgentEvent: (event) => {
-      set((state) => {
-        const nextAgents = mergeAgentEventIntoAgents(state.agents, event)
-        const currentSessions = state.sessionsByAgentId[event.agentId] ?? []
-        const nextSessions = mergeAgentEventIntoSessions(currentSessions, event)
-        const partial: Partial<WorkbenchState> = {}
-
-        if (nextAgents !== state.agents) {
-          partial.agents = nextAgents
-        }
-        const eventSessionId = getAgentEventSessionId(event)
-        const affectsKnownSession =
-          event.type === 'session-created' ||
-          (eventSessionId !== null &&
-            currentSessions.some(
-              (session) => session.sessionId === eventSessionId,
-            ))
-        if (nextSessions !== currentSessions && affectsKnownSession) {
-          partial.sessionsByAgentId = {
-            ...state.sessionsByAgentId,
-            [event.agentId]: nextSessions,
-          }
-        }
-
-        if (event.type === 'transcript-delta') {
-          const currentTranscript = state.transcriptsBySessionId[
-            event.sessionId
-          ] ?? {
-            agentId: event.agentId,
-            sessionId: event.sessionId,
-            entries: [],
-            updatedAt: event.occurredAt,
-          }
-          partial.transcriptsBySessionId = {
-            ...state.transcriptsBySessionId,
-            [event.sessionId]: applyTranscriptDelta(
-              currentTranscript,
-              event.delta,
-            ),
-          }
-        }
-
-        if (
-          event.type === 'approval-required' ||
-          event.type === 'approval-resolved'
-        ) {
-          partial.pendingApprovalsBySessionId = {
-            ...state.pendingApprovalsBySessionId,
-            [event.sessionId]: mergeAgentEventIntoPendingApprovals(
-              state.pendingApprovalsBySessionId[event.sessionId] ?? [],
-              event,
-            ),
-          }
-        }
-
-        if (
-          event.type === 'clarification-required' ||
-          event.type === 'clarification-resolved'
-        ) {
-          partial.pendingClarificationsBySessionId = {
-            ...state.pendingClarificationsBySessionId,
-            [event.sessionId]: mergeAgentEventIntoPendingClarifications(
-              state.pendingClarificationsBySessionId[event.sessionId] ?? [],
-              event,
-            ),
-          }
-        }
-
-        if (
-          event.type === 'approval-required' ||
-          event.type === 'approval-resolved'
-        ) {
-          partial.pendingApprovalSessionIds = computePendingApprovalSessionIds(
-            partial.pendingApprovalsBySessionId ??
-              state.pendingApprovalsBySessionId,
-          )
-        }
-
-        if (
-          event.type === 'turn-cancelled' ||
-          event.type === 'turn-failed' ||
-          (event.type === 'run-state-changed' && event.state !== 'running')
-        ) {
-          partial.sendingBySessionId = {
-            ...state.sendingBySessionId,
-            [event.sessionId]: false,
-          }
-        }
-
-        return partial
-      })
+      set((state) => projectAgentEvent(state, event))
     },
 
     applyTranscriptEvents: (events) => {
@@ -267,7 +167,6 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
         )
         return {
           pendingApprovalsBySessionId: next,
-          pendingApprovalSessionIds: computePendingApprovalSessionIds(next),
         }
       })
     },
@@ -281,7 +180,6 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
         )
         return {
           pendingApprovalsBySessionId: next,
-          pendingApprovalSessionIds: computePendingApprovalSessionIds(next),
         }
       })
     },
@@ -314,8 +212,6 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
         }
         return {
           pendingApprovalsBySessionId: nextApprovals,
-          pendingApprovalSessionIds:
-            computePendingApprovalSessionIds(nextApprovals),
           pendingClarificationsBySessionId: {
             ...state.pendingClarificationsBySessionId,
             [sessionId]: [],
@@ -387,18 +283,4 @@ function omitKey<T>(values: Record<string, T>, key: string): Record<string, T> {
   const remaining = { ...values }
   delete remaining[key]
   return remaining
-}
-
-/**
- * 从审批列表中提取有 pending 状态的会话 ID 列表。
- *
- * @param approvalsBySessionId - 按 session 分组的审批请求。
- * @returns 有 pending 审批的会话 ID 数组。
- */
-function computePendingApprovalSessionIds(
-  approvalsBySessionId: Record<string, BashApprovalRequest[]>,
-): string[] {
-  return Object.entries(approvalsBySessionId)
-    .filter(([, approvals]) => approvals.some((a) => a.status === 'pending'))
-    .map(([sessionId]) => sessionId)
 }

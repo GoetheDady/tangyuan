@@ -15,6 +15,7 @@ import { SessionArchiveCoordinator } from '../session/session-archive-coordinato
 import { createRuntimeServices } from './runtime-services'
 import type { RuntimeServices } from './runtime-services'
 import { RunScheduler } from './run-scheduler'
+import { AgentRuntimeError } from '../core'
 import {
   type AgentSessionSummary,
   type CancelRunRequest,
@@ -214,9 +215,16 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     const snapshot = await this.snapshotStore.getOrLoad()
 
     if (snapshot.status !== 'ready') {
-      throw new Error(
-        '发送消息前，请先配置 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。',
-      )
+      const corrupted =
+        snapshot.configRecovery.state === 'corrupted' ||
+        snapshot.configRecovery.state === 'migration-failed'
+      throw new AgentRuntimeError({
+        code: 'configuration-missing',
+        message: corrupted
+          ? '配置文件已损坏，请先恢复或重置配置。'
+          : '发送消息前，请先配置 Provider（模型服务）、Model（模型）和 API Key（接口密钥）。',
+        recoverable: true,
+      })
     }
   }
 

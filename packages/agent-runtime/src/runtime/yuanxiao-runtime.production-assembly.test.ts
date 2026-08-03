@@ -4,21 +4,13 @@ import {
   createDriver,
   createPiSdkGateway,
 } from '../driver/pi-sdk-driver.test-helpers'
-import { createYuanxiaoRuntimeForTesting } from './yuanxiao-runtime'
 
 afterEach(cleanupTempDirs)
 
 describe('YuanxiaoRuntime 生产模块组装', () => {
   it('通过真实窄模块完成配置、建会话和消息执行', async () => {
     const gateway = createPiSdkGateway()
-    const { driver } = await createDriver({ gateway })
-    const runtime = createYuanxiaoRuntimeForTesting({
-      configuration: driver.getConfigurationModule(),
-      sessions: driver,
-      agents: driver.getAgentLifecycleModule(),
-      profiles: driver.getProfileModule(),
-      skills: driver.getSkillModule(),
-    })
+    const { runtime } = await createDriver({ gateway })
 
     await expect(
       runtime.saveRuntimeConfiguration({

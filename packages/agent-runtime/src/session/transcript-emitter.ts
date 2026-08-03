@@ -54,6 +54,41 @@ export class TranscriptEmitter {
   }
 
   /**
+   * 为分叉会话种子继承历史：读取完整初始快照并建立投影。
+   *
+   * 分叉会话创建后先取回其在 SDK 文件中的继承历史，再种子进事件投影缓存，
+   * 使后续 transcript-delta 增量建立在继承历史之上（缓存不再只有分叉后消息）。
+   *
+   * @param loadSnapshot - 读取该会话完整初始快照的加载器。
+   * @returns 无返回值。
+   * @throws 当快照加载失败时，Promise 会 reject。
+   */
+  async seedSession(
+    loadSnapshot: () => Promise<TranscriptSnapshot>,
+  ): Promise<void> {
+    this.seedSnapshot(await loadSnapshot())
+  }
+
+  /**
+   * 用已完整的快照为会话建立初始投影（分叉会话继承父历史后种子）。
+   *
+   * 种子同时建立 messageId → entry 索引与下一个 entry 序号，
+   * 使后续 transcript-delta 增量正确 append 在继承历史之后。
+   *
+   * @param snapshot - 会话的完整初始快照。
+   * @returns 无返回值。
+   */
+  seedSnapshot(snapshot: TranscriptSnapshot): void {
+    this.transcriptSnapshots.set(snapshot.sessionId, snapshot)
+    this.sessionNextIndex.set(snapshot.sessionId, snapshot.entries.length)
+    for (const [index, entry] of snapshot.entries.entries()) {
+      if (entry.kind !== 'compaction') {
+        this.messageToEntryIndex.set(entry.messageId, index)
+      }
+    }
+  }
+
+  /**
    * 确保指定会话有初始 transcript 快照。
    */
   private ensureSnapshot(

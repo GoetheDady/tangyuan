@@ -31,6 +31,7 @@ import type {
   PiSdkSessionHandle,
 } from './pi-sdk-driver-contracts'
 import type { SessionModule } from '../runtime/runtime-modules'
+import { resolveSdkEntryId } from './sdk-entry-id-resolver'
 import { PiSdkDriverState } from './pi-sdk-driver-state'
 
 /**
@@ -282,9 +283,14 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
       modelId: parentConfig.modelId,
       apiKey,
     }
+    const sdkEntryId = await this.resolveSdkEntryId(
+      request.sessionId,
+      request.entryId,
+      parentEntry.sdkSessionFile,
+    )
     const forkedSession = await this.gateway.createBranchedSession({
       sdkSessionFile: parentEntry.sdkSessionFile,
-      entryId: request.entryId,
+      entryId: sdkEntryId,
     })
     const now = this.now()
     const title = `${parentEntry.title}（分叉）`
@@ -330,6 +336,26 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
     })
 
     return session
+  }
+
+  /**
+   * 把调用方提供的分叉源消息标识解析为 Pi SDK 文件中的真实 entry id。
+   *
+   * @param sessionId - 源会话标识。
+   * @param driverMessageId - 调用方提供的分叉源消息标识。
+   * @param sdkSessionFile - 源会话的 Pi JSONL 文件路径。
+   * @returns SDK 文件中的真实 entry id；无法桥接时返回原标识。
+   * @throws 此方法不会主动抛出错误。
+   */
+  private resolveSdkEntryId(
+    sessionId: string,
+    driverMessageId: string,
+    sdkSessionFile: string,
+  ): Promise<string> {
+    return resolveSdkEntryId(
+      { gateway: this.gateway, messageStore: this.messageStore },
+      { sessionId, driverMessageId, sdkSessionFile },
+    )
   }
 
   /**

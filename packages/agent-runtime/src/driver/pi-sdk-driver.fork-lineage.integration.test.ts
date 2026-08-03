@@ -143,17 +143,17 @@ function createRealFileGateway(): PiSdkGateway {
 /**
  * 从会话 transcript 中读取用户消息标识。
  *
- * @param driver - 当前 Driver。
+ * @param runtime - 当前 Runtime。
  * @param sessionId - 会话标识。
  * @param content - 目标用户消息文本。
  * @returns 对应的用户消息标识。
  */
 async function findUserMessageId(
-  driver: Awaited<ReturnType<typeof createDriver>>['driver'],
+  runtime: Awaited<ReturnType<typeof createDriver>>['runtime'],
   sessionId: string,
   content: string,
 ): Promise<string> {
-  const transcript = await driver.getTranscript({
+  const transcript = await runtime.getTranscript({
     agentId: 'yuanxiao',
     sessionId,
   })
@@ -172,39 +172,39 @@ async function findUserMessageId(
 describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
   it('以真实 Pi JSONL 支持首条消息分叉、同源多分叉与递归分叉', async () => {
     const gateway = createRealFileGateway()
-    const { driver, rootPath, userDataPath } = await createDriver({ gateway })
-    await driver.saveConfiguration({
+    const { runtime, rootPath, userDataPath } = await createDriver({ gateway })
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const parent = await driver.createSession({
+    const parent = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '父会话',
     })
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       content: '第一个问题',
     })
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       content: '第二个问题',
     })
     const firstUserMessageId = await findUserMessageId(
-      driver,
+      runtime,
       parent.sessionId,
       '第一个问题',
     )
     const secondUserMessageId = await findUserMessageId(
-      driver,
+      runtime,
       parent.sessionId,
       '第二个问题',
     )
 
     // 首条用户消息分叉：新会话历史为空，来源仍指向该消息。
-    const firstMessageFork = await driver.forkSession({
+    const firstMessageFork = await runtime.forkSession({
       agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       entryId: firstUserMessageId,
@@ -214,37 +214,37 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
       entryId: firstUserMessageId,
     })
     await expect(
-      driver.getTranscript({
+      runtime.getTranscript({
         agentId: 'yuanxiao',
         sessionId: firstMessageFork.sessionId,
       }),
     ).resolves.toMatchObject({ entries: [] })
 
     // 同一条消息的两个分叉：各自独立，互不覆盖。
-    const siblingOne = await driver.forkSession({
+    const siblingOne = await runtime.forkSession({
       agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       entryId: secondUserMessageId,
     })
-    const siblingTwo = await driver.forkSession({
+    const siblingTwo = await runtime.forkSession({
       agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       entryId: secondUserMessageId,
     })
     expect(siblingTwo.sessionId).not.toBe(siblingOne.sessionId)
 
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: siblingOne.sessionId,
       content: '第一个方案',
     })
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: siblingTwo.sessionId,
       content: '第二个方案',
     })
     await expect(
-      driver.getTranscript({
+      runtime.getTranscript({
         agentId: 'yuanxiao',
         sessionId: siblingOne.sessionId,
       }),
@@ -257,7 +257,7 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
       ],
     })
     await expect(
-      driver.getTranscript({
+      runtime.getTranscript({
         agentId: 'yuanxiao',
         sessionId: siblingTwo.sessionId,
       }),
@@ -272,11 +272,11 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
 
     // 从分叉会话继续分叉，形成第三层谱系。
     const grandchildSourceId = await findUserMessageId(
-      driver,
+      runtime,
       siblingOne.sessionId,
       '第一个方案',
     )
-    const grandchild = await driver.forkSession({
+    const grandchild = await runtime.forkSession({
       agentId: 'yuanxiao',
       sessionId: siblingOne.sessionId,
       entryId: grandchildSourceId,
@@ -285,16 +285,26 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
       sessionId: siblingOne.sessionId,
       entryId: grandchildSourceId,
     })
+    // 孙分叉只继承到分叉点为止的历史：不含「第一个方案」之后的任何内容。
+    await expect(
+      runtime.getTranscript({
+        agentId: 'yuanxiao',
+        sessionId: grandchild.sessionId,
+      }),
+    ).resolves.toMatchObject({
+      entries: [
+        expect.objectContaining({ content: '第一个问题' }),
+        expect.objectContaining({ content: '收到：第一个问题' }),
+      ],
+    })
 
     // 重启：会话谱系从本地索引恢复。
-    const restartedDriver = createDriverAtPath({
+    const restartedRuntime = createDriverAtPath({
       gateway,
       rootPath,
       userDataPath,
     })
-    await expect(
-      restartedDriver.listSessions({ agentId: 'yuanxiao' }),
-    ).resolves.toEqual(
+    await expect(restartedRuntime.listSessions('yuanxiao')).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           sessionId: parent.sessionId,
@@ -331,15 +341,30 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
     )
 
     // 索引丢失：从全局 Pi session 扫描重建谱系与精确来源。
+    // 重建后 transcript 直接读 Pi JSONL（entry id 为 SDK uuid），
+    // 因此来源标识取重建运行时读出的真实 messageId 作对照。
     await unlink(join(userDataPath, 'sessions/index.json'))
-    const rebuiltDriver = createDriverAtPath({
+    const rebuiltRuntime = createDriverAtPath({
       gateway,
       rootPath,
       userDataPath,
     })
-    const rebuiltSessions = await rebuiltDriver.listSessions({
-      agentId: 'yuanxiao',
-    })
+    const rebuiltSessions = await rebuiltRuntime.listSessions('yuanxiao')
+    const rebuiltFirstUserMessageId = await findUserMessageId(
+      rebuiltRuntime,
+      parent.sessionId,
+      '第一个问题',
+    )
+    const rebuiltSecondUserMessageId = await findUserMessageId(
+      rebuiltRuntime,
+      parent.sessionId,
+      '第二个问题',
+    )
+    const rebuiltGrandchildSourceId = await findUserMessageId(
+      rebuiltRuntime,
+      siblingOne.sessionId,
+      '第一个方案',
+    )
 
     expect(
       rebuiltSessions.find((session) => session.sessionId === parent.sessionId)
@@ -356,28 +381,28 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
           sessionId: firstMessageFork.sessionId,
           forkedFrom: {
             sessionId: parent.sessionId,
-            entryId: firstUserMessageId,
+            entryId: rebuiltFirstUserMessageId,
           },
         },
         {
           sessionId: siblingOne.sessionId,
           forkedFrom: {
             sessionId: parent.sessionId,
-            entryId: secondUserMessageId,
+            entryId: rebuiltSecondUserMessageId,
           },
         },
         {
           sessionId: siblingTwo.sessionId,
           forkedFrom: {
             sessionId: parent.sessionId,
-            entryId: secondUserMessageId,
+            entryId: rebuiltSecondUserMessageId,
           },
         },
         {
           sessionId: grandchild.sessionId,
           forkedFrom: {
             sessionId: siblingOne.sessionId,
-            entryId: grandchildSourceId,
+            entryId: rebuiltGrandchildSourceId,
           },
         },
       ]),
@@ -386,27 +411,27 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
 
   it('来源会话文件缺失时报告会话不可用，不产生半个分叉', async () => {
     const gateway = createRealFileGateway()
-    const { driver, userDataPath } = await createDriver({ gateway })
-    await driver.saveConfiguration({
+    const { runtime, userDataPath } = await createDriver({ gateway })
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const parent = await driver.createSession({
+    const parent = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '父会话',
     })
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       content: '会被删掉的会话',
     })
     const sourceId = await findUserMessageId(
-      driver,
+      runtime,
       parent.sessionId,
       '会被删掉的会话',
     )
-    const before = (await driver.listSessions({ agentId: 'yuanxiao' })).length
+    const before = (await runtime.listSessions('yuanxiao')).length
     const index = (await readJson(
       join(userDataPath, 'sessions/index.json'),
     )) as {
@@ -419,63 +444,61 @@ describe('PiSdkDriver 分叉来源与递归会话谱系', () => {
     await rm(parentSessionFile)
 
     await expect(
-      driver.forkSession({
+      runtime.forkSession({
         agentId: 'yuanxiao',
         sessionId: parent.sessionId,
         entryId: sourceId,
       }),
     ).rejects.toThrow()
-    await expect(
-      driver.listSessions({ agentId: 'yuanxiao' }),
-    ).resolves.toHaveLength(before)
+    await expect(runtime.listSessions('yuanxiao')).resolves.toHaveLength(before)
   })
 })
 
 describe('PiSdkDriver 会话运行配置', () => {
   it('分叉继承父会话有效配置，之后两边各自独立', async () => {
     const gateway = createRealFileGateway()
-    const { driver } = await createDriver({ gateway })
-    await driver.saveConfiguration({
+    const { runtime } = await createDriver({ gateway })
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const parent = await driver.createSession({
+    const parent = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '父会话',
     })
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       content: '第一个问题',
     })
 
     // 父会话先换模型和 Thinking Level，分叉应继承这些「有效」取值而非创建时值。
-    await driver.setSessionModel({
+    await runtime.setSessionModel({
       agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       providerId: 'anthropic',
       modelId: 'claude-opus-4-6',
     })
-    await driver.setSessionThinkingLevel({
+    await runtime.setSessionThinkingLevel({
       agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       level: 'high',
     })
 
     const sourceId = await findUserMessageId(
-      driver,
+      runtime,
       parent.sessionId,
       '第一个问题',
     )
-    const fork = await driver.forkSession({
+    const fork = await runtime.forkSession({
       agentId: 'yuanxiao',
       sessionId: parent.sessionId,
       entryId: sourceId,
     })
 
     await expect(
-      driver.getSessionModelInfo({
+      runtime.getSessionModelInfo({
         agentId: 'yuanxiao',
         sessionId: fork.sessionId,
       }),
@@ -486,20 +509,20 @@ describe('PiSdkDriver 会话运行配置', () => {
     })
 
     // 分叉侧换配置不影响父会话。
-    await driver.setSessionThinkingLevel({
+    await runtime.setSessionThinkingLevel({
       agentId: 'yuanxiao',
       sessionId: fork.sessionId,
       level: 'low',
     })
 
     await expect(
-      driver.getSessionModelInfo({
+      runtime.getSessionModelInfo({
         agentId: 'yuanxiao',
         sessionId: parent.sessionId,
       }),
     ).resolves.toMatchObject({ thinkingLevel: 'high' })
     await expect(
-      driver.getSessionModelInfo({
+      runtime.getSessionModelInfo({
         agentId: 'yuanxiao',
         sessionId: fork.sessionId,
       }),
@@ -508,42 +531,42 @@ describe('PiSdkDriver 会话运行配置', () => {
 
   it('重启后打开历史会话恢复会话运行配置，而不是 Agent 默认配置', async () => {
     const gateway = createRealFileGateway()
-    const { driver, rootPath, userDataPath } = await createDriver({ gateway })
-    await driver.saveConfiguration({
+    const { runtime, rootPath, userDataPath } = await createDriver({ gateway })
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const session = await driver.createSession({
+    const session = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '换过模型的会话',
     })
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '第一个问题',
     })
-    await driver.setSessionModel({
+    await runtime.setSessionModel({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       providerId: 'anthropic',
       modelId: 'claude-opus-4-6',
     })
-    await driver.setSessionThinkingLevel({
+    await runtime.setSessionThinkingLevel({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       level: 'medium',
     })
 
-    const restartedDriver = createDriverAtPath({
+    const restartedRuntime = createDriverAtPath({
       gateway,
       rootPath,
       userDataPath,
     })
-    await restartedDriver.listSessions({ agentId: 'yuanxiao' })
+    await restartedRuntime.listSessions('yuanxiao')
 
     await expect(
-      restartedDriver.getSessionModelInfo({
+      restartedRuntime.getSessionModelInfo({
         agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
@@ -556,28 +579,28 @@ describe('PiSdkDriver 会话运行配置', () => {
 
   it('索引丢失后从全局 Pi session 扫描恢复会话运行配置', async () => {
     const gateway = createRealFileGateway()
-    const { driver, rootPath, userDataPath } = await createDriver({ gateway })
-    await driver.saveConfiguration({
+    const { runtime, rootPath, userDataPath } = await createDriver({ gateway })
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const session = await driver.createSession({
+    const session = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '换过模型的会话',
     })
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '第一个问题',
     })
-    await driver.setSessionModel({
+    await runtime.setSessionModel({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       providerId: 'anthropic',
       modelId: 'claude-opus-4-6',
     })
-    await driver.setSessionThinkingLevel({
+    await runtime.setSessionThinkingLevel({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       level: 'medium',
@@ -589,7 +612,7 @@ describe('PiSdkDriver 会话运行配置', () => {
       rootPath,
       userDataPath,
     })
-    await rebuiltDriver.listSessions({ agentId: 'yuanxiao' })
+    await rebuiltDriver.listSessions('yuanxiao')
 
     await expect(
       rebuiltDriver.getSessionModelInfo({

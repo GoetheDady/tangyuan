@@ -20,11 +20,11 @@ describe('PiSdkDriver', () => {
   // ===== profile 测试 =====
 
   it('reads soul content from the correct agent path', async () => {
-    const { driver, rootPath } = await createDriver()
+    const { runtime, rootPath } = await createDriver()
     const { writeFile } = await import('node:fs/promises')
 
     // 先初始化 driver
-    await driver.getSnapshot()
+    await runtime.getRuntimeSnapshot()
     // 写入一个已知的 soul.md
     const resolvedHomePath = join(rootPath, '.yuanxiao/agents/yuanxiao')
     await writeFile(
@@ -33,18 +33,18 @@ describe('PiSdkDriver', () => {
       'utf8',
     )
 
-    const soul = await driver.getSoul('yuanxiao')
+    const soul = await runtime.getSoul('yuanxiao')
 
     expect(soul.agentId).toBe('yuanxiao')
     expect(soul.content).toBe('# 元宵\n自定义 soul 内容。')
     expect(soul.updatedAt).toBeTruthy()
   })
   it('reads shared user profile from the shared profile path', async () => {
-    const { driver, rootPath } = await createDriver()
+    const { runtime, rootPath } = await createDriver()
     const { mkdir } = await import('node:fs/promises')
 
     // 先初始化 driver
-    await driver.getSnapshot()
+    await runtime.getRuntimeSnapshot()
     // 写入共享 user profile
     const profileDir = join(rootPath, '.yuanxiao/profile')
     await mkdir(profileDir, { recursive: true })
@@ -55,17 +55,17 @@ describe('PiSdkDriver', () => {
       'utf8',
     )
 
-    const userProfile = await driver.getUserProfile()
+    const userProfile = await runtime.getUserProfile()
 
     expect(userProfile.content).toBe('# User\n共享用户偏好。')
     expect(userProfile.updatedAt).toBeTruthy()
   })
   it('migrates legacy user.md from yuanxiao agent directory to shared profile path', async () => {
-    const { driver, rootPath } = await createDriver()
+    const { runtime, rootPath } = await createDriver()
     const { writeFile, readFile } = await import('node:fs/promises')
 
     // 先初始化 driver 创建目录
-    await driver.getSnapshot()
+    await runtime.getRuntimeSnapshot()
 
     // 模拟旧结构：在 yuanxiao agent 目录下写入 user.md
     const agentDir = join(rootPath, '.yuanxiao/agents/yuanxiao')
@@ -76,7 +76,7 @@ describe('PiSdkDriver', () => {
     )
 
     // 读取 user profile 应触发迁移
-    const userProfile = await driver.getUserProfile()
+    const userProfile = await runtime.getUserProfile()
 
     expect(userProfile.content).toBe('# Legacy User\n旧用户资料。')
 
@@ -86,10 +86,10 @@ describe('PiSdkDriver', () => {
     expect(migratedContent).toBe('# Legacy User\n旧用户资料。')
   })
   it('updates an agent soul and emits a profile-updated event', async () => {
-    const { driver, rootPath } = await createDriver()
+    const { runtime, rootPath } = await createDriver()
     const { writeFile } = await import('node:fs/promises')
 
-    await driver.getSnapshot()
+    await runtime.getRuntimeSnapshot()
 
     // 写入初始 soul
     const resolvedHomePath = join(rootPath, '.yuanxiao/agents/yuanxiao')
@@ -101,13 +101,13 @@ describe('PiSdkDriver', () => {
 
     // 监听事件
     const events: AgentEvent[] = []
-    driver.subscribe((event) => {
+    runtime.subscribe((event) => {
       events.push(event)
     })
 
-    const current = await driver.getSoul('yuanxiao')
+    const current = await runtime.getSoul('yuanxiao')
 
-    const result = await driver.updateSoul(
+    const result = await runtime.updateSoul(
       'yuanxiao',
       '# 元宵\n新 soul 内容。',
       current.version,
@@ -135,10 +135,10 @@ describe('PiSdkDriver', () => {
     )
   })
   it('creates another agent soul without an empty backup', async () => {
-    const { driver, rootPath } = await createDriver()
+    const { runtime, rootPath } = await createDriver()
     const { mkdir } = await import('node:fs/promises')
 
-    await driver.getSnapshot()
+    await runtime.getRuntimeSnapshot()
 
     // 为 agent-b 创建目录结构
     const agentBPath = join(rootPath, '.yuanxiao/agents/agent-b')
@@ -147,8 +147,8 @@ describe('PiSdkDriver', () => {
     await mkdir(join(agentBPath, 'memory'), { recursive: true })
     await mkdir(join(agentBPath, 'skills'), { recursive: true })
 
-    const current = await driver.getSoul('agent-b')
-    const result = await driver.updateSoul(
+    const current = await runtime.getSoul('agent-b')
+    const result = await runtime.updateSoul(
       'agent-b',
       '# Agent B\n新创建 Agent 的初始 soul。',
       current.version,
@@ -163,13 +163,13 @@ describe('PiSdkDriver', () => {
   })
   it('rejects sensitive content from soul updates', async () => {
     const gateway = createPiSdkGateway()
-    const { driver, rootPath } = await createDriver({ gateway })
+    const { runtime, rootPath } = await createDriver({ gateway })
     const { writeFile } = await import('node:fs/promises')
 
-    await driver.getSnapshot()
+    await runtime.getRuntimeSnapshot()
 
     // 先保存一个 API Key 配置
-    await driver.saveConfiguration({
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
@@ -183,8 +183,8 @@ describe('PiSdkDriver', () => {
       'utf8',
     )
 
-    const current = await driver.getSoul('yuanxiao')
-    const result = await driver.updateSoul(
+    const current = await runtime.getSoul('yuanxiao')
+    const result = await runtime.updateSoul(
       'yuanxiao',
       '# 元宵\n我的 API Key 是 sk-test-secret-7890。',
       current.version,
@@ -201,10 +201,10 @@ describe('PiSdkDriver', () => {
     expect(content).toBe('# 元宵\n旧 soul。')
   })
   it('automatically backs up the old soul before updating', async () => {
-    const { driver, rootPath } = await createDriver()
+    const { runtime, rootPath } = await createDriver()
     const { writeFile } = await import('node:fs/promises')
 
-    await driver.getSnapshot()
+    await runtime.getRuntimeSnapshot()
 
     // 写入初始 soul（不创建备份）
     const resolvedHomePath = join(rootPath, '.yuanxiao/agents/yuanxiao')
@@ -214,8 +214,8 @@ describe('PiSdkDriver', () => {
       'utf8',
     )
 
-    const current = await driver.getSoul('yuanxiao')
-    const result = await driver.updateSoul(
+    const current = await runtime.getSoul('yuanxiao')
+    const result = await runtime.updateSoul(
       'yuanxiao',
       '# 元宵\n新 soul。',
       current.version,
@@ -256,29 +256,29 @@ describe('PiSdkDriver', () => {
         return handle
       },
     })
-    const { driver } = await createDriver({ gateway })
+    const { runtime } = await createDriver({ gateway })
     const events: AgentEvent[] = []
-    driver.subscribe((event) => events.push(event))
+    runtime.subscribe((event) => events.push(event))
 
-    await driver.saveConfiguration({
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const agent = await driver.createAgent('工具更新助手')
-    const defaultSoulBefore = await driver.getSoul('yuanxiao')
-    const session = await driver.createSession({
+    const agent = await runtime.createAgent('工具更新助手')
+    const defaultSoulBefore = await runtime.getSoul('yuanxiao')
+    const session = await runtime.createSession({
       agentId: agent.agentId,
       title: '工具更新',
     })
     expect(gateway.sessionRequests[0]?.onUpdateSoul).toBeTypeOf('function')
 
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: agent.agentId,
       sessionId: session.sessionId,
       content: '更新你的灵魂',
     })
-    const transcript = await driver.getTranscript({
+    const transcript = await runtime.getTranscript({
       agentId: agent.agentId,
       sessionId: session.sessionId,
     })
@@ -299,10 +299,12 @@ describe('PiSdkDriver', () => {
         expect.objectContaining({ kind: 'system-message' }),
       ]),
     )
-    await expect(driver.getSoul(agent.agentId)).resolves.toMatchObject({
+    await expect(runtime.getSoul(agent.agentId)).resolves.toMatchObject({
       content: '# 元宵\n由工具更新。',
     })
-    await expect(driver.getSoul('yuanxiao')).resolves.toEqual(defaultSoulBefore)
+    await expect(runtime.getSoul('yuanxiao')).resolves.toEqual(
+      defaultSoulBefore,
+    )
   })
   it('updates the default Agent during its normal turn without duplicate events or system messages', async () => {
     const prompts: string[] = []
@@ -323,21 +325,21 @@ describe('PiSdkDriver', () => {
         return handle
       },
     })
-    const { driver, rootPath, homePath } = await createDriver({ gateway })
+    const { runtime, rootPath, homePath } = await createDriver({ gateway })
     const events: AgentEvent[] = []
-    driver.subscribe((event) => events.push(event))
+    runtime.subscribe((event) => events.push(event))
 
     await writeInitializedProfile(join(rootPath, homePath.slice(2)), rootPath)
-    await driver.saveConfiguration({
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const session = await driver.createSession({
+    const session = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '默认 Agent 工具更新',
     })
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '更新你的灵魂',
@@ -350,7 +352,7 @@ describe('PiSdkDriver', () => {
       ),
     ).toHaveLength(1)
     await expect(
-      driver.getTranscript({
+      runtime.getTranscript({
         agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
@@ -377,21 +379,21 @@ describe('PiSdkDriver', () => {
         return handle
       },
     })
-    const { driver, rootPath, homePath } = await createDriver({ gateway })
+    const { runtime, rootPath, homePath } = await createDriver({ gateway })
     const events: AgentEvent[] = []
-    driver.subscribe((event) => events.push(event))
+    runtime.subscribe((event) => events.push(event))
 
     await writeInitializedProfile(join(rootPath, homePath.slice(2)), rootPath)
-    await driver.saveConfiguration({
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const session = await driver.createSession({
+    const session = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '共享画像工具更新',
     })
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '记住我的偏好',
@@ -403,7 +405,7 @@ describe('PiSdkDriver', () => {
       ),
     ).toHaveLength(1)
     await expect(
-      driver.getTranscript({
+      runtime.getTranscript({
         agentId: 'yuanxiao',
         sessionId: session.sessionId,
       }),
@@ -416,25 +418,25 @@ describe('PiSdkDriver', () => {
 
   it('binds shared profile updates to the session-observed version and refreshes every active session', async () => {
     const gateway = createPiSdkGateway()
-    const { driver, rootPath, homePath } = await createDriver({ gateway })
+    const { runtime, rootPath, homePath } = await createDriver({ gateway })
     await writeInitializedProfile(join(rootPath, homePath.slice(2)), rootPath)
-    await driver.saveConfiguration({
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
 
-    const first = await driver.createSession({
+    const first = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '第一会话',
     })
-    await driver.createSession({ agentId: 'yuanxiao', title: '第二会话' })
+    await runtime.createSession({ agentId: 'yuanxiao', title: '第二会话' })
     const firstRequest = gateway.sessionRequests.find(
       (request) => request.sessionId === first.sessionId,
     )
     expect(firstRequest).toBeDefined()
 
-    const observed = await driver.getUserProfile()
+    const observed = await runtime.getUserProfile()
     await expect(
       firstRequest?.onUpdateUserProfile('# User\n共享新偏好。'),
     ).resolves.toMatchObject({ status: 'updated' })
@@ -446,7 +448,7 @@ describe('PiSdkDriver', () => {
     ).toBeGreaterThan(1)
 
     await expect(
-      driver.updateUserProfile('# User\n过期覆盖。', observed.version),
+      runtime.updateUserProfile('# User\n过期覆盖。', observed.version),
     ).resolves.toMatchObject({
       status: 'rejected',
       reason: { code: 'version-conflict' },
@@ -479,33 +481,33 @@ describe('PiSdkDriver', () => {
         return handle
       },
     })
-    const { driver, rootPath } = await createDriver({ gateway })
+    const { runtime, rootPath } = await createDriver({ gateway })
 
-    await driver.saveConfiguration({
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const initial = await driver.getSoul('yuanxiao')
-    await driver.updateSoul('yuanxiao', '# 元宵\n更新前。', initial.version)
-    const session = await driver.createSession({
+    const initial = await runtime.getSoul('yuanxiao')
+    await runtime.updateSoul('yuanxiao', '# 元宵\n更新前。', initial.version)
+    const session = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '取消后保留更新',
     })
-    const sendPromise = driver.sendMessage({
+    const sendPromise = runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '更新后取消',
     })
     await updateCompleted.promise
 
-    await driver.cancelRun({
+    await runtime.cancelRun({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
     })
     await sendPromise
 
-    await expect(driver.getSoul('yuanxiao')).resolves.toMatchObject({
+    await expect(runtime.getSoul('yuanxiao')).resolves.toMatchObject({
       content: '# 元宵\n取消前已更新。',
     })
     await expect(
@@ -517,13 +519,13 @@ describe('PiSdkDriver', () => {
     expect(historyFiles).toHaveLength(1)
   })
   it('creates a shared user profile on first update and does not duplicate unchanged writes', async () => {
-    const { driver, rootPath } = await createDriver()
+    const { runtime, rootPath } = await createDriver()
     const events: AgentEvent[] = []
-    driver.subscribe((event) => events.push(event))
-    await driver.getSnapshot()
+    runtime.subscribe((event) => events.push(event))
+    await runtime.getRuntimeSnapshot()
 
-    const initial = await driver.getUserProfile()
-    const firstResult = await driver.updateUserProfile(
+    const initial = await runtime.getUserProfile()
+    const firstResult = await runtime.updateUserProfile(
       '# User\n首次记录的偏好。',
       initial.version,
     )
@@ -539,7 +541,7 @@ describe('PiSdkDriver', () => {
       ),
     ).resolves.toEqual([])
 
-    const unchangedResult = await driver.updateUserProfile(
+    const unchangedResult = await runtime.updateUserProfile(
       '# User\n首次记录的偏好。',
       firstResult.version,
     )
@@ -555,18 +557,18 @@ describe('PiSdkDriver', () => {
   })
 
   it('keeps shared user profile unchanged when its backup fails', async () => {
-    const { driver, rootPath } = await createDriver()
+    const { runtime, rootPath } = await createDriver()
     const { mkdir, rm, writeFile } = await import('node:fs/promises')
-    await driver.getSnapshot()
+    await runtime.getRuntimeSnapshot()
 
     const profileDir = join(rootPath, '.yuanxiao/profile')
     await mkdir(profileDir, { recursive: true })
     await writeFile(join(profileDir, 'user.md'), '# User\n旧偏好。', 'utf8')
-    const current = await driver.getUserProfile()
+    const current = await runtime.getUserProfile()
     await rm(join(profileDir, 'user.history'), { recursive: true })
     await writeFile(join(profileDir, 'user.history'), '阻止创建目录', 'utf8')
 
-    const result = await driver.updateUserProfile(
+    const result = await runtime.updateUserProfile(
       '# User\n新偏好。',
       current.version,
     )
@@ -582,10 +584,10 @@ describe('PiSdkDriver', () => {
   })
 
   it('updates shared user profile and emits a profile-updated event', async () => {
-    const { driver, rootPath } = await createDriver()
+    const { runtime, rootPath } = await createDriver()
     const { mkdir, writeFile } = await import('node:fs/promises')
 
-    await driver.getSnapshot()
+    await runtime.getRuntimeSnapshot()
 
     // 确保共享 profile 目录存在并写入初始 user.md
     const profileDir = join(rootPath, '.yuanxiao/profile')
@@ -595,7 +597,7 @@ describe('PiSdkDriver', () => {
 
     // 监听事件
     const events: AgentEvent[] = []
-    driver.subscribe((event) => {
+    runtime.subscribe((event) => {
       events.push(event)
     })
 
@@ -606,8 +608,8 @@ describe('PiSdkDriver', () => {
       'utf8',
     )
 
-    const current = await driver.getUserProfile()
-    const result = await driver.updateUserProfile(
+    const current = await runtime.getUserProfile()
+    const result = await runtime.updateUserProfile(
       '# User\n新用户偏好。',
       current.version,
     )
@@ -631,13 +633,13 @@ describe('PiSdkDriver', () => {
   })
   it('rejects sensitive content from user profile updates', async () => {
     const gateway = createPiSdkGateway()
-    const { driver, rootPath } = await createDriver({ gateway })
+    const { runtime, rootPath } = await createDriver({ gateway })
     const { mkdir, writeFile } = await import('node:fs/promises')
 
-    await driver.getSnapshot()
+    await runtime.getRuntimeSnapshot()
 
     // 先保存配置
-    await driver.saveConfiguration({
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
@@ -657,8 +659,8 @@ describe('PiSdkDriver', () => {
     )
 
     // 尝试写入含敏感信息的内容
-    const current = await driver.getUserProfile()
-    const result = await driver.updateUserProfile(
+    const current = await runtime.getUserProfile()
+    const result = await runtime.updateUserProfile(
       '# User\npassword: my-secret-pwd',
       current.version,
     )
@@ -676,47 +678,51 @@ describe('PiSdkDriver', () => {
   })
   it('retry：完成后持久化带 inReplyTo 的 completed attempt', async () => {
     const gateway = createPiSdkGateway()
-    const { driver } = await createDriver({ gateway })
+    const { runtime } = await createDriver({ gateway })
     const events: AgentEvent[] = []
-    driver.subscribe((event) => events.push(event))
+    runtime.subscribe((event) => events.push(event))
 
-    await driver.saveConfiguration({
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const session = await driver.createSession({
+    const session = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '新会话',
     })
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '你好',
     })
 
     const userMessageId = `${session.sessionId}-message-1`
-    await driver.retryMessage({
+    await runtime.retryMessage({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       userMessageId,
     })
 
-    await expect(driver.listSessions({ agentId: 'yuanxiao' })).resolves.toEqual(
-      [
-        expect.objectContaining({
-          sessionId: session.sessionId,
-          state: 'completed',
-        }),
-      ],
-    )
-    // retry 完成会 emit attempt-started 与带 inReplyTo 的 message-appended
+    await expect(runtime.listSessions('yuanxiao')).resolves.toEqual([
+      expect.objectContaining({
+        sessionId: session.sessionId,
+        state: 'completed',
+      }),
+    ])
+    // retry 完成会 emit attempt-started 与带 inReplyTo 的 transcript-delta
     expect(events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: 'attempt-started' }),
         expect.objectContaining({
-          type: 'message-appended',
-          inReplyTo: userMessageId,
+          type: 'transcript-delta',
+          delta: expect.objectContaining({
+            type: 'entry-appended',
+            entry: expect.objectContaining({
+              kind: 'agent-reply',
+              inReplyTo: userMessageId,
+            }),
+          }),
         }),
       ]),
     )
@@ -757,43 +763,43 @@ describe('PiSdkDriver', () => {
         return handle
       },
     })
-    const { driver } = await createDriver({ gateway })
+    const { runtime } = await createDriver({ gateway })
 
-    await driver.saveConfiguration({
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const session = await driver.createSession({
+    const session = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '新会话',
     })
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '你好',
     })
 
-    const retryPromise = driver.retryMessage({
+    const retryPromise = runtime.retryMessage({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       userMessageId: `${session.sessionId}-message-1`,
     })
     await runStarted.promise
-    await driver.cancelRun({
+    await runtime.cancelRun({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
     })
 
-    await expect(retryPromise).resolves.toBeUndefined()
-    await expect(driver.listSessions({ agentId: 'yuanxiao' })).resolves.toEqual(
-      [
-        expect.objectContaining({
-          sessionId: session.sessionId,
-          state: 'cancelled',
-        }),
-      ],
-    )
+    await expect(retryPromise).resolves.toMatchObject({
+      sessionId: session.sessionId,
+    })
+    await expect(runtime.listSessions('yuanxiao')).resolves.toEqual([
+      expect.objectContaining({
+        sessionId: session.sessionId,
+        state: 'cancelled',
+      }),
+    ])
   })
   it('retry：SDK 调用失败时置为 failed 并 reject', async () => {
     let promptCount = 0
@@ -822,18 +828,18 @@ describe('PiSdkDriver', () => {
         return handle
       },
     })
-    const { driver } = await createDriver({ gateway })
+    const { runtime } = await createDriver({ gateway })
 
-    await driver.saveConfiguration({
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const session = await driver.createSession({
+    const session = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '新会话',
     })
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '你好',
@@ -841,23 +847,21 @@ describe('PiSdkDriver', () => {
 
     const userMessageId = `${session.sessionId}-message-1`
     const failEvents: AgentEvent[] = []
-    driver.subscribe((event) => failEvents.push(event))
+    runtime.subscribe((event) => failEvents.push(event))
     await expect(
-      driver.retryMessage({
+      runtime.retryMessage({
         agentId: 'yuanxiao',
         sessionId: session.sessionId,
         userMessageId,
       }),
     ).rejects.toThrow('retry provider failed')
 
-    await expect(driver.listSessions({ agentId: 'yuanxiao' })).resolves.toEqual(
-      [
-        expect.objectContaining({
-          sessionId: session.sessionId,
-          state: 'failed',
-        }),
-      ],
-    )
+    await expect(runtime.listSessions('yuanxiao')).resolves.toEqual([
+      expect.objectContaining({
+        sessionId: session.sessionId,
+        state: 'failed',
+      }),
+    ])
     expect(failEvents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: 'turn-failed' }),
@@ -867,25 +871,25 @@ describe('PiSdkDriver', () => {
   })
   it('retry：找不到原始用户消息时 reject', async () => {
     const gateway = createPiSdkGateway()
-    const { driver } = await createDriver({ gateway })
+    const { runtime } = await createDriver({ gateway })
 
-    await driver.saveConfiguration({
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const session = await driver.createSession({
+    const session = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '新会话',
     })
-    await driver.sendMessage({
+    await runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '你好',
     })
 
     await expect(
-      driver.retryMessage({
+      runtime.retryMessage({
         agentId: 'yuanxiao',
         sessionId: session.sessionId,
         userMessageId: 'does-not-exist',
@@ -920,18 +924,18 @@ describe('PiSdkDriver', () => {
         return handle
       },
     })
-    const { driver } = await createDriver({ gateway })
+    const { runtime } = await createDriver({ gateway })
 
-    await driver.saveConfiguration({
+    await runtime.saveRuntimeConfiguration({
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
       apiKey: 'sk-test-secret-7890',
     })
-    const session = await driver.createSession({
+    const session = await runtime.createSession({
       agentId: 'yuanxiao',
       title: '新会话',
     })
-    const sendPromise = driver.sendMessage({
+    const sendPromise = runtime.sendMessage({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
       content: '你好',
@@ -939,17 +943,19 @@ describe('PiSdkDriver', () => {
     await runStarted.promise
 
     await expect(
-      driver.retryMessage({
+      runtime.retryMessage({
         agentId: 'yuanxiao',
         sessionId: session.sessionId,
         userMessageId: `${session.sessionId}-message-1`,
       }),
     ).rejects.toThrow('当前会话正在运行')
 
-    await driver.cancelRun({
+    await runtime.cancelRun({
       agentId: 'yuanxiao',
       sessionId: session.sessionId,
     })
-    await expect(sendPromise).resolves.toBeUndefined()
+    await expect(sendPromise).resolves.toMatchObject({
+      sessionId: session.sessionId,
+    })
   })
 })

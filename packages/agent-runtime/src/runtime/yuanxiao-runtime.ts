@@ -1,6 +1,8 @@
 import { YuanxiaoRuntimeOrchestrator } from './yuanxiao-runtime-orchestrator'
 import type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencies'
 import { collectSessionSubtree } from '../session/session-archive-coordinator'
+import { AgentRuntimeError } from '../core'
+import { canRestoreSessionLineage } from './session-lineage'
 import type { ToolApprovalGateway } from '../driver'
 import { createToolApprovalGateway } from '../approval'
 import type { RuntimeServices } from './runtime-services'
@@ -376,7 +378,11 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
 
         if (
           recordedSession &&
-          (await this.canRestoreSessionLineage(recordedSession, sessions))
+          (await canRestoreSessionLineage(
+            this.sessions,
+            recordedSession,
+            sessions,
+          ))
         ) {
           return record
         }
@@ -387,7 +393,9 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     let fallbackSession: AgentSessionSummary | undefined
 
     for (const session of fallbackSessions) {
-      if (await this.canRestoreSessionLineage(session, fallbackSessions)) {
+      if (
+        await canRestoreSessionLineage(this.sessions, session, fallbackSessions)
+      ) {
         fallbackSession = session
         break
       }
@@ -402,51 +410,6 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
       agentId: fallbackSession.agentId,
       sessionId: fallbackSession.sessionId,
     })
-  }
-
-  /**
-   * 验证会话及其完整父链的 Pi session 内容仍可读取。
-   *
-   * @param session - 需要验证的会话摘要。
-   * @param sessions - 同一 Agent 的全部可见会话。
-   * @returns 谱系完整且每个 transcript 可读时返回 true。
-   */
-  private async canRestoreSessionLineage(
-    session: AgentSessionSummary,
-    sessions: AgentSessionSummary[],
-  ): Promise<boolean> {
-    const sessionsById = new Map(
-      sessions.map((candidate) => [candidate.sessionId, candidate]),
-    )
-    const visitedSessionIds = new Set<string>()
-    let candidate: AgentSessionSummary | undefined = session
-
-    while (candidate) {
-      if (
-        candidate.agentId !== session.agentId ||
-        visitedSessionIds.has(candidate.sessionId)
-      ) {
-        return false
-      }
-      visitedSessionIds.add(candidate.sessionId)
-
-      try {
-        await this.sessions.getTranscript({
-          agentId: candidate.agentId,
-          sessionId: candidate.sessionId,
-        })
-      } catch {
-        return false
-      }
-
-      const parentSessionId = candidate.forkedFrom?.sessionId
-      if (!parentSessionId) {
-        return true
-      }
-      candidate = sessionsById.get(parentSessionId)
-    }
-
-    return false
   }
 
   /**
@@ -514,7 +477,11 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
       session = this.sessionCache.find(request.sessionId)
     }
     if (session?.agentId !== request.agentId) {
-      throw new Error(`找不到会话 ${request.sessionId}，或该会话已归档。`)
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `找不到会话 ${request.sessionId}，或该会话已归档。`,
+        recoverable: true,
+      })
     }
 
     if (session) this.assertLineageAvailable(session)
@@ -554,12 +521,20 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
       this.runScheduler.isRunStarting(request.sessionId) ||
       session?.state === 'running'
     ) {
-      throw new Error('当前会话正在运行，请等待完成或先取消本次响应。')
+      throw new AgentRuntimeError({
+        code: 'run-already-active',
+        message: '当前会话正在运行，请等待完成或先取消本次响应。',
+        recoverable: true,
+      })
     }
 
     // 检查会话是否已在队列中
     if (this.runScheduler.hasQueued(request.sessionId)) {
-      throw new Error('当前会话已在排队中，请等待或取消排队。')
+      throw new AgentRuntimeError({
+        code: 'run-already-active',
+        message: '当前会话已在排队中，请等待或取消排队。',
+        recoverable: true,
+      })
     }
 
     // 达到并发上限时入队
@@ -617,11 +592,17 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
     const forkSourceSession = this.sessionCache.find(request.sessionId)
     if (forkSourceSession) this.assertLineageAvailable(forkSourceSession)
-    const pendingFork = this.sessions.forkSession(request)
-    return this.sessionArchiveCoordinator.trackFork(
+    const forked = await this.sessionArchiveCoordinator.trackFork(
       request.sessionId,
-      pendingFork,
+      this.sessions.forkSession(request),
     )
+    await this.transcriptEmitter.seedSession(() =>
+      this.getTranscript({
+        agentId: forked.agentId,
+        sessionId: forked.sessionId,
+      }),
+    )
+    return forked
   }
 
   /**
@@ -864,9 +845,12 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
   /** 断言会话谱系可用，不可用时抛出错误阻断操作。 */
   private assertLineageAvailable(session: AgentSessionSummary): void {
     if (session.lineageUnavailable) {
-      throw new Error(
-        '该会话的祖先 Pi 会话文件已丢失或损坏，无法操作。请尝试恢复或重新创建。',
-      )
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message:
+          '该会话的祖先 Pi 会话文件已丢失或损坏，无法操作。请尝试恢复或重新创建。',
+        recoverable: true,
+      })
     }
   }
 
@@ -900,7 +884,11 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     const session = this.sessionCache.find(request.sessionId)
 
     if (!session) {
-      throw new Error(`找不到会话 ${request.sessionId}。`)
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: `找不到会话 ${request.sessionId}。`,
+        recoverable: true,
+      })
     }
 
     return session

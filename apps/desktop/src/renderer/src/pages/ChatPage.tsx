@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { useStore } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 
 import { ChatSidebar } from '@/components/ChatSidebar'
 import { ConversationArea } from '@/components/ConversationArea'
@@ -18,6 +19,7 @@ import {
   SessionDeleteDialog,
 } from '@/components/SessionArchiveControls'
 import { useSessionArchive } from '@/hooks/useSessionArchive'
+import { computePendingApprovalSessionIds } from '@/lib/agent-event-state'
 import type { WorkbenchStoreApi } from '@/stores/workbench-store'
 
 /** 未加载时的稳定空列表，避免 selector 每次返回新引用引发重渲染循环。 */
@@ -130,7 +132,9 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
   )
   const pendingApprovalSessionIds = useStore(
     store,
-    (state) => state.pendingApprovalSessionIds,
+    useShallow((state) =>
+      computePendingApprovalSessionIds(state.pendingApprovalsBySessionId),
+    ),
   )
 
   const activeAgent = useMemo(

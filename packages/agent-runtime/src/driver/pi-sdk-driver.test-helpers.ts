@@ -6,9 +6,9 @@ import type {
   TranscriptEntry,
   TranscriptSnapshot,
 } from '@yuanxiao/contracts'
+import { createYuanxiaoRuntime } from '../index'
 import {
   type InternalMessage,
-  PiSdkDriver,
   type PiSdkCreateSessionRequest,
   type PiSdkDriverOptions,
   type PiSdkGateway,
@@ -72,7 +72,7 @@ export async function createDriver(
   tempDirs.push(rootPath)
 
   return {
-    driver: createDriverAtPath({
+    runtime: createDriverAtPath({
       rootPath,
       userDataPath,
       ...(options.gateway ? { gateway: options.gateway } : {}),
@@ -129,10 +129,10 @@ export async function writeInitializedProfile(
 }
 
 /**
- * 在指定目录创建 Driver，用于模拟应用重启后复用同一个 userData。
+ * 在指定目录创建 Runtime，用于模拟应用重启后复用同一个 userData。
  *
  * @param options - Driver 需要复用的根目录、userData 路径和可选 SDK 网关。
- * @returns 指向同一持久化目录的新 PiSdkDriver。
+ * @returns 指向同一持久化目录的新 Runtime。
  * @throws 此测试辅助方法不会主动抛出错误。
  */
 export function createDriverAtPath(options: {
@@ -140,7 +140,7 @@ export function createDriverAtPath(options: {
   userDataPath: string
   gateway?: PiSdkGateway
   encryptionAdapter?: ConfigEncryptionAdapter | null
-}): PiSdkDriver {
+}) {
   const resolvedEncryptionAdapter =
     options.encryptionAdapter !== undefined
       ? options.encryptionAdapter
@@ -158,7 +158,7 @@ export function createDriverAtPath(options: {
     driverOptions.encryptionAdapter = resolvedEncryptionAdapter
   }
 
-  return new PiSdkDriver(driverOptions)
+  return createYuanxiaoRuntime(driverOptions)
 }
 
 /**

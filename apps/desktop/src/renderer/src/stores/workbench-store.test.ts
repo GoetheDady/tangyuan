@@ -10,6 +10,7 @@ import type {
 import { createRuntimeSnapshot } from '@yuanxiao/contracts'
 import { describe, expect, it } from 'vitest'
 
+import { computePendingApprovalSessionIds } from '../lib/agent-event-state'
 import { createWorkbenchStore } from './workbench-store'
 
 const NOW = '2026-07-29T10:00:00.000Z'
@@ -126,7 +127,6 @@ describe('createWorkbenchStore', () => {
       composerDraft: '',
       isInitializing: true,
       activeSession: null,
-      pendingApprovalSessionIds: [],
       alwaysAllowedCommandsBySessionId: {},
     })
 
@@ -342,7 +342,11 @@ describe('createWorkbenchStore', () => {
     expect(store.getState().pendingClarificationsBySessionId).toEqual({
       'session-1': [firstClarification],
     })
-    expect(store.getState().pendingApprovalSessionIds).toEqual(['session-2'])
+    expect(
+      computePendingApprovalSessionIds(
+        store.getState().pendingApprovalsBySessionId,
+      ),
+    ).toEqual(['session-2'])
   })
 
   it('按 session 打开、更新和清理 transcript', () => {
@@ -405,7 +409,11 @@ describe('createWorkbenchStore', () => {
       'session-1': [firstClarification],
       'session-2': [],
     })
-    expect(store.getState().pendingApprovalSessionIds).toEqual([])
+    expect(
+      computePendingApprovalSessionIds(
+        store.getState().pendingApprovalsBySessionId,
+      ),
+    ).toEqual([])
   })
 
   it('composer 草稿和进程内始终允许命令只通过语义 action 修改', () => {

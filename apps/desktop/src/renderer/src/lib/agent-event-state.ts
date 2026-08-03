@@ -50,6 +50,20 @@ export function mergeAgentEventIntoPendingApprovals(
   return approvals
 }
 
+/**
+ * 从审批列表中提取有 pending 状态的会话 ID 列表。
+ *
+ * @param approvalsBySessionId - 按 session 分组的审批请求。
+ * @returns 有 pending 审批的会话 ID 数组。
+ */
+export function computePendingApprovalSessionIds(
+  approvalsBySessionId: Record<string, BashApprovalRequest[]>,
+): string[] {
+  return Object.entries(approvalsBySessionId)
+    .filter(([, approvals]) => approvals.some((a) => a.status === 'pending'))
+    .map(([sessionId]) => sessionId)
+}
+
 /** 将澄清事件归并到待澄清请求集合。 */
 export function mergeAgentEventIntoPendingClarifications(
   clarifications: QuestionClarificationRequest[],

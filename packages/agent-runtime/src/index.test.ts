@@ -8,7 +8,6 @@ import {
   type AgentEvent,
   type PiSdkPromptOptions,
   createYuanxiaoRuntime,
-  createYuanxiaoRuntimeForTesting,
 } from './index'
 import {
   cleanupTempDirs,
@@ -93,14 +92,7 @@ describe('YuanxiaoRuntime', () => {
         return handle
       },
     })
-    const { driver } = await createDriver({ gateway })
-    const runtime = createYuanxiaoRuntimeForTesting({
-      configuration: driver.getConfigurationModule(),
-      sessions: driver,
-      agents: driver.getAgentLifecycleModule(),
-      profiles: driver.getProfileModule(),
-      skills: driver.getSkillModule(),
-    })
+    const { runtime } = await createDriver({ gateway })
     const events: AgentEvent[] = []
     runtime.subscribe((event) => {
       events.push(event)
