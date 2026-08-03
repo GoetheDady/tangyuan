@@ -10,6 +10,11 @@ import {
   type TurnStep,
 } from '@yuanxiao/contracts'
 import { assembleRunTurn } from './run-turn-assembly'
+import {
+  createAgentReplyTranscriptEntry,
+  createCompactionTranscriptEntry,
+  createUserTranscriptEntry,
+} from './transcript-entry-assembly'
 import { createToolStepSummary } from '../core'
 
 /**
@@ -43,6 +48,73 @@ export class TranscriptEmitter {
 
   constructor(emit: AgentEventListener) {
     this.emit = emit
+  }
+
+  /**
+   * 统一的 DriverEvent 投影入口：按事件类型分派到具体处理器。
+   *
+   * 编排层不再需要逐个分支转发 transcript 事件，改为一处调用。
+   *
+   * @param event - 来自 Driver 的标准事件。
+   * @returns 无返回值。
+   * @throws 此方法不会主动抛出错误。
+   */
+  applyEvent(event: DriverEvent): void {
+    switch (event.type) {
+      case 'message-appended':
+        this.emitTranscriptDeltaForMessageAppended(event)
+        break
+      case 'attempt-started':
+        this.startAttemptForRun(event)
+        this.initializeTurnStateForRun(event)
+        break
+      case 'message-delta':
+        if (event.deltaKind === 'thinking') {
+          this.emitTranscriptDeltaForThinking(event)
+        } else {
+          this.emitTranscriptDeltaForDelta(event)
+        }
+        break
+      case 'message-completed':
+        this.completeAttemptForRun(event)
+        break
+      case 'activity-updated':
+        this.emitTranscriptDeltaForActivity(event)
+        break
+      case 'turn-started':
+        this.startTurn(event)
+        break
+      case 'turn-ended':
+        this.endTurn(event)
+        break
+      case 'compaction-detected':
+        this.appendCompactionEntry(event)
+        break
+      case 'auto-retry-progress':
+        this.updateAttemptRetryCount(event)
+        break
+      case 'turn-cancelled':
+        this.failAttemptForRun(
+          event.agentId,
+          event.sessionId,
+          event.runId,
+          'cancelled',
+          event.occurredAt,
+        )
+        break
+      case 'turn-failed':
+        this.failAttemptForRun(
+          event.agentId,
+          event.sessionId,
+          event.runId,
+          'failed',
+          event.occurredAt,
+          event.error,
+        )
+        break
+      default:
+        break
+    }
   }
 
   /**
@@ -125,13 +197,12 @@ export class TranscriptEmitter {
     if (message.role === 'user') {
       const delta: TranscriptDelta = {
         type: 'entry-appended',
-        entry: {
-          kind: 'user-message',
+        entry: createUserTranscriptEntry({
           index: nextIndex,
           messageId: message.messageId,
           content: message.content,
           createdAt: message.createdAt,
-        },
+        }),
       }
       this.emitTranscriptDeltaEvent(event.agentId, sessionId, delta)
       this.sessionNextIndex.set(sessionId, nextIndex + 1)
@@ -146,8 +217,7 @@ export class TranscriptEmitter {
       const attempt = this.pendingAttemptBySession.get(sessionId) ?? null
       const delta: TranscriptDelta = {
         type: 'entry-appended',
-        entry: {
-          kind: 'agent-reply',
+        entry: createAgentReplyTranscriptEntry({
           index: nextIndex,
           messageId: message.messageId,
           content: message.content,
@@ -155,7 +225,7 @@ export class TranscriptEmitter {
           attempt,
           turns: [],
           ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}),
-        },
+        }),
       }
       this.messageToEntryIndex.set(message.messageId, nextIndex)
       this.emitTranscriptDeltaEvent(event.agentId, sessionId, delta)
@@ -175,11 +245,10 @@ export class TranscriptEmitter {
     if (message.role === 'compaction') {
       const delta: TranscriptDelta = {
         type: 'entry-appended',
-        entry: {
-          kind: 'compaction',
+        entry: createCompactionTranscriptEntry({
           index: nextIndex,
           timestamp: message.createdAt,
-        },
+        }),
       }
       this.emitTranscriptDeltaEvent(event.agentId, sessionId, delta)
       this.sessionNextIndex.set(sessionId, nextIndex + 1)
@@ -610,6 +679,7 @@ export class TranscriptEmitter {
    * @throws 此方法不会主动抛出错误。
    */
   failAttemptForRun(
+    agentId: string,
     sessionId: string,
     runId: string,
     status: 'cancelled' | 'failed',
@@ -642,12 +712,7 @@ export class TranscriptEmitter {
       index: entryIndex,
       attempt: updatedAttempt,
     }
-    this.emitTranscriptDeltaEvent(
-      // Use a reasonable agentId; the session should be known
-      'yuanxiao',
-      sessionId,
-      delta,
-    )
+    this.emitTranscriptDeltaEvent(agentId, sessionId, delta)
     this.pendingAttemptBySession.delete(sessionId)
   }
 
@@ -680,11 +745,10 @@ export class TranscriptEmitter {
 
     const delta: TranscriptDelta = {
       type: 'entry-appended',
-      entry: {
-        kind: 'compaction',
+      entry: createCompactionTranscriptEntry({
         index: nextIndex,
         timestamp: occurredAt,
-      },
+      }),
     }
     this.emitTranscriptDeltaEvent(agentId, sessionId, delta)
     this.sessionNextIndex.set(sessionId, nextIndex + 1)

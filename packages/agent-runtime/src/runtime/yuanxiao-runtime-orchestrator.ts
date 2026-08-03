@@ -264,13 +264,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
       return
     }
 
-    if (driverEvent.type === 'message-appended') {
-      this.transcriptEmitter.emitTranscriptDeltaForMessageAppended(
-        driverEvent as Extract<AgentEvent, { type: 'message-appended' }>,
-      )
-      return
-    }
-
+    // 会话状态与调度是编排层的职责；transcript 投影统一交给 emitter 分派。
     if (driverEvent.type === 'attempt-started') {
       this.runScheduler.completeRunStart(driverEvent.sessionId)
       this.upsertSessionState(
@@ -278,96 +272,27 @@ export abstract class YuanxiaoRuntimeOrchestrator {
         'running',
         driverEvent.occurredAt,
       )
-      this.transcriptEmitter.startAttemptForRun(driverEvent)
-      this.transcriptEmitter.initializeTurnStateForRun(driverEvent)
-      return
-    }
-
-    if (driverEvent.type === 'message-delta') {
-      if (driverEvent.deltaKind === 'thinking') {
-        this.transcriptEmitter.emitTranscriptDeltaForThinking(
-          driverEvent as Extract<AgentEvent, { type: 'message-delta' }>,
-        )
-      } else {
-        this.transcriptEmitter.emitTranscriptDeltaForDelta(
-          driverEvent as Extract<AgentEvent, { type: 'message-delta' }>,
-        )
-      }
-      return
-    }
-
-    if (driverEvent.type === 'message-completed') {
-      this.transcriptEmitter.completeAttemptForRun(
-        driverEvent as Extract<AgentEvent, { type: 'message-completed' }>,
-      )
-      return
-    }
-
-    if (driverEvent.type === 'activity-updated') {
-      this.transcriptEmitter.emitTranscriptDeltaForActivity(
-        driverEvent as Extract<AgentEvent, { type: 'activity-updated' }>,
-      )
-      return
-    }
-
-    if (driverEvent.type === 'turn-started') {
-      this.transcriptEmitter.startTurn(driverEvent)
-      return
-    }
-
-    if (driverEvent.type === 'turn-ended') {
-      this.transcriptEmitter.endTurn(driverEvent)
-      return
-    }
-
-    if (driverEvent.type === 'compaction-detected') {
-      this.transcriptEmitter.appendCompactionEntry(driverEvent)
-      return
-    }
-
-    if (driverEvent.type === 'auto-retry-progress') {
-      this.transcriptEmitter.updateAttemptRetryCount(driverEvent)
-      return
-    }
-
-    if (driverEvent.type === 'turn-cancelled') {
+    } else if (driverEvent.type === 'turn-cancelled') {
       this.upsertSessionState(
         driverEvent.sessionId,
         'cancelled',
         driverEvent.occurredAt,
       )
-      this.transcriptEmitter.failAttemptForRun(
-        driverEvent.sessionId,
-        driverEvent.runId,
-        'cancelled',
-        driverEvent.occurredAt,
-      )
-      return
-    }
-
-    if (driverEvent.type === 'turn-failed') {
+    } else if (driverEvent.type === 'turn-failed') {
       this.upsertSessionState(
         driverEvent.sessionId,
         'failed',
         driverEvent.occurredAt,
       )
-      this.transcriptEmitter.failAttemptForRun(
-        driverEvent.sessionId,
-        driverEvent.runId,
-        'failed',
-        driverEvent.occurredAt,
-        driverEvent.error,
-      )
-      return
-    }
-
-    if (driverEvent.type === 'run-state-changed') {
+    } else if (driverEvent.type === 'run-state-changed') {
       this.upsertSessionState(
         driverEvent.sessionId,
         driverEvent.state,
         driverEvent.occurredAt,
       )
     }
+
+    this.transcriptEmitter.applyEvent(driverEvent)
   }
 
   /**

@@ -5,6 +5,10 @@ import type {
   TranscriptSnapshot,
 } from '@yuanxiao/contracts'
 import { assembleRunTurn } from './run-turn-assembly'
+import {
+  createAgentReplyTranscriptEntry,
+  createUserTranscriptEntry,
+} from './transcript-entry-assembly'
 
 type TurnAssistantMessage = Parameters<typeof assembleRunTurn>[0]['message']
 type TurnToolResult = Parameters<
@@ -96,8 +100,7 @@ export function mapPiSdkSessionEntryToTranscriptEntries(
 
   const content = stringifyAssistantText(assistantMessage)
   return [
-    {
-      kind: 'agent-reply',
+    createAgentReplyTranscriptEntry({
       index,
       messageId: candidate.id,
       content,
@@ -113,7 +116,7 @@ export function mapPiSdkSessionEntryToTranscriptEntries(
           completedAt: candidate.timestamp,
         }),
       ],
-    },
+    }),
   ]
 }
 
@@ -162,15 +165,14 @@ export function buildTranscriptSnapshotFromSdkEntries(
     if (!pendingReply) return
 
     flushTurn()
-    const reply: AgentReplyEntry = {
-      kind: 'agent-reply',
+    const reply: AgentReplyEntry = createAgentReplyTranscriptEntry({
       index: transcriptEntries.length,
       messageId: pendingReply.messageId,
       content: pendingReply.content,
       createdAt: pendingReply.createdAt,
       attempt: null,
       turns: pendingReply.turns,
-    }
+    })
     transcriptEntries.push(reply)
     pendingReply = null
   }
@@ -366,11 +368,10 @@ function getToolResult(
 }
 
 function mapUserEntry(entry: SdkMessageEntry, index: number): TranscriptEntry {
-  return {
-    kind: 'user-message',
+  return createUserTranscriptEntry({
     index,
     messageId: entry.id,
     content: stringifyPiSdkMessageContent(entry.message.content),
     createdAt: entry.timestamp,
-  }
+  })
 }
