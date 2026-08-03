@@ -1,18 +1,13 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
-import {
-  YUANXIAO_DEFAULT_AGENT_ID,
-  type AgentRunState,
-  type AgentSessionSummary,
-} from '@yuanxiao/contracts'
+import { dirname } from 'node:path'
+import type { AgentRunState, AgentSessionSummary } from '@yuanxiao/contracts'
 import type { ConfigStore, DirectoryLayout } from '../core'
 import type { PiSdkGateway } from '../driver'
-import { AgentRuntimeError } from '../core'
+import { AgentRuntimeError, isNotFoundError } from '../core'
 import {
-  extractAgentRuntimeConfig,
-  isForkSource,
-  isNotFoundError,
-} from '../core'
+  normalizePersistedIndexEntry,
+  SessionIndexRebuilder,
+} from './session-index-rebuilder'
 import type {
   PersistedAttemptEntry,
   PersistedSessionIndex,
@@ -41,15 +36,17 @@ export interface SessionIndexStoreDependencies {
  */
 export class SessionIndexStore {
   private readonly layout: DirectoryLayout
-  private readonly configStore: ConfigStore
-  private readonly gateway: PiSdkGateway
+  private readonly rebuilder: SessionIndexRebuilder
   private readonly sessionIndex = new Map<string, PersistedSessionIndexEntry>()
   private readonly sessions = new Map<string, AgentSessionSummary>()
 
   constructor(dependencies: SessionIndexStoreDependencies) {
     this.layout = dependencies.layout
-    this.configStore = dependencies.configStore
-    this.gateway = dependencies.gateway
+    this.rebuilder = new SessionIndexRebuilder({
+      layout: dependencies.layout,
+      configStore: dependencies.configStore,
+      gateway: dependencies.gateway,
+    })
   }
 
   /**
@@ -61,142 +58,45 @@ export class SessionIndexStore {
   async load(): Promise<PersistedSessionIndexEntry[]> {
     const indexPath = this.layout.sessionIndex()
 
+    let rawIndex: string
     try {
-      const rawIndex = await readFile(indexPath, 'utf8')
+      rawIndex = await readFile(indexPath, 'utf8')
+    } catch (error) {
+      // 索引缺失（或不可读）时从 Pi SDK 原生 session 重建
+      if (isNotFoundError(error)) {
+        return this.rebuildIndex()
+      }
+
+      return this.rebuildIndex()
+    }
+
+    try {
       const parsedIndex = JSON.parse(rawIndex) as Partial<PersistedSessionIndex>
       const entries = Array.isArray(parsedIndex.sessions)
-        ? parsedIndex.sessions.flatMap((entry) => this.normalizeEntry(entry))
+        ? parsedIndex.sessions.flatMap((entry) =>
+            normalizePersistedIndexEntry(entry),
+          )
         : []
       this.replaceAll(entries)
 
       return entries
-    } catch (error) {
-      if (isNotFoundError(error)) {
-        return this.rebuildFromSdk()
-      }
-
-      // 索引 JSON 损坏时也触发重建
-      return this.rebuildFromSdk()
+    } catch {
+      // 索引 JSON 损坏时同样触发重建，重建器尽力保留可读的扩展数据
+      return this.rebuildIndex()
     }
   }
 
   /**
-   * 在本地索引缺失或损坏时，扫描全局 Pi SDK session 目录重建索引。
-   *
-   * 按 session header 的工作目录恢复 Agent 归属；已归档 Agent 的会话同样保留
-   *（listSummaries 按 agentId 过滤，不会混入当前活跃 Agent 的日常列表）。
-   * 无法归属到任何已知 Agent 的 Pi 会话不进入索引。
+   * 委托重建器从 Pi SDK session 目录重建索引，装回内存并落盘。
    *
    * @returns 从 SDK 恢复出的索引条目。
-   * @throws 当运行时配置读取失败时，Promise 会 reject。
+   * @throws 当重建器读取运行时配置失败时，Promise 会 reject。
    */
-  private async rebuildFromSdk(): Promise<PersistedSessionIndexEntry[]> {
-    const readResult = await this.configStore.read()
-
-    if (!readResult.config) {
-      this.replaceAll([])
-      await this.write()
-      return []
-    }
-
-    // 读取旧索引以保留扩展数据
-    const oldEntries = await this.tryReadOldIndex()
-    const config = readResult.config
-    // 工作目录 → Agent 归属；含已归档 Agent，否则其会话谱系会在重建后丢失。
-    const agentIdByCwd = new Map<string, string>()
-
-    for (const agentId of Object.keys(config.agents)) {
-      const cwd =
-        agentId === YUANXIAO_DEFAULT_AGENT_ID
-          ? this.layout.agentHome()
-          : this.layout.workspace(agentId)
-      agentIdByCwd.set(resolve(cwd), agentId)
-    }
-
-    let sdkSessions: Awaited<ReturnType<PiSdkGateway['listSessions']>>
-
-    try {
-      sdkSessions = await this.gateway.listSessions({
-        sessionDir: this.layout.sdkSessionDir(),
-      })
-    } catch {
-      // 全局扫描失败时给出空索引，下次 load 仍会重试重建。
-      this.replaceAll([])
-      await this.write()
-      return []
-    }
-
-    const allEntries: PersistedSessionIndexEntry[] = []
-
-    for (const session of sdkSessions) {
-      const oldEntry = oldEntries.get(session.sessionId)
-      const agentId = session.cwd
-        ? agentIdByCwd.get(resolve(session.cwd))
-        : oldEntry?.agentId
-
-      // 无法归属到已知 Agent 的会话（如其他工具写入的 Pi 会话）不入索引。
-      if (!agentId) continue
-
-      const runtimeConfig = extractAgentRuntimeConfig(config, agentId)
-      // 会话运行配置属于会话：Pi session 自己记录的取值最可信，
-      // 其次是旧索引，最后才回退到 Agent 默认配置。
-      const provider =
-        session.provider ||
-        oldEntry?.provider ||
-        (runtimeConfig?.providerId ?? '')
-      const model =
-        session.model || oldEntry?.model || (runtimeConfig?.modelId ?? '')
-      const thinkingLevel = session.thinkingLevel ?? oldEntry?.thinkingLevel
-      // 索引已有来源优先；否则从 Pi session 的来源记录投影。
-      const forkedFrom = oldEntry?.forkedFrom ?? session.forkedFrom
-
-      allEntries.push({
-        sessionId: session.sessionId,
-        sdkSessionFile: session.sdkSessionFile,
-        title: session.title?.trim() || session.sessionId,
-        createdAt: session.createdAt,
-        updatedAt: session.updatedAt,
-        provider,
-        model,
-        ...(thinkingLevel !== undefined ? { thinkingLevel } : {}),
-        agentId,
-        // 保留旧扩展数据，不存在则使用默认值
-        lastMessagePreview: oldEntry?.lastMessagePreview ?? '',
-        status: oldEntry?.status ?? 'idle',
-        ...(oldEntry?.archivedAt !== undefined
-          ? { archivedAt: oldEntry.archivedAt }
-          : {}),
-        ...(forkedFrom !== undefined ? { forkedFrom } : {}),
-      })
-    }
-
-    this.replaceAll(allEntries)
+  private async rebuildIndex(): Promise<PersistedSessionIndexEntry[]> {
+    const entries = await this.rebuilder.rebuild()
+    this.replaceAll(entries)
     await this.write()
-
-    return allEntries
-  }
-
-  /**
-   * 尝试读取旧版本地会话索引，用于重建时保留扩展数据。
-   *
-   * @returns 以 sessionId 为键的旧索引条目映射。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private async tryReadOldIndex(): Promise<
-    Map<string, PersistedSessionIndexEntry>
-  > {
-    try {
-      const indexPath = this.layout.sessionIndex()
-      const rawIndex = await readFile(indexPath, 'utf8')
-      const parsedIndex = JSON.parse(rawIndex) as Partial<PersistedSessionIndex>
-      const entries = Array.isArray(parsedIndex.sessions)
-        ? parsedIndex.sessions.flatMap((entry) => this.normalizeEntry(entry))
-        : []
-
-      return new Map(entries.map((entry) => [entry.sessionId, entry]))
-    } catch {
-      return new Map()
-    }
+    return entries
   }
 
   /**
@@ -438,16 +338,26 @@ export class SessionIndexStore {
   }
 
   /**
-   * 在会话索引中新增或更新一条执行尝试记录（最多保留最近 20 条）。
+   * 在会话索引中新增或更新一条执行尝试记录（最多保留最近 20 条），
+   * 并同步写入本次运行状态变更，一次调用只落盘一次。
+   *
+   * 执行记录与它伴随的会话状态（running/completed/cancelled/failed）总是
+   * 成对出现，收敛到本方法是执行记录唯一的写入点。
    *
    * @param sessionId - 所属会话标识。
    * @param attempt - 要持久化的执行尝试记录。
+   * @param sessionUpdate - 与本次尝试同时生效的会话展示状态。
    * @returns 无返回值。
    * @throws 当会话索引不存在或写入失败时，Promise 会 reject。
    */
   async upsertAttempt(
     sessionId: string,
     attempt: PersistedAttemptEntry,
+    sessionUpdate: {
+      status: AgentRunState
+      updatedAt: string
+      lastMessagePreview?: string
+    },
   ): Promise<void> {
     const currentEntry = this.getEntry(sessionId)
     const existingAttempts = currentEntry.attempts ?? []
@@ -469,6 +379,11 @@ export class SessionIndexStore {
 
     await this.updateEntry(sessionId, {
       attempts: trimmedAttempts,
+      status: sessionUpdate.status,
+      updatedAt: sessionUpdate.updatedAt,
+      ...(sessionUpdate.lastMessagePreview !== undefined
+        ? { lastMessagePreview: sessionUpdate.lastMessagePreview }
+        : {}),
     })
   }
 
@@ -503,76 +418,5 @@ export class SessionIndexStore {
     }
     this.sessions.set(sessionId, nextSession)
     return nextSession
-  }
-
-  /**
-   * 把未知 JSON 值规范化为合法的会话索引条目。
-   *
-   * @param value - 待校验的未知值。
-   * @returns 合法时返回单元素数组，否则返回空数组。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private normalizeEntry(value: unknown): PersistedSessionIndexEntry[] {
-    const entry = value as Partial<PersistedSessionIndexEntry>
-
-    if (
-      typeof entry.sessionId !== 'string' ||
-      typeof entry.sdkSessionFile !== 'string' ||
-      typeof entry.title !== 'string' ||
-      typeof entry.createdAt !== 'string' ||
-      typeof entry.updatedAt !== 'string' ||
-      typeof entry.provider !== 'string' ||
-      typeof entry.model !== 'string' ||
-      typeof entry.agentId !== 'string' ||
-      typeof entry.lastMessagePreview !== 'string' ||
-      !this.isAgentRunState(entry.status)
-    ) {
-      return []
-    }
-
-    const attempts = Array.isArray(entry.attempts) ? entry.attempts : undefined
-    const forkedFrom = isForkSource(entry.forkedFrom)
-      ? entry.forkedFrom
-      : undefined
-    const thinkingLevel =
-      typeof entry.thinkingLevel === 'string' ? entry.thinkingLevel : undefined
-    const archivedAt =
-      typeof entry.archivedAt === 'string' ? entry.archivedAt : undefined
-
-    return [
-      {
-        sessionId: entry.sessionId,
-        sdkSessionFile: entry.sdkSessionFile,
-        title: entry.title,
-        createdAt: entry.createdAt,
-        updatedAt: entry.updatedAt,
-        provider: entry.provider,
-        model: entry.model,
-        ...(thinkingLevel !== undefined ? { thinkingLevel } : {}),
-        agentId: entry.agentId,
-        lastMessagePreview: entry.lastMessagePreview,
-        status: entry.status,
-        ...(archivedAt !== undefined ? { archivedAt } : {}),
-        ...(attempts !== undefined ? { attempts } : {}),
-        ...(forkedFrom !== undefined ? { forkedFrom } : {}),
-      },
-    ]
-  }
-
-  /**
-   * 判断未知值是否是可展示的 Agent 运行状态。
-   *
-   * @param value - 待判断的未知值。
-   * @returns 是 AgentRunState 时返回 true。
-   * @throws 此方法不会主动抛出错误。
-   */
-  private isAgentRunState(value: unknown): value is AgentRunState {
-    return (
-      value === 'idle' ||
-      value === 'running' ||
-      value === 'completed' ||
-      value === 'cancelled' ||
-      value === 'failed'
-    )
   }
 }

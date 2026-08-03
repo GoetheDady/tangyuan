@@ -182,14 +182,18 @@ describe('SessionIndexStore.upsertAttempt', () => {
     store.addSession(makeEntry())
 
     for (let i = 0; i < 25; i++) {
-      await store.upsertAttempt('s1', {
-        attemptId: `a${i}`,
-        runId: `r${i}`,
-        messageId: `m${i}`,
-        status: 'completed',
-        startedAt: 'now',
-        completedAt: 'now',
-      })
+      await store.upsertAttempt(
+        's1',
+        {
+          attemptId: `a${i}`,
+          runId: `r${i}`,
+          messageId: `m${i}`,
+          status: 'completed',
+          startedAt: 'now',
+          completedAt: 'now',
+        },
+        { status: 'completed', updatedAt: 'now' },
+      )
     }
 
     const attempts = store.getAttempts('s1')
@@ -202,14 +206,22 @@ describe('SessionIndexStore.upsertAttempt', () => {
     const store = await makeStore()
     store.addSession(makeEntry())
 
-    await store.upsertAttempt('s1', {
-      attemptId: 'a1',
-      runId: 'r1',
-      messageId: 'm1',
-      status: 'failed',
-      startedAt: 'now',
-      completedAt: 'later',
-    })
+    await store.upsertAttempt(
+      's1',
+      {
+        attemptId: 'a1',
+        runId: 'r1',
+        messageId: 'm1',
+        status: 'failed',
+        startedAt: 'now',
+        completedAt: 'later',
+      },
+      {
+        status: 'failed',
+        lastMessagePreview: '失败',
+        updatedAt: 'later',
+      },
+    )
 
     // 新 store 加载同一份磁盘索引
     const store2 = await makeStore()
@@ -218,6 +230,10 @@ describe('SessionIndexStore.upsertAttempt', () => {
     expect(attempts).toHaveLength(1)
     expect(attempts[0]?.attemptId).toBe('a1')
     expect(attempts[0]?.status).toBe('failed')
+    expect(store2.getSummary('s1')).toMatchObject({
+      state: 'failed',
+    })
+    expect(store2.getEntryOrNull('s1')?.lastMessagePreview).toBe('失败')
   })
 })
 

@@ -467,11 +467,6 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
     })
     this.activeRunIds.set(request.sessionId, runId)
     this.updateSessionState(session.sessionId, 'running')
-    await this.sessionIndexStore.updateEntry(session.sessionId, {
-      lastMessagePreview: createMessagePreview(content),
-      status: 'running',
-      updatedAt: this.now(),
-    })
     this.emit({
       type: 'attempt-started',
       agentId: request.agentId,
@@ -479,15 +474,23 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
       runId,
       occurredAt: this.now(),
     })
-    // 持久化执行尝试记录（运行中状态）
-    await this.sessionIndexStore.upsertAttempt(request.sessionId, {
-      attemptId: runId,
-      runId,
-      messageId: agentMessage.messageId,
-      status: 'running',
-      startedAt: this.now(),
-      completedAt: null,
-    })
+    // 一次写盘持久化执行尝试记录与会话运行状态
+    await this.sessionIndexStore.upsertAttempt(
+      request.sessionId,
+      {
+        attemptId: runId,
+        runId,
+        messageId: agentMessage.messageId,
+        status: 'running',
+        startedAt: this.now(),
+        completedAt: null,
+      },
+      {
+        status: 'running',
+        lastMessagePreview: createMessagePreview(content),
+        updatedAt: this.now(),
+      },
+    )
     this.transcriptCache.delete(request.sessionId)
 
     await this.executePromptRun({
@@ -769,21 +772,24 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
 
       if (this.activeRunIds.get(sessionId) !== runId) {
         this.messageStore.removeIfEmpty(agentMessage.messageId)
-        await this.sessionIndexStore.upsertAttempt(sessionId, {
-          attemptId: runId,
-          runId,
-          messageId: agentMessage.messageId,
-          status: 'cancelled',
-          startedAt: this.now(),
-          completedAt: this.now(),
-          ...inReplyToPatch,
-          ...(retryCount > 0 ? { retryCount } : {}),
-        })
+        await this.sessionIndexStore.upsertAttempt(
+          sessionId,
+          {
+            attemptId: runId,
+            runId,
+            messageId: agentMessage.messageId,
+            status: 'cancelled',
+            startedAt: this.now(),
+            completedAt: this.now(),
+            ...inReplyToPatch,
+            ...(retryCount > 0 ? { retryCount } : {}),
+          },
+          {
+            status: 'cancelled',
+            updatedAt: this.now(),
+          },
+        )
         this.updateSessionState(session.sessionId, 'cancelled')
-        await this.sessionIndexStore.updateEntry(session.sessionId, {
-          status: 'cancelled',
-          updatedAt: this.now(),
-        })
         return
       }
 
@@ -823,40 +829,46 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
       // 是否都已就绪；就绪时自动结束初始化。
       await this.profileStore.performBootstrapCompletionGating()
 
-      await this.sessionIndexStore.upsertAttempt(sessionId, {
-        attemptId: runId,
-        runId,
-        messageId: agentMessage.messageId,
-        status: 'completed',
-        startedAt: this.now(),
-        completedAt: this.now(),
-        ...inReplyToPatch,
-        ...(retryCount > 0 ? { retryCount } : {}),
-      })
-      this.updateSessionState(session.sessionId, 'completed')
-      await this.sessionIndexStore.updateEntry(session.sessionId, {
-        lastMessagePreview: createMessagePreview(completedMessage.content),
-        status: 'completed',
-        updatedAt: this.now(),
-      })
-    } catch (error) {
-      if (isAbortError(error) || !this.activeRunIds.has(sessionId)) {
-        this.messageStore.removeIfEmpty(agentMessage.messageId)
-        await this.sessionIndexStore.upsertAttempt(sessionId, {
+      await this.sessionIndexStore.upsertAttempt(
+        sessionId,
+        {
           attemptId: runId,
           runId,
           messageId: agentMessage.messageId,
-          status: 'cancelled',
+          status: 'completed',
           startedAt: this.now(),
           completedAt: this.now(),
           ...inReplyToPatch,
           ...(retryCount > 0 ? { retryCount } : {}),
-        })
-        this.updateSessionState(session.sessionId, 'cancelled')
-        await this.sessionIndexStore.updateEntry(session.sessionId, {
-          status: 'cancelled',
+        },
+        {
+          status: 'completed',
+          lastMessagePreview: createMessagePreview(completedMessage.content),
           updatedAt: this.now(),
-        })
+        },
+      )
+      this.updateSessionState(session.sessionId, 'completed')
+    } catch (error) {
+      if (isAbortError(error) || !this.activeRunIds.has(sessionId)) {
+        this.messageStore.removeIfEmpty(agentMessage.messageId)
+        await this.sessionIndexStore.upsertAttempt(
+          sessionId,
+          {
+            attemptId: runId,
+            runId,
+            messageId: agentMessage.messageId,
+            status: 'cancelled',
+            startedAt: this.now(),
+            completedAt: this.now(),
+            ...inReplyToPatch,
+            ...(retryCount > 0 ? { retryCount } : {}),
+          },
+          {
+            status: 'cancelled',
+            updatedAt: this.now(),
+          },
+        )
+        this.updateSessionState(session.sessionId, 'cancelled')
         this.emit({
           type: 'turn-cancelled',
           agentId,
@@ -873,23 +885,26 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
         recoverable: true,
       }
       this.messageStore.removeIfEmpty(agentMessage.messageId)
-      await this.sessionIndexStore.upsertAttempt(sessionId, {
-        attemptId: runId,
-        runId,
-        messageId: agentMessage.messageId,
-        status: 'failed',
-        startedAt: this.now(),
-        completedAt: this.now(),
-        error: runtimeError,
-        ...inReplyToPatch,
-        ...(retryCount > 0 ? { retryCount } : {}),
-      })
+      await this.sessionIndexStore.upsertAttempt(
+        sessionId,
+        {
+          attemptId: runId,
+          runId,
+          messageId: agentMessage.messageId,
+          status: 'failed',
+          startedAt: this.now(),
+          completedAt: this.now(),
+          error: runtimeError,
+          ...inReplyToPatch,
+          ...(retryCount > 0 ? { retryCount } : {}),
+        },
+        {
+          status: 'failed',
+          lastMessagePreview: createMessagePreview(runtimeError.message),
+          updatedAt: this.now(),
+        },
+      )
       this.updateSessionState(session.sessionId, 'failed')
-      await this.sessionIndexStore.updateEntry(session.sessionId, {
-        lastMessagePreview: createMessagePreview(runtimeError.message),
-        status: 'failed',
-        updatedAt: this.now(),
-      })
       this.emit({
         type: 'turn-failed',
         agentId,
