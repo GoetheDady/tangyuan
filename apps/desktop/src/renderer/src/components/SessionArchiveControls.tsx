@@ -168,6 +168,7 @@ export function SessionDeleteButton(props: {
 }
 
 export function SessionDeleteDialog(props: {
+  open: boolean
   activities: readonly SessionLineageActivity[]
   isDeleting: boolean
   onCancel(): void
@@ -175,39 +176,49 @@ export function SessionDeleteDialog(props: {
 }): React.JSX.Element {
   return (
     <AlertDialog
-      open={props.activities.length > 0}
+      open={props.open}
       onOpenChange={(open) => {
         if (!open) props.onCancel()
       }}
     >
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>停止活动并永久删除会话谱系？</AlertDialogTitle>
+          <AlertDialogTitle>
+            {props.activities.length > 0
+              ? '停止活动并永久删除会话谱系？'
+              : '永久删除会话谱系？'}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            以下会话仍有活动。确认后会先停止这些活动，再永久删除目标会话及其后代。此操作不可撤销。
+            {props.activities.length > 0
+              ? '以下会话仍有活动。确认后会先停止这些活动，再永久删除目标会话及其后代。此操作不可撤销。'
+              : '确认后将永久删除当前会话及其全部后代。此操作不可撤销。'}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <ul className="text-foreground space-y-1 text-sm">
-          {props.activities.map((activity) => (
-            <li key={activity.sessionId}>
-              {activity.title}：
-              {activity.kinds
-                .map((kind) => activityKindLabels[kind])
-                .join('、')}
-            </li>
-          ))}
-        </ul>
+        {props.activities.length > 0 ? (
+          <ul className="text-foreground space-y-1 text-sm">
+            {props.activities.map((activity) => (
+              <li key={activity.sessionId}>
+                {activity.title}：
+                {activity.kinds
+                  .map((kind) => activityKindLabels[kind])
+                  .join('、')}
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={props.isDeleting}>
             取消
           </AlertDialogCancel>
-          <AlertDialogAction
+          <Button
             variant="destructive"
             disabled={props.isDeleting}
             onClick={props.onConfirm}
           >
-            停止活动并永久删除
-          </AlertDialogAction>
+            {props.activities.length > 0
+              ? '停止活动并永久删除'
+              : '确认永久删除'}
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

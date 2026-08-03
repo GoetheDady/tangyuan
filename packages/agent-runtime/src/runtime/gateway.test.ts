@@ -67,6 +67,58 @@ import type {
 import { RealPiSdkGateway } from './gateway'
 
 describe('RealPiSdkGateway profile tools', () => {
+  it.each([
+    { name: 'Error', thrownValue: new Error('renderer event failed') },
+    { name: 'falsy 值', thrownValue: undefined },
+  ])(
+    '事件监听器抛出 $name 时仍在持久化完成后继续抛出',
+    async ({ thrownValue }) => {
+      let listener: ((event: unknown) => void) | undefined
+      let persisted = false
+      createAgentSession.mockResolvedValueOnce({
+        session: {
+          subscribe: (nextListener: (event: unknown) => void) => {
+            listener = nextListener
+            return () => undefined
+          },
+          prompt: vi.fn(async () => {
+            listener?.({
+              type: 'message_update',
+              assistantMessageEvent: { type: 'text_delta', delta: '回复' },
+            })
+            persisted = true
+          }),
+          getLastAssistantText: () => '回复',
+          abort: vi.fn(async () => undefined),
+          dispose: vi.fn(),
+        },
+      })
+      const request: PiSdkCreateSessionRequest = {
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        apiKey: 'sk-test',
+        agentId: 'yuanxiao',
+        sessionId: 'session-listener-error',
+        sdkSessionFile: '/tmp/session.json',
+        cwd: '/tmp',
+        agentSkillsPath: '/tmp/agent/skills',
+        sharedSkillsPath: '/tmp/shared/skills',
+        onUpdateSoul: vi.fn(),
+        onUpdateUserProfile: vi.fn(),
+      }
+      const handle = await new RealPiSdkGateway().createSession(request)
+
+      await expect(
+        handle.prompt('你好', {
+          onEvent: () => {
+            throw thrownValue
+          },
+        }),
+      ).rejects.toBe(thrownValue)
+      expect(persisted).toBe(true)
+    },
+  )
+
   it('创建会话时传入 SettingsManager.inMemory() 以隔离外部 Pi 配置', async () => {
     createAgentSession.mockResolvedValueOnce({
       session: {

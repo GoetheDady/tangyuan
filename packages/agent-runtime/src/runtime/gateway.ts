@@ -700,14 +700,22 @@ export class RealPiSdkGateway implements PiSdkGateway {
         systemPromptContext = context
       },
       prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
+        let eventListenerError: { value: unknown } | undefined
         const unsubscribe = session.subscribe((event: unknown) => {
           for (const streamEvent of normalizePiSdkSessionEvent(event)) {
-            options?.onEvent?.(streamEvent)
+            try {
+              options?.onEvent?.(streamEvent)
+            } catch (error) {
+              eventListenerError ??= { value: error }
+            }
           }
         })
 
         try {
           await session.prompt(prompt)
+          if (eventListenerError !== undefined) {
+            throw eventListenerError.value
+          }
           return session.getLastAssistantText() ?? null
         } finally {
           unsubscribe()

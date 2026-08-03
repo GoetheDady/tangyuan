@@ -16,6 +16,7 @@ import { DESKTOP_AGENT_EVENT_CHANNEL } from '@yuanxiao/contracts'
 import icon from '../../resources/icon.png?asset'
 import { buildContentSecurityPolicy } from './content-security-policy'
 import { registerDesktopAppIpc } from './ipc'
+import { createQaRuntimePaths } from './runtime-paths'
 
 const safeStorageAdapter: ConfigEncryptionAdapter = {
   encrypt: async (plaintext: string): Promise<string> => {
@@ -50,14 +51,13 @@ const qaApiKey = process.env['YUANXIAO_QA_API_KEY']
 const isQaMode = Boolean(qaApiKey)
 
 const encryptionAdapter = isQaMode ? plaintextAdapter : safeStorageAdapter
+const qaRuntimePaths = createQaRuntimePaths(homedir())
 
 // QA 模式用独立数据目录，避免污染用户 ~/.yuanxiao。
 const yuanxiaoRuntime = isQaMode
   ? createYuanxiaoRuntime({
       encryptionAdapter,
-      fsRoot: join(homedir(), '.yuanxiao-qa-root'),
-      userDataPath: join(homedir(), '.yuanxiao-qa-root', '.yuanxiao'),
-      agentHomePath: '~/.yuanxiao-qa-root/.yuanxiao/agents/yuanxiao',
+      ...qaRuntimePaths,
     })
   : createYuanxiaoRuntime({ encryptionAdapter })
 const smokeTestResultPath =

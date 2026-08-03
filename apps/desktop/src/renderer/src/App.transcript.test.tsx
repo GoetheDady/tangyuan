@@ -446,6 +446,7 @@ describe('App', () => {
     const listeners: AgentEventListener[] = []
     // Deferred：控制 sendMessage 不立即 resolve（模拟长时间运行的请求）
     const releaseSend = createDeferred<void>()
+    const releaseCancel = createDeferred<void>()
     const cancelledSession = {
       ...createDefaultSessionSummary({
         sessionId: 'welcome',
@@ -613,6 +614,7 @@ describe('App', () => {
             })
           }
           releaseSend.resolve()
+          await releaseCancel.promise
           return cancelledSession
         }),
         subscribeToAgentEvents: vi.fn((listener: AgentEventListener) => {
@@ -680,6 +682,17 @@ describe('App', () => {
 
     // 点击停止按钮
     await user.click(screen.getByRole('button', { name: '停止' }))
+
+    // 取消事件已经到达但 cancelRun IPC 尚未完成时，仍保持停止态，避免首条新消息
+    // 与旧运行的收尾流程竞争。
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: '停止' })).toBeInTheDocument()
+    })
+    expect(
+      screen.queryByRole('button', { name: '发送' }),
+    ).not.toBeInTheDocument()
+
+    releaseCancel.resolve()
 
     // Cancel 完成后：
     // - 停止按钮应切换为发送按钮

@@ -404,7 +404,7 @@ describe('App 会话谱系归档与恢复', () => {
     ).toBeInTheDocument()
   })
 
-  it('无活动时直接永久删除目标子树并保留兄弟会话', async () => {
+  it('无活动时确认后永久删除目标子树并保留兄弟会话', async () => {
     const user = userEvent.setup()
     let isDeleted = false
     installReadyArchiveApi(() => {
@@ -426,6 +426,12 @@ describe('App 会话谱系归档与恢复', () => {
     await user.click(
       await screen.findByRole('button', { name: '永久删除当前会话谱系' }),
     )
+
+    expect(window.api.deleteSession).not.toHaveBeenCalled()
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+      '此操作不可撤销',
+    )
+    await user.click(screen.getByRole('button', { name: '确认永久删除' }))
 
     expect(window.api.deleteSession).toHaveBeenCalledWith({
       agentId: 'yuanxiao',
@@ -492,6 +498,8 @@ describe('App 会话谱系归档与恢复', () => {
     await user.click(
       await screen.findByRole('button', { name: '永久删除当前会话谱系' }),
     )
+    expect(window.api.deleteSession).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: '确认永久删除' }))
     expect(await screen.findByRole('alertdialog')).toHaveTextContent(
       '父会话：运行中、待审批',
     )
@@ -508,6 +516,7 @@ describe('App 会话谱系归档与恢复', () => {
     await user.click(
       screen.getByRole('button', { name: '永久删除当前会话谱系' }),
     )
+    await user.click(screen.getByRole('button', { name: '确认永久删除' }))
     await user.click(
       await screen.findByRole('button', { name: '停止活动并永久删除' }),
     )

@@ -20,8 +20,10 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
   deletePreview: DeleteSessionResult | null
   isArchiving: boolean
   isDeleting: boolean
+  isDeleteDialogOpen: boolean
   recoveringSessionId: string | null
   archiveSelectedSession(confirmActivityStop: boolean): Promise<void>
+  requestDeleteSelectedSession(): void
   deleteSelectedSession(confirmActivityStop: boolean): Promise<void>
   recoverSession(session: AgentSessionSummary): Promise<void>
   cancelArchive(): void
@@ -161,10 +163,9 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
   async function deleteSelectedSession(
     confirmActivityStop: boolean,
   ): Promise<void> {
-    const target = confirmActivityStop ? deleteTarget : options.selectedSession
+    const target = deleteTarget
     if (!target) return
 
-    setDeleteTarget(target)
     setIsDeleting(true)
 
     try {
@@ -204,8 +205,14 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
     deletePreview,
     isArchiving,
     isDeleting,
+    isDeleteDialogOpen: deleteTarget !== null,
     recoveringSessionId,
     archiveSelectedSession,
+    requestDeleteSelectedSession: () => {
+      if (!options.selectedSession) return
+      setDeleteTarget(options.selectedSession)
+      setDeletePreview(null)
+    },
     deleteSelectedSession,
     recoverSession,
     cancelArchive: () => {

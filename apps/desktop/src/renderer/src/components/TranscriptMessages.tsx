@@ -433,27 +433,24 @@ export function TranscriptMessages({
     )
   }
 
-  if (renderItems.length === 0) {
-    return (
-      <div className="grid min-h-full place-items-center text-center">
-        <div>
-          <div className="bg-card mx-auto mb-4 grid size-11 place-items-center rounded-md border">
-            <Sparkles size={20} aria-hidden="true" />
-          </div>
-          <p className="text-body text-muted-foreground">
-            发送第一条消息开始会话。
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div
       ref={scrollRef}
       className="h-full w-full overflow-x-hidden overflow-y-auto [overflow-anchor:none]"
       data-testid="message-scroll-area"
     >
+      {renderItems.length === 0 ? (
+        <div className="grid min-h-full place-items-center text-center">
+          <div>
+            <div className="bg-card mx-auto mb-4 grid size-11 place-items-center rounded-md border">
+              <Sparkles size={20} aria-hidden="true" />
+            </div>
+            <p className="text-body text-muted-foreground">
+              发送第一条消息开始会话。
+            </p>
+          </div>
+        </div>
+      ) : null}
       <div className="mx-auto w-full max-w-[720px] px-4">
         <div
           className="relative w-full"

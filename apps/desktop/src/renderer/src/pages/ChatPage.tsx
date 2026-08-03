@@ -171,6 +171,9 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     useState<SessionModelInfo | null>(null)
   const [isLoadingModelInfo, setIsLoadingModelInfo] = useState(false)
   const [isSwitchingModel, setIsSwitchingModel] = useState(false)
+  const [cancellingSessionId, setCancellingSessionId] = useState<string | null>(
+    null,
+  )
   const openSessionRequestIdRef = useRef(0)
   const persistLastActiveSessionQueueRef = useRef<Promise<void>>(
     Promise.resolve(),
@@ -307,6 +310,8 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
     return sessions[0] ?? null
   }, [sessions, sessionId])
   const isSelectedSessionRunning = selectedSession?.state === 'running'
+  const isCancellingSelectedSession =
+    cancellingSessionId === selectedSession?.sessionId
   // 响应等待提示信号：正在发送、排队或运行中。具体是否展示占位
   // 由 TranscriptMessages 根据本次执行尝试是否已有可见回复内容判定。
   const isAwaitingResponse =
@@ -535,10 +540,12 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
    * @throws Preload API 错误会被捕获并通过 toast 反馈。
    */
   const cancelRun = async (): Promise<void> => {
-    if (!selectedSession) {
+    if (!selectedSession || cancellingSessionId === selectedSession.sessionId) {
       return
     }
 
+    const targetSessionId = selectedSession.sessionId
+    setCancellingSessionId(targetSessionId)
     try {
       await window.api.cancelRun({
         agentId: selectedSession.agentId,
@@ -555,6 +562,10 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
       toast.error(error instanceof Error ? error.message : '取消运行失败')
       // 即使取消失败，也要重置 isSendingMessage，防止 UI 卡住
       finishSending(selectedSession.sessionId)
+    } finally {
+      setCancellingSessionId((current) =>
+        current === targetSessionId ? null : current,
+      )
     }
   }
 
@@ -765,7 +776,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
                 <SessionDeleteButton
                   disabled={sessionArchive.isDeleting}
                   onDelete={() => {
-                    void sessionArchive.deleteSelectedSession(false)
+                    sessionArchive.requestDeleteSelectedSession()
                   }}
                 />
               </>
@@ -875,7 +886,11 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
                   ? '继续输入...'
                   : `给${activeAgentDisplayName}发送消息...`
               }
-              isRunning={isSelectedSessionRunning || isSendingMessage}
+              isRunning={
+                isSelectedSessionRunning ||
+                isSendingMessage ||
+                isCancellingSelectedSession
+              }
               onCancel={() => {
                 void cancelRun()
               }}
@@ -904,11 +919,14 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
         }}
       />
       <SessionDeleteDialog
+        open={sessionArchive.isDeleteDialogOpen}
         activities={sessionArchive.deletePreview?.affectedActivities ?? []}
         isDeleting={sessionArchive.isDeleting}
         onCancel={sessionArchive.cancelDelete}
         onConfirm={() => {
-          void sessionArchive.deleteSelectedSession(true)
+          void sessionArchive.deleteSelectedSession(
+            sessionArchive.deletePreview !== null,
+          )
         }}
       />
     </main>

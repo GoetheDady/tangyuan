@@ -118,6 +118,35 @@ function createRendererInitScript(
 }
 
 test.describe('Transcript 真实 Renderer 回归', () => {
+  test('异步加载长 transcript 后可滚动到最早消息', async ({ page }) => {
+    const runtime = createReadyRuntimeSnapshot()
+    const sessions = createTestSessions(1)
+    const entries = Array.from({ length: 24 }, (_, index) =>
+      index % 2 === 0
+        ? userEntry(index, `历史消息 ${index}`)
+        : agentEntry(index, `历史回复 ${index}`),
+    )
+
+    await page.addInitScript({
+      content: createRendererInitScript(runtime, sessions, {
+        'session-1': transcript('session-1', entries),
+      }),
+    })
+    await page.goto('/#/chat/yuanxiao/session-1')
+
+    const scrollArea = page.getByTestId('message-scroll-area')
+    await expect(scrollArea).toBeVisible()
+    await expect(page.getByText('历史回复 23')).toBeVisible()
+
+    await scrollArea.evaluate((element) => {
+      element.scrollTop = 0
+      element.dispatchEvent(new Event('scroll'))
+    })
+
+    await expect(page.getByText('历史消息 0')).toBeVisible()
+    await expect(page.getByText('历史回复 23')).not.toBeVisible()
+  })
+
   test('多 turn 工具循环和最终正文共同渲染', async ({ page }) => {
     const runtime = createReadyRuntimeSnapshot()
     const sessions = createTestSessions(1)

@@ -162,6 +162,31 @@ describe('TranscriptMessages', () => {
     expect(screen.getByText('发送第一条消息开始会话。')).toBeInTheDocument()
   })
 
+  it('keeps the scroll container mounted while an empty transcript receives its first message', () => {
+    defineMockApi()
+    const { rerender } = render(
+      <TranscriptMessages
+        transcript={createTranscriptSnapshot([])}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
+
+    expect(screen.getByTestId('message-scroll-area')).toBeInTheDocument()
+
+    rerender(
+      <TranscriptMessages
+        transcript={createTranscriptSnapshot([
+          createUserMessageEntry({ content: '第一条消息' }),
+        ])}
+        isStreaming={false}
+        sessionId="session-1"
+      />,
+    )
+
+    expect(screen.getByText('第一条消息')).toBeInTheDocument()
+  })
+
   it('shows select-session prompt when sessionId is null', () => {
     defineMockApi()
     render(
