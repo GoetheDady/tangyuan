@@ -63,6 +63,20 @@ function installReadyArchiveApi(
   }))
 }
 
+/** hover 会话卡片，点击 ⋯ 按钮，点击下拉菜单项。 */
+async function openSessionMenu(
+  user: ReturnType<typeof userEvent.setup>,
+  sessionTitle: string,
+): Promise<void> {
+  // 用 findByRole 等待会话列表异步加载完成后再查询
+  const item = await screen.findByRole('treeitem', { name: sessionTitle })
+  await user.hover(item)
+  const menuButton = screen.getByRole('button', {
+    name: `${sessionTitle}的操作菜单`,
+  })
+  await user.click(menuButton)
+}
+
 describe('App 会话谱系归档与恢复', () => {
   afterEach(resetAppTestEnvironment)
 
@@ -96,17 +110,17 @@ describe('App 会话谱系归档与恢复', () => {
 
     render(<App />)
 
-    await user.click(
-      await screen.findByRole('button', { name: '归档当前会话谱系' }),
-    )
+    await openSessionMenu(user, '父会话')
+    await user.click(await screen.findByRole('menuitem', { name: '归档' }))
 
     expect(window.api.archiveSession).toHaveBeenCalledWith({
       agentId: 'yuanxiao',
       sessionId: PARENT.sessionId,
       confirmActivityStop: false,
     })
+    // 归档当前会话后导航到兄弟会话（sibling 优先级最高）
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/chat/yuanxiao')
+      expect(window.location.hash).toBe('#/chat/yuanxiao/sibling-session')
     })
     expect(
       screen.queryByRole('treeitem', { name: /父会话/ }),
@@ -121,59 +135,32 @@ describe('App 会话谱系归档与恢复', () => {
     expect(screen.getByText('父会话')).toBeInTheDocument()
   })
 
-  it('有活动时明确预览影响，取消不改变状态，确认后才归档', async () => {
+  it('API 竞态返回 confirmation-required 时显示 toast 错误而不弹对话框', async () => {
+    // UI 会在谱系有活动任务时置灰按钮；若会话在点击后才开始运行（竞态），
+    // API 返回 confirmation-required，此时展示 toast 而不是弹对话框。
     const user = userEvent.setup()
     installReadyArchiveApi(() => [PARENT, CHILD, SIBLING])
-    vi.mocked(window.api.archiveSession).mockImplementation(
-      async (request: ArchiveSessionRequest) => ({
-        status: request.confirmActivityStop
-          ? 'archived'
-          : 'confirmation-required',
-        affectedSessionIds: [PARENT.sessionId, CHILD.sessionId],
-        affectedActivities: [
-          {
-            sessionId: PARENT.sessionId,
-            title: PARENT.title,
-            kinds: ['running', 'pending-approval'],
-          },
-          {
-            sessionId: CHILD.sessionId,
-            title: CHILD.title,
-            kinds: ['queued', 'pending-clarification'],
-          },
-        ],
-      }),
-    )
+    vi.mocked(window.api.archiveSession).mockResolvedValue({
+      status: 'confirmation-required',
+      affectedSessionIds: [PARENT.sessionId, CHILD.sessionId],
+      affectedActivities: [
+        { sessionId: PARENT.sessionId, title: PARENT.title, kinds: ['running'] },
+      ],
+    })
     window.location.hash = '#/chat/yuanxiao/parent-session'
 
     render(<App />)
 
-    await user.click(
-      await screen.findByRole('button', { name: '归档当前会话谱系' }),
-    )
-    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
-      '父会话：运行中、待审批',
-    )
-    expect(screen.getByRole('alertdialog')).toHaveTextContent(
-      '子会话：排队中、待澄清',
-    )
+    await openSessionMenu(user, '父会话')
+    await user.click(await screen.findByRole('menuitem', { name: '归档' }))
 
-    await user.click(screen.getByRole('button', { name: '取消' }))
     expect(window.api.archiveSession).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(await screen.findByText('有活动任务，请先停止后再归档')).toBeInTheDocument()
+    // 路由未跳转，当前会话仍可见
     expect(
       screen.getByRole('heading', { name: PARENT.title }),
     ).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: '归档当前会话谱系' }))
-    await user.click(
-      await screen.findByRole('button', { name: '停止活动并归档' }),
-    )
-
-    expect(window.api.archiveSession).toHaveBeenLastCalledWith({
-      agentId: 'yuanxiao',
-      sessionId: PARENT.sessionId,
-      confirmActivityStop: true,
-    })
   })
 
   it('从已归档区域恢复整棵子树及原有谱系位置', async () => {
@@ -270,9 +257,8 @@ describe('App 会话谱系归档与恢复', () => {
 
     render(<App />)
 
-    await user.click(
-      await screen.findByRole('button', { name: '归档当前会话谱系' }),
-    )
+    await openSessionMenu(user, '父会话')
+    await user.click(await screen.findByRole('menuitem', { name: '归档' }))
     await user.click(
       screen.getByRole('button', { name: '切换到 Agent 研究助手' }),
     )
@@ -350,9 +336,8 @@ describe('App 会话谱系归档与恢复', () => {
 
     render(<App />)
 
-    await user.click(
-      await screen.findByRole('button', { name: '归档当前会话谱系' }),
-    )
+    await openSessionMenu(user, '父会话')
+    await user.click(await screen.findByRole('menuitem', { name: '归档' }))
     await user.click(
       screen.getByRole('button', { name: '切换到 Agent 研究助手' }),
     )
@@ -403,9 +388,8 @@ describe('App 会话谱系归档与恢复', () => {
 
     render(<App />)
 
-    await user.click(
-      await screen.findByRole('button', { name: '永久删除当前会话谱系' }),
-    )
+    await openSessionMenu(user, '父会话')
+    await user.click(await screen.findByRole('menuitem', { name: '删除' }))
 
     expect(window.api.deleteSession).not.toHaveBeenCalled()
     expect(await screen.findByRole('alertdialog')).toHaveTextContent(
@@ -418,8 +402,9 @@ describe('App 会话谱系归档与恢复', () => {
       sessionId: PARENT.sessionId,
       confirmActivityStop: false,
     })
+    // 删除当前会话后导航到兄弟会话
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/chat/yuanxiao')
+      expect(window.location.hash).toBe('#/chat/yuanxiao/sibling-session')
     })
     expect(
       screen.queryByRole('treeitem', { name: /父会话/ }),
@@ -475,9 +460,8 @@ describe('App 会话谱系归档与恢复', () => {
 
     render(<App />)
 
-    await user.click(
-      await screen.findByRole('button', { name: '永久删除当前会话谱系' }),
-    )
+    await openSessionMenu(user, '父会话')
+    await user.click(await screen.findByRole('menuitem', { name: '删除' }))
     expect(window.api.deleteSession).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: '确认永久删除' }))
     expect(await screen.findByRole('alertdialog')).toHaveTextContent(
@@ -493,9 +477,8 @@ describe('App 会话谱系归档与恢复', () => {
       screen.getByRole('heading', { name: PARENT.title }),
     ).toBeInTheDocument()
 
-    await user.click(
-      screen.getByRole('button', { name: '永久删除当前会话谱系' }),
-    )
+    await openSessionMenu(user, '父会话')
+    await user.click(await screen.findByRole('menuitem', { name: '删除' }))
     await user.click(screen.getByRole('button', { name: '确认永久删除' }))
     await user.click(
       await screen.findByRole('button', { name: '停止活动并永久删除' }),
@@ -507,7 +490,7 @@ describe('App 会话谱系归档与恢复', () => {
       confirmActivityStop: true,
     })
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/chat/yuanxiao')
+      expect(window.location.hash).toBe('#/chat/yuanxiao/sibling-session')
     })
     expect(
       screen.queryByRole('treeitem', { name: /父会话/ }),

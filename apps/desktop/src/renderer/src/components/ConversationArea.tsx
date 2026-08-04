@@ -11,10 +11,6 @@ import type {
 import { BashApprovalCard } from '@/components/BashApprovalCard'
 import { Composer } from '@/components/Composer'
 import { ForkSourceNotice } from '@/components/ForkSourceNotice'
-import {
-  SessionArchiveButton,
-  SessionDeleteButton,
-} from '@/components/SessionArchiveControls'
 import { QuestionClarificationCard } from '@/components/QuestionClarificationCard'
 import { TranscriptMessages } from '@/components/TranscriptMessages'
 
@@ -55,18 +51,11 @@ export interface ConversationAreaProps {
   activeAgentDisplayName: string
   /** 输入区与模型选择状态。 */
   composer: ConversationAreaComposerProps
-  /** 消息操作与归档操作回调。 */
+  /** 消息操作回调。 */
   actions: {
     onRetry(userMessageId: string): void
     onFork(userMessageId: string): void
     onViewForkSource(): void
-    onArchive(): void
-    onDelete(): void
-  }
-  /** 归档/删除进行中状态。 */
-  archive: {
-    isArchiving: boolean
-    isDeleting: boolean
   }
   /** 审批操作回调。 */
   approvals: {
@@ -125,22 +114,6 @@ export function ConversationArea(
         <h2 className="text-section-heading min-w-0 flex-1 truncate font-semibold">
           {selectedSession?.title ?? '新对话'}
         </h2>
-        {selectedSession && (
-          <>
-            <SessionArchiveButton
-              disabled={props.archive.isArchiving}
-              onArchive={() => {
-                props.actions.onArchive()
-              }}
-            />
-            <SessionDeleteButton
-              disabled={props.archive.isDeleting}
-              onDelete={() => {
-                props.actions.onDelete()
-              }}
-            />
-          </>
-        )}
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col">

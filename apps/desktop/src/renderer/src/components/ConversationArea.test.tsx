@@ -47,10 +47,7 @@ function renderConversationArea(
         onRetry: vi.fn(),
         onFork: vi.fn(),
         onViewForkSource: vi.fn(),
-        onArchive: vi.fn(),
-        onDelete: vi.fn(),
       }}
-      archive={{ isArchiving: false, isDeleting: false }}
       approvals={{
         onApproveOnce: vi.fn(),
         onApproveAlways: vi.fn(),

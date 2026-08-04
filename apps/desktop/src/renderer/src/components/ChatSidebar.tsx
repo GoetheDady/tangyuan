@@ -34,6 +34,10 @@ export interface ChatSidebarProps {
   onSelectSession(session: AgentSessionSummary): void
   /** 恢复某个已归档会话。 */
   onRecoverSession(session: AgentSessionSummary): void
+  /** 归档某个会话谱系。 */
+  onArchiveSession(session: AgentSessionSummary): void
+  /** 永久删除某个会话谱系。 */
+  onDeleteSession(session: AgentSessionSummary): void
 }
 
 /**
@@ -169,6 +173,8 @@ export function ChatSidebar(props: ChatSidebarProps): React.JSX.Element {
                     selectedSessionId={props.selectedSessionId}
                     pendingApprovalSessionIds={props.pendingApprovalSessionIds}
                     onSelect={props.onSelectSession}
+                    onArchive={props.onArchiveSession}
+                    onDelete={props.onDeleteSession}
                   />
                 </div>
               ))}

@@ -12,7 +12,6 @@ import { useShallow } from 'zustand/react/shallow'
 import { ChatSidebar } from '@/components/ChatSidebar'
 import { ConversationArea } from '@/components/ConversationArea'
 import {
-  SessionArchiveDialog,
   SessionDeleteDialog,
 } from '@/components/SessionArchiveControls'
 import { useChatSessionActions } from '@/hooks/useChatSessionActions'
@@ -180,7 +179,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
 
   const sessionArchive = useSessionArchive({
     agentId: activeAgentId,
-    selectedSession,
+    selectedSessionId: selectedSession?.sessionId ?? null,
     store,
   })
   const parentSession = useMemo(() => {
@@ -240,6 +239,12 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
           onRecoverSession={(session) => {
             void sessionArchive.recoverSession(session)
           }}
+          onArchiveSession={(session) => {
+            void sessionArchive.archiveSession(session)
+          }}
+          onDeleteSession={(session) => {
+            sessionArchive.requestDeleteSession(session)
+          }}
         />
         <ConversationArea
           selectedSession={selectedSession}
@@ -289,16 +294,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
             onViewForkSource: () => {
               viewForkSource()
             },
-            onArchive: () => {
-              void sessionArchive.archiveSelectedSession(false)
-            },
-            onDelete: () => {
-              sessionArchive.requestDeleteSelectedSession()
-            },
-          }}
-          archive={{
-            isArchiving: sessionArchive.isArchiving,
-            isDeleting: sessionArchive.isDeleting,
           }}
           approvals={{
             onApproveOnce: (approvalId) => {
@@ -327,21 +322,13 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
           }}
         />
       </div>
-      <SessionArchiveDialog
-        activities={sessionArchive.archivePreview?.affectedActivities ?? []}
-        isArchiving={sessionArchive.isArchiving}
-        onCancel={sessionArchive.cancelArchive}
-        onConfirm={() => {
-          void sessionArchive.archiveSelectedSession(true)
-        }}
-      />
       <SessionDeleteDialog
         open={sessionArchive.isDeleteDialogOpen}
         activities={sessionArchive.deletePreview?.affectedActivities ?? []}
         isDeleting={sessionArchive.isDeleting}
         onCancel={sessionArchive.cancelDelete}
         onConfirm={() => {
-          void sessionArchive.deleteSelectedSession(
+          void sessionArchive.deleteSession(
             sessionArchive.deletePreview !== null,
           )
         }}

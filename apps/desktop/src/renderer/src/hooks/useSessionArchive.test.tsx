@@ -38,12 +38,12 @@ describe('useSessionArchive', () => {
     vi.mocked(window.api.listSessions).mockResolvedValue([archived])
 
     const { result, rerender } = renderHook(
-      ({ agentId, selectedSession }) =>
-        useSessionArchive({ agentId, selectedSession, store }),
+      ({ agentId, selectedSessionId }: { agentId: string; selectedSessionId: string | null }) =>
+        useSessionArchive({ agentId, selectedSessionId, store }),
       {
         initialProps: {
           agentId: 'yuanxiao',
-          selectedSession: target as AgentSessionSummary | null,
+          selectedSessionId: target.sessionId,
         },
         wrapper: ({ children }) => <MemoryRouter>{children}</MemoryRouter>,
       },
@@ -51,9 +51,9 @@ describe('useSessionArchive', () => {
 
     let operation!: Promise<void>
     act(() => {
-      operation = result.current.archiveSelectedSession(false)
+      operation = result.current.archiveSession(target as AgentSessionSummary)
     })
-    rerender({ agentId: 'researcher', selectedSession: null })
+    rerender({ agentId: 'researcher', selectedSessionId: null })
     resolveArchive({
       status: 'archived',
       affectedSessionIds: ['session-1'],

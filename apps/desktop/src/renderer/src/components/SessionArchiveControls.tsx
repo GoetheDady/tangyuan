@@ -1,14 +1,14 @@
 import type {
   AgentSessionSummary,
+  DeleteSessionResult,
   SessionLineageActivity,
   SessionLineageActivityKind,
 } from '@yuanxiao/contracts'
-import { Archive, ArchiveRestore, Trash2 } from 'lucide-react'
+import { ArchiveRestore } from 'lucide-react'
 import { useMemo } from 'react'
 
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -23,26 +23,6 @@ const activityKindLabels: Record<SessionLineageActivityKind, string> = {
   queued: '排队中',
   'pending-approval': '待审批',
   'pending-clarification': '待澄清',
-}
-
-export function SessionArchiveButton(props: {
-  disabled: boolean
-  onArchive(): void
-}): React.JSX.Element {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      className="window-no-drag relative z-50"
-      aria-label="归档当前会话谱系"
-      title="归档当前会话谱系"
-      disabled={props.disabled}
-      onClick={props.onArchive}
-    >
-      <Archive aria-hidden="true" />
-    </Button>
-  )
 }
 
 export function ArchivedSessionList(props: {
@@ -97,73 +77,6 @@ export function ArchivedSessionList(props: {
         ))}
       </div>
     </section>
-  )
-}
-
-export function SessionArchiveDialog(props: {
-  activities: readonly SessionLineageActivity[]
-  isArchiving: boolean
-  onCancel(): void
-  onConfirm(): void
-}): React.JSX.Element {
-  return (
-    <AlertDialog
-      open={props.activities.length > 0}
-      onOpenChange={(open) => {
-        if (!open) props.onCancel()
-      }}
-    >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>停止活动并归档会话谱系？</AlertDialogTitle>
-          <AlertDialogDescription>
-            以下会话仍有活动。确认后会先停止这些活动，再归档目标会话及其后代。
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <ul className="text-foreground space-y-1 text-sm">
-          {props.activities.map((activity) => (
-            <li key={activity.sessionId}>
-              {activity.title}：
-              {activity.kinds
-                .map((kind) => activityKindLabels[kind])
-                .join('、')}
-            </li>
-          ))}
-        </ul>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={props.isArchiving}>
-            取消
-          </AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            disabled={props.isArchiving}
-            onClick={props.onConfirm}
-          >
-            停止活动并归档
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  )
-}
-
-export function SessionDeleteButton(props: {
-  disabled: boolean
-  onDelete(): void
-}): React.JSX.Element {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      className="window-no-drag relative z-50"
-      aria-label="永久删除当前会话谱系"
-      title="永久删除当前会话谱系"
-      disabled={props.disabled}
-      onClick={props.onDelete}
-    >
-      <Trash2 aria-hidden="true" />
-    </Button>
   )
 }
 

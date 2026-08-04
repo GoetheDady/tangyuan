@@ -53,6 +53,8 @@ describe('ChatSidebar', () => {
           onCreateSession={onCreateSession}
           onSelectSession={onSelectSession}
           onRecoverSession={vi.fn()}
+          onArchiveSession={vi.fn()}
+          onDeleteSession={vi.fn()}
         />
       </MemoryRouter>,
     )
@@ -87,6 +89,8 @@ describe('ChatSidebar', () => {
           onCreateSession={vi.fn()}
           onSelectSession={vi.fn()}
           onRecoverSession={vi.fn()}
+          onArchiveSession={vi.fn()}
+          onDeleteSession={vi.fn()}
         />
       </MemoryRouter>,
     )
