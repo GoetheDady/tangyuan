@@ -46,8 +46,8 @@ export class SessionIndexRebuilder {
    *（listSummaries 按 agentId 过滤，不会混入当前活跃 Agent 的日常列表）。
    * 无法归属到任何已知 Agent 的 Pi 会话不进入索引。
    *
-   * @returns 从 SDK 恢复出的索引条目；无配置或全局扫描失败时返回空数组。
-   * @throws 当运行时配置读取失败时，Promise 会 reject。
+   * @returns 从 SDK 恢复出的索引条目；无配置时返回空数组。
+   * @throws 当运行时配置读取或全局会话扫描失败时，Promise 会 reject。
    */
   async rebuild(): Promise<PersistedSessionIndexEntry[]> {
     const readResult = await this.configStore.read()
@@ -70,16 +70,9 @@ export class SessionIndexRebuilder {
       agentIdByCwd.set(resolve(cwd), agentId)
     }
 
-    let sdkSessions: Awaited<ReturnType<PiSdkGateway['listSessions']>>
-
-    try {
-      sdkSessions = await this.gateway.listSessions({
-        sessionDir: this.layout.sdkSessionDir(),
-      })
-    } catch {
-      // 全局扫描失败时给出空索引，下次 load 仍会重试重建。
-      return []
-    }
+    const sdkSessions = await this.gateway.listSessions({
+      sessionDir: this.layout.sdkSessionDir(),
+    })
 
     const allEntries: PersistedSessionIndexEntry[] = []
 

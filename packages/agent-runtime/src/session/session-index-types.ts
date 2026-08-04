@@ -19,6 +19,8 @@ export interface PersistedAttemptEntry {
   error?: AgentRuntimeErrorPayload
   /** 关联的用户消息标识；重试场景的 inReplyTo。 */
   inReplyTo?: string
+  /** SDK 层自动重试次数；未发生重试时省略。 */
+  retryCount?: number
 }
 
 /**

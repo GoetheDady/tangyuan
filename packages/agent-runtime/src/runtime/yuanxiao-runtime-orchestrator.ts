@@ -6,7 +6,7 @@ import type {
 } from '../driver'
 import { TranscriptEmitter } from '../session/transcript-emitter'
 import { BashApprovalRegistry, ClarificationRegistry } from '../approval'
-import { SessionCache } from '../session/session-cache'
+import { SessionDirectory } from '../session/session-directory'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
 import { AgentManager, IdentityService } from '../agent'
 import { SkillService } from '../skill'
@@ -65,7 +65,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
   protected readonly agentManager: AgentManager
   protected readonly identityService: IdentityService
   protected readonly sessionModelService: SessionModelService
-  protected readonly sessionCache = new SessionCache()
+  protected readonly sessionDirectory: SessionDirectory
   protected readonly runScheduler: RunScheduler
   protected readonly bashApprovals: BashApprovalRegistry
   protected readonly skillService: SkillService
@@ -113,6 +113,10 @@ export abstract class YuanxiaoRuntimeOrchestrator {
       sendMessage: (request) => this.sessions.sendMessage(request),
       getTranscript: (request) => this.getTranscript(request),
       activeRunCount: () => this.sessions.getActiveRunCount(),
+    })
+    this.sessionDirectory = new SessionDirectory({
+      sessions: this.sessions,
+      isQueued: (sessionId) => this.runScheduler.hasQueued(sessionId),
     })
     this.sessions.subscribe((event) => {
       this.applyAgentEvent(event)
@@ -186,8 +190,8 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     // 清空队列
     this.runScheduler.drainAll()
 
-    const runningSessions = this.sessionCache
-      .list()
+    const runningSessions = this.sessionDirectory
+      .listAll()
       .filter(
         (session) =>
           session.state === 'running' ||
@@ -235,17 +239,18 @@ export abstract class YuanxiaoRuntimeOrchestrator {
    * @throws 当 Session 模块读取会话列表失败时，Promise 会 reject。
    */
   protected async findSession(
+    agentId: string,
     sessionId: string,
   ): Promise<AgentSessionSummary | undefined> {
-    const cachedSession = this.sessionCache.find(sessionId)
+    const cachedSession = this.sessionDirectory.find(sessionId)
 
     if (cachedSession) {
       return cachedSession
     }
 
-    await this.listSessions()
+    await this.listSessions(agentId)
 
-    return this.sessionCache.find(sessionId)
+    return this.sessionDirectory.find(sessionId)
   }
 
   /**
@@ -303,7 +308,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
    * @throws 此方法不会主动抛出错误。
    */
   protected upsertSession(session: AgentSessionSummary): void {
-    this.sessionCache.upsert(session)
+    this.sessionDirectory.upsert(session)
   }
 
   /**
@@ -320,7 +325,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     state: AgentSessionSummary['state'],
     updatedAt: string,
   ): void {
-    this.sessionCache.updateState(sessionId, state, updatedAt)
+    this.sessionDirectory.updateState(sessionId, state, updatedAt)
   }
 
   /**

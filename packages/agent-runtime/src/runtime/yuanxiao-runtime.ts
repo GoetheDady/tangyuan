@@ -2,7 +2,6 @@ import { YuanxiaoRuntimeOrchestrator } from './yuanxiao-runtime-orchestrator'
 import type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencies'
 import { collectSessionSubtree } from '../session/session-archive-coordinator'
 import { AgentRuntimeError } from '../core'
-import { canRestoreSessionLineage } from './session-lineage'
 import type { ToolApprovalGateway } from '../driver'
 import { createToolApprovalGateway } from '../approval'
 import type { RuntimeServices } from './runtime-services'
@@ -301,60 +300,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     agentId: string = YUANXIAO_DEFAULT_AGENT_ID,
     includeArchived = false,
   ): Promise<AgentSessionSummary[]> {
-    const driverSessions = await this.sessions.listSessions({
-      agentId,
-      ...(includeArchived ? { includeArchived: true } : {}),
-    })
-    const sessions = driverSessions.map((session) => ({
-      ...session,
-      state:
-        this.sessions.getActiveRunId(session.sessionId) !== undefined
-          ? ('running' as const)
-          : this.runScheduler.hasQueued(session.sessionId)
-            ? ('queued' as const)
-            : session.state,
-    }))
-    // 对非归档会话检查祖先谱系完整性
-    if (!includeArchived) {
-      const sessionsById = new Map(sessions.map((s) => [s.sessionId, s]))
-      const lineageCache = new Map<string, boolean>()
-
-      for (const session of sessions) {
-        if (!session.forkedFrom?.sessionId) continue
-
-        let ancestorId: string | undefined = session.forkedFrom.sessionId
-        const visited = new Set<string>()
-
-        while (ancestorId && !visited.has(ancestorId)) {
-          visited.add(ancestorId)
-          if (!lineageCache.has(ancestorId)) {
-            const ancestor = sessionsById.get(ancestorId)
-            if (!ancestor) {
-              lineageCache.set(ancestorId, false)
-            } else {
-              try {
-                await this.sessions.getTranscript({
-                  agentId: ancestor.agentId,
-                  sessionId: ancestor.sessionId,
-                })
-                lineageCache.set(ancestorId, true)
-              } catch {
-                lineageCache.set(ancestorId, false)
-              }
-            }
-          }
-          if (!lineageCache.get(ancestorId)) {
-            session.lineageUnavailable = true
-            break
-          }
-          ancestorId = sessionsById.get(ancestorId)?.forkedFrom?.sessionId
-        }
-      }
-    }
-    this.sessionCache.replace(
-      sessions.filter((session) => session.archivedAt === undefined),
-    )
-    return includeArchived ? sessions : this.sessionCache.list()
+    return this.sessionDirectory.refresh(agentId, includeArchived)
   }
 
   /**
@@ -380,11 +326,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
 
         if (
           recordedSession &&
-          (await canRestoreSessionLineage(
-            this.sessions,
-            recordedSession,
-            sessions,
-          ))
+          (await this.sessionDirectory.isRestorable(recordedSession, sessions))
         ) {
           return record
         }
@@ -395,9 +337,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     let fallbackSession: AgentSessionSummary | undefined
 
     for (const session of fallbackSessions) {
-      if (
-        await canRestoreSessionLineage(this.sessions, session, fallbackSessions)
-      ) {
+      if (await this.sessionDirectory.isRestorable(session, fallbackSessions)) {
         fallbackSession = session
         break
       }
@@ -456,7 +396,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     await this.assertRuntimeReady()
 
     const session = await this.sessions.createSession(request)
-    this.sessionCache.upsert(session)
+    this.sessionDirectory.upsert(session)
     return session
   }
 
@@ -473,10 +413,10 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
   async getTranscript(
     request: GetSessionMessagesRequest,
   ): Promise<TranscriptSnapshot> {
-    let session = this.sessionCache.find(request.sessionId)
+    let session = this.sessionDirectory.find(request.sessionId)
     if (session?.agentId !== request.agentId) {
       await this.listSessions(request.agentId)
-      session = this.sessionCache.find(request.sessionId)
+      session = this.sessionDirectory.find(request.sessionId)
     }
     if (session?.agentId !== request.agentId) {
       throw new AgentRuntimeError({
@@ -511,8 +451,8 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
 
     const session =
-      this.sessionCache.find(request.sessionId) ??
-      (await this.findSession(request.sessionId))
+      this.sessionDirectory.find(request.sessionId) ??
+      (await this.findSession(request.agentId, request.sessionId))
 
     this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
 
@@ -567,7 +507,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
   async retryMessage(request: RetryRunRequest): Promise<TranscriptSnapshot> {
     this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
 
-    const retrySession = this.sessionCache.find(request.sessionId)
+    const retrySession = this.sessionDirectory.find(request.sessionId)
     if (retrySession) this.assertLineageAvailable(retrySession)
 
     this.runScheduler.beginRunStart(request.sessionId)
@@ -592,7 +532,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    */
   async forkSession(request: ForkSessionRequest): Promise<AgentSessionSummary> {
     this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
-    const forkSourceSession = this.sessionCache.find(request.sessionId)
+    const forkSourceSession = this.sessionDirectory.find(request.sessionId)
     if (forkSourceSession) this.assertLineageAvailable(forkSourceSession)
     const forked = await this.sessionArchiveCoordinator.trackFork(
       request.sessionId,
@@ -794,7 +734,8 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
       }
 
       for (const id of affectedSessionIds) {
-        this.sessionCache.remove(id)
+        this.sessionDirectory.remove(id)
+        this.transcriptEmitter.deleteSession(id)
       }
 
       return {
@@ -869,7 +810,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     // 先检查队列中的待处理请求
     if (this.runScheduler.cancelQueued(request.sessionId, request.agentId)) {
       return (
-        this.sessionCache.find(request.sessionId) ?? {
+        this.sessionDirectory.find(request.sessionId) ?? {
           agentId: request.agentId,
           sessionId: request.sessionId,
           title: '',
@@ -881,7 +822,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
 
     await this.sessions.cancelRun(request)
     await this.listSessions(request.agentId)
-    const session = this.sessionCache.find(request.sessionId)
+    const session = this.sessionDirectory.find(request.sessionId)
 
     if (!session) {
       throw new AgentRuntimeError({

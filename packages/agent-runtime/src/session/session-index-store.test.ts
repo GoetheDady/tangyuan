@@ -389,7 +389,7 @@ describe('SessionIndexStore.load 重建', () => {
     })
   })
 
-  it('全局扫描失败时给出空索引而不抛错', async () => {
+  it('全局扫描失败时不提交空索引，下次 load 仍会重试', async () => {
     await configStore.write({
       schemaVersion: 2,
       providers: { openai: { apiKey: 'sk-x', updatedAt: 'now' } },
@@ -403,15 +403,39 @@ describe('SessionIndexStore.load 重建', () => {
         },
       },
     })
-    const failingGateway = {
+    let scanCount = 0
+    const recoveringGateway = {
       listSessions: async () => {
-        throw new Error('session 目录不可读')
+        scanCount++
+        if (scanCount === 1) {
+          throw new Error('session 目录不可读')
+        }
+        return [
+          {
+            sessionId: 'recovered-session',
+            sdkSessionFile: '/tmp/recovered-session.jsonl',
+            title: '恢复的会话',
+            cwd: layout.agentHome(),
+            createdAt: 'now',
+            updatedAt: 'now',
+          },
+        ]
       },
     } as unknown as PiSdkGateway
-    const store = await makeStore(failingGateway)
+    const store = await makeStore(recoveringGateway)
 
-    await expect(store.load()).resolves.toEqual([])
+    await expect(store.load()).rejects.toThrow('session 目录不可读')
     expect(store.listSummaries('yuanxiao')).toEqual([])
+    await expect(readFile(layout.sessionIndex(), 'utf8')).rejects.toMatchObject(
+      {
+        code: 'ENOENT',
+      },
+    )
+
+    await expect(store.load()).resolves.toEqual([
+      expect.objectContaining({ sessionId: 'recovered-session' }),
+    ])
+    expect(scanCount).toBe(2)
   })
 
   it('按 session header 工作目录归属 Agent，无法归属的会话不入索引', async () => {

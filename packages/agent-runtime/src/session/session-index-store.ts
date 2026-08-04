@@ -95,7 +95,7 @@ export class SessionIndexStore {
    * 委托重建器从 Pi SDK session 目录重建索引，装回内存并落盘。
    *
    * @returns 从 SDK 恢复出的索引条目。
-   * @throws 当重建器读取运行时配置失败时，Promise 会 reject。
+   * @throws 当重建器读取运行时配置或扫描 Pi session 失败时，Promise 会 reject；失败结果不会写盘。
    */
   private async rebuildIndex(): Promise<PersistedSessionIndexEntry[]> {
     const entries = await this.rebuilder.rebuild()

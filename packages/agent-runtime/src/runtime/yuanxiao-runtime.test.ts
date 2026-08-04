@@ -63,6 +63,37 @@ describe('YuanxiaoRuntime', () => {
       agentId: YUANXIAO_DEFAULT_AGENT_ID,
     })
   })
+  it('切换 Agent 列表后仍能取消其他 Agent 的活动会话', async () => {
+    const runningSession = createSessionSummary('agent-a-session', {
+      agentId: 'agent-a',
+      state: 'running',
+    })
+    const idleSession = createSessionSummary('agent-b-session', {
+      agentId: 'agent-b',
+      state: 'idle',
+    })
+    const runtimeDriver = createRuntimeDriver(createSnapshot())
+    const sessionDriver = createSessionDriver([])
+    sessionDriver.listSessions = vi.fn(async ({ agentId }) =>
+      agentId === 'agent-a' ? [runningSession] : [idleSession],
+    )
+    const runtime = createYuanxiaoRuntimeForTesting({
+      configuration: runtimeDriver,
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
+    })
+
+    await runtime.listSessions('agent-a')
+    await runtime.listSessions('agent-b')
+    await runtime.cancelAllActiveRuns()
+
+    expect(sessionDriver.cancelRun).toHaveBeenCalledWith({
+      agentId: 'agent-a',
+      sessionId: 'agent-a-session',
+    })
+  })
   it('sends messages through the session driver only when runtime is ready', async () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(

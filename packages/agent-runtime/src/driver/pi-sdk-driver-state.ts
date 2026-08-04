@@ -6,6 +6,7 @@ import { SkillStore } from '../skill'
 import { ProfileStore } from '../profile'
 import { SessionIndexStore } from '../session/session-index-store'
 import { MessageStore } from '../session/message-store'
+import { AttemptLifecycle } from '../session/attempt-lifecycle'
 import { AgentRuntimeError, sanitizeErrorMessage } from '../core'
 import {
   YUANXIAO_DEFAULT_AGENT_ID,
@@ -49,6 +50,7 @@ export abstract class PiSdkDriverState {
   protected readonly profileStore: ProfileStore
   protected readonly sessionIndexStore: SessionIndexStore
   protected readonly messageStore: MessageStore
+  protected readonly attemptLifecycle: AttemptLifecycle
   protected readonly configurationModule: DefaultRuntimeConfiguration
   protected readonly profileModule: DefaultProfileModule
   protected readonly gateway: PiSdkGateway
@@ -89,6 +91,7 @@ export abstract class PiSdkDriverState {
     this.profileStore = resolved.profileStore
     this.sessionIndexStore = resolved.sessionIndexStore
     this.messageStore = resolved.messageStore
+    this.attemptLifecycle = new AttemptLifecycle(this.sessionIndexStore)
     this.configurationModule = resolved.configurationModule
     this.profileModule = resolved.profileModule
     this.eventBus = resolved.eventBus

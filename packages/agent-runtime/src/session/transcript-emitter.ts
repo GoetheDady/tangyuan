@@ -31,6 +31,15 @@ interface TurnState {
   toolCallStepIndex: Map<string, number>
 }
 
+interface SessionProjectionState {
+  nextIndex: number
+  messageToEntryIndex: Map<string, number>
+  pendingAttempt: ExecutionAttempt | null
+  attemptsByRunId: Map<string, ExecutionAttempt>
+  turnStatesByRunId: Map<string, TurnState>
+  snapshot?: TranscriptSnapshot
+}
+
 /**
  * 负责 transcript delta 的发射逻辑。
  *
@@ -38,12 +47,7 @@ interface TurnState {
  * 通过注入的 emit 回调向 Runtime 订阅者广播标准事件。
  */
 export class TranscriptEmitter {
-  private readonly sessionNextIndex = new Map<string, number>()
-  private readonly messageToEntryIndex = new Map<string, number>()
-  private readonly pendingAttemptBySession = new Map<string, ExecutionAttempt>()
-  private readonly runToAttempt = new Map<string, ExecutionAttempt>()
-  private readonly turnStateByRun = new Map<string, TurnState>()
-  private readonly transcriptSnapshots = new Map<string, TranscriptSnapshot>()
+  private readonly sessionStates = new Map<string, SessionProjectionState>()
   private readonly emit: AgentEventListener
 
   constructor(emit: AgentEventListener) {
@@ -122,7 +126,7 @@ export class TranscriptEmitter {
    * 若从未收到过该会话的 delta，返回 undefined。
    */
   getSnapshot(sessionId: string): TranscriptSnapshot | undefined {
-    return this.transcriptSnapshots.get(sessionId)
+    return this.sessionStates.get(sessionId)?.snapshot
   }
 
   /**
@@ -151,13 +155,35 @@ export class TranscriptEmitter {
    * @returns 无返回值。
    */
   seedSnapshot(snapshot: TranscriptSnapshot): void {
-    this.transcriptSnapshots.set(snapshot.sessionId, snapshot)
-    this.sessionNextIndex.set(snapshot.sessionId, snapshot.entries.length)
+    const state = this.ensureSessionState(snapshot.sessionId)
+    state.snapshot = snapshot
+    state.nextIndex = snapshot.entries.length
+    state.messageToEntryIndex.clear()
     for (const [index, entry] of snapshot.entries.entries()) {
       if (entry.kind !== 'compaction') {
-        this.messageToEntryIndex.set(entry.messageId, index)
+        state.messageToEntryIndex.set(entry.messageId, index)
       }
     }
+  }
+
+  /** 释放已删除会话的全部实时投影状态。 */
+  deleteSession(sessionId: string): void {
+    this.sessionStates.delete(sessionId)
+  }
+
+  private ensureSessionState(sessionId: string): SessionProjectionState {
+    const existing = this.sessionStates.get(sessionId)
+    if (existing) return existing
+
+    const state: SessionProjectionState = {
+      nextIndex: 0,
+      messageToEntryIndex: new Map(),
+      pendingAttempt: null,
+      attemptsByRunId: new Map(),
+      turnStatesByRunId: new Map(),
+    }
+    this.sessionStates.set(sessionId, state)
+    return state
   }
 
   /**
@@ -167,7 +193,8 @@ export class TranscriptEmitter {
     agentId: string,
     sessionId: string,
   ): TranscriptSnapshot {
-    const existing = this.transcriptSnapshots.get(sessionId)
+    const state = this.ensureSessionState(sessionId)
+    const existing = state.snapshot
     if (existing) return existing
 
     const snapshot: TranscriptSnapshot = {
@@ -176,7 +203,7 @@ export class TranscriptEmitter {
       entries: [],
       updatedAt: new Date().toISOString(),
     }
-    this.transcriptSnapshots.set(sessionId, snapshot)
+    state.snapshot = snapshot
     return snapshot
   }
 
@@ -192,7 +219,8 @@ export class TranscriptEmitter {
   ): void {
     const message = event.message
     const sessionId = message.sessionId
-    const nextIndex = this.sessionNextIndex.get(sessionId) ?? 0
+    const state = this.ensureSessionState(sessionId)
+    const nextIndex = state.nextIndex
 
     if (message.role === 'user') {
       const delta: TranscriptDelta = {
@@ -205,16 +233,16 @@ export class TranscriptEmitter {
         }),
       }
       this.emitTranscriptDeltaEvent(event.agentId, sessionId, delta)
-      this.sessionNextIndex.set(sessionId, nextIndex + 1)
+      state.nextIndex = nextIndex + 1
       return
     }
 
     if (message.role === 'agent') {
       // 幂等：agent 条目在 turn 开头已宣告，结尾的重复 message-appended 不再建新条目。
-      if (this.messageToEntryIndex.has(message.messageId)) {
+      if (state.messageToEntryIndex.has(message.messageId)) {
         return
       }
-      const attempt = this.pendingAttemptBySession.get(sessionId) ?? null
+      const attempt = state.pendingAttempt
       const delta: TranscriptDelta = {
         type: 'entry-appended',
         entry: createAgentReplyTranscriptEntry({
@@ -227,13 +255,14 @@ export class TranscriptEmitter {
           ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}),
         }),
       }
-      this.messageToEntryIndex.set(message.messageId, nextIndex)
+      state.messageToEntryIndex.set(message.messageId, nextIndex)
       this.emitTranscriptDeltaEvent(event.agentId, sessionId, delta)
-      this.sessionNextIndex.set(sessionId, nextIndex + 1)
+      state.nextIndex = nextIndex + 1
       // entry 刚创建完成，若对应 attempt 已存在（attempt-started 先到），立即初始化并
       // 用本轮真实 entryIndex 修正 attempt-started 早到时的猜测。
       if (attempt) {
         this.ensureTurnStateInitialized(
+          sessionId,
           attempt.runId,
           message.createdAt,
           nextIndex,
@@ -251,7 +280,7 @@ export class TranscriptEmitter {
         }),
       }
       this.emitTranscriptDeltaEvent(event.agentId, sessionId, delta)
-      this.sessionNextIndex.set(sessionId, nextIndex + 1)
+      state.nextIndex = nextIndex + 1
     }
   }
 
@@ -272,8 +301,9 @@ export class TranscriptEmitter {
       startedAt: event.occurredAt,
       completedAt: null,
     }
-    this.runToAttempt.set(event.runId, attempt)
-    this.pendingAttemptBySession.set(event.sessionId, attempt)
+    const state = this.ensureSessionState(event.sessionId)
+    state.attemptsByRunId.set(event.runId, attempt)
+    state.pendingAttempt = attempt
   }
 
   /**
@@ -286,7 +316,9 @@ export class TranscriptEmitter {
   emitTranscriptDeltaForDelta(
     event: Extract<DriverEvent, { type: 'message-delta' }>,
   ): void {
-    const entryIndex = this.messageToEntryIndex.get(event.messageId)
+    const entryIndex = this.ensureSessionState(
+      event.sessionId,
+    ).messageToEntryIndex.get(event.messageId)
     if (entryIndex === undefined) return
 
     const delta: TranscriptDelta = {
@@ -310,7 +342,11 @@ export class TranscriptEmitter {
   initializeTurnStateForRun(
     event: Extract<DriverEvent, { type: 'attempt-started' }>,
   ): void {
-    this.ensureTurnStateInitialized(event.runId, event.occurredAt)
+    this.ensureTurnStateInitialized(
+      event.sessionId,
+      event.runId,
+      event.occurredAt,
+    )
   }
 
   /**
@@ -326,7 +362,9 @@ export class TranscriptEmitter {
    * @throws 此方法不会主动抛出错误。
    */
   startTurn(event: Extract<DriverEvent, { type: 'turn-started' }>): void {
-    const turnState = this.turnStateByRun.get(event.runId)
+    const turnState = this.ensureSessionState(
+      event.sessionId,
+    ).turnStatesByRunId.get(event.runId)
     if (!turnState) return
 
     turnState.turnIndex = event.turnIndex
@@ -348,10 +386,11 @@ export class TranscriptEmitter {
    * @throws 此方法不会主动抛出错误。
    */
   endTurn(event: Extract<DriverEvent, { type: 'turn-ended' }>): void {
-    const turnState = this.turnStateByRun.get(event.runId)
+    const state = this.ensureSessionState(event.sessionId)
+    const turnState = state.turnStatesByRunId.get(event.runId)
     if (!turnState) return
 
-    const snapshot = this.transcriptSnapshots.get(event.sessionId)
+    const snapshot = state.snapshot
     if (!snapshot) return
 
     const entry = snapshot.entries[turnState.entryIndex]
@@ -420,21 +459,23 @@ export class TranscriptEmitter {
    * @returns 无返回值。
    */
   private ensureTurnStateInitialized(
+    sessionId: string,
     runId: string,
     startedAt: string,
     entryIndex?: number,
   ): void {
-    const existing = this.turnStateByRun.get(runId)
+    const state = this.ensureSessionState(sessionId)
+    const existing = state.turnStatesByRunId.get(runId)
     if (existing) {
       // attempt-started 早到时用旧条目猜错了 entryIndex，此处用真实值修正。
       if (entryIndex !== undefined) existing.entryIndex = entryIndex
       return
     }
 
-    const resolvedIndex = entryIndex ?? this.findLastAgentReplyIndex()
+    const resolvedIndex = entryIndex ?? this.findLastAgentReplyIndex(sessionId)
     if (resolvedIndex === undefined) return
 
-    this.turnStateByRun.set(runId, {
+    state.turnStatesByRunId.set(runId, {
       entryIndex: resolvedIndex,
       turnIndex: 0,
       stepIndex: 0,
@@ -454,7 +495,9 @@ export class TranscriptEmitter {
   emitTranscriptDeltaForThinking(
     event: Extract<DriverEvent, { type: 'message-delta' }>,
   ): void {
-    const turnState = this.turnStateByRun.get(event.runId)
+    const turnState = this.ensureSessionState(
+      event.sessionId,
+    ).turnStatesByRunId.get(event.runId)
     if (!turnState) return
 
     const now = event.occurredAt
@@ -520,7 +563,8 @@ export class TranscriptEmitter {
     turnIndex: number,
     stepIndex: number,
   ): TurnStep | undefined {
-    const entry = this.transcriptSnapshots.get(sessionId)?.entries[entryIndex]
+    const entry =
+      this.sessionStates.get(sessionId)?.snapshot?.entries[entryIndex]
     if (!entry || entry.kind !== 'agent-reply') return undefined
     const step = entry.turns[turnIndex]?.steps[stepIndex]
     return step?.kind === 'thinking' ? step : undefined
@@ -541,7 +585,9 @@ export class TranscriptEmitter {
   emitTranscriptDeltaForActivity(
     event: Extract<DriverEvent, { type: 'activity-updated' }>,
   ): void {
-    const turnState = this.turnStateByRun.get(event.runId)
+    const turnState = this.ensureSessionState(
+      event.sessionId,
+    ).turnStatesByRunId.get(event.runId)
     if (!turnState) return
 
     const now = event.occurredAt
@@ -639,9 +685,13 @@ export class TranscriptEmitter {
   completeAttemptForRun(
     event: Extract<DriverEvent, { type: 'message-completed' }>,
   ): void {
-    const attempt = this.runToAttempt.get(event.runId)
-    const entryIndex = this.messageToEntryIndex.get(event.message.messageId)
-    if (entryIndex === undefined) return
+    const state = this.ensureSessionState(event.sessionId)
+    const attempt = state.attemptsByRunId.get(event.runId)
+    const entryIndex = state.messageToEntryIndex.get(event.message.messageId)
+    if (entryIndex === undefined) {
+      this.clearRunState(state, event.runId)
+      return
+    }
 
     const completedAttempt: ExecutionAttempt = attempt
       ? { ...attempt, status: 'completed', completedAt: event.occurredAt }
@@ -653,18 +703,13 @@ export class TranscriptEmitter {
           completedAt: event.occurredAt,
         }
 
-    // Always store in runToAttempt so future lookups work
-    if (!attempt) {
-      this.runToAttempt.set(event.runId, completedAttempt)
-    }
-
     const delta: TranscriptDelta = {
       type: 'attempt-status-changed',
       index: entryIndex,
       attempt: completedAttempt,
     }
     this.emitTranscriptDeltaEvent(event.agentId, event.sessionId, delta)
-    this.pendingAttemptBySession.delete(event.sessionId)
+    this.clearRunState(state, event.runId)
   }
 
   /**
@@ -686,7 +731,8 @@ export class TranscriptEmitter {
     occurredAt: string,
     error?: AgentRuntimeErrorPayload,
   ): void {
-    const attempt = this.runToAttempt.get(runId)
+    const state = this.ensureSessionState(sessionId)
+    const attempt = state.attemptsByRunId.get(runId)
     const updatedAttempt: ExecutionAttempt = attempt
       ? {
           ...attempt,
@@ -704,8 +750,11 @@ export class TranscriptEmitter {
         }
 
     // Find the agent-reply entry index for this session
-    const entryIndex = this.findLastAgentReplyIndex()
-    if (entryIndex === undefined) return
+    const entryIndex = this.findLastAgentReplyIndex(sessionId)
+    if (entryIndex === undefined) {
+      this.clearRunState(state, runId)
+      return
+    }
 
     const delta: TranscriptDelta = {
       type: 'attempt-status-changed',
@@ -713,7 +762,16 @@ export class TranscriptEmitter {
       attempt: updatedAttempt,
     }
     this.emitTranscriptDeltaEvent(agentId, sessionId, delta)
-    this.pendingAttemptBySession.delete(sessionId)
+    this.clearRunState(state, runId)
+  }
+
+  /** 清理指定 run 在所属会话里的待关联 attempt 与 turn 投影。 */
+  private clearRunState(state: SessionProjectionState, runId: string): void {
+    if (state.pendingAttempt?.runId === runId) {
+      state.pendingAttempt = null
+    }
+    state.attemptsByRunId.delete(runId)
+    state.turnStatesByRunId.delete(runId)
   }
 
   /**
@@ -722,12 +780,14 @@ export class TranscriptEmitter {
    * @param sessionId - 会话标识。
    * @returns 条目索引；不存在时返回 undefined。
    */
-  findLastAgentReplyIndex(): number | undefined {
-    let lastIndex: number | undefined
-    for (const [, index] of this.messageToEntryIndex) {
-      lastIndex = index
+  private findLastAgentReplyIndex(sessionId: string): number | undefined {
+    const entries = this.sessionStates.get(sessionId)?.snapshot?.entries
+    if (!entries) return undefined
+
+    for (let index = entries.length - 1; index >= 0; index--) {
+      if (entries[index]?.kind === 'agent-reply') return index
     }
-    return lastIndex
+    return undefined
   }
 
   /**
@@ -741,7 +801,8 @@ export class TranscriptEmitter {
     event: Extract<DriverEvent, { type: 'compaction-detected' }>,
   ): void {
     const { agentId, sessionId, occurredAt } = event
-    const nextIndex = this.sessionNextIndex.get(sessionId) ?? 0
+    const state = this.ensureSessionState(sessionId)
+    const nextIndex = state.nextIndex
 
     const delta: TranscriptDelta = {
       type: 'entry-appended',
@@ -751,7 +812,7 @@ export class TranscriptEmitter {
       }),
     }
     this.emitTranscriptDeltaEvent(agentId, sessionId, delta)
-    this.sessionNextIndex.set(sessionId, nextIndex + 1)
+    state.nextIndex = nextIndex + 1
   }
 
   /**
@@ -766,13 +827,14 @@ export class TranscriptEmitter {
     event: Extract<DriverEvent, { type: 'auto-retry-progress' }>,
   ): void {
     const { agentId, sessionId, runId, retryCount } = event
-    const attempt = this.runToAttempt.get(runId)
+    const state = this.ensureSessionState(sessionId)
+    const attempt = state.attemptsByRunId.get(runId)
     if (!attempt) return
 
     const updatedAttempt: ExecutionAttempt = { ...attempt, retryCount }
-    this.runToAttempt.set(runId, updatedAttempt)
+    state.attemptsByRunId.set(runId, updatedAttempt)
 
-    const turnState = this.turnStateByRun.get(runId)
+    const turnState = state.turnStatesByRunId.get(runId)
     if (!turnState) return
 
     const delta: TranscriptDelta = {
@@ -797,12 +859,13 @@ export class TranscriptEmitter {
     delta: TranscriptDelta,
   ): void {
     // Accumulate snapshot for session reconstruction (AC 8)
+    const state = this.ensureSessionState(sessionId)
     const snapshot = this.ensureSnapshot(agentId, sessionId)
     const nextSnapshot = applyTranscriptDelta(snapshot, delta)
-    this.transcriptSnapshots.set(sessionId, {
+    state.snapshot = {
       ...nextSnapshot,
       updatedAt: new Date().toISOString(),
-    })
+    }
 
     this.emit({
       type: 'transcript-delta',

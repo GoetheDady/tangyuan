@@ -65,6 +65,7 @@ export async function createDriver(
   options: {
     gateway?: PiSdkGateway
     encryptionAdapter?: ConfigEncryptionAdapter | null
+    now?: () => string
   } = {},
 ) {
   const rootPath = await mkdtemp(join(tmpdir(), 'yuanxiao-agent-runtime-'))
@@ -79,6 +80,7 @@ export async function createDriver(
       ...(options.encryptionAdapter !== undefined
         ? { encryptionAdapter: options.encryptionAdapter }
         : {}),
+      ...(options.now ? { now: options.now } : {}),
     }),
     rootPath,
     userDataPath,
@@ -140,6 +142,7 @@ export function createDriverAtPath(options: {
   userDataPath: string
   gateway?: PiSdkGateway
   encryptionAdapter?: ConfigEncryptionAdapter | null
+  now?: () => string
 }) {
   const resolvedEncryptionAdapter =
     options.encryptionAdapter !== undefined
@@ -150,7 +153,7 @@ export function createDriverAtPath(options: {
     fsRoot: options.rootPath,
     userDataPath: options.userDataPath,
     agentHomePath: '~/.yuanxiao/agents/yuanxiao',
-    now: () => '2026-07-08T00:00:00.000Z',
+    now: options.now ?? (() => '2026-07-08T00:00:00.000Z'),
     ...(options.gateway ? { gateway: options.gateway } : {}),
   }
 

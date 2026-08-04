@@ -274,16 +274,21 @@ export function createSessionDriver(
  * 创建会话列表里展示的测试摘要。
  *
  * @param sessionId - 会话唯一标识。
+ * @param overrides - 需要覆盖的会话摘要字段。
  * @returns 默认 Agent 下的空闲会话摘要。
  * @throws 此测试辅助方法不会抛出错误。
  */
-export function createSessionSummary(sessionId: string): AgentSessionSummary {
+export function createSessionSummary(
+  sessionId: string,
+  overrides: Partial<AgentSessionSummary> = {},
+): AgentSessionSummary {
   return {
     agentId: YUANXIAO_DEFAULT_AGENT_ID,
     sessionId,
     title: '新会话',
     state: 'idle',
     updatedAt: '2026-07-08T00:00:00.000Z',
+    ...overrides,
   }
 }
 

@@ -97,13 +97,13 @@ describe('SessionIndexRebuilder.rebuild', () => {
     await expect(rebuilder.rebuild()).resolves.toEqual([])
   })
 
-  it('全局扫描失败时返回空数组而不抛错', async () => {
+  it('全局扫描失败时传播错误，避免调用方把失败提交为空索引', async () => {
     const gateway = {
       listSessions: vi.fn().mockRejectedValue(new Error('扫描失败')),
     } as unknown as PiSdkGateway
     const rebuilder = createRebuilder(gateway)
 
-    await expect(rebuilder.rebuild()).resolves.toEqual([])
+    await expect(rebuilder.rebuild()).rejects.toThrow('扫描失败')
   })
 
   it('按工作目录归属 Agent，会话配置优先于 Agent 默认值', async () => {
