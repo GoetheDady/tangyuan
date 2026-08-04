@@ -16,6 +16,8 @@ export interface YuanxiaoRuntimeDependencies {
   agents: AgentLifecycleModule
   profiles: ProfileModule
   skills: SkillModule
+  /** 生产环境的 Agent 命令许可持久化路径；测试可省略以使用内存。 */
+  commandPermissionFilePath?: string
   lastActiveSessionStore?: Pick<
     LastActiveSessionStore,
     'read' | 'write' | 'clear'

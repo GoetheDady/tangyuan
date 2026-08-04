@@ -58,6 +58,7 @@ function createApproval(
     command: 'bun run test',
     cwd: '/workspace',
     riskDescription: '运行测试',
+    riskLevel: 'normal',
     status: 'pending',
     createdAt: NOW,
   }

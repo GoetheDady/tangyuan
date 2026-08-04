@@ -7,14 +7,28 @@ const DEFAULT_AGENT = 'yuanxiao'
 
 function createService(driver: Partial<SessionModule & SkillModule>) {
   const events: AgentEvent[] = []
+  const skills = {
+    preflightSkillOperation: vi.fn(async () => ({
+      description: '测试用途的 skill',
+      hasScripts: false,
+    })),
+    ...driver,
+  }
   const service = new SkillService({
-    skills: driver as SkillModule,
-    sessions: driver as SessionModule,
+    skills: skills as SkillModule,
+    sessions: skills as SessionModule,
     defaultAgentId: DEFAULT_AGENT,
     emit: (event) => events.push(event),
     now: () => '2024-01-01T00:00:00.000Z',
   })
   return { service, events }
+}
+
+async function pendingApprovalId(service: SkillService): Promise<string> {
+  await vi.waitFor(() => {
+    expect(service.getPendingApprovals()).toHaveLength(1)
+  })
+  return service.getPendingApprovals()[0]!.approvalId
 }
 
 function sharedInstall(
@@ -46,7 +60,7 @@ describe('SkillService', () => {
 
     const promise = service.install(sharedInstall())
     // 审批被登记后批准
-    const approvalId = service.getPendingApprovals()[0]!.approvalId
+    const approvalId = await pendingApprovalId(service)
     service.approveOperation(approvalId)
 
     expect(await promise).toEqual([{ name: 'demo' }])
@@ -59,7 +73,7 @@ describe('SkillService', () => {
     const { service } = createService({ installSkill })
 
     const promise = service.install(sharedInstall())
-    const approvalId = service.getPendingApprovals()[0]!.approvalId
+    const approvalId = await pendingApprovalId(service)
     service.rejectOperation(approvalId)
 
     await expect(promise).rejects.toThrow('用户拒绝了 Skill 操作')
@@ -100,7 +114,7 @@ describe('SkillService', () => {
     } as SkillOperationParams
 
     const promise = service.delete(params)
-    service.approveOperation(service.getPendingApprovals()[0]!.approvalId)
+    service.approveOperation(await pendingApprovalId(service))
     await promise
 
     expect(deleteSkill).toHaveBeenCalledTimes(1)
@@ -110,8 +124,62 @@ describe('SkillService', () => {
   it('rejectAllApprovals 清空待审批', async () => {
     const { service } = createService({ installSkill: vi.fn() })
     void service.install(sharedInstall()).catch(() => {})
-    expect(service.getPendingApprovals()).toHaveLength(1)
+    await pendingApprovalId(service)
     service.rejectAllApprovals()
     expect(service.getPendingApprovals()).toHaveLength(0)
+  })
+
+  it('预检失败时不产生审批，也不执行安装', async () => {
+    const installSkill = vi.fn(async () => [] as never)
+    const { service, events } = createService({
+      preflightSkillOperation: vi.fn(async () => {
+        throw new Error('Skill 目录缺少 SKILL.md')
+      }),
+      installSkill,
+    })
+
+    await expect(service.install(sharedInstall())).rejects.toThrow(
+      'Skill 目录缺少 SKILL.md',
+    )
+    expect(service.getPendingApprovals()).toEqual([])
+    expect(events).not.toContainEqual(
+      expect.objectContaining({ type: 'skill-approval-required' }),
+    )
+    expect(installSkill).not.toHaveBeenCalled()
+  })
+
+  it('审批载荷使用预检得到的描述、脚本风险和同名覆盖信息', async () => {
+    const installSkill = vi.fn(async () => [] as never)
+    const { service } = createService({
+      preflightSkillOperation: vi.fn(async () => ({
+        description: '会执行本地脚本',
+        hasScripts: true,
+        conflict: {
+          overriddenPath: '/shared/demo/SKILL.md',
+          overriddenSource: 'shared' as const,
+        },
+      })),
+      installSkill,
+    })
+
+    const promise = service.install(
+      sharedInstall({
+        source: 'agent',
+        targetAgentId: DEFAULT_AGENT,
+        skillDirPath: '/tmp/demo',
+      }),
+    )
+    const approvalId = await pendingApprovalId(service)
+    expect(service.getPendingApprovals()[0]).toMatchObject({
+      description: '会执行本地脚本',
+      hasScripts: true,
+      conflict: {
+        overriddenPath: '/shared/demo/SKILL.md',
+        overriddenSource: 'shared',
+      },
+    })
+
+    service.rejectOperation(approvalId)
+    await expect(promise).rejects.toThrow('用户拒绝了 Skill 操作')
   })
 })

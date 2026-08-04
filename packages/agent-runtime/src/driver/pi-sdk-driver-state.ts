@@ -112,21 +112,6 @@ export abstract class PiSdkDriverState {
   }
 
   /**
-   * 确保指定会话已从索引加载到内存。
-   *
-   * @param sessionId - 需要加载的会话标识。
-   * @returns 无返回值。
-   * @throws 当索引读取失败时，Promise 会 reject。
-   */
-  protected async ensureSessionLoaded(sessionId: string): Promise<void> {
-    if (this.sessionIndexStore.hasSummary(sessionId)) {
-      return
-    }
-
-    await this.sessionIndexStore.load()
-  }
-
-  /**
    * 确保指定会话已有 Pi SDK session handle，历史会话会通过 openSession 打开。
    *
    * @param sessionId - 需要打开的会话标识。
@@ -142,7 +127,7 @@ export abstract class PiSdkDriverState {
       return existingHandle
     }
 
-    const indexEntry = this.sessionIndexStore.getEntry(sessionId)
+    const indexEntry = await this.sessionIndexStore.resolveEntry(sessionId)
     const configuration = await this.resolveSessionConfiguration(indexEntry)
 
     return this.openSessionHandle(sessionId, configuration)
@@ -258,7 +243,7 @@ export abstract class PiSdkDriverState {
     sessionId: string,
     configuration: RuntimeConfiguration,
   ): Promise<PiSdkSessionHandle> {
-    const indexEntry = this.sessionIndexStore.getEntry(sessionId)
+    const indexEntry = await this.sessionIndexStore.resolveEntry(sessionId)
     const cwd =
       indexEntry.agentId === YUANXIAO_DEFAULT_AGENT_ID
         ? this.layout.agentHome()
@@ -337,7 +322,8 @@ export abstract class PiSdkDriverState {
 
     for (const [sessionId, handle] of this.sessionHandles) {
       if (
-        this.sessionIndexStore.getEntryOrNull(sessionId)?.agentId !== agentId ||
+        (await this.sessionIndexStore.findEntry(sessionId))?.agentId !==
+          agentId ||
         !handle.setSystemPromptContext
       ) {
         continue
@@ -412,7 +398,7 @@ export abstract class PiSdkDriverState {
     sessionId: string,
   ): Promise<void> {
     const handle = this.sessionHandles.get(sessionId)
-    const agentId = this.sessionIndexStore.getEntryOrNull(sessionId)?.agentId
+    const agentId = (await this.sessionIndexStore.findEntry(sessionId))?.agentId
     if (!handle?.setSystemPromptContext || !agentId) return
 
     const [context, soul, userProfile] = await Promise.all([
@@ -451,7 +437,8 @@ export abstract class PiSdkDriverState {
   protected async refreshAllProfileContext(): Promise<void> {
     const agentIds = new Set<AgentId>()
     for (const sessionId of this.sessionHandles.keys()) {
-      const agentId = this.sessionIndexStore.getEntryOrNull(sessionId)?.agentId
+      const agentId = (await this.sessionIndexStore.findEntry(sessionId))
+        ?.agentId
       if (agentId) {
         agentIds.add(agentId)
       }
@@ -470,37 +457,11 @@ export abstract class PiSdkDriverState {
    * @returns 对应的会话摘要。
    * @throws 当会话不存在时抛出 AgentRuntimeError。
    */
-  protected assertKnownSession(
+  protected async assertKnownSession(
     sessionId: string,
     agentId = YUANXIAO_DEFAULT_AGENT_ID,
-  ): AgentSessionSummary {
-    const session = this.sessionIndexStore.getSummary(sessionId)
-
-    if (!session) {
-      throw new AgentRuntimeError({
-        code: 'session-not-found',
-        message: `找不到会话 ${sessionId}。`,
-        recoverable: true,
-      })
-    }
-
-    if (session.agentId !== agentId) {
-      throw new AgentRuntimeError({
-        code: 'session-not-found',
-        message: `会话 ${sessionId} 不属于 Agent ${agentId}。`,
-        recoverable: true,
-      })
-    }
-
-    if (session.archivedAt !== undefined) {
-      throw new AgentRuntimeError({
-        code: 'session-not-found',
-        message: `会话 ${sessionId} 已归档，请先恢复后再打开。`,
-        recoverable: true,
-      })
-    }
-
-    return session
+  ): Promise<AgentSessionSummary> {
+    return this.sessionIndexStore.resolveSession(sessionId, agentId)
   }
 
   /**
@@ -516,8 +477,6 @@ export abstract class PiSdkDriverState {
     role: InternalMessage['role']
     content: string
   }): InternalMessage {
-    this.assertKnownSession(input.sessionId, input.agentId)
-
     return this.messageStore.append(input)
   }
 
@@ -543,21 +502,22 @@ export abstract class PiSdkDriverState {
    * @returns 更新后的会话摘要。
    * @throws 当会话不存在时抛出 AgentRuntimeError。
    */
-  protected updateSessionState(
+  protected async updateSessionState(
     sessionId: string,
     state: AgentRunState,
-  ): AgentSessionSummary {
-    const nextSession = this.sessionIndexStore.setSummaryState(
+  ): Promise<AgentSessionSummary> {
+    const occurredAt = this.now()
+    const nextSession = await this.sessionIndexStore.setState(
       sessionId,
       state,
-      this.now(),
+      occurredAt,
     )
     this.emit({
       type: 'run-state-changed',
       agentId: nextSession.agentId,
       sessionId,
       state,
-      occurredAt: this.now(),
+      occurredAt,
     })
 
     return nextSession
@@ -607,7 +567,7 @@ export abstract class PiSdkDriverState {
     const promises: Promise<void>[] = []
 
     for (const [sessionId, handle] of this.sessionHandles) {
-      const indexEntry = this.sessionIndexStore.getEntryOrNull(sessionId)
+      const indexEntry = await this.sessionIndexStore.findEntry(sessionId)
       if (indexEntry?.agentId === agentId && handle.reload) {
         promises.push(handle.reload())
       }
@@ -646,7 +606,7 @@ export abstract class PiSdkDriverState {
   async getSessionModelInfo(
     request: GetSessionModelInfoRequest,
   ): Promise<SessionModelInfo> {
-    this.assertKnownSession(request.sessionId, request.agentId)
+    await this.assertKnownSession(request.sessionId, request.agentId)
     const handle = await this.ensureSessionHandle(request.sessionId)
 
     if (!handle.getModelInfo) {
@@ -670,7 +630,7 @@ export abstract class PiSdkDriverState {
   async setSessionModel(
     request: SetSessionModelRequest,
   ): Promise<SessionModelInfo> {
-    this.assertKnownSession(request.sessionId, request.agentId)
+    await this.assertKnownSession(request.sessionId, request.agentId)
     const handle = await this.ensureSessionHandle(request.sessionId)
 
     if (!handle.setModel) {
@@ -682,7 +642,9 @@ export abstract class PiSdkDriverState {
     }
 
     // 读取目标 Provider 的 API Key 用于跨 Provider 切换
-    const indexEntry = this.sessionIndexStore.getEntry(request.sessionId)
+    const indexEntry = await this.sessionIndexStore.resolveEntry(
+      request.sessionId,
+    )
     const configuration = await this.configStore.readRequired(
       indexEntry.agentId,
     )
@@ -692,10 +654,11 @@ export abstract class PiSdkDriverState {
         : undefined
 
     await handle.setModel(request.providerId, request.modelId, targetApiKey)
-    await this.sessionIndexStore.updateEntry(request.sessionId, {
-      provider: request.providerId,
-      model: request.modelId,
-    })
+    await this.sessionIndexStore.setModel(
+      request.sessionId,
+      request.providerId,
+      request.modelId,
+    )
 
     if (!handle.getModelInfo) {
       throw new AgentRuntimeError({
@@ -718,7 +681,7 @@ export abstract class PiSdkDriverState {
   async setSessionThinkingLevel(
     request: SetSessionThinkingLevelRequest,
   ): Promise<SessionModelInfo> {
-    this.assertKnownSession(request.sessionId, request.agentId)
+    await this.assertKnownSession(request.sessionId, request.agentId)
     const handle = await this.ensureSessionHandle(request.sessionId)
 
     if (!handle.setThinkingLevel) {
@@ -742,9 +705,10 @@ export abstract class PiSdkDriverState {
     const info = await handle.getModelInfo()
     // Thinking Level 属于会话运行配置：持久化后重新打开会话才能恢复，
     // 而不是静默回退到 Agent 默认配置。
-    await this.sessionIndexStore.updateEntry(request.sessionId, {
-      thinkingLevel: request.level,
-    })
+    await this.sessionIndexStore.setThinkingLevel(
+      request.sessionId,
+      request.level,
+    )
 
     return info
   }

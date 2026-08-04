@@ -45,6 +45,7 @@ import type {
 } from './types'
 import type {
   LastActiveSession,
+  SessionResumeSnapshot,
   SetLastActiveSessionRequest,
 } from './last-active-session'
 import type {
@@ -80,7 +81,7 @@ export interface DesktopPreloadApi {
   archiveSession(request: ArchiveSessionRequest): Promise<ArchiveSessionResult>
   recoverSession(request: RecoverSessionRequest): Promise<AgentSessionSummary[]>
   deleteSession(request: DeleteSessionRequest): Promise<DeleteSessionResult>
-  getLastActiveSession(): Promise<LastActiveSession | null>
+  resumeSession(): Promise<SessionResumeSnapshot>
   setLastActiveSession(
     request: SetLastActiveSessionRequest,
   ): Promise<LastActiveSession | null>

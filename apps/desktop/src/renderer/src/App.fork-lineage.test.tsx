@@ -53,11 +53,6 @@ function installLineageApi(): void {
   })
   vi.mocked(window.api.getRuntimeSnapshot).mockResolvedValue(readyRuntime)
   vi.mocked(window.api.refreshRuntime).mockResolvedValue(readyRuntime)
-  vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
-    agentId: 'yuanxiao',
-    sessionId: 'parent-session',
-    updatedAt: '2026-07-28T00:02:00.000Z',
-  })
   vi.mocked(window.api.listSessions).mockResolvedValue([
     PARENT,
     CHILD,

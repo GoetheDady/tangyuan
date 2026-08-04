@@ -4,15 +4,14 @@ import type {
   DeleteSessionResult,
 } from '@yuanxiao/contracts'
 import { useLayoutEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
+import type { WorkbenchStoreApi } from '../stores/workbench-store'
 
 interface UseSessionArchiveOptions {
   agentId: string
   selectedSession: AgentSessionSummary | null
-  /** 归档/删除/恢复后按 Agent 刷新会话列表（含已归档，由调用方分片入 store）。 */
-  onListsRefreshed(agentId: string, allSessions: AgentSessionSummary[]): void
-  onArchived(target: AgentSessionSummary, result: ArchiveSessionResult): void
-  onDeleted(target: AgentSessionSummary, result: DeleteSessionResult): void
+  store: WorkbenchStoreApi
 }
 
 export function useSessionArchive(options: UseSessionArchiveOptions): {
@@ -29,6 +28,7 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
   cancelArchive(): void
   cancelDelete(): void
 } {
+  const navigate = useNavigate()
   const [archiveTarget, setArchiveTarget] =
     useState<AgentSessionSummary | null>(null)
   const [archivePreview, setArchivePreview] =
@@ -49,18 +49,15 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
     activeAgentIdRef.current = options.agentId
   }, [options.agentId])
 
-  async function refreshSessionLists(agentId: string): Promise<boolean> {
-    if (activeAgentIdRef.current !== agentId) return false
-
+  async function refreshSessionLists(
+    agentId: string,
+  ): Promise<AgentSessionSummary[]> {
     const allSessions = await window.api.listSessions({
       agentId,
       includeArchived: true,
     })
 
-    if (activeAgentIdRef.current !== agentId) return false
-
-    options.onListsRefreshed(agentId, allSessions)
-    return true
+    return allSessions
   }
 
   async function archiveSelectedSession(
@@ -89,9 +86,14 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
         return
       }
 
-      const isTargetAgentActive = await refreshSessionLists(target.agentId)
-      if (isTargetAgentActive) {
-        options.onArchived(target, result)
+      const allSessions = await refreshSessionLists(target.agentId)
+      options.store.getState().removeSessionLineage({
+        agentId: target.agentId,
+        allSessions,
+        affectedSessionIds: result.affectedSessionIds,
+      })
+      if (activeAgentIdRef.current === target.agentId) {
+        navigate(`/chat/${target.agentId}`, { replace: true })
       }
       setArchiveTarget(null)
       setArchivePreview(null)
@@ -111,7 +113,12 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
         agentId: session.agentId,
         sessionId: session.sessionId,
       })
-      await refreshSessionLists(session.agentId)
+      options.store
+        .getState()
+        .replaceSessionCatalog(
+          session.agentId,
+          await refreshSessionLists(session.agentId),
+        )
       toast.success('已恢复会话谱系')
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : '恢复会话谱系失败')
@@ -145,9 +152,14 @@ export function useSessionArchive(options: UseSessionArchiveOptions): {
         return
       }
 
-      const isTargetAgentActive = await refreshSessionLists(target.agentId)
-      if (isTargetAgentActive) {
-        options.onDeleted(target, result)
+      const allSessions = await refreshSessionLists(target.agentId)
+      options.store.getState().removeSessionLineage({
+        agentId: target.agentId,
+        allSessions,
+        affectedSessionIds: result.affectedSessionIds,
+      })
+      if (activeAgentIdRef.current === target.agentId) {
+        navigate(`/chat/${target.agentId}`, { replace: true })
       }
       setDeleteTarget(null)
       setDeletePreview(null)

@@ -164,6 +164,11 @@ export class DirectoryLayout {
     return join(this.userDataPath, 'sessions', 'last-active-session.json')
   }
 
+  /** 解析 Agent 命令许可持久化文件。 */
+  commandPermissions(): string {
+    return join(this.userDataPath, 'command-permissions.json')
+  }
+
   /**
    * 解析 Pi SDK 会话目录绝对路径。
    *

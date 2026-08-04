@@ -69,6 +69,7 @@ function createApproval(
     command,
     cwd: '/workspace',
     riskDescription: '运行测试',
+    riskLevel: 'normal',
     status: 'pending',
     createdAt: NOW,
   }
@@ -102,7 +103,6 @@ function createHarness() {
       return unsubscribe
     }),
     refreshRuntime: vi.fn<() => Promise<RuntimeSnapshot>>(),
-    approveBash: vi.fn<() => Promise<void>>(),
   }
   const notifications = {
     success: vi.fn<(message: string) => void>(),
@@ -238,13 +238,9 @@ describe('createAgentEventBridge', () => {
     })
   })
 
-  it('自动批准始终允许的 Bash 命令且不加入待审批队列', () => {
+  it('审批请求始终进入 Renderer 待处理投影', () => {
     const harness = createHarness()
     const approval = createApproval('session-1', 'bun run test')
-    harness.store
-      .getState()
-      .allowCommandForProcess(approval.sessionId, approval.command)
-    harness.api.approveBash.mockResolvedValue()
 
     harness.dispatch({
       type: 'approval-required',
@@ -254,13 +250,10 @@ describe('createAgentEventBridge', () => {
       occurredAt: NOW,
     })
 
-    expect(harness.api.approveBash).toHaveBeenCalledWith({
-      approvalId: approval.approvalId,
-    })
     expect(
       harness.store.getState().pendingApprovalsBySessionId[approval.sessionId],
-    ).toBeUndefined()
-    expect(harness.notifications.info).not.toHaveBeenCalled()
+    ).toEqual([approval])
+    expect(harness.notifications.info).toHaveBeenCalledOnce()
   })
 
   it('同一帧按到达顺序合并 transcript delta，且只提交一次 store 更新', () => {
@@ -386,8 +379,8 @@ describe('createAgentEventBridge', () => {
     ],
   ] as const)('%s 会结束对应 session 的发送状态', (_label, eventFragment) => {
     const harness = createHarness()
-    harness.store.getState().beginSending('session-1')
-    harness.store.getState().beginSending('session-2')
+    harness.store.getState().startSessionExecution({ sessionId: 'session-1' })
+    harness.store.getState().startSessionExecution({ sessionId: 'session-2' })
 
     harness.dispatch({
       agentId: 'yuanxiao',

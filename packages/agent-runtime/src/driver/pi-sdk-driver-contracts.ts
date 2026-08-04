@@ -46,6 +46,7 @@ export interface ToolApprovalGateway {
     runId: string
     command: string
     cwd: string
+    riskLevel: import('@yuanxiao/contracts').BashRiskLevel
     riskDescription: string
   }): Promise<{ approved: boolean }>
 

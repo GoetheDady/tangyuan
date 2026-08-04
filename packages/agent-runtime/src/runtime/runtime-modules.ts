@@ -62,7 +62,7 @@ export interface SessionModule {
   cancelRun(request: CancelRunRequest): Promise<void>
   retryMessage(request: RetryRunRequest): Promise<void>
   forkSession(request: ForkSessionRequest): Promise<AgentSessionSummary>
-  getSessionAttempts(sessionId: string): PersistedAttemptEntry[]
+  getSessionAttempts(sessionId: string): Promise<PersistedAttemptEntry[]>
   getSessionModelInfo(
     request: GetSessionModelInfoRequest,
   ): Promise<SessionModelInfo>
@@ -115,9 +115,21 @@ export interface ProfileModule {
 }
 
 /** Skill 列表、持久化与安装记录能力。 */
+export interface SkillOperationPreflight {
+  description: string
+  hasScripts: boolean
+  conflict?: {
+    overriddenPath: string
+    overriddenSource: 'shared' | 'agent'
+  }
+}
+
 export interface SkillModule {
   listAgentSkills(agentId: AgentId): Promise<SkillSummary[]>
   listSharedSkills(): Promise<SkillSummary[]>
+  preflightSkillOperation(
+    params: SkillOperationParams,
+  ): Promise<SkillOperationPreflight>
   installSkill(params: SkillOperationParams): Promise<SkillSummary[]>
   deleteSkill(params: SkillOperationParams): Promise<SkillSummary[]>
   getSkillInstallRecords(): Promise<SkillInstallRecord[]>

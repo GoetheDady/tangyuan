@@ -11,6 +11,7 @@ import App from './App'
 import {
   createMissingConfigurationSnapshot,
   createReadyRuntimeSnapshot,
+  createResumeSessionFromApi,
   installDefaultAppApi,
   resetAppTestEnvironment,
 } from './app.test-helpers'
@@ -78,10 +79,9 @@ describe('App', () => {
       updatedAt: '2026-07-28T08:00:00.000Z',
     }
     window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(readyRuntime)
-    window.api.getLastActiveSession = vi.fn().mockResolvedValue({
+    window.api.resumeSession = createResumeSessionFromApi({
       agentId: 'agent-2',
       sessionId: 'fork-session',
-      updatedAt: '2026-07-28T10:00:00.000Z',
     })
     window.api.listSessions = vi
       .fn()
@@ -131,7 +131,6 @@ describe('App', () => {
       updatedAt: '2026-07-28T10:00:00.000Z',
     })
     window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(readyRuntime)
-    window.api.getLastActiveSession = vi.fn().mockResolvedValue(null)
     window.api.listSessions = vi.fn().mockResolvedValue([unavailableSession])
     window.api.createSession = vi.fn().mockResolvedValue(newSession)
     window.api.getTranscript = vi.fn(async ({ agentId, sessionId }) => ({
@@ -188,7 +187,6 @@ describe('App', () => {
       agentId: 'agent-2',
     }
     window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(readyRuntime)
-    window.api.getLastActiveSession = vi.fn().mockResolvedValue(null)
     window.api.listSessions = vi
       .fn()
       .mockResolvedValueOnce([defaultSession])
@@ -418,7 +416,7 @@ describe('App', () => {
           .fn()
           .mockResolvedValue(readyRuntime),
         listSessions: vi.fn().mockResolvedValue([]),
-        getLastActiveSession: vi.fn().mockResolvedValue(null),
+        resumeSession: createResumeSessionFromApi(),
         setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn().mockResolvedValue(
           createDefaultSessionSummary({
@@ -523,7 +521,7 @@ describe('App', () => {
           .fn()
           .mockResolvedValue(readyRuntime),
         listSessions: vi.fn().mockResolvedValue([]),
-        getLastActiveSession: vi.fn().mockResolvedValue(null),
+        resumeSession: createResumeSessionFromApi(),
         setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn().mockResolvedValue(
           createDefaultSessionSummary({
@@ -629,11 +627,7 @@ describe('App', () => {
             updatedAt: '2026-07-08T00:00:00.000Z',
           }),
         ]),
-        getLastActiveSession: vi.fn().mockResolvedValue({
-          agentId: 'yuanxiao',
-          sessionId: 'welcome',
-          updatedAt: '2026-07-08T00:00:00.000Z',
-        }),
+        resumeSession: createResumeSessionFromApi(),
         setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({

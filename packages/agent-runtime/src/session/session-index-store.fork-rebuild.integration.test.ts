@@ -134,40 +134,47 @@ describe('SessionIndexStore 从真实 Pi session 重建会话谱系', () => {
     })
 
     const store = new SessionIndexStore({ layout, configStore, gateway })
-    await store.load()
-    await store.write()
+    await store.listSummaries('yuanxiao')
     // 模拟本地会话索引丢失。
     await unlink(layout.sessionIndex())
 
     const rebuiltStore = new SessionIndexStore({ layout, configStore, gateway })
-    await rebuiltStore.load()
+    const rebuiltSessions = await rebuiltStore.listSummaries('yuanxiao')
 
     expect(
-      rebuiltStore.getSummary(parent.sessionId)?.forkedFrom,
+      rebuiltSessions.find((session) => session.sessionId === parent.sessionId)
+        ?.forkedFrom,
     ).toBeUndefined()
-    expect(rebuiltStore.getSummary(child.sessionId)).toMatchObject({
+    expect(
+      rebuiltSessions.find((session) => session.sessionId === child.sessionId),
+    ).toMatchObject({
       forkedFrom: {
         sessionId: parent.sessionId,
         entryId: parent.secondUserMessageId,
       },
     })
-    expect(rebuiltStore.getSummary(sibling.sessionId)).toMatchObject({
+    expect(
+      rebuiltSessions.find(
+        (session) => session.sessionId === sibling.sessionId,
+      ),
+    ).toMatchObject({
       forkedFrom: {
         sessionId: parent.sessionId,
         entryId: parent.secondUserMessageId,
       },
     })
-    expect(rebuiltStore.getSummary(grandchild.sessionId)).toMatchObject({
+    expect(
+      rebuiltSessions.find(
+        (session) => session.sessionId === grandchild.sessionId,
+      ),
+    ).toMatchObject({
       forkedFrom: {
         sessionId: child.sessionId,
         entryId: childUserMessageId,
       },
     })
     expect(
-      rebuiltStore
-        .listSummaries('yuanxiao')
-        .map((summary) => summary.sessionId)
-        .sort(),
+      rebuiltSessions.map((summary) => summary.sessionId).sort(),
     ).toEqual(
       [
         parent.sessionId,
@@ -188,13 +195,16 @@ describe('SessionIndexStore 从真实 Pi session 重建会话谱系', () => {
     })
 
     const store = new SessionIndexStore({ layout, configStore, gateway })
-    await store.load()
-
-    expect(store.getSummary(child.sessionId)).toMatchObject({
-      forkedFrom: {
-        sessionId: parent.sessionId,
-        entryId: parent.firstUserMessageId,
-      },
-    })
+    await expect(store.listSummaries('yuanxiao')).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sessionId: child.sessionId,
+          forkedFrom: expect.objectContaining({
+            sessionId: parent.sessionId,
+            entryId: parent.firstUserMessageId,
+          }),
+        }),
+      ]),
+    )
   })
 })

@@ -20,7 +20,6 @@ import { useSessionArchive } from '@/hooks/useSessionArchive'
 import { computePendingApprovalSessionIds } from '@/lib/agent-event-state'
 import {
   EMPTY_SESSIONS,
-  partitionSessionsByArchive,
   type WorkbenchStoreApi,
 } from '@/stores/workbench-store'
 
@@ -81,22 +80,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
   const updateComposerDraft = useStore(
     store,
     (state) => state.updateComposerDraft,
-  )
-  const allowCommandForProcess = useStore(
-    store,
-    (state) => state.allowCommandForProcess,
-  )
-  const replaceAgentSessions = useStore(
-    store,
-    (state) => state.replaceAgentSessions,
-  )
-  const replaceArchivedSessions = useStore(
-    store,
-    (state) => state.replaceArchivedSessions,
-  )
-  const clearSessionRequests = useStore(
-    store,
-    (state) => state.clearSessionRequests,
   )
   const activeAgentId = agentId ?? runtime?.activeAgent.agentId ?? 'yuanxiao'
 
@@ -195,28 +178,10 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
   const selectedTranscript =
     transcript?.sessionId === selectedSession?.sessionId ? transcript : null
 
-  const clearSessionRequestsForSessions = (sessionIds: string[]): void => {
-    for (const sessionId of sessionIds) {
-      clearSessionRequests(sessionId)
-    }
-  }
-
   const sessionArchive = useSessionArchive({
     agentId: activeAgentId,
     selectedSession,
-    onListsRefreshed: (agentId, allSessions) => {
-      const { active, archived } = partitionSessionsByArchive(allSessions)
-      replaceAgentSessions(agentId, active)
-      replaceArchivedSessions(agentId, archived)
-    },
-    onArchived: (target, result) => {
-      clearSessionRequestsForSessions(result.affectedSessionIds)
-      navigate(`/chat/${target.agentId}`, { replace: true })
-    },
-    onDeleted: (target, result) => {
-      clearSessionRequestsForSessions(result.affectedSessionIds)
-      navigate(`/chat/${target.agentId}`, { replace: true })
-    },
+    store,
   })
   const parentSession = useMemo(() => {
     const parentSessionId = selectedSession?.forkedFrom?.sessionId
@@ -340,8 +305,10 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
               void window.api.approveBash({ approvalId })
             },
             onApproveAlways: (approval) => {
-              allowCommandForProcess(approval.sessionId, approval.command)
-              void window.api.approveBash({ approvalId: approval.approvalId })
+              void window.api.approveBash({
+                approvalId: approval.approvalId,
+                remember: true,
+              })
             },
             onReject: (approvalId) => {
               void window.api.rejectBash({ approvalId })

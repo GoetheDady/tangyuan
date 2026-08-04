@@ -80,7 +80,7 @@ describe('useChatSessionActions', () => {
 
   it('createSession 创建后置顶会话并持久化最后激活会话', async () => {
     const store = createWorkbenchStore()
-    store.getState().replaceAgentSessions('yuanxiao', [createSession('old-1')])
+    store.getState().replaceSessionCatalog('yuanxiao', [createSession('old-1')])
     const created = createSession('new-1')
     vi.mocked(window.api.createSession).mockResolvedValue(created)
 
@@ -106,11 +106,12 @@ describe('useChatSessionActions', () => {
   it('sendMessage 清空草稿、发送、打开 transcript 并刷新会话列表', async () => {
     const store = createWorkbenchStore()
     const sessions = [createSession('session-1')]
-    store.getState().replaceAgentSessions('yuanxiao', sessions)
+    const archived = { ...createSession('archived-1'), archivedAt: NOW }
+    store.getState().replaceSessionCatalog('yuanxiao', [...sessions, archived])
     store.getState().updateComposerDraft('你好')
     const nextTranscript = createTranscript('session-1')
     vi.mocked(window.api.sendMessage).mockResolvedValue(nextTranscript)
-    vi.mocked(window.api.listSessions).mockResolvedValue(sessions)
+    vi.mocked(window.api.listSessions).mockResolvedValue([...sessions, archived])
 
     const { result } = renderActions(store)
 
@@ -129,13 +130,17 @@ describe('useChatSessionActions', () => {
     )
     expect(window.api.listSessions).toHaveBeenCalledWith({
       agentId: 'yuanxiao',
+      includeArchived: true,
     })
+    expect(store.getState().archivedSessionsByAgentId.yuanxiao).toEqual([
+      archived,
+    ])
   })
 
   it('retryMessage 复用原始用户消息创建新尝试并刷新', async () => {
     const store = createWorkbenchStore()
     const sessions = [createSession('session-1')]
-    store.getState().replaceAgentSessions('yuanxiao', sessions)
+    store.getState().replaceSessionCatalog('yuanxiao', sessions)
     const nextTranscript = createTranscript('session-1')
     vi.mocked(window.api.retryMessage).mockResolvedValue(nextTranscript)
     vi.mocked(window.api.listSessions).mockResolvedValue(sessions)
@@ -159,8 +164,8 @@ describe('useChatSessionActions', () => {
   it('forkSession 用源消息内容填充草稿并跳转到子会话', async () => {
     const store = createWorkbenchStore()
     const sessions = [createSession('session-1')]
-    store.getState().replaceAgentSessions('yuanxiao', sessions)
-    store.getState().openTranscript({
+    store.getState().replaceSessionCatalog('yuanxiao', sessions)
+    store.getState().openSession({
       agentId: 'yuanxiao',
       sessionId: 'session-1',
       entries: [
@@ -205,7 +210,7 @@ describe('useChatSessionActions', () => {
   it('cancelRun 停止生成并刷新会话列表', async () => {
     const store = createWorkbenchStore()
     const sessions = [createSession('session-1')]
-    store.getState().replaceAgentSessions('yuanxiao', sessions)
+    store.getState().replaceSessionCatalog('yuanxiao', sessions)
     vi.mocked(window.api.listSessions).mockResolvedValue(sessions)
 
     const { result } = renderActions(store)
@@ -220,6 +225,7 @@ describe('useChatSessionActions', () => {
     })
     expect(window.api.listSessions).toHaveBeenCalledWith({
       agentId: 'yuanxiao',
+      includeArchived: true,
     })
   })
 
@@ -227,7 +233,7 @@ describe('useChatSessionActions', () => {
     const store = createWorkbenchStore()
     store
       .getState()
-      .replaceAgentSessions('yuanxiao', [createSession('session-1')])
+      .replaceSessionCatalog('yuanxiao', [createSession('session-1')])
 
     const { result } = renderActions(store)
 
@@ -245,6 +251,122 @@ describe('useChatSessionActions', () => {
       modelId: 'claude-sonnet-4-5',
     })
     expect(result.current.sessionModelInfo?.modelId).toBe('claude-sonnet-4-5')
+  })
+
+  it('连续切换模型时只接纳最后一次写入结果', async () => {
+    const store = createWorkbenchStore()
+    store
+      .getState()
+      .replaceSessionCatalog('yuanxiao', [createSession('session-1')])
+    let resolveFirst!: (value: Awaited<
+      ReturnType<typeof window.api.setSessionModel>
+    >) => void
+    let resolveSecond!: (value: Awaited<
+      ReturnType<typeof window.api.setSessionModel>
+    >) => void
+    vi.mocked(window.api.setSessionModel)
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (resolveFirst = resolve)),
+      )
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (resolveSecond = resolve)),
+      )
+
+    const { result } = renderActions(store)
+    let firstPromise!: Promise<void>
+    let secondPromise!: Promise<void>
+    act(() => {
+      firstPromise = result.current.handleSessionModelChange('openai', 'old')
+      secondPromise = result.current.handleSessionModelChange('openai', 'new')
+    })
+
+    resolveSecond({
+      providerId: 'openai',
+      modelId: 'new',
+      displayName: 'New',
+      thinkingLevel: null,
+      supportedThinkingLevels: [],
+      supportsThinking: false,
+    })
+    await act(async () => {
+      await secondPromise
+    })
+    resolveFirst({
+      providerId: 'openai',
+      modelId: 'old',
+      displayName: 'Old',
+      thinkingLevel: null,
+      supportedThinkingLevels: [],
+      supportsThinking: false,
+    })
+    await act(async () => {
+      await firstPromise
+    })
+
+    expect(result.current.sessionModelInfo?.modelId).toBe('new')
+    expect(result.current.isSwitchingModel).toBe(false)
+  })
+
+  it('快速切换会话时只接纳最后一次模型信息请求', async () => {
+    const store = createWorkbenchStore()
+    store.getState().replaceSessionCatalog('yuanxiao', [
+      createSession('session-1'),
+      createSession('session-2'),
+    ])
+    let resolveFirst!: (value: Awaited<
+      ReturnType<typeof window.api.getSessionModelInfo>
+    >) => void
+    let resolveSecond!: (value: Awaited<
+      ReturnType<typeof window.api.getSessionModelInfo>
+    >) => void
+    vi.mocked(window.api.getSessionModelInfo)
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (resolveFirst = resolve)),
+      )
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (resolveSecond = resolve)),
+      )
+
+    const { result, rerender } = renderHook(
+      ({ sessionId }) =>
+        useChatSessionActions({
+          store,
+          activeAgentId: 'yuanxiao',
+          sessionId,
+        }),
+      {
+        initialProps: { sessionId: 'session-1' },
+        wrapper: ({ children }) => <MemoryRouter>{children}</MemoryRouter>,
+      },
+    )
+    rerender({ sessionId: 'session-2' })
+
+    resolveSecond({
+      providerId: 'openai',
+      modelId: 'new-model',
+      displayName: 'New Model',
+      thinkingLevel: null,
+      supportedThinkingLevels: [],
+      supportsThinking: false,
+    })
+    await waitFor(() => {
+      expect(result.current.sessionModelInfo?.modelId).toBe('new-model')
+    })
+
+    resolveFirst({
+      providerId: 'openai',
+      modelId: 'stale-model',
+      displayName: 'Stale Model',
+      thinkingLevel: null,
+      supportedThinkingLevels: [],
+      supportsThinking: false,
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(result.current.sessionModelInfo?.modelId).toBe('new-model')
+    expect(result.current.isLoadingModelInfo).toBe(false)
   })
 
   it('transcript 随路由会话变化按需读取并持久化最后激活会话', async () => {

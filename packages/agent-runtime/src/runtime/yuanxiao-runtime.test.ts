@@ -4,8 +4,6 @@ import {
 } from '@yuanxiao/contracts'
 import { describe, expect, it, vi } from 'vitest'
 import { createYuanxiaoRuntimeForTesting } from './yuanxiao-runtime'
-import { createRuntimeServices } from './runtime-services'
-import type { BashApprovalRegistry } from '../approval'
 import {
   createDeferred,
   createRuntimeDriver,
@@ -710,34 +708,5 @@ describe('YuanxiaoRuntime', () => {
     )
     // 成功后应刷新快照
     expect(runtimeDriver.getSnapshot).toHaveBeenCalled()
-  })
-})
-
-describe('YuanxiaoRuntime · 内部服务注入', () => {
-  it('通过 RuntimeServices seam 替换内部服务', async () => {
-    const sessionDriver = createSessionDriver([])
-    const dependencies = {
-      configuration: createRuntimeDriver(createSnapshot()),
-      sessions: sessionDriver,
-      agents: sessionDriver,
-      profiles: sessionDriver,
-      skills: sessionDriver,
-    }
-    const services = createRuntimeServices(
-      dependencies,
-      () => undefined,
-      () => '2026-07-08T00:00:00.000Z',
-    )
-    const bashApprovalsStub = {
-      approve: vi.fn(),
-      reject: vi.fn(),
-      list: vi.fn(() => []),
-    } as unknown as BashApprovalRegistry
-    services.bashApprovals = bashApprovalsStub
-
-    const runtime = createYuanxiaoRuntimeForTesting(dependencies, services)
-
-    await runtime.approveBash('approval-1')
-    expect(bashApprovalsStub.approve).toHaveBeenCalledWith('approval-1')
   })
 })

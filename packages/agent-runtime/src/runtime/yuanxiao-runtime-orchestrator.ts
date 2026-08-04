@@ -5,16 +5,15 @@ import type {
   DriverEvent,
 } from '../driver'
 import { TranscriptEmitter } from '../session/transcript-emitter'
-import { BashApprovalRegistry, ClarificationRegistry } from '../approval'
+import { CommandPermissionModule, ClarificationRegistry } from '../approval'
 import { SessionDirectory } from '../session/session-directory'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
 import { AgentManager, IdentityService } from '../agent'
 import { SkillService } from '../skill'
-import { SessionModelService } from '../session/session-model-service'
-import { SessionArchiveCoordinator } from '../session/session-archive-coordinator'
-import { createRuntimeServices } from './runtime-services'
-import type { RuntimeServices } from './runtime-services'
-import { RunScheduler } from './run-scheduler'
+import { SessionContinuation } from '../session/session-continuation'
+import { SessionLineageLifecycle } from '../session/session-lineage-lifecycle'
+import { createRuntimeInternals } from './runtime-internals'
+import { RunAdmissionGate } from './run-admission-gate'
 import { AgentRuntimeError } from '../core'
 import {
   type AgentSessionSummary,
@@ -59,15 +58,15 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     'read' | 'write' | 'clear'
   >
   protected readonly listeners = new Set<AgentEventListener>()
-  protected readonly sessionArchiveCoordinator = new SessionArchiveCoordinator()
+  protected readonly sessionLineageLifecycle: SessionLineageLifecycle
   protected readonly transcriptEmitter: TranscriptEmitter
   protected readonly snapshotStore: RuntimeSnapshotStore
   protected readonly agentManager: AgentManager
   protected readonly identityService: IdentityService
-  protected readonly sessionModelService: SessionModelService
   protected readonly sessionDirectory: SessionDirectory
-  protected readonly runScheduler: RunScheduler
-  protected readonly bashApprovals: BashApprovalRegistry
+  protected readonly sessionContinuation: SessionContinuation
+  protected readonly runAdmission: RunAdmissionGate
+  protected readonly commandPermissions: CommandPermissionModule
   protected readonly skillService: SkillService
   protected readonly clarifications: ClarificationRegistry
 
@@ -78,10 +77,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
    * @returns YuanxiaoRuntime 实例。
    * @throws 此构造方法不会主动抛出错误。
    */
-  constructor(
-    dependencies: YuanxiaoRuntimeDependencies,
-    services?: RuntimeServices,
-  ) {
+  constructor(dependencies: YuanxiaoRuntimeDependencies) {
     this.sessions = dependencies.sessions
     this.lastActiveSessionStore = dependencies.lastActiveSessionStore ?? {
       read: async () => null,
@@ -91,34 +87,54 @@ export abstract class YuanxiaoRuntimeOrchestrator {
       }),
       clear: async () => undefined,
     }
-    const created =
-      services ??
-      createRuntimeServices(dependencies, this.emit.bind(this), () =>
-        new Date().toISOString(),
-      )
+    const created = createRuntimeInternals(
+      dependencies,
+      this.emit.bind(this),
+      () => new Date().toISOString(),
+    )
     this.transcriptEmitter = created.transcriptEmitter
     this.snapshotStore = created.snapshotStore
     this.agentManager = created.agentManager
     this.identityService = created.identityService
-    this.sessionModelService = created.sessionModelService
-    this.bashApprovals = created.bashApprovals
+    this.commandPermissions = created.commandPermissions
     this.skillService = created.skillService
     this.clarifications = created.clarifications
-    this.runScheduler = new RunScheduler({
+    this.runAdmission = new RunAdmissionGate({
       emit: this.emit.bind(this),
       upsertSessionState: (sessionId, state, updatedAt) =>
         this.upsertSessionState(sessionId, state, updatedAt),
-      isArchiving: (sessionId) =>
-        this.sessionArchiveCoordinator.isArchiving(sessionId),
-      sendMessage: (request) => this.sessions.sendMessage(request),
       getTranscript: (request) => this.getTranscript(request),
       activeRunCount: () => this.sessions.getActiveRunCount(),
+      isRunActive: (sessionId) =>
+        this.sessions.getActiveRunId(sessionId) !== undefined,
+      now: () => new Date().toISOString(),
     })
     this.sessionDirectory = new SessionDirectory({
       sessions: this.sessions,
-      isQueued: (sessionId) => this.runScheduler.hasQueued(sessionId),
+      isQueued: (sessionId) => this.runAdmission.isQueued(sessionId),
+    })
+    this.sessionContinuation = new SessionContinuation({
+      sessions: this.sessions,
+      directory: this.sessionDirectory,
+      snapshotStore: this.snapshotStore,
+      lastActiveSessionStore: this.lastActiveSessionStore,
+      getTranscript: (request) => this.getTranscript(request),
+    })
+    this.sessionLineageLifecycle = new SessionLineageLifecycle({
+      sessions: this.sessions,
+      directory: this.sessionDirectory,
+      admission: this.runAdmission,
+      transcriptEmitter: this.transcriptEmitter,
+      lastActiveSessionStore: this.lastActiveSessionStore,
+      cancelRun: (request) => this.cancelRun(request),
+      pendingApprovalSessionIds: () =>
+        this.commandPermissions.list().map((approval) => approval.sessionId),
+      pendingClarificationSessionIds: () =>
+        this.clarifications.list().map((item) => item.sessionId),
+      now: () => new Date().toISOString(),
     })
     this.sessions.subscribe((event) => {
+      this.runAdmission.applyEvent(event)
       this.applyAgentEvent(event)
       // 内部驱动事件（message-appended/message-delta/message-completed/
       // activity-updated）已由 applyAgentEvent 翻译为 transcript-delta，
@@ -138,16 +154,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
         this.rejectSessionPendingApprovals(event.sessionId)
       }
 
-      // 当 run 结束时，释放 slot 并启动下一个排队请求
-      if (
-        event.type === 'turn-cancelled' ||
-        event.type === 'turn-failed' ||
-        (event.type === 'run-state-changed' &&
-          event.state !== 'running' &&
-          event.state !== 'queued')
-      ) {
-        this.runScheduler.dequeueNext()
-      }
     })
   }
 
@@ -188,7 +194,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     this.rejectAllPendingSkillApprovals()
 
     // 清空队列
-    this.runScheduler.drainAll()
+    this.runAdmission.drainAll()
 
     const runningSessions = this.sessionDirectory
       .listAll()
@@ -271,7 +277,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
 
     // 会话状态与调度是编排层的职责；transcript 投影统一交给 emitter 分派。
     if (driverEvent.type === 'attempt-started') {
-      this.runScheduler.completeRunStart(driverEvent.sessionId)
       this.upsertSessionState(
         driverEvent.sessionId,
         'running',
@@ -348,7 +353,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
    * @throws 此方法不会主动抛出错误。
    */
   protected rejectAllPendingApprovals(): void {
-    this.bashApprovals.rejectAll()
+    this.commandPermissions.rejectAll()
     this.clarifications.cancelAll()
   }
 
@@ -360,7 +365,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
    * @throws 此方法不会主动抛出错误。
    */
   protected rejectSessionPendingApprovals(sessionId: string): void {
-    this.bashApprovals.rejectSession(sessionId)
+    this.commandPermissions.rejectSession(sessionId)
     this.clarifications.cancelSession(sessionId)
   }
 

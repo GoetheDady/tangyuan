@@ -44,7 +44,17 @@ describe('registerDesktopAppIpc', () => {
         .fn()
         .mockResolvedValue(snapshot),
       listSessions: vi.fn().mockResolvedValue([session]),
-      getLastActiveSession: vi.fn().mockResolvedValue(lastActiveSession),
+      resumeSession: vi.fn().mockResolvedValue({
+        sessions: [session],
+        archivedSessions: [],
+        activeSession: session,
+        transcript: {
+          sessionId: 'session-1',
+          agentId: 'yuanxiao',
+          entries: [],
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      }),
       setLastActiveSession: vi.fn().mockResolvedValue(lastActiveSession),
       createSession: vi.fn().mockResolvedValue(session),
       getTranscript: vi.fn().mockResolvedValue({
@@ -257,11 +267,9 @@ describe('registerDesktopAppIpc', () => {
       }),
     ).resolves.toEqual(session)
     await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsGetLastActive)(
-        null,
-        undefined,
-      ),
-    ).resolves.toEqual(lastActiveSession)
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsResume)(null, undefined),
+    ).resolves.toMatchObject({ activeSession: session })
+    expect(runtime.resumeSession).toHaveBeenCalledOnce()
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsSetLastActive)(null, {
         agentId: 'yuanxiao',
@@ -432,6 +440,17 @@ describe('registerDesktopAppIpc', () => {
       },
     ])
     expect(runtime.listSharedSkills).toHaveBeenCalledOnce()
+
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsApproveBash)(null, {
+        approvalId: 'approval-1',
+        remember: true,
+      }),
+    ).resolves.toBeUndefined()
+    expect(runtime.approveBash).toHaveBeenCalledWith({
+      approvalId: 'approval-1',
+      remember: true,
+    })
   })
 
   it('rejects malformed IPC payloads before they reach the runtime', async () => {
@@ -452,7 +471,7 @@ describe('registerDesktopAppIpc', () => {
         .fn()
         .mockResolvedValue(snapshot),
       listSessions: vi.fn().mockResolvedValue([]),
-      getLastActiveSession: vi.fn().mockResolvedValue(null),
+      resumeSession: vi.fn(),
       setLastActiveSession: vi.fn().mockResolvedValue(null),
       createSession: vi.fn(),
       getTranscript: vi.fn().mockResolvedValue({

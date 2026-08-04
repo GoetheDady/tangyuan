@@ -328,7 +328,10 @@ export function isForkSource(value: unknown): value is ForkSource {
  * @returns 面向用户的中文风险说明。
  * @throws 此方法不会主动抛出错误。
  */
-export function describeBashRisk(command: string): string {
+export function assessBashRisk(command: string): {
+  level: import('@yuanxiao/contracts').BashRiskLevel
+  description: string
+} {
   const highRiskPatterns: Array<{ pattern: RegExp; label: string }> = [
     { pattern: /\brm\s+-rf\b/, label: '递归强制删除' },
     { pattern: /\bsudo\b/, label: '提权操作' },
@@ -362,14 +365,27 @@ export function describeBashRisk(command: string): string {
     .map((p) => p.label)
 
   if (highHits.length > 0) {
-    return `高风险命令：${highHits.join('、')}。命令将以当前 macOS 用户权限执行，可能造成不可逆的系统影响。`
+    return {
+      level: 'high',
+      description: `高风险命令：${highHits.join('、')}。命令将以当前 macOS 用户权限执行，可能造成不可逆的系统影响。`,
+    }
   }
 
   if (mediumHits.length > 0) {
-    return `中风险命令：${mediumHits.join('、')}。命令将以当前 macOS 用户权限执行，请确认操作意图。`
+    return {
+      level: 'medium',
+      description: `中风险命令：${mediumHits.join('、')}。命令将以当前 macOS 用户权限执行，请确认操作意图。`,
+    }
   }
 
-  return `命令将以当前 macOS 用户权限执行。`
+  return {
+    level: 'normal',
+    description: '命令将以当前 macOS 用户权限执行。',
+  }
+}
+
+export function describeBashRisk(command: string): string {
+  return assessBashRisk(command).description
 }
 
 /**

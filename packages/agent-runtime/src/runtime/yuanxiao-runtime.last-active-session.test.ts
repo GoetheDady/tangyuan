@@ -6,8 +6,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { createYuanxiaoRuntimeForTesting } from './yuanxiao-runtime'
 import {
   createRuntimeDriver,
+  createReadySnapshot,
   createSessionDriver,
-  createSnapshot,
 } from './yuanxiao-runtime.test-helpers'
 
 const savedRecord: LastActiveSession = {
@@ -42,8 +42,64 @@ const sessions: AgentSessionSummary[] = [
 ]
 
 describe('YuanxiaoRuntime · 最后激活会话', () => {
+  it('一次续接返回会话分片、可读 transcript 与最后激活会话', async () => {
+    const snapshot = createReadySnapshot()
+    snapshot.agents.push({
+      agentId: 'agent-2',
+      displayName: '研究助手',
+      status: 'active',
+      defaultProviderId: null,
+      defaultModelId: null,
+      homePath: '~/.yuanxiao/agents/agent-2',
+      archivedAt: null,
+      directoryStatus: 'healthy',
+    })
+    const archivedSession: AgentSessionSummary = {
+      agentId: 'agent-2',
+      sessionId: 'archived-session',
+      title: '已归档会话',
+      state: 'idle',
+      updatedAt: '2026-07-27T08:00:00.000Z',
+      archivedAt: '2026-07-28T08:00:00.000Z',
+    }
+    const sessionDriver = createSessionDriver([...sessions, archivedSession])
+    sessionDriver.listSessions = vi.fn(async ({ agentId }) =>
+      [...sessions, archivedSession].filter(
+        (session) => session.agentId === agentId,
+      ),
+    )
+    const lastActiveSessionStore = {
+      read: vi.fn().mockResolvedValue(savedRecord),
+      write: vi.fn(),
+      clear: vi.fn(),
+    }
+    const runtime = createYuanxiaoRuntimeForTesting({
+      configuration: createRuntimeDriver(snapshot),
+      sessions: sessionDriver,
+      agents: sessionDriver,
+      profiles: sessionDriver,
+      skills: sessionDriver,
+      lastActiveSessionStore,
+    })
+
+    await expect(runtime.resumeSession()).resolves.toMatchObject({
+      sessions: [sessions[1], sessions[2]],
+      archivedSessions: [archivedSession],
+      activeSession: sessions[1],
+      transcript: {
+        agentId: 'agent-2',
+        sessionId: 'fork-session',
+      },
+    })
+    expect(sessionDriver.listSessions).toHaveBeenCalledWith({
+      agentId: 'agent-2',
+      includeArchived: true,
+    })
+    expect(lastActiveSessionStore.write).not.toHaveBeenCalled()
+  })
+
   it('优先恢复仍可用的自定义 Agent 分叉会话', async () => {
-    const snapshot = createSnapshot()
+    const snapshot = createReadySnapshot()
     snapshot.agents.push({
       agentId: 'agent-2',
       displayName: '研究助手',
@@ -71,11 +127,13 @@ describe('YuanxiaoRuntime · 最后激活会话', () => {
       },
     })
 
-    await expect(runtime.getLastActiveSession()).resolves.toEqual(savedRecord)
+    await expect(runtime.resumeSession()).resolves.toMatchObject({
+      activeSession: sessions[1],
+    })
   })
 
   it('记录指向已归档 Agent 时回退到默认 Agent 的最近会话', async () => {
-    const snapshot = createSnapshot()
+    const snapshot = createReadySnapshot()
     snapshot.agents.push({
       agentId: 'agent-2',
       displayName: '研究助手',
@@ -108,13 +166,13 @@ describe('YuanxiaoRuntime · 最后激活会话', () => {
       },
     })
 
-    await expect(runtime.getLastActiveSession()).resolves.toEqual(
-      fallbackRecord,
-    )
+    await expect(runtime.resumeSession()).resolves.toMatchObject({
+      activeSession: sessions[0],
+    })
   })
 
   it('记录指向损坏会话时回退到默认 Agent 的最近可读会话', async () => {
-    const snapshot = createSnapshot()
+    const snapshot = createReadySnapshot()
     snapshot.agents.push({
       agentId: 'agent-2',
       displayName: '研究助手',
@@ -171,9 +229,9 @@ describe('YuanxiaoRuntime · 最后激活会话', () => {
       },
     })
 
-    await expect(runtime.getLastActiveSession()).resolves.toEqual(
-      fallbackRecord,
-    )
+    await expect(runtime.resumeSession()).resolves.toMatchObject({
+      activeSession: expect.objectContaining({ sessionId: 'default-older' }),
+    })
     expect(sessionDriver.getTranscript).toHaveBeenCalledWith({
       agentId: 'yuanxiao',
       sessionId: 'default-older',
@@ -181,7 +239,7 @@ describe('YuanxiaoRuntime · 最后激活会话', () => {
   })
 
   it('记录指向父会话缺失的分叉时回退到默认 Agent 会话', async () => {
-    const snapshot = createSnapshot()
+    const snapshot = createReadySnapshot()
     snapshot.agents.push({
       agentId: 'agent-2',
       displayName: '研究助手',
@@ -217,13 +275,13 @@ describe('YuanxiaoRuntime · 最后激活会话', () => {
       },
     })
 
-    await expect(runtime.getLastActiveSession()).resolves.toEqual(
-      fallbackRecord,
-    )
+    await expect(runtime.resumeSession()).resolves.toMatchObject({
+      activeSession: sessions[0],
+    })
   })
 
   it('目标分叉会话可用时更新最后激活记录', async () => {
-    const snapshot = createSnapshot()
+    const snapshot = createReadySnapshot()
     snapshot.agents.push({
       agentId: 'agent-2',
       displayName: '研究助手',

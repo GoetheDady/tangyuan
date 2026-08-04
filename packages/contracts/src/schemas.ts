@@ -476,6 +476,7 @@ export const bashApprovalRequestSchema = z.strictObject({
   runId: nonEmptyIdentifierSchema,
   command: z.string().min(1),
   cwd: z.string().min(1),
+  riskLevel: z.enum(['normal', 'medium', 'high']),
   riskDescription: z.string(),
   status: z.enum(['pending', 'approved', 'rejected']),
   createdAt: timestampSchema,
@@ -663,6 +664,16 @@ export const lastActiveSessionSchema = z.strictObject({
   agentId: nonEmptyIdentifierSchema,
   sessionId: nonEmptyIdentifierSchema,
   updatedAt: timestampSchema,
+})
+
+/**
+ * 校验 Runtime 返回给聊天主界面的完整会话续接快照。
+ */
+export const sessionResumeSnapshotSchema = z.strictObject({
+  sessions: z.array(agentSessionSummarySchema),
+  archivedSessions: z.array(agentSessionSummarySchema),
+  activeSession: agentSessionSummarySchema,
+  transcript: transcriptSnapshotSchema,
 })
 
 /**
@@ -906,6 +917,7 @@ export const openExternalLinkRequestSchema = z.strictObject({
  */
 export const approveBashRequestSchema = z.strictObject({
   approvalId: nonEmptyIdentifierSchema,
+  remember: z.boolean().optional(),
 })
 
 /**

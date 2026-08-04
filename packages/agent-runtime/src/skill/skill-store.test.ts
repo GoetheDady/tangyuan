@@ -33,6 +33,11 @@ async function makeSourceSkill(name: string): Promise<string> {
   return src
 }
 
+async function addScripts(skillDir: string): Promise<void> {
+  await mkdir(join(skillDir, 'scripts'), { recursive: true })
+  await writeFile(join(skillDir, 'scripts', 'run.ts'), 'export {}\n', 'utf8')
+}
+
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'skill-store-'))
   layout = new DirectoryLayout({
@@ -48,6 +53,55 @@ afterEach(async () => {
 })
 
 describe('SkillStore.installSkill', () => {
+  it('预检读取描述、脚本风险和 Agent 专属 Skill 的共享覆盖关系', async () => {
+    const sharedSource = await makeSourceSkill('demo')
+    await store.installSkill({
+      operation: 'install',
+      source: 'shared',
+      agentId: 'yuanxiao',
+      skillName: 'demo',
+      skillDirPath: sharedSource,
+    })
+    const agentSource = await makeSourceSkill('agent-demo')
+    await writeFile(
+      join(agentSource, 'SKILL.md'),
+      '---\nname: demo\ndescription: 可执行脚本的专属版本\n---\n',
+      'utf8',
+    )
+    await addScripts(agentSource)
+
+    await expect(
+      store.preflightSkillOperation({
+        operation: 'install',
+        source: 'agent',
+        agentId: 'yuanxiao',
+        targetAgentId: 'yuanxiao',
+        skillName: 'demo',
+        skillDirPath: agentSource,
+      }),
+    ).resolves.toEqual({
+      description: '可执行脚本的专属版本',
+      hasScripts: true,
+      conflict: {
+        overriddenPath: join(layout.sharedSkills(), 'demo', 'SKILL.md'),
+        overriddenSource: 'shared',
+      },
+    })
+  })
+
+  it('预检在审批前拒绝名称不匹配的 SKILL.md', async () => {
+    const source = await makeSourceSkill('actual-name')
+    await expect(
+      store.preflightSkillOperation({
+        operation: 'install',
+        source: 'shared',
+        agentId: 'yuanxiao',
+        skillName: 'expected-name',
+        skillDirPath: source,
+      }),
+    ).rejects.toThrow('name 字段')
+  })
+
   it('安装共享 Skill：写入目标目录并记录安装', async () => {
     const src = await makeSourceSkill('demo')
     const params: SkillOperationParams = {

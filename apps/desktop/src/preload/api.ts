@@ -98,8 +98,8 @@ export function createYuanxiaoPreloadApi(
     listSessions: async (request?: ListSessionsRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsList, request)
     },
-    getLastActiveSession: async () => {
-      return invoke(DESKTOP_IPC_CHANNELS.sessionsGetLastActive)
+    resumeSession: async () => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsResume)
     },
     setLastActiveSession: async (request: SetLastActiveSessionRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsSetLastActive, request)

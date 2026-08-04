@@ -51,8 +51,6 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
   async listSessions(
     request: ListSessionsRequest,
   ): Promise<AgentSessionSummary[]> {
-    await this.sessionIndexStore.load()
-
     return this.sessionIndexStore.listSummaries(
       request.agentId,
       request.includeArchived,
@@ -64,16 +62,16 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
     sessionIds: readonly string[],
     archivedAt: string | null,
   ): Promise<AgentSessionSummary[]> {
-    await this.sessionIndexStore.load()
     return this.sessionIndexStore.setArchived(sessionIds, archivedAt)
   }
 
   /** 永久删除 Pi session 文件并移除索引条目。 */
   async deleteSessions(sessionIds: readonly string[]): Promise<void> {
-    await this.sessionIndexStore.load()
-
-    for (const sessionId of sessionIds) {
-      const entry = this.sessionIndexStore.getEntryOrNull(sessionId)
+    const entries = await Promise.all(
+      sessionIds.map((sessionId) => this.sessionIndexStore.findEntry(sessionId)),
+    )
+    for (const [index, sessionId] of sessionIds.entries()) {
+      const entry = entries[index]
       if (entry) {
         await rm(entry.sdkSessionFile, { force: true })
       }
@@ -119,10 +117,7 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
       })
     }
 
-    const [configuration] = await Promise.all([
-      this.configStore.readRequired(request.agentId),
-      this.sessionIndexStore.load(),
-    ])
+    const configuration = await this.configStore.readRequired(request.agentId)
     const [soul, userProfile] = await Promise.all([
       this.profileStore.readSoul(request.agentId),
       this.profileStore.readUserProfile(),
@@ -180,7 +175,7 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
       status: 'idle',
     }
 
-    this.sessionIndexStore.addSession(indexEntry)
+    await this.sessionIndexStore.addSession(indexEntry)
     this.messageStore.initSession(session.sessionId)
     this.sessionHandles.set(session.sessionId, handle)
     // 身份上下文走系统提示词：建会话时注入并 reload 使其生效。
@@ -190,7 +185,6 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
       )
       await handle.reload?.()
     }
-    await this.sessionIndexStore.write()
     this.emit({
       type: 'session-created',
       agentId: request.agentId,
@@ -211,8 +205,7 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
   async getTranscript(
     request: GetSessionMessagesRequest,
   ): Promise<TranscriptSnapshot> {
-    await this.ensureSessionLoaded(request.sessionId)
-    this.assertKnownSession(request.sessionId, request.agentId)
+    await this.assertKnownSession(request.sessionId, request.agentId)
 
     const cached = this.transcriptCache.get(request.sessionId)
     if (cached && cached.entries.length > 0) {
@@ -220,14 +213,16 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
     }
 
     await this.ensureSessionHandle(request.sessionId)
-    const indexEntry = this.sessionIndexStore.getEntry(request.sessionId)
+    const indexEntry = await this.sessionIndexStore.resolveEntry(
+      request.sessionId,
+    )
     const snapshot = await this.gateway.readMessages({
       sessionId: request.sessionId,
       sdkSessionFile: indexEntry.sdkSessionFile,
     })
 
     // 填充持久化的 attempt 数据
-    const attempts = this.getSessionAttempts(request.sessionId)
+    const attempts = await this.getSessionAttempts(request.sessionId)
     const enriched = this.enrichTranscriptWithAttempts(snapshot, attempts)
     this.transcriptCache.set(request.sessionId, enriched)
 
@@ -237,8 +232,8 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
   /**
    * 读取指定会话的持久化执行尝试记录。
    */
-  getSessionAttempts(sessionId: string): PersistedAttemptEntry[] {
-    return this.sessionIndexStore.getAttempts(sessionId)
+  getSessionAttempts(sessionId: string): Promise<PersistedAttemptEntry[]> {
+    return this.sessionIndexStore.resolveAttempts(sessionId)
   }
 
   /** 返回指定会话当前活跃运行的 runId；无活跃运行时返回 undefined。 */
@@ -262,10 +257,11 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
    * @throws 当会话不存在、父会话 Provider 缺少 API Key 或分叉失败时，Promise 会 reject。
    */
   async forkSession(request: ForkSessionRequest): Promise<AgentSessionSummary> {
-    await this.sessionIndexStore.load()
-    this.assertKnownSession(request.sessionId, request.agentId)
+    await this.assertKnownSession(request.sessionId, request.agentId)
 
-    const parentEntry = this.sessionIndexStore.getEntry(request.sessionId)
+    const parentEntry = await this.sessionIndexStore.resolveEntry(
+      request.sessionId,
+    )
     // 分叉继承父会话的「有效」会话运行配置：父会话已打开时以运行中的
     // Provider/Model/Thinking Level 为准，否则用索引中持久化的取值。
     const parentConfig = await this.readEffectiveSessionConfig(
@@ -327,10 +323,9 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
       forkedFrom,
     }
 
-    this.sessionIndexStore.addSession(childEntry)
+    await this.sessionIndexStore.addSession(childEntry)
     this.messageStore.initSession(forkedSession.sessionId)
     await this.openSessionHandle(forkedSession.sessionId, configuration)
-    await this.sessionIndexStore.write()
 
     const session: AgentSessionSummary = {
       agentId: request.agentId,
@@ -416,8 +411,10 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
    * @throws 当配置缺失、会话不存在或 SDK 调用失败时，Promise 会 reject。
    */
   async sendMessage(request: SendMessageRequest): Promise<void> {
-    await this.ensureSessionLoaded(request.sessionId)
-    const session = this.assertKnownSession(request.sessionId, request.agentId)
+    const session = await this.assertKnownSession(
+      request.sessionId,
+      request.agentId,
+    )
     const handle = await this.ensureSessionHandle(request.sessionId)
 
     if (
@@ -470,7 +467,7 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
       content: '',
     })
     this.activeRunIds.set(request.sessionId, runId)
-    this.updateSessionState(session.sessionId, 'running')
+    await this.updateSessionState(session.sessionId, 'running')
     this.emit({
       type: 'attempt-started',
       agentId: request.agentId,
@@ -506,8 +503,7 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
    * @throws 当会话不存在时，Promise 会 reject。
    */
   async cancelRun(request: CancelRunRequest): Promise<void> {
-    await this.ensureSessionLoaded(request.sessionId)
-    this.assertKnownSession(request.sessionId, request.agentId)
+    await this.assertKnownSession(request.sessionId, request.agentId)
     const runId = this.activeRunIds.get(request.sessionId)
 
     if (runId) {
@@ -515,11 +511,7 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
     }
 
     await this.sessionHandles.get(request.sessionId)?.abort()
-    this.updateSessionState(request.sessionId, 'cancelled')
-    await this.sessionIndexStore.updateEntry(request.sessionId, {
-      status: 'cancelled',
-      updatedAt: this.now(),
-    })
+    await this.updateSessionState(request.sessionId, 'cancelled')
 
     if (runId) {
       this.emit({
@@ -542,8 +534,10 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
   async retryMessage(
     request: import('@yuanxiao/contracts').RetryRunRequest,
   ): Promise<void> {
-    await this.ensureSessionLoaded(request.sessionId)
-    const session = this.assertKnownSession(request.sessionId, request.agentId)
+    const session = await this.assertKnownSession(
+      request.sessionId,
+      request.agentId,
+    )
     const handle = await this.ensureSessionHandle(request.sessionId)
 
     if (
@@ -573,7 +567,9 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
 
     if (!userMessage) {
       // 尝试从 Pi SDK 加载
-      const indexEntry = this.sessionIndexStore.getEntry(request.sessionId)
+      const indexEntry = await this.sessionIndexStore.resolveEntry(
+        request.sessionId,
+      )
       const loadedMessages = await this.gateway.readMessages({
         sessionId: request.sessionId,
         sdkSessionFile: indexEntry.sdkSessionFile,
@@ -775,7 +771,7 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
           ...inReplyToPatch,
           ...(retryCount > 0 ? { retryCount } : {}),
         })
-        this.updateSessionState(session.sessionId, 'cancelled')
+        await this.updateSessionState(session.sessionId, 'cancelled')
         return
       }
 
@@ -825,7 +821,7 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
         ...inReplyToPatch,
         ...(retryCount > 0 ? { retryCount } : {}),
       })
-      this.updateSessionState(session.sessionId, 'completed')
+      await this.updateSessionState(session.sessionId, 'completed')
     } catch (error) {
       if (isAbortError(error) || !this.activeRunIds.has(sessionId)) {
         this.messageStore.removeIfEmpty(agentMessage.messageId)
@@ -838,7 +834,7 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
           ...inReplyToPatch,
           ...(retryCount > 0 ? { retryCount } : {}),
         })
-        this.updateSessionState(session.sessionId, 'cancelled')
+        await this.updateSessionState(session.sessionId, 'cancelled')
         this.emit({
           type: 'turn-cancelled',
           agentId,
@@ -866,7 +862,7 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
         ...inReplyToPatch,
         ...(retryCount > 0 ? { retryCount } : {}),
       })
-      this.updateSessionState(session.sessionId, 'failed')
+      await this.updateSessionState(session.sessionId, 'failed')
       this.emit({
         type: 'turn-failed',
         agentId,
@@ -938,7 +934,7 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
     })
 
     this.activeRunIds.set(request.sessionId, runId)
-    this.updateSessionState(session.sessionId, 'running')
+    await this.updateSessionState(session.sessionId, 'running')
     this.emit({
       type: 'attempt-started',
       agentId: request.agentId,

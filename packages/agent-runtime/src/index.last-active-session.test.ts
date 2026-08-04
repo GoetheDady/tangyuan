@@ -64,10 +64,11 @@ describe('createYuanxiaoRuntime · 最后激活会话存储', () => {
       apiKey: 'sk-test-secret-7890',
     })
 
-    await expect(runtime.getLastActiveSession()).resolves.toEqual({
-      agentId: 'yuanxiao',
-      sessionId: 'session-1',
-      updatedAt: '2026-07-28T10:00:00.000Z',
+    await expect(runtime.resumeSession()).resolves.toMatchObject({
+      activeSession: {
+        agentId: 'yuanxiao',
+        sessionId: 'session-1',
+      },
     })
   })
 })

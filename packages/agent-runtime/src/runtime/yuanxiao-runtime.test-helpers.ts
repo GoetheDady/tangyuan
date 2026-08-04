@@ -151,7 +151,7 @@ export function createSessionDriver(
     }),
     setSessionsArchived: vi.fn(async () => currentSessions),
     deleteSessions: vi.fn().mockResolvedValue(undefined),
-    getSessionAttempts: vi.fn(() => []),
+    getSessionAttempts: vi.fn(async () => []),
     getActiveRunId: vi.fn((sessionId: string) => activeRunIds.get(sessionId)),
     getActiveRunCount: vi.fn(() => activeRunIds.size),
     getSessionModelInfo: vi.fn(async () => {
@@ -201,6 +201,10 @@ export function createSessionDriver(
     }),
     listAgentSkills: vi.fn().mockResolvedValue([]),
     listSharedSkills: vi.fn().mockResolvedValue([]),
+    preflightSkillOperation: vi.fn().mockResolvedValue({
+      description: '测试 Skill',
+      hasScripts: false,
+    }),
     installSkill: vi.fn().mockResolvedValue([]),
     deleteSkill: vi.fn().mockResolvedValue([]),
     getSkillInstallRecords: vi.fn().mockResolvedValue([]),

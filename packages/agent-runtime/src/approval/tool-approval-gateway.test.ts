@@ -1,44 +1,48 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { BashApprovalRegistry } from './bash-approval-registry'
+import type { CommandPermissionModule } from './command-permission-module'
 import type { ClarificationRegistry } from './clarification-registry'
 import { createToolApprovalGateway } from './tool-approval-gateway'
 
 function createGateway(resolveRunId = () => 'run-active') {
-  const bashApprovals = {
-    register: vi.fn(async () => ({ approved: true })),
-  } as unknown as BashApprovalRegistry & { register: ReturnType<typeof vi.fn> }
+  const commandPermissions = {
+    request: vi.fn(async () => ({ approved: true })),
+  } as unknown as CommandPermissionModule & {
+    request: ReturnType<typeof vi.fn>
+  }
   const clarifications = {
     register: vi.fn(async () => ({ answer: 'A' })),
   } as unknown as ClarificationRegistry & { register: ReturnType<typeof vi.fn> }
 
   const gateway = createToolApprovalGateway({
-    bashApprovals,
+    commandPermissions,
     clarifications,
     resolveRunId,
     now: () => '2024-01-01T00:00:00.000Z',
   })
-  return { gateway, bashApprovals, clarifications }
+  return { gateway, commandPermissions, clarifications }
 }
 
 describe('createToolApprovalGateway', () => {
   it('requestBashApproval 组装请求并委托登记表', async () => {
-    const { gateway, bashApprovals } = createGateway()
+    const { gateway, commandPermissions } = createGateway()
 
     const result = await gateway.requestBashApproval({
       agentId: 'yuanxiao',
       sessionId: 's1',
       command: 'ls',
       cwd: '/tmp',
+      riskLevel: 'normal',
       riskDescription: '低',
     } as never)
 
     expect(result).toEqual({ approved: true })
-    expect(bashApprovals.register).toHaveBeenCalledWith(
+    expect(commandPermissions.request).toHaveBeenCalledWith(
       expect.objectContaining({
         agentId: 'yuanxiao',
         sessionId: 's1',
         runId: 'run-active',
         command: 'ls',
+        riskLevel: 'normal',
         status: 'pending',
         createdAt: '2024-01-01T00:00:00.000Z',
       }),
@@ -46,16 +50,19 @@ describe('createToolApprovalGateway', () => {
   })
 
   it('requestBashApproval 优先使用参数自带的 runId', async () => {
-    const { gateway, bashApprovals } = createGateway()
+    const { gateway, commandPermissions } = createGateway()
     await gateway.requestBashApproval({
       agentId: 'yuanxiao',
       sessionId: 's1',
       runId: 'run-explicit',
       command: 'ls',
       cwd: '/tmp',
+      riskLevel: 'normal',
       riskDescription: '低',
     } as never)
-    expect(bashApprovals.register.mock.calls[0]![0].runId).toBe('run-explicit')
+    expect(commandPermissions.request.mock.calls[0]![0].runId).toBe(
+      'run-explicit',
+    )
   })
 
   it('validateFilePath 拦截受保护路径', () => {

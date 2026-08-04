@@ -13,7 +13,6 @@ import { describe, expect, it } from 'vitest'
 import { computePendingApprovalSessionIds } from '../lib/agent-event-state'
 import {
   createWorkbenchStore,
-  partitionSessionsByArchive,
 } from './workbench-store'
 
 const NOW = '2026-07-29T10:00:00.000Z'
@@ -92,6 +91,7 @@ function createApproval(
     command: 'bun run test',
     cwd: '/workspace',
     riskDescription: '运行测试',
+    riskLevel: 'normal',
     status: 'pending',
     createdAt: NOW,
   }
@@ -130,11 +130,10 @@ describe('createWorkbenchStore', () => {
       composerDraft: '',
       isInitializing: true,
       activeSession: null,
-      alwaysAllowedCommandsBySessionId: {},
     })
 
     first.getState().updateComposerDraft('只属于第一个实例')
-    first.getState().finishInitialization()
+    first.getState().completeInitialization()
 
     expect(second.getState().composerDraft).toBe('')
     expect(second.getState().isInitializing).toBe(true)
@@ -143,45 +142,39 @@ describe('createWorkbenchStore', () => {
     expect(first).not.toHaveProperty('setState')
   })
 
-  it('通过多个语义 action 装载启动工作台数据', () => {
+  it('通过一次领域 transition 装载启动工作台数据', () => {
     const store = createWorkbenchStore()
     const runtime = createRuntime()
     const session = createSession('researcher', 'session-1')
+    const archived = {
+      ...createSession('researcher', 'session-archived'),
+      archivedAt: NOW,
+    }
     const transcript = createTranscript('researcher', 'session-1')
 
-    store.getState().loadRuntimeSnapshot(runtime)
-    store.getState().setActiveSession(session)
-    store.getState().replaceAgentSessions('researcher', [session])
-    store.getState().openTranscript(transcript)
+    store.getState().restoreWorkbench({
+      runtime,
+      activeSession: session,
+      sessions: [archived, session],
+      transcript,
+    })
 
     expect(store.getState()).toMatchObject({
       runtime,
       agents: [YUANXIAO, RESEARCHER],
       activeSession: session,
       sessionsByAgentId: { researcher: [session] },
+      archivedSessionsByAgentId: { researcher: [archived] },
       transcriptsBySessionId: { 'session-1': transcript },
-      isInitializing: true,
+      isInitializing: false,
     })
-  })
-
-  it('设置和清除启动时激活会话', () => {
-    const store = createWorkbenchStore()
-    const session = createSession('yuanxiao', 'session-1')
-
-    expect(store.getState().activeSession).toBeNull()
-
-    store.getState().setActiveSession(session)
-    expect(store.getState().activeSession).toBe(session)
-
-    store.getState().setActiveSession(null)
-    expect(store.getState().activeSession).toBeNull()
   })
 
   it('装载 Runtime 刷新快照并同步 Agent 摘要', () => {
     const store = createWorkbenchStore()
     const runtime = createRuntime()
 
-    store.getState().loadRuntimeSnapshot(runtime)
+    store.getState().refreshRuntime(runtime)
 
     expect(store.getState().runtime).toBe(runtime)
     expect(store.getState().agents).toEqual([YUANXIAO, RESEARCHER])
@@ -192,11 +185,11 @@ describe('createWorkbenchStore', () => {
     const firstSession = createSession('yuanxiao', 'session-1')
     const secondSession = createSession('researcher', 'session-2')
 
-    store.getState().replaceAgentSessions('yuanxiao', [firstSession])
-    store.getState().replaceAgentSessions('researcher', [secondSession])
+    store.getState().replaceSessionCatalog('yuanxiao', [firstSession])
+    store.getState().replaceSessionCatalog('researcher', [secondSession])
     store
       .getState()
-      .replaceAgentSessions('yuanxiao', [
+      .replaceSessionCatalog('yuanxiao', [
         { ...firstSession, title: '更新后的会话' },
       ])
 
@@ -271,9 +264,9 @@ describe('createWorkbenchStore', () => {
     const store = createWorkbenchStore()
     const firstSession = createSession('yuanxiao', 'session-1')
     const secondSession = createSession('researcher', 'session-2')
-    store.getState().loadRuntimeSnapshot(createRuntime())
-    store.getState().replaceAgentSessions('yuanxiao', [firstSession])
-    store.getState().replaceAgentSessions('researcher', [secondSession])
+    store.getState().refreshRuntime(createRuntime())
+    store.getState().replaceSessionCatalog('yuanxiao', [firstSession])
+    store.getState().replaceSessionCatalog('researcher', [secondSession])
 
     const runEvent: AgentEvent = {
       type: 'attempt-started',
@@ -354,8 +347,8 @@ describe('createWorkbenchStore', () => {
 
   it('按 session 打开、更新和清理 transcript', () => {
     const store = createWorkbenchStore()
-    store.getState().openTranscript(createTranscript('yuanxiao', 'session-1'))
-    store.getState().openTranscript(createTranscript('researcher', 'session-2'))
+    store.getState().openSession(createTranscript('yuanxiao', 'session-1'))
+    store.getState().openSession(createTranscript('researcher', 'session-2'))
 
     store.getState().applyAgentEvent({
       type: 'transcript-delta',
@@ -373,9 +366,7 @@ describe('createWorkbenchStore', () => {
       },
       occurredAt: NOW,
     })
-    store.getState().clearTranscript('session-1')
-
-    expect(store.getState().transcriptsBySessionId['session-1']).toBeUndefined()
+    expect(store.getState().transcriptsBySessionId['session-1']).toBeDefined()
     expect(
       store.getState().transcriptsBySessionId['session-2']?.entries,
     ).toHaveLength(1)
@@ -388,8 +379,8 @@ describe('createWorkbenchStore', () => {
     const firstClarification = createClarification('yuanxiao', 'session-1')
     const secondClarification = createClarification('researcher', 'session-2')
 
-    store.getState().beginSending('session-1')
-    store.getState().beginSending('session-2')
+    store.getState().startSessionExecution({ sessionId: 'session-1' })
+    store.getState().startSessionExecution({ sessionId: 'session-2' })
     store.getState().applyAgentEvent({
       type: 'approval-required',
       agentId: firstApproval.agentId,
@@ -418,11 +409,15 @@ describe('createWorkbenchStore', () => {
       clarification: secondClarification,
       occurredAt: NOW,
     })
-    store.getState().finishSending('session-1')
-    store
-      .getState()
-      .resolvePendingApproval('session-1', firstApproval.approvalId)
-    store.getState().clearSessionRequests('session-2')
+    store.getState().endSessionExecution('session-1')
+    store.getState().applyAgentEvent({
+      type: 'approval-resolved',
+      agentId: firstApproval.agentId,
+      sessionId: firstApproval.sessionId,
+      approvalId: firstApproval.approvalId,
+      status: 'approved',
+      occurredAt: NOW,
+    })
 
     expect(store.getState().sendingBySessionId).toEqual({
       'session-1': false,
@@ -430,20 +425,109 @@ describe('createWorkbenchStore', () => {
     })
     expect(store.getState().pendingApprovalsBySessionId).toEqual({
       'session-1': [],
-      'session-2': [],
+      'session-2': [secondApproval],
     })
     expect(store.getState().pendingClarificationsBySessionId).toEqual({
       'session-1': [firstClarification],
-      'session-2': [],
+      'session-2': [secondClarification],
     })
     expect(
       computePendingApprovalSessionIds(
         store.getState().pendingApprovalsBySessionId,
       ),
-    ).toEqual([])
+    ).toEqual(['session-2'])
   })
 
-  it('归档会话按 Agent 分片维护，与活跃会话互不覆盖', () => {
+  it('执行完成通过一次 transition 更新 transcript、会话目录与发送状态', () => {
+    const store = createWorkbenchStore()
+    const running = {
+      ...createSession('yuanxiao', 'session-1'),
+      state: 'running' as const,
+    }
+    const completed = { ...running, state: 'completed' as const }
+    const transcript = createTranscript('yuanxiao', 'session-1')
+    store.getState().replaceSessionCatalog('yuanxiao', [running])
+    store.getState().startSessionExecution({ sessionId: 'session-1' })
+
+    store.getState().completeSessionExecution({
+      agentId: 'yuanxiao',
+      sessionId: 'session-1',
+      allSessions: [completed],
+      transcript,
+    })
+
+    expect(store.getState().sendingBySessionId['session-1']).toBe(false)
+    expect(store.getState().transcriptsBySessionId['session-1']).toBe(transcript)
+    expect(store.getState().sessionsByAgentId.yuanxiao).toEqual([completed])
+  })
+
+  it('分叉完成通过一次 transition 写入目录、继承 transcript 与草稿', () => {
+    const store = createWorkbenchStore()
+    const parent = createSession('yuanxiao', 'parent')
+    const child = createSession('yuanxiao', 'child')
+    const transcript = createTranscript('yuanxiao', 'child')
+
+    store.getState().completeSessionFork({
+      agentId: 'yuanxiao',
+      allSessions: [child, parent],
+      transcript,
+      composerDraft: '原始用户消息',
+    })
+
+    expect(store.getState().sessionsByAgentId.yuanxiao).toEqual([child, parent])
+    expect(store.getState().transcriptsBySessionId.child).toBe(transcript)
+    expect(store.getState().composerDraft).toBe('原始用户消息')
+  })
+
+  it('谱系删除通过一次 transition 清理目录和全部会话投影', () => {
+    const store = createWorkbenchStore()
+    const parent = createSession('yuanxiao', 'parent')
+    const child = createSession('yuanxiao', 'child')
+    const survivor = createSession('yuanxiao', 'survivor')
+    const approval = createApproval('yuanxiao', 'parent')
+    const clarification = createClarification('yuanxiao', 'child')
+    store
+      .getState()
+      .replaceSessionCatalog('yuanxiao', [parent, child, survivor])
+    store.getState().openSession(createTranscript('yuanxiao', 'parent'))
+    store.getState().openSession(createTranscript('yuanxiao', 'child'))
+    store.getState().startSessionExecution({ sessionId: 'parent' })
+    store.getState().startSessionExecution({ sessionId: 'child' })
+    store.getState().applyAgentEvent({
+      type: 'approval-required',
+      agentId: 'yuanxiao',
+      sessionId: 'parent',
+      approval,
+      occurredAt: NOW,
+    })
+    store.getState().applyAgentEvent({
+      type: 'clarification-required',
+      agentId: 'yuanxiao',
+      sessionId: 'child',
+      clarification,
+      occurredAt: NOW,
+    })
+
+    store.getState().removeSessionLineage({
+      agentId: 'yuanxiao',
+      allSessions: [survivor],
+      affectedSessionIds: ['parent', 'child'],
+    })
+
+    expect(store.getState().sessionsByAgentId.yuanxiao).toEqual([survivor])
+    for (const sessionId of ['parent', 'child']) {
+      expect(store.getState().transcriptsBySessionId).not.toHaveProperty(sessionId)
+      expect(store.getState().sendingBySessionId).not.toHaveProperty(sessionId)
+      expect(store.getState().pendingApprovalsBySessionId).not.toHaveProperty(
+        sessionId,
+      )
+      expect(store.getState().pendingClarificationsBySessionId).not.toHaveProperty(
+        sessionId,
+      )
+    }
+  })
+
+  it('一次替换完整会话目录并按 Agent、归档状态分片', () => {
     const store = createWorkbenchStore()
     const archivedA = {
       ...createSession('yuanxiao', 'archived-a'),
@@ -454,41 +538,27 @@ describe('createWorkbenchStore', () => {
       archivedAt: NOW,
     }
 
-    store.getState().replaceArchivedSessions('yuanxiao', [archivedA])
-    store.getState().replaceArchivedSessions('researcher', [archivedB])
+    const activeA = createSession('yuanxiao', 'active-a')
+    const activeB = createSession('researcher', 'active-b')
+    store.getState().replaceSessionCatalog('yuanxiao', [archivedA, activeA])
+    store.getState().replaceSessionCatalog('researcher', [activeB, archivedB])
 
     expect(store.getState().archivedSessionsByAgentId).toEqual({
       yuanxiao: [archivedA],
       researcher: [archivedB],
     })
-  })
-
-  it('partitionSessionsByArchive 按 archivedAt 拆分一次查询结果', () => {
-    const archived = {
-      ...createSession('yuanxiao', 'archived'),
-      archivedAt: NOW,
-    }
-    const active = createSession('yuanxiao', 'active')
-
-    expect(partitionSessionsByArchive([archived, active])).toEqual({
-      active: [active],
-      archived: [archived],
+    expect(store.getState().sessionsByAgentId).toEqual({
+      yuanxiao: [activeA],
+      researcher: [activeB],
     })
   })
 
-  it('composer 草稿和进程内始终允许命令只通过语义 action 修改', () => {
+  it('composer 草稿只通过语义 action 修改', () => {
     const store = createWorkbenchStore()
 
     store.getState().updateComposerDraft('准备发送')
-    store.getState().allowCommandForProcess('session-1', 'bun run test')
-    store.getState().allowCommandForProcess('session-1', 'bun run test')
-    store.getState().allowCommandForProcess('session-2', 'bun run typecheck')
-    store.getState().clearComposerDraft()
+    store.getState().updateComposerDraft('')
 
     expect(store.getState().composerDraft).toBe('')
-    expect(store.getState().alwaysAllowedCommandsBySessionId).toEqual({
-      'session-1': ['bun run test'],
-      'session-2': ['bun run typecheck'],
-    })
   })
 })

@@ -17,7 +17,6 @@ import { WindowShell } from '@/components/WindowShell'
 import { createAgentEventBridge } from '@/lib/agent-event-bridge'
 import {
   loadDesktopWorkbenchOnce,
-  loadSessionsForReadyRuntime,
 } from '@/lib/desktop-workbench-loader'
 import { ChatGuard, LoadingScreen } from '@/pages/ChatPage'
 import { ConsoleProviderPage } from '@/pages/ConsoleProviderPage'
@@ -113,16 +112,12 @@ function DesktopRoutes(): React.JSX.Element {
         if (!isMounted) return
 
         const store = workbenchStore.getState()
-        store.loadRuntimeSnapshot(snapshot.runtime)
-        store.setActiveSession(snapshot.activeSession)
-        const activeAgentId =
-          snapshot.activeSession?.agentId ??
-          snapshot.runtime.activeAgent.agentId
-        store.replaceAgentSessions(activeAgentId, snapshot.sessions)
-        store.replaceArchivedSessions(activeAgentId, snapshot.archivedSessions)
-        if (snapshot.transcript) {
-          store.openTranscript(snapshot.transcript)
-        }
+        store.restoreWorkbench({
+          runtime: snapshot.runtime,
+          activeSession: snapshot.activeSession,
+          sessions: [...snapshot.sessions, ...snapshot.archivedSessions],
+          transcript: snapshot.transcript,
+        })
         if (snapshot.sessionLoadError) {
           toast.error(`无法恢复会话：${snapshot.sessionLoadError}`)
         }
@@ -140,7 +135,7 @@ function DesktopRoutes(): React.JSX.Element {
       })
       .finally(() => {
         if (isMounted) {
-          workbenchStore.getState().finishInitialization()
+          workbenchStore.getState().completeInitialization()
         }
       })
 
@@ -174,20 +169,18 @@ function DesktopRoutes(): React.JSX.Element {
   const handleConfigurationSaved = useCallback(
     async (nextRuntime: RuntimeSnapshot): Promise<void> => {
       const store = workbenchStore.getState()
-      store.loadRuntimeSnapshot(nextRuntime)
 
       try {
         const { sessions, archivedSessions, activeSession, transcript } =
-          await loadSessionsForReadyRuntime(window.api, nextRuntime)
-        store.setActiveSession(activeSession)
-        const activeAgentId =
-          activeSession?.agentId ?? nextRuntime.activeAgent.agentId
-        store.replaceAgentSessions(activeAgentId, sessions)
-        store.replaceArchivedSessions(activeAgentId, archivedSessions)
-        if (transcript) {
-          store.openTranscript(transcript)
-        }
+          await window.api.resumeSession()
+        store.restoreWorkbench({
+          runtime: nextRuntime,
+          activeSession,
+          sessions: [...sessions, ...archivedSessions],
+          transcript,
+        })
       } catch (error) {
+        store.refreshRuntime(nextRuntime)
         toast.error(
           `配置已保存，但无法打开会话：${
             error instanceof Error ? error.message : '未知错误'

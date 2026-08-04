@@ -74,26 +74,24 @@ function createRendererInitScript(
   const base = createPreloadApiInitScript(runtime, sessions, [])
   const serialized = JSON.stringify(transcripts)
   const activeSession = sessions[0]
-  const serializedLastActiveSession = JSON.stringify(
-    activeSession
-      ? {
-          agentId: activeSession.agentId,
-          sessionId: activeSession.sessionId,
-          updatedAt: FIXED_TIME,
-        }
-      : null,
-  )
 
   return `${base}
     (() => {
       const transcripts = ${serialized};
-      const lastActiveSession = ${serializedLastActiveSession};
       let listener = null;
       window.__retryMessageCalls__ = [];
       window.__getTranscriptCalls__ = [];
       window.api = {
         ...window.api,
-        getLastActiveSession: async () => lastActiveSession,
+        resumeSession: async () => {
+          const activeSession = ${JSON.stringify(activeSession ?? null)};
+          return {
+            sessions: ${JSON.stringify(sessions)},
+            archivedSessions: [],
+            activeSession,
+            transcript: transcripts[activeSession.sessionId]
+          };
+        },
         getTranscript: async (request) => {
           window.__getTranscriptCalls__.push(request);
           const result = transcripts[request.sessionId] || {

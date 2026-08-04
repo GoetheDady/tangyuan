@@ -47,10 +47,12 @@ import {
   skillSummarySchema,
   forkSessionRequestSchema,
   lastActiveSessionSchema,
+  sessionResumeSnapshotSchema,
   setLastActiveSessionRequestSchema,
 } from './schemas'
 import type {
   LastActiveSession,
+  SessionResumeSnapshot,
   SetLastActiveSessionRequest,
 } from './last-active-session'
 import type {
@@ -155,7 +157,7 @@ export const DESKTOP_IPC_CHANNELS = {
   sessionsArchive: 'yuanxiao:sessions:archive',
   sessionsRecover: 'yuanxiao:sessions:recover',
   sessionsDelete: 'yuanxiao:sessions:delete',
-  sessionsGetLastActive: 'yuanxiao:sessions:get-last-active',
+  sessionsResume: 'yuanxiao:sessions:resume',
   sessionsSetLastActive: 'yuanxiao:sessions:set-last-active',
 } as const
 
@@ -221,7 +223,7 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.sessionsArchive]: ArchiveSessionRequest
   [DESKTOP_IPC_CHANNELS.sessionsRecover]: RecoverSessionRequest
   [DESKTOP_IPC_CHANNELS.sessionsDelete]: DeleteSessionRequest
-  [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: undefined
+  [DESKTOP_IPC_CHANNELS.sessionsResume]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: SetLastActiveSessionRequest
 }
 
@@ -280,7 +282,7 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsArchive]: archiveSessionRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRecover]: recoverSessionRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsDelete]: deleteSessionRequestSchema,
-  [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: z.undefined(),
+  [DESKTOP_IPC_CHANNELS.sessionsResume]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]:
     setLastActiveSessionRequestSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
@@ -356,7 +358,7 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsArchive]: ArchiveSessionResult
   [DESKTOP_IPC_CHANNELS.sessionsRecover]: AgentSessionSummary[]
   [DESKTOP_IPC_CHANNELS.sessionsDelete]: DeleteSessionResult
-  [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]: LastActiveSession | null
+  [DESKTOP_IPC_CHANNELS.sessionsResume]: SessionResumeSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: LastActiveSession | null
 }
 
@@ -496,8 +498,7 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsArchive]: archiveSessionResultSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRecover]: z.array(agentSessionSummarySchema),
   [DESKTOP_IPC_CHANNELS.sessionsDelete]: deleteSessionResultSchema,
-  [DESKTOP_IPC_CHANNELS.sessionsGetLastActive]:
-    lastActiveSessionSchema.nullable(),
+  [DESKTOP_IPC_CHANNELS.sessionsResume]: sessionResumeSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]:
     lastActiveSessionSchema.nullable(),
 } satisfies Record<DesktopIpcChannel, z.ZodType>

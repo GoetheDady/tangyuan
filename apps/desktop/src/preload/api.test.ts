@@ -52,7 +52,6 @@ describe('createYuanxiaoPreloadApi', () => {
       'deleteSession',
       'deleteSkill',
       'forkSession',
-      'getLastActiveSession',
       'getPendingApprovals',
       'getPendingClarifications',
       'getPendingSkillApprovals',
@@ -77,6 +76,7 @@ describe('createYuanxiaoPreloadApi', () => {
       'rejectSkillOperation',
       'resetConfiguration',
       'restoreFromBackup',
+      'resumeSession',
       'retryMessage',
       'saveProvider',
       'saveRuntimeConfiguration',
@@ -101,7 +101,7 @@ describe('createYuanxiaoPreloadApi', () => {
       verificationId: 'verify-1',
     })
     await api.listSessions({ agentId: 'agent-2' })
-    await api.getLastActiveSession()
+    await api.resumeSession()
     await api.setLastActiveSession({
       agentId: 'yuanxiao',
       sessionId: 'session-1',
@@ -158,7 +158,7 @@ describe('createYuanxiaoPreloadApi', () => {
     await api.openExternalLink({ url: 'https://example.com' })
     await api.listAgentSkills({ agentId: 'agent-1' })
     await api.listSharedSkills()
-    await api.approveBash({ approvalId: 'approval-1' })
+    await api.approveBash({ approvalId: 'approval-1', remember: true })
     await api.rejectBash({ approvalId: 'approval-2' })
     await api.getPendingApprovals()
     await api.installSkill({
@@ -197,7 +197,7 @@ describe('createYuanxiaoPreloadApi', () => {
         { verificationId: 'verify-1' },
       ],
       [DESKTOP_IPC_CHANNELS.sessionsList, { agentId: 'agent-2' }],
-      [DESKTOP_IPC_CHANNELS.sessionsGetLastActive],
+      [DESKTOP_IPC_CHANNELS.sessionsResume],
       [
         DESKTOP_IPC_CHANNELS.sessionsSetLastActive,
         { agentId: 'yuanxiao', sessionId: 'session-1' },
@@ -290,7 +290,10 @@ describe('createYuanxiaoPreloadApi', () => {
       [DESKTOP_IPC_CHANNELS.openExternalLink, { url: 'https://example.com' }],
       [DESKTOP_IPC_CHANNELS.skillsListAgent, { agentId: 'agent-1' }],
       [DESKTOP_IPC_CHANNELS.skillsListShared],
-      [DESKTOP_IPC_CHANNELS.sessionsApproveBash, { approvalId: 'approval-1' }],
+      [
+        DESKTOP_IPC_CHANNELS.sessionsApproveBash,
+        { approvalId: 'approval-1', remember: true },
+      ],
       [DESKTOP_IPC_CHANNELS.sessionsRejectBash, { approvalId: 'approval-2' }],
       [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals],
       [

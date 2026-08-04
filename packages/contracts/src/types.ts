@@ -302,6 +302,9 @@ export interface AgentRuntimeErrorPayload {
  */
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
+/** Runtime 对 Bash 命令给出的最低风险等级。 */
+export type BashRiskLevel = 'normal' | 'medium' | 'high'
+
 /**
  * 描述问题澄清请求的当前状态。
  */
@@ -317,6 +320,7 @@ export interface BashApprovalRequest {
   runId: string
   command: string
   cwd: string
+  riskLevel: BashRiskLevel
   riskDescription: string
   status: ApprovalStatus
   createdAt: string
@@ -327,6 +331,8 @@ export interface BashApprovalRequest {
  */
 export interface ApproveBashRequest {
   approvalId: string
+  /** 是否把普通/中风险命令记为当前 Agent 与 cwd 的长期许可。 */
+  remember?: boolean
 }
 
 /**

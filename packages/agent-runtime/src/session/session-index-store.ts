@@ -48,6 +48,9 @@ export class SessionIndexStore {
   private readonly rebuilder: SessionIndexRebuilder
   private readonly sessionIndex = new Map<string, PersistedSessionIndexEntry>()
   private readonly sessions = new Map<string, AgentSessionSummary>()
+  private initialized = false
+  private initialization: Promise<PersistedSessionIndexEntry[]> | null = null
+  private mutationTail: Promise<void> = Promise.resolve()
 
   constructor(dependencies: SessionIndexStoreDependencies) {
     this.layout = dependencies.layout
@@ -64,7 +67,23 @@ export class SessionIndexStore {
    * @returns 当前可展示的会话索引条目。
    * @throws 当索引 JSON 损坏且 SDK 列表读取也失败时，Promise 会 reject。
    */
-  async load(): Promise<PersistedSessionIndexEntry[]> {
+  private async load(): Promise<PersistedSessionIndexEntry[]> {
+    if (this.initialized) {
+      return [...this.sessionIndex.values()]
+    }
+    if (this.initialization) return this.initialization
+
+    this.initialization = this.loadFromDisk()
+    try {
+      const entries = await this.initialization
+      this.initialized = true
+      return entries
+    } finally {
+      this.initialization = null
+    }
+  }
+
+  private async loadFromDisk(): Promise<PersistedSessionIndexEntry[]> {
     const indexPath = this.layout.sessionIndex()
 
     let rawIndex: string
@@ -99,8 +118,8 @@ export class SessionIndexStore {
    */
   private async rebuildIndex(): Promise<PersistedSessionIndexEntry[]> {
     const entries = await this.rebuilder.rebuild()
+    await this.persistEntries(entries)
     this.replaceAll(entries)
-    await this.write()
     return entries
   }
 
@@ -150,9 +169,11 @@ export class SessionIndexStore {
    * @returns 无返回值。
    * @throws 当目录创建或文件写入失败时，Promise 会 reject。
    */
-  async write(): Promise<void> {
+  private async persistEntries(
+    sourceEntries: readonly PersistedSessionIndexEntry[],
+  ): Promise<void> {
     const indexPath = this.layout.sessionIndex()
-    const entries = [...this.sessionIndex.values()].sort((left, right) =>
+    const entries = [...sourceEntries].sort((left, right) =>
       right.updatedAt.localeCompare(left.updatedAt),
     )
     const payload: PersistedSessionIndex = {
@@ -172,23 +193,27 @@ export class SessionIndexStore {
   }
 
   /**
-   * 判断指定会话的摘要是否已加载到内存。
-   *
-   * @param sessionId - 会话标识。
-   * @returns 已加载返回 true。
+   * 把一次索引 mutation 排入单写者队列。每个 mutation 基于前一次已提交状态
+   * 创建草稿，写盘成功后才替换内存索引与派生摘要。
    */
-  hasSummary(sessionId: string): boolean {
-    return this.sessions.has(sessionId)
-  }
+  private async commitMutation<T>(
+    mutate: (draft: Map<string, PersistedSessionIndexEntry>) => T,
+  ): Promise<T> {
+    await this.load()
 
-  /**
-   * 读取指定会话摘要；不存在时返回 undefined。
-   *
-   * @param sessionId - 会话标识。
-   * @returns 会话摘要或 undefined。
-   */
-  getSummary(sessionId: string): AgentSessionSummary | undefined {
-    return this.sessions.get(sessionId)
+    const pending = this.mutationTail.then(async () => {
+      const draft = new Map(this.sessionIndex)
+      const result = mutate(draft)
+      const entries = [...draft.values()]
+      await this.persistEntries(entries)
+      this.replaceAll(entries)
+      return result
+    })
+    this.mutationTail = pending.then(
+      () => undefined,
+      () => undefined,
+    )
+    return pending
   }
 
   /**
@@ -198,10 +223,11 @@ export class SessionIndexStore {
    * @param includeArchived - 是否包含已归档会话。
    * @returns 该 Agent 的会话摘要列表。
    */
-  listSummaries(
+  async listSummaries(
     agentId: string,
     includeArchived = false,
-  ): AgentSessionSummary[] {
+  ): Promise<AgentSessionSummary[]> {
+    await this.load()
     return [...this.sessions.values()]
       .filter(
         (session) =>
@@ -211,25 +237,11 @@ export class SessionIndexStore {
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
   }
 
-  /**
-   * 读取已加载的单个索引条目；不存在时返回 undefined。
-   *
-   * @param sessionId - 会话标识。
-   * @returns 索引条目或 undefined。
-   */
-  getEntryOrNull(sessionId: string): PersistedSessionIndexEntry | undefined {
-    return this.sessionIndex.get(sessionId)
-  }
-
-  /**
-   * 读取已加载的单个索引条目，不存在时抛错。
-   *
-   * @param sessionId - 会话标识。
-   * @returns 对应索引条目。
-   * @throws 当索引条目不存在时抛出 AgentRuntimeError。
-   */
-  getEntry(sessionId: string): PersistedSessionIndexEntry {
-    const indexEntry = this.sessionIndex.get(sessionId)
+  private requireEntry(
+    entries: ReadonlyMap<string, PersistedSessionIndexEntry>,
+    sessionId: string,
+  ): PersistedSessionIndexEntry {
+    const indexEntry = entries.get(sessionId)
 
     if (!indexEntry) {
       throw new AgentRuntimeError({
@@ -242,15 +254,49 @@ export class SessionIndexStore {
     return indexEntry
   }
 
-  /**
-   * 读取指定会话已持久化的执行尝试记录。
-   *
-   * @param sessionId - 会话标识。
-   * @returns 执行尝试列表；无记录时返回空数组。
-   */
-  getAttempts(sessionId: string): PersistedAttemptEntry[] {
-    const entry = this.sessionIndex.get(sessionId)
-    return entry?.attempts ?? []
+  /** 初始化完成后读取单个索引条目，不存在时抛错。 */
+  async resolveEntry(sessionId: string): Promise<PersistedSessionIndexEntry> {
+    await this.load()
+    return this.requireEntry(this.sessionIndex, sessionId)
+  }
+
+  /** 初始化完成后读取可选索引条目。 */
+  async findEntry(
+    sessionId: string,
+  ): Promise<PersistedSessionIndexEntry | undefined> {
+    await this.load()
+    return this.sessionIndex.get(sessionId)
+  }
+
+  /** 初始化完成后校验会话归属与归档状态。 */
+  async resolveSession(
+    sessionId: string,
+    agentId: string,
+  ): Promise<AgentSessionSummary> {
+    await this.load()
+    const session = this.sessions.get(sessionId)
+    if (
+      !session ||
+      session.agentId !== agentId ||
+      session.archivedAt !== undefined
+    ) {
+      throw new AgentRuntimeError({
+        code: 'session-not-found',
+        message: !session
+          ? `找不到会话 ${sessionId}。`
+          : session.agentId !== agentId
+            ? `会话 ${sessionId} 不属于 Agent ${agentId}。`
+            : `会话 ${sessionId} 已归档，请先恢复后再打开。`,
+        recoverable: true,
+      })
+    }
+    return session
+  }
+
+  /** 初始化完成后读取会话的执行尝试。 */
+  async resolveAttempts(sessionId: string): Promise<PersistedAttemptEntry[]> {
+    await this.load()
+    return this.sessionIndex.get(sessionId)?.attempts ?? []
   }
 
   /**
@@ -259,34 +305,26 @@ export class SessionIndexStore {
    * @param entry - 新会话的索引条目。
    * @returns 派生出的会话摘要。
    */
-  addSession(entry: PersistedSessionIndexEntry): AgentSessionSummary {
-    this.sessionIndex.set(entry.sessionId, entry)
-    const summary = this.toSummary(entry)
-    this.sessions.set(entry.sessionId, summary)
-    return summary
+  async addSession(
+    entry: PersistedSessionIndexEntry,
+  ): Promise<AgentSessionSummary> {
+    return this.commitMutation((draft) => {
+      draft.set(entry.sessionId, entry)
+      return this.toSummary(entry)
+    })
   }
 
-  /**
-   * 更新单个会话索引条目并同步会话摘要缓存，随后写盘。
-   *
-   * @param sessionId - 需要更新的会话标识。
-   * @param patch - 要覆盖到索引条目上的字段。
-   * @returns 更新后的索引条目。
-   * @throws 当会话索引不存在时抛出 AgentRuntimeError。
-   */
-  async updateEntry(
+  private updateEntry(
+    draft: Map<string, PersistedSessionIndexEntry>,
     sessionId: string,
     patch: Partial<PersistedSessionIndexEntry>,
-  ): Promise<PersistedSessionIndexEntry> {
-    const currentEntry = this.getEntry(sessionId)
-    const nextEntry = {
+  ): PersistedSessionIndexEntry {
+    const currentEntry = this.requireEntry(draft, sessionId)
+    const nextEntry: PersistedSessionIndexEntry = {
       ...currentEntry,
       ...patch,
     }
-    this.sessionIndex.set(sessionId, nextEntry)
-    this.sessions.set(sessionId, this.toSummary(nextEntry))
-    await this.write()
-
+    draft.set(sessionId, nextEntry)
     return nextEntry
   }
 
@@ -302,26 +340,28 @@ export class SessionIndexStore {
     sessionIds: readonly string[],
     archivedAt: string | null,
   ): Promise<AgentSessionSummary[]> {
-    const entries = sessionIds.map((sessionId) => this.getEntry(sessionId))
+    return this.commitMutation((draft) => {
+      const entries = sessionIds.map((sessionId) =>
+        this.requireEntry(draft, sessionId),
+      )
 
-    for (const entry of entries) {
-      const nextEntry: PersistedSessionIndexEntry = {
-        ...entry,
-        ...(archivedAt === null ? {} : { archivedAt }),
+      for (const entry of entries) {
+        const nextEntry: PersistedSessionIndexEntry = {
+          ...entry,
+          ...(archivedAt === null ? {} : { archivedAt }),
+        }
+
+        if (archivedAt === null) {
+          delete nextEntry.archivedAt
+        }
+
+        draft.set(entry.sessionId, nextEntry)
       }
 
-      if (archivedAt === null) {
-        delete nextEntry.archivedAt
-      }
-
-      this.sessionIndex.set(entry.sessionId, nextEntry)
-      this.sessions.set(entry.sessionId, this.toSummary(nextEntry))
-    }
-
-    await this.write()
-    return sessionIds.flatMap((sessionId) => {
-      const summary = this.sessions.get(sessionId)
-      return summary ? [summary] : []
+      return sessionIds.flatMap((sessionId) => {
+        const entry = draft.get(sessionId)
+        return entry ? [this.toSummary(entry)] : []
+      })
     })
   }
 
@@ -334,12 +374,11 @@ export class SessionIndexStore {
    * @throws 当索引写入失败时，Promise 会 reject。
    */
   async deleteSessions(sessionIds: readonly string[]): Promise<void> {
-    for (const sessionId of sessionIds) {
-      this.sessionIndex.delete(sessionId)
-      this.sessions.delete(sessionId)
-    }
-
-    await this.write()
+    await this.commitMutation((draft) => {
+      for (const sessionId of sessionIds) {
+        draft.delete(sessionId)
+      }
+    })
   }
 
   /**
@@ -360,64 +399,60 @@ export class SessionIndexStore {
     attempt: PersistedAttemptEntry,
     sessionUpdate: AttemptSessionUpdate,
   ): Promise<void> {
-    const currentEntry = this.getEntry(sessionId)
-    const existingAttempts = currentEntry.attempts ?? []
-    const existingIndex = existingAttempts.findIndex(
-      (a) => a.attemptId === attempt.attemptId,
-    )
+    await this.commitMutation((draft) => {
+      const currentEntry = this.requireEntry(draft, sessionId)
+      const existingAttempts = currentEntry.attempts ?? []
+      const existingIndex = existingAttempts.findIndex(
+        (candidate) => candidate.attemptId === attempt.attemptId,
+      )
+      const nextAttempts =
+        existingIndex >= 0
+          ? [
+              ...existingAttempts.slice(0, existingIndex),
+              attempt,
+              ...existingAttempts.slice(existingIndex + 1),
+            ]
+          : [...existingAttempts, attempt]
 
-    const nextAttempts =
-      existingIndex >= 0
-        ? [
-            ...existingAttempts.slice(0, existingIndex),
-            attempt,
-            ...existingAttempts.slice(existingIndex + 1),
-          ]
-        : [...existingAttempts, attempt]
-
-    // 只保留最近 20 条，避免无限增长
-    const trimmedAttempts = nextAttempts.slice(-20)
-
-    await this.updateEntry(sessionId, {
-      attempts: trimmedAttempts,
-      status: sessionUpdate.status,
-      updatedAt: sessionUpdate.updatedAt,
-      ...(sessionUpdate.lastMessagePreview !== undefined
-        ? { lastMessagePreview: sessionUpdate.lastMessagePreview }
-        : {}),
+      this.updateEntry(draft, sessionId, {
+        attempts: nextAttempts.slice(-20),
+        status: sessionUpdate.status,
+        updatedAt: sessionUpdate.updatedAt,
+        ...(sessionUpdate.lastMessagePreview !== undefined
+          ? { lastMessagePreview: sessionUpdate.lastMessagePreview }
+          : {}),
+      })
     })
   }
 
-  /**
-   * 更新会话摘要的运行状态（仅改数据，不广播事件）。
-   *
-   * @param sessionId - 会话标识。
-   * @param state - 新的运行状态。
-   * @param updatedAt - 更新时间。
-   * @returns 更新后的会话摘要。
-   * @throws 当会话摘要不存在时抛出 AgentRuntimeError。
-   */
-  setSummaryState(
+  /** 原子更新索引与摘要中的运行状态并落盘。 */
+  async setState(
     sessionId: string,
     state: AgentRunState,
     updatedAt: string,
-  ): AgentSessionSummary {
-    const session = this.sessions.get(sessionId)
+  ): Promise<AgentSessionSummary> {
+    return this.commitMutation((draft) =>
+      this.toSummary(
+        this.updateEntry(draft, sessionId, { status: state, updatedAt }),
+      ),
+    )
+  }
 
-    if (!session) {
-      throw new AgentRuntimeError({
-        code: 'session-not-found',
-        message: `找不到会话 ${sessionId}。`,
-        recoverable: true,
-      })
-    }
+  /** 持久化当前会话的 Provider 与 Model。 */
+  async setModel(
+    sessionId: string,
+    provider: string,
+    model: string,
+  ): Promise<void> {
+    await this.commitMutation((draft) => {
+      this.updateEntry(draft, sessionId, { provider, model })
+    })
+  }
 
-    const nextSession = {
-      ...session,
-      state,
-      updatedAt,
-    }
-    this.sessions.set(sessionId, nextSession)
-    return nextSession
+  /** 持久化当前会话的 Thinking Level。 */
+  async setThinkingLevel(sessionId: string, thinkingLevel: string): Promise<void> {
+    await this.commitMutation((draft) => {
+      this.updateEntry(draft, sessionId, { thinkingLevel })
+    })
   }
 }

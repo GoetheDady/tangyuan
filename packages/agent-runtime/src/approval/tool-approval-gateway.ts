@@ -3,7 +3,7 @@ import type {
   QuestionClarificationRequest,
 } from '@yuanxiao/contracts'
 import type { ToolApprovalGateway } from '../driver'
-import type { BashApprovalRegistry } from './bash-approval-registry'
+import type { CommandPermissionModule } from './command-permission-module'
 import type { ClarificationRegistry } from './clarification-registry'
 import { validateFilePath } from '../core'
 
@@ -11,7 +11,7 @@ import { validateFilePath } from '../core'
  * 创建 ToolApprovalGateway 所需的依赖。
  */
 export interface ToolApprovalGatewayDependencies {
-  bashApprovals: BashApprovalRegistry
+  commandPermissions: CommandPermissionModule
   clarifications: ClarificationRegistry
   /** 根据会话查回当前 active run 的 runId，用于补齐工具构造时缺失的 runId。 */
   resolveRunId: (sessionId: string) => string
@@ -31,7 +31,7 @@ export interface ToolApprovalGatewayDependencies {
 export function createToolApprovalGateway(
   deps: ToolApprovalGatewayDependencies,
 ): ToolApprovalGateway {
-  const { bashApprovals, clarifications, resolveRunId, now } = deps
+  const { commandPermissions, clarifications, resolveRunId, now } = deps
 
   return {
     requestBashApproval: async (params) => {
@@ -44,12 +44,13 @@ export function createToolApprovalGateway(
         runId: params.runId || resolveRunId(params.sessionId),
         command: params.command,
         cwd: params.cwd,
+        riskLevel: params.riskLevel,
         riskDescription: params.riskDescription,
         status: 'pending',
         createdAt: now(),
       }
 
-      return bashApprovals.register(request)
+      return commandPermissions.request(request)
     },
 
     validateFilePath: (params) => validateFilePath(params),

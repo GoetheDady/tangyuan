@@ -5,7 +5,6 @@ import type {
   RuntimeSnapshot,
   TranscriptSnapshot,
 } from '@yuanxiao/contracts'
-import { partitionSessionsByArchive } from '@/stores/workbench-store'
 
 /**
  * Renderer 启动快照 single-flight。
@@ -28,96 +27,6 @@ export function loadDesktopWorkbenchOnce(
 /** 测试卸载后清空 single-flight，避免跨测试复用旧的 preload API。 */
 export function resetDesktopWorkbenchLoadForTest(): void {
   desktopWorkbenchLoadPromise = null
-}
-
-/**
- * 在运行时就绪后加载会话数据：优先恢复上次激活会话；没有记录时创建新会话。
- */
-export async function loadSessionsForReadyRuntime(
-  api: DesktopPreloadApi,
-  runtime: RuntimeSnapshot,
-): Promise<{
-  sessions: AgentSessionSummary[]
-  archivedSessions: AgentSessionSummary[]
-  activeSession: AgentSessionSummary
-  transcript: TranscriptSnapshot | null
-}> {
-  const lastActiveSession = await api.getLastActiveSession()
-  const activeAgentId =
-    lastActiveSession?.agentId ?? runtime.activeAgent.agentId
-  // 一次 includeArchived 查询同时取活跃与归档列表，按归档状态分片。
-  const allSessions = await api.listSessions({
-    agentId: activeAgentId,
-    includeArchived: true,
-  })
-  const { active: activeSessions, archived: archivedSessions } =
-    partitionSessionsByArchive(allSessions)
-  let nextSessions = activeSessions
-  let activeSession: AgentSessionSummary | null = null
-  let transcript: TranscriptSnapshot | null = null
-
-  if (lastActiveSession) {
-    const preferredSession = nextSessions.find(
-      (session) => session.sessionId === lastActiveSession.sessionId,
-    )
-    const candidates = [
-      ...(preferredSession ? [preferredSession] : []),
-      ...nextSessions.filter(
-        (session) => session.sessionId !== preferredSession?.sessionId,
-      ),
-    ]
-
-    for (const candidate of candidates) {
-      if (candidate.lineageUnavailable) continue
-
-      try {
-        transcript = await api.getTranscript({
-          agentId: candidate.agentId,
-          sessionId: candidate.sessionId,
-        })
-        activeSession = candidate
-        break
-      } catch {
-        // 会话可能在 Runtime 校验后被移除或损坏，继续尝试下一个候选。
-      }
-    }
-  }
-
-  if (!activeSession) {
-    activeSession = await api.createSession({
-      agentId: activeAgentId,
-      title: runtime.activeAgent.profile.bootstrapRequired
-        ? 'Bootstrap 初始化'
-        : '新会话',
-    })
-    nextSessions = [
-      activeSession,
-      ...nextSessions.filter(
-        (session) => session.sessionId !== activeSession!.sessionId,
-      ),
-    ]
-    transcript = await api.getTranscript({
-      agentId: activeSession.agentId,
-      sessionId: activeSession.sessionId,
-    })
-  }
-
-  if (
-    lastActiveSession?.agentId !== activeSession.agentId ||
-    lastActiveSession.sessionId !== activeSession.sessionId
-  ) {
-    await api.setLastActiveSession({
-      agentId: activeSession.agentId,
-      sessionId: activeSession.sessionId,
-    })
-  }
-
-  return {
-    sessions: nextSessions,
-    archivedSessions,
-    activeSession,
-    transcript,
-  }
 }
 
 /** 并行读取 Renderer 首屏需要的运行时和会话数据。 */
@@ -147,7 +56,7 @@ export async function loadDesktopWorkbench(api: DesktopPreloadApi): Promise<{
 
   try {
     const { sessions, archivedSessions, activeSession, transcript } =
-      await loadSessionsForReadyRuntime(api, runtime)
+      await api.resumeSession()
     return {
       runtime,
       agents,

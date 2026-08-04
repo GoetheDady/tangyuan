@@ -257,15 +257,12 @@ export function registerDesktopAppIpc(
     },
   )
   ipcMain.handle(
-    DESKTOP_IPC_CHANNELS.sessionsGetLastActive,
+    DESKTOP_IPC_CHANNELS.sessionsResume,
     async (_event, payload) => {
-      parseDesktopIpcRequest(
-        DESKTOP_IPC_CHANNELS.sessionsGetLastActive,
-        payload,
-      )
+      parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsResume, payload)
       return parseDesktopIpcResponse(
-        DESKTOP_IPC_CHANNELS.sessionsGetLastActive,
-        await runtime.getLastActiveSession(),
+        DESKTOP_IPC_CHANNELS.sessionsResume,
+        await runtime.resumeSession(),
       )
     },
   )
@@ -527,11 +524,11 @@ export function registerDesktopAppIpc(
   ipcMain.handle(
     DESKTOP_IPC_CHANNELS.sessionsApproveBash,
     async (_event, payload) => {
-      const { approvalId } = parseDesktopIpcRequest(
+      const request = parseDesktopIpcRequest(
         DESKTOP_IPC_CHANNELS.sessionsApproveBash,
         payload,
       )
-      await runtime.approveBash(approvalId)
+      await runtime.approveBash(request)
       return parseDesktopIpcResponse(
         DESKTOP_IPC_CHANNELS.sessionsApproveBash,
         undefined,

@@ -84,11 +84,6 @@ describe('聊天路由状态', () => {
       '深层会话',
     )
     window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(runtime)
-    window.api.getLastActiveSession = vi.fn().mockResolvedValue({
-      agentId: 'yuanxiao',
-      sessionId: 'default-session',
-      updatedAt: NOW,
-    })
     window.api.listSessions = vi.fn(async ({ agentId }) =>
       agentId === 'researcher' ? [deepSession] : [defaultSession],
     )
@@ -149,11 +144,6 @@ describe('聊天路由状态', () => {
     const firstTranscript = createDeferred<TranscriptSnapshot>()
     const lastTranscript = createDeferred<TranscriptSnapshot>()
     window.api.getRuntimeSnapshot = vi.fn().mockResolvedValue(runtime)
-    window.api.getLastActiveSession = vi.fn().mockResolvedValue({
-      agentId: 'yuanxiao',
-      sessionId: 'default-session',
-      updatedAt: NOW,
-    })
     window.api.listSessions = vi.fn(async ({ agentId }) =>
       agentId === 'researcher' ? [firstSession, lastSession] : [defaultSession],
     )

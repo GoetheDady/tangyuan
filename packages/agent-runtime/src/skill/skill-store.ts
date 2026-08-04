@@ -21,6 +21,7 @@ import {
   type SkillSummary,
 } from '@yuanxiao/contracts'
 import type { DirectoryLayout } from '../core'
+import type { SkillOperationPreflight } from '../runtime/runtime-modules'
 
 /**
  * Pi SDK ResourceLoader 解析出的 Skill 结构（mapSkillsToSummaries 输入）。
@@ -130,6 +131,32 @@ export class SkillStore {
     return this.mapSkillsToSummaries(skills, diagnostics)
   }
 
+  /** 在审批前读取真实 Skill 信息并校验目标。 */
+  async preflightSkillOperation(
+    params: SkillOperationParams,
+  ): Promise<SkillOperationPreflight> {
+    const targetDir = this.resolveSkillTargetDir(
+      params.source,
+      params.targetAgentId,
+    )
+    const skillDir =
+      params.operation === 'install'
+        ? params.skillDirPath
+        : join(targetDir, params.skillName)
+
+    if (!skillDir) {
+      throw new Error('安装 Skill 需要提供 skillDirPath。')
+    }
+
+    const metadata = await this.readSkillMetadata(skillDir, params.skillName)
+    const conflict = await this.resolveLayerConflict(params)
+
+    return {
+      ...metadata,
+      ...(conflict ? { conflict } : {}),
+    }
+  }
+
   /**
    * 安装或更新 Skill（含 SKILL.md 校验和原子写入）。
    *
@@ -144,7 +171,7 @@ export class SkillStore {
     }
 
     // 校验源目录
-    await this.validateSkillDirectory(sourceDir, params.skillName)
+    await this.readSkillMetadata(sourceDir, params.skillName)
 
     const targetDir = this.resolveSkillTargetDir(
       params.source,
@@ -165,23 +192,18 @@ export class SkillStore {
       // 复制源内容到临时目录
       await this.copyDirectoryContents(sourceDir, tempSkillDir)
 
-      // 原子 rename 到目标位置
-      // 如果已存在旧版本，先移除
+      const trashDir = join(targetDir, '.yuanxiao-trash')
+      await mkdir(trashDir, { recursive: true })
+
+      // 原子 rename 到目标位置；已有版本先移入可恢复目录。
       try {
         await rename(
           skillTargetDir,
-          join(
-            targetDir,
-            `.yuanxiao-trash`,
-            `${params.skillName}-${this.now().replace(/:/g, '-')}`,
-          ),
+          join(trashDir, `${params.skillName}-${this.now().replace(/:/g, '-')}`),
         )
       } catch {
         // 目录不存在则忽略
       }
-
-      // 确保 trash 目录存在
-      await mkdir(join(targetDir, '.yuanxiao-trash'), { recursive: true })
 
       await rename(tempSkillDir, skillTargetDir)
     } catch (error) {
@@ -279,15 +301,15 @@ export class SkillStore {
    * @returns 带有来源和冲突标注的 SkillSummary 列表。
    * @throws 此方法不会主动抛出错误。
    */
-  private mapSkillsToSummaries(
+  private async mapSkillsToSummaries(
     skills: LoadedSkill[],
     diagnostics: SkillDiagnostic[],
-  ): SkillSummary[] {
+  ): Promise<SkillSummary[]> {
     const agentSkillsPath = this.layout.agentSkills(YUANXIAO_DEFAULT_AGENT_ID)
     const sharedSkillsPath = this.layout.sharedSkills()
 
-    // 从 diagnostics 中提取冲突信息（按 loserPath 索引）
-    const collisionsByLoserPath = new Map<
+    // Loader 只返回获胜项，因此按 winnerPath 标注被覆盖的同名 Skill。
+    const collisionsByWinnerPath = new Map<
       string,
       { overriddenPath: string; overriddenSource: 'shared' | 'agent' }
     >()
@@ -296,21 +318,18 @@ export class SkillStore {
         diagnostic.type === 'collision' &&
         diagnostic.collision?.resourceType === 'skill'
       ) {
-        const loserSource = diagnostic.collision.loserPath.startsWith(
-          agentSkillsPath.replace(YUANXIAO_DEFAULT_AGENT_ID, ''),
-        )
-          ? 'agent'
-          : diagnostic.collision.loserPath.startsWith(sharedSkillsPath)
+        collisionsByWinnerPath.set(diagnostic.collision.winnerPath, {
+          overriddenPath: diagnostic.collision.loserPath,
+          overriddenSource: diagnostic.collision.loserPath.startsWith(
+            sharedSkillsPath,
+          )
             ? 'shared'
-            : 'agent'
-        collisionsByLoserPath.set(diagnostic.collision.loserPath, {
-          overriddenPath: diagnostic.collision.winnerPath,
-          overriddenSource: loserSource,
+            : 'agent',
         })
       }
     }
 
-    return skills.map((skill) => {
+    return Promise.all(skills.map(async (skill) => {
       const source: 'shared' | 'agent' = skill.filePath.startsWith(
         agentSkillsPath.replace(YUANXIAO_DEFAULT_AGENT_ID, ''),
       )
@@ -319,14 +338,14 @@ export class SkillStore {
           ? 'shared'
           : 'agent'
 
-      const conflict = collisionsByLoserPath.get(skill.filePath)
+      const conflict = collisionsByWinnerPath.get(skill.filePath)
 
       const summary: SkillSummary = {
         name: skill.name,
         description: skill.description ?? '',
         source,
         path: skill.filePath,
-        hasScripts: false, // Pi SDK Skill 类型不直接暴露此信息，MVP 默认 false
+        hasScripts: await this.isDirectory(join(skill.baseDir, 'scripts')),
       }
 
       if (conflict) {
@@ -337,7 +356,7 @@ export class SkillStore {
       }
 
       return summary
-    })
+    }))
   }
 
   /**
@@ -371,10 +390,10 @@ export class SkillStore {
    * @returns 无返回值。
    * @throws 当 SKILL.md 缺失或缺少 description 时抛出错误。
    */
-  private async validateSkillDirectory(
+  private async readSkillMetadata(
     dirPath: string,
     expectedName: string,
-  ): Promise<void> {
+  ): Promise<Pick<SkillOperationPreflight, 'description' | 'hasScripts'>> {
     const skillMdPath = join(dirPath, 'SKILL.md')
 
     try {
@@ -385,12 +404,56 @@ export class SkillStore {
 
     const content = await readFile(skillMdPath, 'utf8')
 
-    // 校验 description 字段存在（v3 frontmatter 格式）
+    const nameMatch = content.match(/^name:\s*(.+)$/m)
+    const actualName = nameMatch?.[1]?.trim().replace(/^['"]|['"]$/g, '')
+    if (actualName !== expectedName) {
+      throw new Error(
+        `Skill "${expectedName}" 的 SKILL.md name 字段必须与目标名称一致。`,
+      )
+    }
+
     const descriptionMatch = content.match(/^description:\s*(.+)$/m)
-    if (!descriptionMatch || !descriptionMatch[1]?.trim()) {
+    const description = descriptionMatch?.[1]
+      ?.trim()
+      .replace(/^['"]|['"]$/g, '')
+    if (!description) {
       throw new Error(
         `Skill "${expectedName}" 的 SKILL.md 缺少 description 字段，拒绝安装。`,
       )
+    }
+
+    return {
+      description,
+      hasScripts: await this.isDirectory(join(dirPath, 'scripts')),
+    }
+  }
+
+  private async resolveLayerConflict(
+    params: SkillOperationParams,
+  ): Promise<SkillOperationPreflight['conflict'] | undefined> {
+    if (params.source !== 'agent') return undefined
+
+    const sharedSkillPath = join(
+      this.layout.sharedSkills(),
+      params.skillName,
+      'SKILL.md',
+    )
+    try {
+      await access(sharedSkillPath, fsConstants.R_OK)
+      return {
+        overriddenPath: sharedSkillPath,
+        overriddenSource: 'shared',
+      }
+    } catch {
+      return undefined
+    }
+  }
+
+  private async isDirectory(path: string): Promise<boolean> {
+    try {
+      return (await stat(path)).isDirectory()
+    } catch {
+      return false
     }
   }
 

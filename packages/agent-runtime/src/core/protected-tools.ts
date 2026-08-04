@@ -2,7 +2,7 @@ import { dirname, resolve as pathResolve } from 'node:path'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
 import type { ToolApprovalGateway } from '../driver'
-import { describeBashRisk } from './utils'
+import { assessBashRisk } from './utils'
 
 /**
  * Pi SDK 原生危险工具名：文件读取、命令执行、文件写入和文件编辑。
@@ -125,13 +125,15 @@ export function createRunCommandTool(
       additionalProperties: false,
     },
     async execute(_toolCallId: string, params: { command: string }) {
+      const risk = assessBashRisk(params.command)
       const result = await context.gateway.requestBashApproval({
         agentId: context.agentId || 'yuanxiao',
         sessionId: context.sessionId,
         runId: '',
         command: params.command,
         cwd: context.cwd,
-        riskDescription: describeBashRisk(params.command),
+        riskLevel: risk.level,
+        riskDescription: risk.description,
       })
 
       if (!result.approved) {

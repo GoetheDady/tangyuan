@@ -192,7 +192,43 @@ export function createPreloadApiInitScript(
             ? agentSessions
             : agentSessions.filter((session) => session.archivedAt === undefined);
         },
-        getLastActiveSession: async () => data.lastActiveSession,
+        resumeSession: async () => {
+          const agentId = data.lastActiveSession?.agentId || data.runtime.activeAgent.agentId;
+          const allSessions = data.sessions.filter((session) => session.agentId === agentId);
+          const sessions = allSessions.filter((session) => session.archivedAt === undefined);
+          const archivedSessions = allSessions.filter((session) => session.archivedAt !== undefined);
+          let activeSession = sessions.find(
+            (session) => session.sessionId === data.lastActiveSession?.sessionId && !session.lineageUnavailable
+          ) || sessions.find((session) => !session.lineageUnavailable);
+          if (!activeSession) {
+            activeSession = {
+              agentId,
+              sessionId: 'session-' + Date.now(),
+              title: data.runtime.activeAgent.profile.bootstrapRequired ? 'Bootstrap 初始化' : '新会话',
+              state: 'idle',
+              updatedAt: new Date().toISOString()
+            };
+            data.sessions = [activeSession, ...data.sessions];
+            sessions.unshift(activeSession);
+          }
+          const entries = [];
+          let index = 0;
+          for (const msg of data.messages) {
+            if (msg.role === 'user') {
+              entries.push({ kind: 'user-message', index: index++, messageId: msg.messageId, content: msg.content, createdAt: msg.createdAt });
+            } else if (msg.role === 'agent') {
+              entries.push({ kind: 'agent-reply', index: index++, messageId: msg.messageId, content: msg.content, createdAt: msg.createdAt, attempt: null, turns: [] });
+            } else if (msg.role === 'compaction') {
+              entries.push({ kind: 'compaction', index: index++, timestamp: msg.createdAt });
+            }
+          }
+          return {
+            sessions,
+            archivedSessions,
+            activeSession,
+            transcript: { sessionId: activeSession.sessionId, agentId: activeSession.agentId, entries, updatedAt: new Date().toISOString() }
+          };
+        },
         setLastActiveSession: async (request) => {
           data.lastActiveSession = { ...request, updatedAt: new Date().toISOString() };
           return data.lastActiveSession;

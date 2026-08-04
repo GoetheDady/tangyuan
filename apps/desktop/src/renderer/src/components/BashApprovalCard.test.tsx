@@ -15,6 +15,7 @@ function createApproval(
     runId: 'run-1',
     command: 'npm install lodash',
     cwd: '/Users/test/project',
+    riskLevel: 'normal',
     riskDescription: '此命令将安装第三方软件包 lodash，可能引入未知依赖。',
     status: 'pending',
     createdAt: '2026-07-21T00:00:00.000Z',
@@ -70,7 +71,7 @@ describe('BashApprovalCard', () => {
     ).toBeInTheDocument()
     expect(
       screen.getByRole('button', {
-        name: '始终允许此命令（当前会话中同命令免审）',
+        name: '始终允许此 Agent 在当前工作目录执行此命令',
       }),
     ).toBeInTheDocument()
     expect(
@@ -126,7 +127,7 @@ describe('BashApprovalCard', () => {
     })
 
     const alwaysButton = screen.getByRole('button', {
-      name: '始终允许此命令（当前会话中同命令免审）',
+      name: '始终允许此 Agent 在当前工作目录执行此命令',
     })
     await user.click(alwaysButton)
 
@@ -225,7 +226,7 @@ describe('BashApprovalCard', () => {
       name: '拒绝此命令执行',
     })
     const alwaysButton = screen.getByRole('button', {
-      name: '始终允许此命令（当前会话中同命令免审）',
+      name: '始终允许此 Agent 在当前工作目录执行此命令',
     })
 
     await waitFor(() => {
@@ -264,6 +265,21 @@ describe('BashApprovalCard', () => {
 
     // Buttons should be disabled in resolved state
     expect(approveButton).toBeDisabled()
+  })
+
+  it('高风险命令不提供长期许可', () => {
+    render(
+      <BashApprovalCard
+        approval={createApproval({ riskLevel: 'high' })}
+        onApproveOnce={vi.fn()}
+        onApproveAlways={vi.fn()}
+        onReject={vi.fn()}
+      />,
+    )
+
+    expect(
+      screen.queryByRole('button', { name: /始终允许/ }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows error message when action fails', async () => {

@@ -15,6 +15,14 @@ import { projectAgentEvent } from '@/lib/agent-event-projection'
 /** 未加载时的稳定空会话列表，避免 selector 每次返回新引用引发重渲染循环。 */
 export const EMPTY_SESSIONS: AgentSessionSummary[] = []
 
+export interface WorkbenchRestoreSnapshot {
+  runtime: RuntimeSnapshot
+  activeSession: AgentSessionSummary | null
+  /** 当前 Agent 的完整会话目录，包含活跃与归档会话。 */
+  sessions: AgentSessionSummary[]
+  transcript: TranscriptSnapshot | null
+}
+
 export interface WorkbenchState {
   runtime: RuntimeSnapshot | null
   agents: AgentSummary[]
@@ -32,32 +40,42 @@ export interface WorkbenchState {
   >
   composerDraft: string
   isInitializing: boolean
-  alwaysAllowedCommandsBySessionId: Record<string, string[]>
 }
 
 export interface WorkbenchActions {
-  loadRuntimeSnapshot(snapshot: RuntimeSnapshot): void
-  setActiveSession(session: AgentSessionSummary | null): void
-  replaceAgentSessions(agentId: string, sessions: AgentSessionSummary[]): void
-  replaceArchivedSessions(
-    agentId: string,
-    sessions: AgentSessionSummary[],
-  ): void
+  restoreWorkbench(snapshot: WorkbenchRestoreSnapshot): void
+  refreshRuntime(snapshot: RuntimeSnapshot): void
+  replaceSessionCatalog(agentId: string, sessions: AgentSessionSummary[]): void
+  addSession(session: AgentSessionSummary): void
+  removeSessionLineage(input: {
+    agentId: string
+    allSessions: AgentSessionSummary[]
+    affectedSessionIds: string[]
+  }): void
+  completeSessionExecution(input: {
+    agentId: string
+    sessionId: string
+    allSessions: AgentSessionSummary[]
+    transcript?: TranscriptSnapshot
+  }): void
+  completeSessionFork(input: {
+    agentId: string
+    allSessions: AgentSessionSummary[]
+    transcript: TranscriptSnapshot
+    composerDraft: string
+  }): void
+  openSession(transcript: TranscriptSnapshot): void
+  startSessionExecution(input: {
+    sessionId: string
+    clearComposer?: boolean
+  }): void
+  endSessionExecution(sessionId: string): void
   applyAgentEvent(event: AgentEvent): void
   applyTranscriptEvents(
     events: Extract<AgentEvent, { type: 'transcript-delta' }>[],
   ): void
-  openTranscript(transcript: TranscriptSnapshot): void
-  clearTranscript(sessionId: string): void
-  beginSending(sessionId: string): void
-  finishSending(sessionId: string): void
-  resolvePendingApproval(sessionId: string, approvalId: string): void
-  resolvePendingClarification(sessionId: string, clarificationId: string): void
-  clearSessionRequests(sessionId: string): void
   updateComposerDraft(value: string): void
-  clearComposerDraft(): void
-  finishInitialization(): void
-  allowCommandForProcess(sessionId: string, command: string): void
+  completeInitialization(): void
 }
 
 export type WorkbenchStore = WorkbenchState & WorkbenchActions
@@ -79,7 +97,6 @@ function createInitialState(): WorkbenchState {
     pendingClarificationsBySessionId: {},
     composerDraft: '',
     isInitializing: true,
-    alwaysAllowedCommandsBySessionId: {},
   }
 }
 
@@ -88,28 +105,177 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
   const store = createStore<WorkbenchStore>()((set) => ({
     ...createInitialState(),
 
-    loadRuntimeSnapshot: (runtime) => {
+    restoreWorkbench: ({ runtime, activeSession, sessions, transcript }) => {
+      set((state) => {
+        const agentId = activeSession?.agentId ?? runtime.activeAgent.agentId
+        const { active, archived } = partitionSessionsByArchive(sessions)
+        return {
+          runtime,
+          agents: runtime.agents,
+          activeSession,
+          sessionsByAgentId: {
+            ...state.sessionsByAgentId,
+            [agentId]: active,
+          },
+          archivedSessionsByAgentId: {
+            ...state.archivedSessionsByAgentId,
+            [agentId]: archived,
+          },
+          transcriptsBySessionId: transcript
+            ? {
+                ...state.transcriptsBySessionId,
+                [transcript.sessionId]: transcript,
+              }
+            : state.transcriptsBySessionId,
+          isInitializing: false,
+        }
+      })
+    },
+
+    refreshRuntime: (runtime) => {
       set({ runtime, agents: runtime.agents })
     },
 
-    setActiveSession: (session) => {
-      set({ activeSession: session })
-    },
-
-    replaceAgentSessions: (agentId, sessions) => {
+    replaceSessionCatalog: (agentId, sessions) => {
+      const { active, archived } = partitionSessionsByArchive(sessions)
       set((state) => ({
         sessionsByAgentId: {
           ...state.sessionsByAgentId,
-          [agentId]: sessions,
+          [agentId]: active,
+        },
+        archivedSessionsByAgentId: {
+          ...state.archivedSessionsByAgentId,
+          [agentId]: archived,
         },
       }))
     },
 
-    replaceArchivedSessions: (agentId, sessions) => {
+    addSession: (session) => {
+      set((state) => {
+        const current = state.sessionsByAgentId[session.agentId] ?? []
+        return {
+          sessionsByAgentId: {
+            ...state.sessionsByAgentId,
+            [session.agentId]: [
+              session,
+              ...current.filter(
+                (candidate) => candidate.sessionId !== session.sessionId,
+              ),
+            ],
+          },
+        }
+      })
+    },
+
+    removeSessionLineage: ({ agentId, allSessions, affectedSessionIds }) => {
+      const affected = new Set(affectedSessionIds)
+      const { active, archived } = partitionSessionsByArchive(allSessions)
       set((state) => ({
+        activeSession:
+          state.activeSession && affected.has(state.activeSession.sessionId)
+            ? null
+            : state.activeSession,
+        sessionsByAgentId: {
+          ...state.sessionsByAgentId,
+          [agentId]: active,
+        },
         archivedSessionsByAgentId: {
           ...state.archivedSessionsByAgentId,
-          [agentId]: sessions,
+          [agentId]: archived,
+        },
+        transcriptsBySessionId: omitKeys(
+          state.transcriptsBySessionId,
+          affected,
+        ),
+        sendingBySessionId: omitKeys(state.sendingBySessionId, affected),
+        pendingApprovalsBySessionId: omitKeys(
+          state.pendingApprovalsBySessionId,
+          affected,
+        ),
+        pendingClarificationsBySessionId: omitKeys(
+          state.pendingClarificationsBySessionId,
+          affected,
+        ),
+      }))
+    },
+
+    completeSessionExecution: ({
+      agentId,
+      sessionId,
+      allSessions,
+      transcript,
+    }) => {
+      const { active, archived } = partitionSessionsByArchive(allSessions)
+      set((state) => ({
+        sessionsByAgentId: {
+          ...state.sessionsByAgentId,
+          [agentId]: active,
+        },
+        archivedSessionsByAgentId: {
+          ...state.archivedSessionsByAgentId,
+          [agentId]: archived,
+        },
+        transcriptsBySessionId: transcript
+          ? {
+              ...state.transcriptsBySessionId,
+              [transcript.sessionId]: transcript,
+            }
+          : state.transcriptsBySessionId,
+        sendingBySessionId: {
+          ...state.sendingBySessionId,
+          [sessionId]: false,
+        },
+      }))
+    },
+
+    completeSessionFork: ({
+      agentId,
+      allSessions,
+      transcript,
+      composerDraft,
+    }) => {
+      const { active, archived } = partitionSessionsByArchive(allSessions)
+      set((state) => ({
+        sessionsByAgentId: {
+          ...state.sessionsByAgentId,
+          [agentId]: active,
+        },
+        archivedSessionsByAgentId: {
+          ...state.archivedSessionsByAgentId,
+          [agentId]: archived,
+        },
+        transcriptsBySessionId: {
+          ...state.transcriptsBySessionId,
+          [transcript.sessionId]: transcript,
+        },
+        composerDraft,
+      }))
+    },
+
+    openSession: (transcript) => {
+      set((state) => ({
+        transcriptsBySessionId: {
+          ...state.transcriptsBySessionId,
+          [transcript.sessionId]: transcript,
+        },
+      }))
+    },
+
+    startSessionExecution: ({ sessionId, clearComposer = false }) => {
+      set((state) => ({
+        sendingBySessionId: {
+          ...state.sendingBySessionId,
+          [sessionId]: true,
+        },
+        ...(clearComposer ? { composerDraft: '' } : {}),
+      }))
+    },
+
+    endSessionExecution: (sessionId) => {
+      set((state) => ({
+        sendingBySessionId: {
+          ...state.sendingBySessionId,
+          [sessionId]: false,
         },
       }))
     },
@@ -139,107 +305,14 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
       })
     },
 
-    openTranscript: (transcript) => {
-      set((state) => ({
-        transcriptsBySessionId: {
-          ...state.transcriptsBySessionId,
-          [transcript.sessionId]: transcript,
-        },
-      }))
-    },
-
-    clearTranscript: (sessionId) => {
-      set((state) => ({
-        transcriptsBySessionId: omitKey(
-          state.transcriptsBySessionId,
-          sessionId,
-        ),
-      }))
-    },
-
-    beginSending: (sessionId) => {
-      set((state) => ({
-        sendingBySessionId: {
-          ...state.sendingBySessionId,
-          [sessionId]: true,
-        },
-      }))
-    },
-
-    finishSending: (sessionId) => {
-      set((state) => ({
-        sendingBySessionId: {
-          ...state.sendingBySessionId,
-          [sessionId]: false,
-        },
-      }))
-    },
-
-    resolvePendingApproval: (sessionId, approvalId) => {
-      set((state) => {
-        const next = removeSessionValue(
-          state.pendingApprovalsBySessionId,
-          sessionId,
-          (approval) => approval.approvalId === approvalId,
-        )
-        return {
-          pendingApprovalsBySessionId: next,
-        }
-      })
-    },
-
-    resolvePendingClarification: (sessionId, clarificationId) => {
-      set((state) => ({
-        pendingClarificationsBySessionId: removeSessionValue(
-          state.pendingClarificationsBySessionId,
-          sessionId,
-          (clarification) => clarification.clarificationId === clarificationId,
-        ),
-      }))
-    },
-
-    clearSessionRequests: (sessionId) => {
-      set((state) => {
-        const nextApprovals = {
-          ...state.pendingApprovalsBySessionId,
-          [sessionId]: [],
-        }
-        return {
-          pendingApprovalsBySessionId: nextApprovals,
-          pendingClarificationsBySessionId: {
-            ...state.pendingClarificationsBySessionId,
-            [sessionId]: [],
-          },
-        }
-      })
-    },
-
     updateComposerDraft: (composerDraft) => {
       set({ composerDraft })
     },
 
-    clearComposerDraft: () => {
-      set({ composerDraft: '' })
-    },
-
-    finishInitialization: () => {
+    completeInitialization: () => {
       set({ isInitializing: false })
     },
 
-    allowCommandForProcess: (sessionId, command) => {
-      set((state) => {
-        const currentCommands =
-          state.alwaysAllowedCommandsBySessionId[sessionId] ?? []
-        if (currentCommands.includes(command)) return state
-
-        return {
-          alwaysAllowedCommandsBySessionId: {
-            ...state.alwaysAllowedCommandsBySessionId,
-            [sessionId]: [...currentCommands, command],
-          },
-        }
-      })
-    },
   }))
 
   return {
@@ -255,7 +328,7 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
  * @param sessions - 查询返回的全部会话摘要。
  * @returns 活跃与归档两个分片；两者都保持原顺序。
  */
-export function partitionSessionsByArchive(
+function partitionSessionsByArchive(
   sessions: readonly AgentSessionSummary[],
 ): { active: AgentSessionSummary[]; archived: AgentSessionSummary[] } {
   return {
@@ -264,21 +337,11 @@ export function partitionSessionsByArchive(
   }
 }
 
-function removeSessionValue<T>(
-  valuesBySessionId: Record<string, T[]>,
-  sessionId: string,
-  matches: (value: T) => boolean,
-): Record<string, T[]> {
-  return {
-    ...valuesBySessionId,
-    [sessionId]: (valuesBySessionId[sessionId] ?? []).filter(
-      (value) => !matches(value),
-    ),
-  }
-}
-
-function omitKey<T>(values: Record<string, T>, key: string): Record<string, T> {
-  const remaining = { ...values }
-  delete remaining[key]
-  return remaining
+function omitKeys<T>(
+  values: Record<string, T>,
+  keys: ReadonlySet<string>,
+): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(values).filter(([key]) => !keys.has(key)),
+  ) as Record<string, T>
 }

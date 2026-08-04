@@ -93,9 +93,32 @@ afterEach(async () => {
 })
 
 describe('SessionIndexStore.addSession / 摘要派生', () => {
+  it('列会话时自动完成索引初始化', async () => {
+    await mkdir(join(dir, 'sessions'), { recursive: true })
+    await writeFile(
+      layout.sessionIndex(),
+      JSON.stringify({ sessions: [makeEntry()] }),
+      'utf8',
+    )
+    const store = await makeStore()
+
+    await expect(store.listSummaries('yuanxiao')).resolves.toHaveLength(1)
+  })
+
+  it('新增会话一次调用同时更新摘要并持久化索引', async () => {
+    const store = await makeStore()
+
+    const summary = await store.addSession(makeEntry())
+
+    expect(summary.sessionId).toBe('s1')
+    const raw = JSON.parse(await readFile(layout.sessionIndex(), 'utf8'))
+    expect(raw.sessions).toHaveLength(1)
+    expect(raw.sessions[0].sessionId).toBe('s1')
+  })
+
   it('新增会话后可查摘要、条目与列表', async () => {
     const store = await makeStore()
-    const summary = store.addSession(makeEntry())
+    const summary = await store.addSession(makeEntry())
 
     expect(summary).toEqual({
       agentId: 'yuanxiao',
@@ -104,56 +127,83 @@ describe('SessionIndexStore.addSession / 摘要派生', () => {
       state: 'idle',
       updatedAt: '2026-01-01',
     })
-    expect(store.hasSummary('s1')).toBe(true)
-    expect(store.getEntry('s1').model).toBe('gpt-4')
-    expect(store.listSummaries('yuanxiao')).toHaveLength(1)
-    expect(store.listSummaries('other')).toHaveLength(0)
+    await expect(store.resolveEntry('s1')).resolves.toMatchObject({
+      model: 'gpt-4',
+    })
+    await expect(store.listSummaries('yuanxiao')).resolves.toHaveLength(1)
+    await expect(store.listSummaries('other')).resolves.toHaveLength(0)
   })
 
-  it('getEntry 不存在时抛错', async () => {
+  it('不存在的条目通过查询 interface 返回缺失语义', async () => {
     const store = await makeStore()
-    expect(() => store.getEntry('missing')).toThrow(AgentRuntimeError)
-    expect(store.getEntryOrNull('missing')).toBeUndefined()
+    await expect(store.resolveEntry('missing')).rejects.toThrow(
+      AgentRuntimeError,
+    )
+    await expect(store.findEntry('missing')).resolves.toBeUndefined()
+  })
+
+  it('并发 mutation 按调用顺序持久化，不会让旧快照覆盖新快照', async () => {
+    const store = await makeStore()
+    const sessionId = 'concurrent-session'
+
+    await Promise.all([
+      store.addSession(
+        makeEntry({
+          sessionId,
+          title: '旧'.repeat(4_000_000),
+        }),
+      ),
+      store.deleteSessions([sessionId]),
+    ])
+
+    const reloadedStore = await makeStore()
+    await expect(
+      reloadedStore.listSummaries('yuanxiao', true),
+    ).resolves.toEqual([])
   })
 })
 
-describe('SessionIndexStore.updateEntry / write / load 往返', () => {
-  it('updateEntry 写盘后可被新 store load 读回', async () => {
+describe('SessionIndexStore 模型配置往返', () => {
+  it('模型配置写盘后可被新 store 自动读回', async () => {
     const store = await makeStore()
-    store.addSession(makeEntry())
-    await store.updateEntry('s1', { title: '改名了', status: 'completed' })
+    await store.addSession(makeEntry())
+    await store.setModel('s1', 'anthropic', 'claude-sonnet-4-5')
 
-    // 磁盘上应有 index.json
     const raw = JSON.parse(await readFile(layout.sessionIndex(), 'utf8'))
-    expect(raw.sessions[0].title).toBe('改名了')
+    expect(raw.sessions[0]).toMatchObject({
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5',
+    })
 
-    // 新 store load 读回
     const store2 = await makeStore()
-    const entries = await store2.load()
-    expect(entries).toHaveLength(1)
-    expect(store2.getSummary('s1')?.state).toBe('completed')
+    await expect(store2.resolveEntry('s1')).resolves.toMatchObject({
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5',
+    })
   })
 })
 
 describe('SessionIndexStore 会话归档', () => {
   it('整批归档后从日常列表隐藏，重载后仍可显式读取', async () => {
     const store = await makeStore()
-    store.addSession(makeEntry({ sessionId: 'parent', title: '父会话' }))
-    store.addSession(
+    await store.addSession(makeEntry({ sessionId: 'parent', title: '父会话' }))
+    await store.addSession(
       makeEntry({
         sessionId: 'child',
         title: '子会话',
         forkedFrom: { sessionId: 'parent', entryId: 'source-message' },
       }),
     )
-    store.addSession(makeEntry({ sessionId: 'sibling', title: '兄弟会话' }))
+    await store.addSession(
+      makeEntry({ sessionId: 'sibling', title: '兄弟会话' }),
+    )
 
     await store.setArchived(['parent', 'child'], '2026-07-29T03:00:00.000Z')
 
-    expect(store.listSummaries('yuanxiao')).toEqual([
+    await expect(store.listSummaries('yuanxiao')).resolves.toEqual([
       expect.objectContaining({ sessionId: 'sibling' }),
     ])
-    expect(store.listSummaries('yuanxiao', true)).toEqual(
+    await expect(store.listSummaries('yuanxiao', true)).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           sessionId: 'parent',
@@ -168,18 +218,26 @@ describe('SessionIndexStore 会话归档', () => {
     )
 
     const reloadedStore = await makeStore()
-    await reloadedStore.load()
-    expect(reloadedStore.listSummaries('yuanxiao')).toHaveLength(1)
-    expect(reloadedStore.getSummary('child')).toMatchObject({
-      archivedAt: '2026-07-29T03:00:00.000Z',
-    })
+    await expect(
+      reloadedStore.listSummaries('yuanxiao'),
+    ).resolves.toHaveLength(1)
+    await expect(
+      reloadedStore.listSummaries('yuanxiao', true),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sessionId: 'child',
+          archivedAt: '2026-07-29T03:00:00.000Z',
+        }),
+      ]),
+    )
   })
 })
 
 describe('SessionIndexStore.upsertAttempt', () => {
   it('新增与更新 attempt，超过 20 条时截断', async () => {
     const store = await makeStore()
-    store.addSession(makeEntry())
+    await store.addSession(makeEntry())
 
     for (let i = 0; i < 25; i++) {
       await store.upsertAttempt(
@@ -196,7 +254,7 @@ describe('SessionIndexStore.upsertAttempt', () => {
       )
     }
 
-    const attempts = store.getAttempts('s1')
+    const attempts = await store.resolveAttempts('s1')
     expect(attempts).toHaveLength(20)
     expect(attempts[0]?.attemptId).toBe('a5')
     expect(attempts[19]?.attemptId).toBe('a24')
@@ -204,7 +262,7 @@ describe('SessionIndexStore.upsertAttempt', () => {
 
   it('写盘后重读仍可取得 attempts', async () => {
     const store = await makeStore()
-    store.addSession(makeEntry())
+    await store.addSession(makeEntry())
 
     await store.upsertAttempt(
       's1',
@@ -225,28 +283,29 @@ describe('SessionIndexStore.upsertAttempt', () => {
 
     // 新 store 加载同一份磁盘索引
     const store2 = await makeStore()
-    await store2.load()
-    const attempts = store2.getAttempts('s1')
+    const attempts = await store2.resolveAttempts('s1')
     expect(attempts).toHaveLength(1)
     expect(attempts[0]?.attemptId).toBe('a1')
     expect(attempts[0]?.status).toBe('failed')
-    expect(store2.getSummary('s1')).toMatchObject({
-      state: 'failed',
+    await expect(store2.resolveSession('s1', 'yuanxiao')).resolves.toMatchObject(
+      { state: 'failed' },
+    )
+    await expect(store2.resolveEntry('s1')).resolves.toMatchObject({
+      lastMessagePreview: '失败',
     })
-    expect(store2.getEntryOrNull('s1')?.lastMessagePreview).toBe('失败')
   })
 })
 
 describe('SessionIndexStore 会话运行配置', () => {
   it('Thinking Level 写盘后可被新 store 读回', async () => {
     const store = await makeStore()
-    store.addSession(makeEntry())
-    await store.updateEntry('s1', { thinkingLevel: 'high' })
+    await store.addSession(makeEntry())
+    await store.setThinkingLevel('s1', 'high')
 
     const store2 = await makeStore()
-    await store2.load()
-
-    expect(store2.getEntry('s1').thinkingLevel).toBe('high')
+    await expect(store2.resolveEntry('s1')).resolves.toMatchObject({
+      thinkingLevel: 'high',
+    })
   })
 })
 
@@ -277,11 +336,11 @@ describe('SessionIndexStore.load 重建', () => {
       },
     ])
     const store = await makeStore(gateway)
-    const entries = await store.load()
+    const entries = await store.listSummaries('yuanxiao')
 
     expect(entries).toHaveLength(1)
     expect(entries[0]?.sessionId).toBe('sdk-1')
-    expect(store.getSummary('sdk-1')?.title).toBe('SDK 会话')
+    expect(entries[0]?.title).toBe('SDK 会话')
   })
 
   it('索引缺失时从 Pi session 元数据恢复分叉来源', async () => {
@@ -318,11 +377,14 @@ describe('SessionIndexStore.load 重建', () => {
       ]),
     )
 
-    await store.load()
-
-    expect(store.getSummary('child')).toMatchObject({
-      forkedFrom: { sessionId: 'parent', entryId: 'source-user' },
-    })
+    await expect(store.listSummaries('yuanxiao')).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sessionId: 'child',
+          forkedFrom: { sessionId: 'parent', entryId: 'source-user' },
+        }),
+      ]),
+    )
   })
 
   it('损坏的索引 JSON 触发重建', async () => {
@@ -343,8 +405,7 @@ describe('SessionIndexStore.load 重建', () => {
     })
 
     const store = await makeStore(createFakeGateway([]))
-    const entries = await store.load()
-    expect(entries).toEqual([])
+    await expect(store.listSummaries('yuanxiao')).resolves.toEqual([])
   })
 
   it('重建优先恢复 Pi session 里的会话运行配置，不回退到 Agent 默认值', async () => {
@@ -380,9 +441,7 @@ describe('SessionIndexStore.load 重建', () => {
       ]),
     )
 
-    await store.load()
-
-    expect(store.getEntry('s1')).toMatchObject({
+    await expect(store.resolveEntry('s1')).resolves.toMatchObject({
       provider: 'anthropic',
       model: 'claude-sonnet-4-5',
       thinkingLevel: 'high',
@@ -424,15 +483,16 @@ describe('SessionIndexStore.load 重建', () => {
     } as unknown as PiSdkGateway
     const store = await makeStore(recoveringGateway)
 
-    await expect(store.load()).rejects.toThrow('session 目录不可读')
-    expect(store.listSummaries('yuanxiao')).toEqual([])
+    await expect(store.listSummaries('yuanxiao')).rejects.toThrow(
+      'session 目录不可读',
+    )
     await expect(readFile(layout.sessionIndex(), 'utf8')).rejects.toMatchObject(
       {
         code: 'ENOENT',
       },
     )
 
-    await expect(store.load()).resolves.toEqual([
+    await expect(store.listSummaries('yuanxiao')).resolves.toEqual([
       expect.objectContaining({ sessionId: 'recovered-session' }),
     ])
     expect(scanCount).toBe(2)
@@ -488,15 +548,13 @@ describe('SessionIndexStore.load 重建', () => {
       ]),
     )
 
-    await store.load()
-
     expect(
-      store.listSummaries('yuanxiao').map((item) => item.sessionId),
+      (await store.listSummaries('yuanxiao')).map((item) => item.sessionId),
     ).toEqual(['yuanxiao-session'])
-    expect(store.listSummaries('helper').map((item) => item.sessionId)).toEqual(
-      ['helper-session'],
-    )
-    expect(store.getEntryOrNull('foreign-session')).toBeUndefined()
+    expect(
+      (await store.listSummaries('helper')).map((item) => item.sessionId),
+    ).toEqual(['helper-session'])
+    await expect(store.findEntry('foreign-session')).resolves.toBeUndefined()
   })
 
   it('已归档 Agent 的会话在重建后保留，且不混入活跃 Agent 列表', async () => {
@@ -542,29 +600,40 @@ describe('SessionIndexStore.load 重建', () => {
       ]),
     )
 
-    await store.load()
-
-    expect(store.listSummaries('yuanxiao')).toEqual([])
-    expect(
-      store.listSummaries('retired').map((item) => item.sessionId),
-    ).toEqual(expect.arrayContaining(['retired-root', 'retired-fork']))
-    expect(store.getSummary('retired-fork')).toMatchObject({
-      forkedFrom: { sessionId: 'retired-root', entryId: 'source-user' },
-    })
+    await expect(store.listSummaries('yuanxiao')).resolves.toEqual([])
+    const retiredSessions = await store.listSummaries('retired')
+    expect(retiredSessions.map((item) => item.sessionId)).toEqual(
+      expect.arrayContaining(['retired-root', 'retired-fork']),
+    )
+    expect(retiredSessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sessionId: 'retired-fork',
+          forkedFrom: { sessionId: 'retired-root', entryId: 'source-user' },
+        }),
+      ]),
+    )
   })
 })
 
-describe('SessionIndexStore.setSummaryState', () => {
-  it('改状态返回新摘要，不存在时抛错', async () => {
+describe('SessionIndexStore.setState', () => {
+  it('原子更新索引、摘要与磁盘，不存在时抛错', async () => {
     const store = await makeStore()
-    store.addSession(makeEntry())
+    await store.addSession(makeEntry())
 
-    const next = store.setSummaryState('s1', 'running', '2026-02-02')
+    const next = await store.setState('s1', 'running', '2026-02-02')
     expect(next.state).toBe('running')
     expect(next.updatedAt).toBe('2026-02-02')
-    expect(store.getSummary('s1')?.state).toBe('running')
+    await expect(store.resolveSession('s1', 'yuanxiao')).resolves.toMatchObject(
+      { state: 'running' },
+    )
+    const raw = JSON.parse(await readFile(layout.sessionIndex(), 'utf8'))
+    expect(raw.sessions[0]).toMatchObject({
+      status: 'running',
+      updatedAt: '2026-02-02',
+    })
 
-    expect(() => store.setSummaryState('missing', 'idle', 'now')).toThrow(
+    await expect(store.setState('missing', 'idle', 'now')).rejects.toThrow(
       AgentRuntimeError,
     )
   })

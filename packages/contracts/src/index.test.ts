@@ -417,7 +417,7 @@ describe('DESKTOP_IPC_CHANNELS', () => {
       sessionsArchive: 'yuanxiao:sessions:archive',
       sessionsRecover: 'yuanxiao:sessions:recover',
       sessionsDelete: 'yuanxiao:sessions:delete',
-      sessionsGetLastActive: 'yuanxiao:sessions:get-last-active',
+      sessionsResume: 'yuanxiao:sessions:resume',
       sessionsSetLastActive: 'yuanxiao:sessions:set-last-active',
       agentsArchive: 'yuanxiao:agents:archive',
       agentsClaimDirectory: 'yuanxiao:agents:claim-directory',

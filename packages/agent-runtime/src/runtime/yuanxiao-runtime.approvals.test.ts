@@ -3,7 +3,7 @@ import {
   YUANXIAO_DEFAULT_AGENT_ID,
   agentEventSchema,
 } from '@yuanxiao/contracts'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createYuanxiaoRuntimeForTesting } from './yuanxiao-runtime'
 import {
   createReadySnapshot,
@@ -13,7 +13,7 @@ import {
 } from './yuanxiao-runtime.test-helpers'
 
 describe('bash 审批事件', () => {
-  it('turn-cancelled 触发时自动清理该 session 的待审批请求', () => {
+  it('turn-cancelled 触发时自动清理该 session 的待审批请求', async () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
@@ -49,11 +49,14 @@ describe('bash 审批事件', () => {
       runId: '',
       command: 'ls -la',
       cwd: '/tmp',
+      riskLevel: 'normal',
       riskDescription: '列目录',
     })
 
     // 确认审批已被登记
-    expect(runtime.getPendingApprovals()).toHaveLength(1)
+    await vi.waitFor(() => {
+      expect(runtime.getPendingApprovals()).toHaveLength(1)
+    })
 
     // 模拟 run 被异常取消（不经过 cancelRun，直接由 Driver 发出 turn-cancelled）
     sessionDriver.emit({
@@ -68,7 +71,7 @@ describe('bash 审批事件', () => {
     expect(runtime.getPendingApprovals()).toHaveLength(0)
   })
 
-  it('turn-failed 触发时自动清理该 session 的待审批请求', () => {
+  it('turn-failed 触发时自动清理该 session 的待审批请求', async () => {
     const session = createSessionSummary('session-2')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
@@ -98,10 +101,13 @@ describe('bash 审批事件', () => {
       runId: '',
       command: 'rm -rf /tmp/test',
       cwd: '/tmp',
+      riskLevel: 'high',
       riskDescription: '删除目录',
     })
 
-    expect(runtime.getPendingApprovals()).toHaveLength(1)
+    await vi.waitFor(() => {
+      expect(runtime.getPendingApprovals()).toHaveLength(1)
+    })
 
     // 模拟 run 失败
     sessionDriver.emit({
@@ -116,7 +122,7 @@ describe('bash 审批事件', () => {
     expect(runtime.getPendingApprovals()).toHaveLength(0)
   })
 
-  it('approval-required 携带非空 runId，不会被 agentEventSchema 拒绝', () => {
+  it('approval-required 携带非空 runId，不会被 agentEventSchema 拒绝', async () => {
     const session = createSessionSummary('session-1')
     const runtimeDriver = createRuntimeDriver(createReadySnapshot())
     const sessionDriver = createSessionDriver([session])
@@ -155,10 +161,16 @@ describe('bash 审批事件', () => {
         runId: '',
         command: 'ls -la',
         cwd: '/tmp',
+        riskLevel: 'normal',
         riskDescription: '列目录',
       })
     }).not.toThrow()
 
+    await vi.waitFor(() => {
+      expect(
+        received.some((event) => event.type === 'approval-required'),
+      ).toBe(true)
+    })
     const approvalEvent = received.find(
       (event) => event.type === 'approval-required',
     )

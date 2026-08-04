@@ -10,9 +10,9 @@ import { useStore } from 'zustand'
 
 import {
   EMPTY_SESSIONS,
-  partitionSessionsByArchive,
   type WorkbenchStoreApi,
 } from '@/stores/workbench-store'
+import { useSessionModelController } from './useSessionModelController'
 
 /** 会话操作组合层所需的 store 与路由上下文。 */
 export interface UseChatSessionActionsOptions {
@@ -49,10 +49,10 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
 } {
   const { store, activeAgentId, sessionId } = options
   const navigate = useNavigate()
-  const [sessionModelInfo, setSessionModelInfo] =
-    useState<SessionModelInfo | null>(null)
-  const [isLoadingModelInfo, setIsLoadingModelInfo] = useState(false)
-  const [isSwitchingModel, setIsSwitchingModel] = useState(false)
+  const sessionModel = useSessionModelController({
+    agentId: activeAgentId,
+    sessionId,
+  })
   const [cancellingSessionId, setCancellingSessionId] = useState<string | null>(
     null,
   )
@@ -79,17 +79,23 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
     sessionId ? (state.transcriptsBySessionId[sessionId] ?? null) : null,
   )
   const composerText = useStore(store, (state) => state.composerDraft)
-  const updateComposerDraft = useStore(
+  const addSession = useStore(store, (state) => state.addSession)
+  const startSessionExecution = useStore(
     store,
-    (state) => state.updateComposerDraft,
+    (state) => state.startSessionExecution,
   )
-  const openTranscript = useStore(store, (state) => state.openTranscript)
-  const replaceAgentSessions = useStore(
+  const endSessionExecution = useStore(
     store,
-    (state) => state.replaceAgentSessions,
+    (state) => state.endSessionExecution,
   )
-  const beginSending = useStore(store, (state) => state.beginSending)
-  const finishSending = useStore(store, (state) => state.finishSending)
+  const completeSessionExecution = useStore(
+    store,
+    (state) => state.completeSessionExecution,
+  )
+  const completeSessionFork = useStore(
+    store,
+    (state) => state.completeSessionFork,
+  )
 
   const selectedSession = useMemo<AgentSessionSummary | null>(() => {
     if (sessionId) {
@@ -100,33 +106,6 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
   const selectedTranscript: TranscriptSnapshot | null =
     transcript?.sessionId === selectedSession?.sessionId ? transcript : null
 
-  // 当 URL 中的 session 变化时加载模型信息
-  useEffect(() => {
-    if (!sessionId || !activeAgentId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- 依赖变化时同步重置状态是预期行为
-      setSessionModelInfo(null)
-      return
-    }
-
-    setIsLoadingModelInfo(true)
-
-    void window.api
-      .getSessionModelInfo({
-        agentId: activeAgentId,
-        sessionId,
-      })
-      .then((info) => {
-        setSessionModelInfo(info)
-      })
-      .catch(() => {
-        // 模型信息不可用时静默处理
-        setSessionModelInfo(null)
-      })
-      .finally(() => {
-        setIsLoadingModelInfo(false)
-      })
-  }, [sessionId, activeAgentId])
-
   // 当前 Agent 的会话列表尚未加载时按需读取；结果按 Agent 落盘，互不覆盖。
   // 一次 includeArchived 查询同时填充活跃与归档两个分片，避免重复 IPC。
   useEffect(() => {
@@ -135,9 +114,7 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
     void window.api
       .listSessions({ agentId: activeAgentId, includeArchived: true })
       .then((allSessions) => {
-        const { active, archived } = partitionSessionsByArchive(allSessions)
-        store.getState().replaceAgentSessions(activeAgentId, active)
-        store.getState().replaceArchivedSessions(activeAgentId, archived)
+        store.getState().replaceSessionCatalog(activeAgentId, allSessions)
       })
       .catch((error: unknown) => {
         toast.error(
@@ -160,7 +137,7 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
       .then((nextTranscript) => {
         if (requestId !== openSessionRequestIdRef.current) return
 
-        store.getState().openTranscript(nextTranscript)
+        store.getState().openSession(nextTranscript)
         void persistLastActiveSession(activeAgentId, sessionId)
       })
       .catch((error) => {
@@ -210,14 +187,7 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
         agentId: activeAgentId,
         title: '新会话',
       })
-      const currentSessions =
-        store.getState().sessionsByAgentId[activeAgentId] ?? []
-      replaceAgentSessions(activeAgentId, [
-        session,
-        ...currentSessions.filter(
-          (candidate) => candidate.sessionId !== session.sessionId,
-        ),
-      ])
+      addSession(session)
       navigate(`/chat/${activeAgentId}/${session.sessionId}`, { replace: true })
       await persistLastActiveSession(session.agentId, session.sessionId)
     } catch (error) {
@@ -243,8 +213,10 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
       return
     }
 
-    updateComposerDraft('')
-    if (sessionId) beginSending(sessionId)
+    startSessionExecution({
+      sessionId: selectedSession.sessionId,
+      clearComposer: true,
+    })
 
     try {
       const nextTranscript = await window.api.sendMessage({
@@ -252,18 +224,23 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
         sessionId: selectedSession.sessionId,
         content,
       })
-      openTranscript(nextTranscript)
-      replaceAgentSessions(
-        selectedSession.agentId,
-        await window.api.listSessions({ agentId: selectedSession.agentId }),
-      )
+      const nextSessions = await window.api.listSessions({
+        agentId: selectedSession.agentId,
+        includeArchived: true,
+      })
+      completeSessionExecution({
+        agentId: selectedSession.agentId,
+        sessionId: selectedSession.sessionId,
+        allSessions: nextSessions,
+        transcript: nextTranscript,
+      })
       navigate(`/chat/${activeAgentId}/${selectedSession.sessionId}`, {
         replace: true,
       })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '发送消息失败')
     } finally {
-      if (sessionId) finishSending(sessionId)
+      endSessionExecution(selectedSession.sessionId)
     }
   }
 
@@ -280,7 +257,7 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
       return
     }
 
-    if (sessionId) beginSending(sessionId)
+    startSessionExecution({ sessionId: selectedSession.sessionId })
 
     try {
       const nextTranscript = await window.api.retryMessage({
@@ -288,15 +265,20 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
         sessionId: selectedSession.sessionId,
         userMessageId,
       })
-      openTranscript(nextTranscript)
-      replaceAgentSessions(
-        selectedSession.agentId,
-        await window.api.listSessions({ agentId: selectedSession.agentId }),
-      )
+      const nextSessions = await window.api.listSessions({
+        agentId: selectedSession.agentId,
+        includeArchived: true,
+      })
+      completeSessionExecution({
+        agentId: selectedSession.agentId,
+        sessionId: selectedSession.sessionId,
+        allSessions: nextSessions,
+        transcript: nextTranscript,
+      })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '重试消息失败')
     } finally {
-      if (sessionId) finishSending(sessionId)
+      endSessionExecution(selectedSession.sessionId)
     }
   }
 
@@ -327,15 +309,21 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
         entryId: userMessageId,
       })
       const [nextSessions, childTranscript] = await Promise.all([
-        window.api.listSessions({ agentId: childSession.agentId }),
+        window.api.listSessions({
+          agentId: childSession.agentId,
+          includeArchived: true,
+        }),
         window.api.getTranscript({
           agentId: childSession.agentId,
           sessionId: childSession.sessionId,
         }),
       ])
-      replaceAgentSessions(childSession.agentId, nextSessions)
-      openTranscript(childTranscript)
-      updateComposerDraft(sourceMessageContent)
+      completeSessionFork({
+        agentId: childSession.agentId,
+        allSessions: nextSessions,
+        transcript: childTranscript,
+        composerDraft: sourceMessageContent,
+      })
       navigate(`/chat/${activeAgentId}/${childSession.sessionId}`, {
         replace: true,
       })
@@ -367,17 +355,20 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
         agentId: selectedSession.agentId,
         sessionId: selectedSession.sessionId,
       })
-      finishSending(selectedSession.sessionId)
       // 刷新 sessions 以同步取消后的状态，避免仅依赖异步推送事件
-      replaceAgentSessions(
-        selectedSession.agentId,
-        await window.api.listSessions({ agentId: selectedSession.agentId }),
-      )
+      completeSessionExecution({
+        agentId: selectedSession.agentId,
+        sessionId: selectedSession.sessionId,
+        allSessions: await window.api.listSessions({
+          agentId: selectedSession.agentId,
+          includeArchived: true,
+        }),
+      })
       toast.success('已停止生成')
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : '取消运行失败')
       // 即使取消失败，也要重置 isSendingMessage，防止 UI 卡住
-      finishSending(selectedSession.sessionId)
+      endSessionExecution(selectedSession.sessionId)
     } finally {
       setCancellingSessionId((current) =>
         current === targetSessionId ? null : current,
@@ -397,24 +388,7 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
     providerId: string,
     modelId: string,
   ): Promise<void> {
-    if (!sessionId || !activeAgentId) return
-
-    setIsSwitchingModel(true)
-
-    try {
-      const info = await window.api.setSessionModel({
-        agentId: activeAgentId,
-        sessionId,
-        providerId,
-        modelId,
-      })
-      setSessionModelInfo(info)
-      toast.success(`已切换到 ${info.displayName}`)
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : '切换模型失败')
-    } finally {
-      setIsSwitchingModel(false)
-    }
+    await sessionModel.setModel(providerId, modelId)
   }
 
   /**
@@ -425,27 +399,13 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
    * @throws Preload API 错误会被捕获并通过 toast 反馈。
    */
   async function handleThinkingLevelChange(level: string): Promise<void> {
-    if (!sessionId || !activeAgentId) return
-
-    try {
-      const info = await window.api.setSessionThinkingLevel({
-        agentId: activeAgentId,
-        sessionId,
-        level,
-      })
-      setSessionModelInfo(info)
-      toast.success(`已切换到 Thinking Level: ${level}`)
-    } catch (error: unknown) {
-      toast.error(
-        error instanceof Error ? error.message : '切换 Thinking Level 失败',
-      )
-    }
+    await sessionModel.setThinkingLevel(level)
   }
 
   return {
-    sessionModelInfo,
-    isLoadingModelInfo,
-    isSwitchingModel,
+    sessionModelInfo: sessionModel.sessionModelInfo,
+    isLoadingModelInfo: sessionModel.isLoadingModelInfo,
+    isSwitchingModel: sessionModel.isSwitchingModel,
     cancellingSessionId,
     createSession,
     sendMessage,

@@ -5,7 +5,7 @@ import type { PersistedAttemptEntry } from './session-index-types'
 function createIndex(initialAttempts: PersistedAttemptEntry[] = []) {
   let attempts = initialAttempts
   const index = {
-    getAttempts: vi.fn(() => attempts),
+    resolveAttempts: vi.fn(async () => attempts),
     upsertAttempt: vi.fn(
       async (_sessionId: string, attempt: PersistedAttemptEntry) => {
         attempts = [

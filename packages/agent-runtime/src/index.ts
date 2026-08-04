@@ -119,6 +119,7 @@ export function createYuanxiaoRuntime(
     agents: stores.agentRegistry,
     profiles: stores.profileModule,
     skills: stores.skillStore,
+    commandPermissionFilePath: stores.layout.commandPermissions(),
     lastActiveSessionStore,
   })
 

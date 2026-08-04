@@ -4,7 +4,7 @@ import type { WorkbenchStoreApi } from '@/stores/workbench-store'
 
 interface AgentEventBridgeApi extends Pick<
   DesktopPreloadApi,
-  'approveBash' | 'refreshRuntime' | 'subscribeToAgentEvents'
+  'refreshRuntime' | 'subscribeToAgentEvents'
 > {}
 
 interface AgentEventNotifications {
@@ -92,7 +92,7 @@ export function createAgentEventBridge({
       void api
         .refreshRuntime()
         .then((runtime) => {
-          store.getState().loadRuntimeSnapshot(runtime)
+          store.getState().refreshRuntime(runtime)
         })
         .catch((error: unknown) => {
           notifications.error(
@@ -102,13 +102,6 @@ export function createAgentEventBridge({
     }
 
     if (event.type === 'approval-required') {
-      const allowedCommands =
-        store.getState().alwaysAllowedCommandsBySessionId[event.sessionId] ?? []
-      if (allowedCommands.includes(event.approval.command)) {
-        void api.approveBash({ approvalId: event.approval.approvalId })
-        return
-      }
-
       store.getState().applyAgentEvent(event)
       notifications.info(
         `Bash 命令需要审批：${event.approval.command.slice(0, 60)}...`,

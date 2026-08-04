@@ -5,7 +5,11 @@ import type {
   SkillOperationParams,
   SkillSummary,
 } from '@yuanxiao/contracts'
-import type { SessionModule, SkillModule } from '../runtime/runtime-modules'
+import type {
+  SessionModule,
+  SkillModule,
+  SkillOperationPreflight,
+} from '../runtime/runtime-modules'
 import { SkillApprovalRegistry } from './skill-approval-registry'
 
 /**
@@ -73,7 +77,8 @@ export class SkillService {
    */
   async install(params: SkillOperationParams): Promise<SkillSummary[]> {
     this.validatePermission(params)
-    await this.requireApproval(params)
+    const preflight = await this.skills.preflightSkillOperation(params)
+    await this.requireApproval(params, preflight)
     const result = await this.skills.installSkill(params)
     await this.reloadAfterOperation(params)
     return result
@@ -88,7 +93,8 @@ export class SkillService {
    */
   async delete(params: SkillOperationParams): Promise<SkillSummary[]> {
     this.validatePermission(params)
-    await this.requireApproval(params)
+    const preflight = await this.skills.preflightSkillOperation(params)
+    await this.requireApproval(params, preflight)
     const result = await this.skills.deleteSkill(params)
     await this.reloadAfterOperation(params)
     return result
@@ -172,7 +178,10 @@ export class SkillService {
    * @param params - 操作参数。
    * @throws 当用户拒绝时抛出错误。
    */
-  private async requireApproval(params: SkillOperationParams): Promise<void> {
+  private async requireApproval(
+    params: SkillOperationParams,
+    preflight: SkillOperationPreflight,
+  ): Promise<void> {
     const request: SkillApprovalRequest = {
       approvalId: crypto.randomUUID(),
       agentId: params.agentId,
@@ -182,8 +191,9 @@ export class SkillService {
         ? { targetAgentId: params.targetAgentId }
         : {}),
       skillName: params.skillName,
-      description: '',
-      hasScripts: false,
+      description: preflight.description,
+      hasScripts: preflight.hasScripts,
+      ...(preflight.conflict ? { conflict: preflight.conflict } : {}),
       status: 'pending',
       createdAt: this.now(),
     }

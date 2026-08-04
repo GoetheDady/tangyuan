@@ -273,7 +273,7 @@ test.describe('Electron 窗口', () => {
     expect(apiKeys).toContain('saveRuntimeConfiguration')
     expect(apiKeys).toContain('cancelRuntimeConfigurationVerification')
     expect(apiKeys).toContain('listSessions')
-    expect(apiKeys).toContain('getLastActiveSession')
+    expect(apiKeys).toContain('resumeSession')
     expect(apiKeys).toContain('setLastActiveSession')
     expect(apiKeys).toContain('createSession')
     expect(apiKeys).toContain('getTranscript')
@@ -362,17 +362,15 @@ test.describe('Electron 窗口', () => {
     expect(sessions).toBeInstanceOf(Array)
   })
 
-  test('最后激活会话 IPC 在无可用会话时返回 null', async () => {
-    const result = await mainWindow.evaluate(async () => {
-      const initial = await window.api.getLastActiveSession()
-      const updated = await window.api.setLastActiveSession({
+  test('无可用会话时最后激活记录不会接受缺失目标', async () => {
+    const updated = await mainWindow.evaluate(async () => {
+      return window.api.setLastActiveSession({
         agentId: 'yuanxiao',
         sessionId: 'missing-session',
       })
-      return { initial, updated }
     })
 
-    expect(result).toEqual({ initial: null, updated: null })
+    expect(updated).toBeNull()
   })
 
   test('调用 openExternalLink 被拒绝当协议不是 http/https', async () => {
@@ -496,11 +494,7 @@ test.describe('真实 Electron 启动恢复', () => {
         },
       )
 
-      expect(
-        await secondLaunch.window.evaluate(async () =>
-          window.api.getLastActiveSession(),
-        ),
-      ).toMatchObject({ agentId: 'yuanxiao', sessionId: PARENT_SESSION_ID })
+      expect(secondLaunch.window.url()).toContain(PARENT_SESSION_ID)
     } finally {
       await runningApp?.close()
       rmSync(tempHome, { recursive: true, force: true })

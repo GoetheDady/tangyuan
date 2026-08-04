@@ -7,6 +7,48 @@ import {
 import { vi } from 'vitest'
 import { resetDesktopWorkbenchLoadForTest } from './lib/desktop-workbench-loader'
 
+/** 为非启动行为测试从现有 preload 替身生成一个完整续接结果。 */
+export function createResumeSessionFromApi(
+  target?: { agentId: string; sessionId?: string },
+): DesktopPreloadApi['resumeSession'] {
+  return vi.fn(async () => {
+    const runtime = await window.api.getRuntimeSnapshot()
+    const agentId = target?.agentId ?? runtime.activeAgent.agentId
+    const allSessions = await window.api.listSessions({
+      agentId,
+      includeArchived: true,
+    })
+    let sessions = allSessions.filter(
+      (session) => session.archivedAt === undefined,
+    )
+    const archivedSessions = allSessions.filter(
+      (session) => session.archivedAt !== undefined,
+    )
+    let activeSession =
+      sessions.find(
+        (session) =>
+          session.sessionId === target?.sessionId &&
+          !session.lineageUnavailable,
+      ) ?? sessions.find((session) => !session.lineageUnavailable)
+
+    if (!activeSession) {
+      activeSession = await window.api.createSession({
+        agentId,
+        title: runtime.activeAgent.profile.bootstrapRequired
+          ? 'Bootstrap 初始化'
+          : '新会话',
+      })
+      sessions = [activeSession]
+    }
+
+    const transcript = await window.api.getTranscript({
+      agentId: activeSession.agentId,
+      sessionId: activeSession.sessionId,
+    })
+    return { sessions, archivedSessions, activeSession, transcript }
+  })
+}
+
 export function installDefaultAppApi(): void {
   window.location.hash = '#/'
   const runtime = createMissingConfigurationSnapshot()
@@ -30,10 +72,9 @@ export function installDefaultAppApi(): void {
         updatedAt: '2026-07-08T00:00:00.000Z',
       }),
     ]),
-    getLastActiveSession: vi.fn().mockResolvedValue({
+    resumeSession: createResumeSessionFromApi({
       agentId: 'yuanxiao',
       sessionId: 'welcome',
-      updatedAt: '2026-07-08T00:00:00.000Z',
     }),
     setLastActiveSession: vi.fn().mockResolvedValue(null),
     createSession: vi.fn().mockResolvedValue(

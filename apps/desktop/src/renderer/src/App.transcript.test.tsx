@@ -12,6 +12,7 @@ import App from './App'
 import {
   createDeferred,
   createReadyRuntimeSnapshot,
+  createResumeSessionFromApi,
   installDefaultAppApi,
   resetAppTestEnvironment,
 } from './app.test-helpers'
@@ -46,11 +47,7 @@ describe('App', () => {
             updatedAt: '2026-07-08T00:00:00.000Z',
           }),
         ]),
-        getLastActiveSession: vi.fn().mockResolvedValue({
-          agentId: 'yuanxiao',
-          sessionId: 'welcome',
-          updatedAt: '2026-07-08T00:00:00.000Z',
-        }),
+        resumeSession: createResumeSessionFromApi(),
         setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
@@ -225,11 +222,7 @@ describe('App', () => {
             updatedAt: '2026-07-08T00:00:00.000Z',
           }),
         ]),
-        getLastActiveSession: vi.fn().mockResolvedValue({
-          agentId: 'yuanxiao',
-          sessionId: 'welcome',
-          updatedAt: '2026-07-08T00:00:00.000Z',
-        }),
+        resumeSession: createResumeSessionFromApi(),
         setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
@@ -343,11 +336,7 @@ describe('App', () => {
             updatedAt: '2026-07-08T00:00:00.000Z',
           }),
         ]),
-        getLastActiveSession: vi.fn().mockResolvedValue({
-          agentId: 'yuanxiao',
-          sessionId: 'welcome',
-          updatedAt: '2026-07-08T00:00:00.000Z',
-        }),
+        resumeSession: createResumeSessionFromApi(),
         setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
@@ -478,11 +467,7 @@ describe('App', () => {
           .fn()
           .mockResolvedValue(readyRuntime),
         listSessions: mockListSessions,
-        getLastActiveSession: vi.fn().mockResolvedValue({
-          agentId: 'yuanxiao',
-          sessionId: 'welcome',
-          updatedAt: '2026-07-08T00:00:00.000Z',
-        }),
+        resumeSession: createResumeSessionFromApi(),
         setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({
@@ -729,11 +714,7 @@ describe('App', () => {
             updatedAt: '2026-07-08T00:00:00.000Z',
           }),
         ]),
-        getLastActiveSession: vi.fn().mockResolvedValue({
-          agentId: 'yuanxiao',
-          sessionId: 'welcome',
-          updatedAt: '2026-07-08T00:00:00.000Z',
-        }),
+        resumeSession: createResumeSessionFromApi(),
         setLastActiveSession: vi.fn().mockResolvedValue(null),
         createSession: vi.fn(),
         getTranscript: vi.fn().mockResolvedValue({

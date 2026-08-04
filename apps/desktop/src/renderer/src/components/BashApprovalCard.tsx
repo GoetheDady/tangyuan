@@ -26,7 +26,7 @@ export interface BashApprovalCardProps {
   approval: BashApprovalRequest
   /** 允许本次操作的回调。 */
   onApproveOnce: (approvalId: string) => Promise<void>
-  /** 始终允许的回调（当前会话中同命令免审）。 */
+  /** 授予当前 Agent、工作目录和完整命令长期许可的回调。 */
   onApproveAlways: (approvalId: string) => Promise<void>
   /** 拒绝操作的回调。 */
   onReject: (approvalId: string) => Promise<void>
@@ -304,31 +304,32 @@ export function BashApprovalCard({
             拒绝
           </button>
 
-          {/* 始终允许按钮 */}
-          <button
-            type="button"
-            className={`text-label focus-visible:ring-ring inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
-              isResolved
-                ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                : 'bg-secondary text-secondary-foreground hover:bg-split'
-            }`}
-            onClick={() => {
-              void executeAction('approve-always')
-            }}
-            disabled={isSubmitting || isResolved}
-            aria-label="始终允许此命令（当前会话中同命令免审）"
-          >
-            {isSubmitting && activeAction === 'approve-always' ? (
-              <LoaderCircle
-                size={12}
-                className="animate-spin"
-                aria-hidden="true"
-              />
-            ) : (
-              <ShieldCheck size={12} aria-hidden="true" />
-            )}
-            始终允许
-          </button>
+          {approval.riskLevel !== 'high' && (
+            <button
+              type="button"
+              className={`text-label focus-visible:ring-ring inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
+                isResolved
+                  ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                  : 'bg-secondary text-secondary-foreground hover:bg-split'
+              }`}
+              onClick={() => {
+                void executeAction('approve-always')
+              }}
+              disabled={isSubmitting || isResolved}
+              aria-label="始终允许此 Agent 在当前工作目录执行此命令"
+            >
+              {isSubmitting && activeAction === 'approve-always' ? (
+                <LoaderCircle
+                  size={12}
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
+              ) : (
+                <ShieldCheck size={12} aria-hidden="true" />
+              )}
+              始终允许
+            </button>
+          )}
 
           {/* 允许本次按钮 */}
           <button

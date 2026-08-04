@@ -52,11 +52,6 @@ function installReadyArchiveApi(
   })
   vi.mocked(window.api.getRuntimeSnapshot).mockResolvedValue(readyRuntime)
   vi.mocked(window.api.refreshRuntime).mockResolvedValue(readyRuntime)
-  vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
-    agentId: 'yuanxiao',
-    sessionId: PARENT.sessionId,
-    updatedAt: '2026-07-28T00:00:00.000Z',
-  })
   vi.mocked(window.api.listSessions).mockImplementation(async (request) =>
     listSessions(request?.includeArchived === true),
   )
@@ -193,11 +188,6 @@ describe('App 会话谱系归档与恢复', () => {
         ? allSessions
         : allSessions.filter((session) => !session.archivedAt)
     })
-    vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
-      agentId: 'yuanxiao',
-      sessionId: SIBLING.sessionId,
-      updatedAt: '2026-07-28T00:00:00.000Z',
-    })
     vi.mocked(window.api.recoverSession).mockImplementation(async () => {
       isArchived = false
       return [PARENT, CHILD]
@@ -260,11 +250,6 @@ describe('App 会话谱系归档与恢复', () => {
 
     vi.mocked(window.api.getRuntimeSnapshot).mockResolvedValue(readyRuntime)
     vi.mocked(window.api.refreshRuntime).mockResolvedValue(readyRuntime)
-    vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
-      agentId: 'yuanxiao',
-      sessionId: PARENT.sessionId,
-      updatedAt: '2026-07-28T00:00:00.000Z',
-    })
     vi.mocked(window.api.listSessions).mockImplementation(async (request) => {
       if (request?.agentId === 'agent-2') return [agentSession]
       if (!isArchived) return [PARENT]
@@ -349,11 +334,6 @@ describe('App 会话谱系归档与恢复', () => {
 
     vi.mocked(window.api.getRuntimeSnapshot).mockResolvedValue(readyRuntime)
     vi.mocked(window.api.refreshRuntime).mockResolvedValue(readyRuntime)
-    vi.mocked(window.api.getLastActiveSession).mockResolvedValue({
-      agentId: 'yuanxiao',
-      sessionId: PARENT.sessionId,
-      updatedAt: '2026-07-28T00:00:00.000Z',
-    })
     vi.mocked(window.api.listSessions).mockImplementation(async (request) =>
       request?.agentId === 'agent-2' ? [agentSession] : [PARENT],
     )

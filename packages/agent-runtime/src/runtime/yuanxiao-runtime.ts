@@ -1,10 +1,8 @@
 import { YuanxiaoRuntimeOrchestrator } from './yuanxiao-runtime-orchestrator'
 import type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencies'
-import { collectSessionSubtree } from '../session/session-archive-coordinator'
 import { AgentRuntimeError } from '../core'
 import type { ToolApprovalGateway } from '../driver'
 import { createToolApprovalGateway } from '../approval'
-import type { RuntimeServices } from './runtime-services'
 import type {
   BashApprovalRequest,
   QuestionClarificationRequest,
@@ -42,9 +40,8 @@ import {
   type RetryRunRequest,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
+  type SessionResumeSnapshot,
   type SendMessageRequest,
-  type SessionLineageActivity,
-  type SessionLineageActivityKind,
   type SetLastActiveSessionRequest,
   type TranscriptSnapshot,
 } from '@yuanxiao/contracts'
@@ -55,16 +52,18 @@ export type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencie
  * Electron Main 调用运行时行为的唯一高层接口。
  */
 class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
-  async approveBash(approvalId: string): Promise<void> {
-    this.bashApprovals.approve(approvalId)
+  async approveBash(
+    request: import('@yuanxiao/contracts').ApproveBashRequest,
+  ): Promise<void> {
+    await this.commandPermissions.approve(request)
   }
 
   async rejectBash(approvalId: string): Promise<void> {
-    this.bashApprovals.reject(approvalId)
+    this.commandPermissions.reject(approvalId)
   }
 
   getPendingApprovals(): BashApprovalRequest[] {
-    return this.bashApprovals.list()
+    return this.commandPermissions.list()
   }
 
   async answerClarification(
@@ -108,7 +107,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
 
   createToolApprovalGateway(): ToolApprovalGateway {
     return createToolApprovalGateway({
-      bashApprovals: this.bashApprovals,
+      commandPermissions: this.commandPermissions,
       clarifications: this.clarifications,
       resolveRunId: (sessionId) =>
         this.sessions.getActiveRunId(sessionId) ?? '',
@@ -159,19 +158,19 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
   async getSessionModelInfo(
     request: GetSessionModelInfoRequest,
   ): Promise<SessionModelInfo> {
-    return this.sessionModelService.getInfo(request)
+    return this.sessions.getSessionModelInfo(request)
   }
 
   async setSessionModel(
     request: SetSessionModelRequest,
   ): Promise<SessionModelInfo> {
-    return this.sessionModelService.setModel(request)
+    return this.sessions.setSessionModel(request)
   }
 
   async setSessionThinkingLevel(
     request: SetSessionThinkingLevelRequest,
   ): Promise<SessionModelInfo> {
-    return this.sessionModelService.setThinkingLevel(request)
+    return this.sessions.setSessionThinkingLevel(request)
   }
 
   async listAgentSkills(agentId: string): Promise<SkillSummary[]> {
@@ -304,57 +303,6 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
   }
 
   /**
-   * 解析应用启动时应恢复的最后激活会话。
-   *
-   * @returns 最后激活会话可用时返回原记录；否则返回并记录默认 Agent 的首个可恢复会话；无可恢复会话时返回 null。
-   * @throws 当 Agent 或会话列表读取失败，或回退记录写入、清理失败时，Promise 会 reject。
-   */
-  async getLastActiveSession(): Promise<LastActiveSession | null> {
-    const record = await this.lastActiveSessionStore.read()
-
-    if (record) {
-      const agents = await this.listAgents()
-      const agent = agents.find(
-        (candidate) => candidate.agentId === record.agentId,
-      )
-
-      if (agent?.status === 'active') {
-        const sessions = await this.listSessions(record.agentId)
-        const recordedSession = sessions.find(
-          (session) => session.sessionId === record.sessionId,
-        )
-
-        if (
-          recordedSession &&
-          (await this.sessionDirectory.isRestorable(recordedSession, sessions))
-        ) {
-          return record
-        }
-      }
-    }
-
-    const fallbackSessions = await this.listSessions(YUANXIAO_DEFAULT_AGENT_ID)
-    let fallbackSession: AgentSessionSummary | undefined
-
-    for (const session of fallbackSessions) {
-      if (await this.sessionDirectory.isRestorable(session, fallbackSessions)) {
-        fallbackSession = session
-        break
-      }
-    }
-
-    if (!fallbackSession) {
-      await this.lastActiveSessionStore.clear()
-      return null
-    }
-
-    return this.lastActiveSessionStore.write({
-      agentId: fallbackSession.agentId,
-      sessionId: fallbackSession.sessionId,
-    })
-  }
-
-  /**
    * 校验并持久化用户最后打开的会话。
    *
    * @param request - 要记录的 Agent 和会话标识。
@@ -364,23 +312,12 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
   async setLastActiveSession(
     request: SetLastActiveSessionRequest,
   ): Promise<LastActiveSession | null> {
-    const agents = await this.listAgents()
-    const agent = agents.find(
-      (candidate) => candidate.agentId === request.agentId,
-    )
+    return this.sessionContinuation.setLastActive(request)
+  }
 
-    if (!agent || agent.status !== 'active') {
-      return null
-    }
-
-    const sessions = await this.listSessions(request.agentId)
-    const isAvailable = sessions.some(
-      (session) =>
-        session.agentId === request.agentId &&
-        session.sessionId === request.sessionId,
-    )
-
-    return isAvailable ? this.lastActiveSessionStore.write(request) : null
+  /** 恢复聊天主界面所需的完整会话续接快照。 */
+  async resumeSession(): Promise<SessionResumeSnapshot> {
+    return this.sessionContinuation.resume()
   }
 
   /**
@@ -445,56 +382,17 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    * @throws 当运行时缺少配置、会话不存在或 Session 模块发送失败时，Promise 会 reject。
    */
   async sendMessage(request: SendMessageRequest): Promise<TranscriptSnapshot> {
-    this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
     await this.assertRuntimeReady()
-
-    this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
 
     const session =
       this.sessionDirectory.find(request.sessionId) ??
       (await this.findSession(request.agentId, request.sessionId))
 
-    this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
-
     if (session) this.assertLineageAvailable(session)
 
-    if (
-      this.sessions.getActiveRunId(request.sessionId) !== undefined ||
-      this.runScheduler.isRunStarting(request.sessionId) ||
-      session?.state === 'running'
-    ) {
-      throw new AgentRuntimeError({
-        code: 'run-already-active',
-        message: '当前会话正在运行，请等待完成或先取消本次响应。',
-        recoverable: true,
-      })
-    }
-
-    // 检查会话是否已在队列中
-    if (this.runScheduler.hasQueued(request.sessionId)) {
-      throw new AgentRuntimeError({
-        code: 'run-already-active',
-        message: '当前会话已在排队中，请等待或取消排队。',
-        recoverable: true,
-      })
-    }
-
-    // 达到并发上限时入队
-    if (!this.runScheduler.hasRunCapacity()) {
-      return this.runScheduler.enqueueRun(request)
-    }
-
-    this.runScheduler.beginRunStart(request.sessionId)
-    try {
-      await this.sessions.sendMessage(request)
-    } finally {
-      this.runScheduler.completeRunStart(request.sessionId)
-    }
-
-    return this.getTranscript({
-      agentId: request.agentId,
-      sessionId: request.sessionId,
-    })
+    return this.runAdmission.submit(request, () =>
+      this.sessions.sendMessage(request),
+    )
   }
 
   /**
@@ -505,22 +403,12 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    * @throws 当 Session 模块重试执行失败时，Promise 会 reject。
    */
   async retryMessage(request: RetryRunRequest): Promise<TranscriptSnapshot> {
-    this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
-
     const retrySession = this.sessionDirectory.find(request.sessionId)
     if (retrySession) this.assertLineageAvailable(retrySession)
 
-    this.runScheduler.beginRunStart(request.sessionId)
-    try {
-      await this.sessions.retryMessage(request)
-    } finally {
-      this.runScheduler.completeRunStart(request.sessionId)
-    }
-
-    return this.getTranscript({
-      agentId: request.agentId,
-      sessionId: request.sessionId,
-    })
+    return this.runAdmission.submit(request, () =>
+      this.sessions.retryMessage(request),
+    )
   }
 
   /**
@@ -531,10 +419,10 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    * @throws 当 Session 模块分叉失败时，Promise 会 reject。
    */
   async forkSession(request: ForkSessionRequest): Promise<AgentSessionSummary> {
-    this.sessionArchiveCoordinator.assertAvailable(request.sessionId)
+    this.sessionLineageLifecycle.assertAvailable(request.sessionId)
     const forkSourceSession = this.sessionDirectory.find(request.sessionId)
     if (forkSourceSession) this.assertLineageAvailable(forkSourceSession)
-    const forked = await this.sessionArchiveCoordinator.trackFork(
+    const forked = await this.sessionLineageLifecycle.trackFork(
       request.sessionId,
       this.sessions.forkSession(request),
     )
@@ -556,232 +444,21 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
   async archiveSession(
     request: ArchiveSessionRequest,
   ): Promise<ArchiveSessionResult> {
-    const archiveLease = this.sessionArchiveCoordinator.acquire(
-      request.sessionId,
-    )
-
-    try {
-      let sessions = await this.listSessions(request.agentId, true)
-      let subtree = collectSessionSubtree(
-        sessions,
-        request.agentId,
-        request.sessionId,
-      )
-
-      while (true) {
-        archiveLease.lock(subtree.map((session) => session.sessionId))
-        await archiveLease.waitForPendingForks(
-          subtree.map((session) => session.sessionId),
-        )
-        sessions = await this.listSessions(request.agentId, true)
-        const refreshedSubtree = collectSessionSubtree(
-          sessions,
-          request.agentId,
-          request.sessionId,
-        )
-        const hasUnlockedDescendant = refreshedSubtree.some(
-          (session) => !archiveLease.owns(session.sessionId),
-        )
-        subtree = refreshedSubtree
-        if (!hasUnlockedDescendant) break
-      }
-
-      const affectedActivities = this.collectSessionActivities(subtree)
-      const affectedSessionIds = subtree.map((session) => session.sessionId)
-
-      if (affectedActivities.length > 0 && !request.confirmActivityStop) {
-        return {
-          status: 'confirmation-required',
-          affectedSessionIds,
-          affectedActivities,
-        }
-      }
-
-      await Promise.all(
-        affectedSessionIds.map((sessionId) =>
-          this.runScheduler.waitForRunStart(sessionId),
-        ),
-      )
-      const currentSessions = await this.listSessions(request.agentId, true)
-      const currentSubtree = collectSessionSubtree(
-        currentSessions,
-        request.agentId,
-        request.sessionId,
-      )
-      const currentActivities = this.collectSessionActivities(currentSubtree)
-      const orderedActivities = [...currentActivities].sort(
-        (left, right) =>
-          Number(right.kinds.includes('queued')) -
-          Number(left.kinds.includes('queued')),
-      )
-      for (const activity of orderedActivities) {
-        await this.cancelRun({
-          agentId: request.agentId,
-          sessionId: activity.sessionId,
-        })
-      }
-
-      await this.sessions.setSessionsArchived(
-        affectedSessionIds,
-        new Date().toISOString(),
-      )
-      await this.listSessions(request.agentId)
-
-      return {
-        status: 'archived',
-        affectedSessionIds,
-        affectedActivities,
-      }
-    } finally {
-      archiveLease.release()
-      this.runScheduler.dequeueNext()
-    }
+    return this.sessionLineageLifecycle.archive(request)
   }
 
   /** 恢复目标会话及其全部后代。 */
   async recoverSession(
     request: RecoverSessionRequest,
   ): Promise<AgentSessionSummary[]> {
-    const sessions = await this.listSessions(request.agentId, true)
-    const subtree = collectSessionSubtree(
-      sessions,
-      request.agentId,
-      request.sessionId,
-    )
-
-    const recovered = await this.sessions.setSessionsArchived(
-      subtree.map((session) => session.sessionId),
-      null,
-    )
-    await this.listSessions(request.agentId)
-    return recovered
+    return this.sessionLineageLifecycle.recover(request)
   }
 
   /** 永久删除目标会话及其全部后代。 */
   async deleteSession(
     request: DeleteSessionRequest,
   ): Promise<DeleteSessionResult> {
-    const archiveLease = this.sessionArchiveCoordinator.acquire(
-      request.sessionId,
-    )
-
-    try {
-      let sessions = await this.listSessions(request.agentId, true)
-      let subtree = collectSessionSubtree(
-        sessions,
-        request.agentId,
-        request.sessionId,
-      )
-
-      while (true) {
-        archiveLease.lock(subtree.map((session) => session.sessionId))
-        await archiveLease.waitForPendingForks(
-          subtree.map((session) => session.sessionId),
-        )
-        sessions = await this.listSessions(request.agentId, true)
-        const refreshedSubtree = collectSessionSubtree(
-          sessions,
-          request.agentId,
-          request.sessionId,
-        )
-        const hasUnlockedDescendant = refreshedSubtree.some(
-          (session) => !archiveLease.owns(session.sessionId),
-        )
-        subtree = refreshedSubtree
-        if (!hasUnlockedDescendant) break
-      }
-
-      const affectedActivities = this.collectSessionActivities(subtree)
-      const affectedSessionIds = subtree.map((session) => session.sessionId)
-
-      if (affectedActivities.length > 0 && !request.confirmActivityStop) {
-        return {
-          status: 'confirmation-required',
-          affectedSessionIds,
-          affectedActivities,
-        }
-      }
-
-      await Promise.all(
-        affectedSessionIds.map((sessionId) =>
-          this.runScheduler.waitForRunStart(sessionId),
-        ),
-      )
-      const currentSessions = await this.listSessions(request.agentId, true)
-      const currentSubtree = collectSessionSubtree(
-        currentSessions,
-        request.agentId,
-        request.sessionId,
-      )
-      const currentActivities = this.collectSessionActivities(currentSubtree)
-      const orderedActivities = [...currentActivities].sort(
-        (left, right) =>
-          Number(right.kinds.includes('queued')) -
-          Number(left.kinds.includes('queued')),
-      )
-      for (const activity of orderedActivities) {
-        await this.cancelRun({
-          agentId: request.agentId,
-          sessionId: activity.sessionId,
-        })
-      }
-
-      await this.sessions.deleteSessions(affectedSessionIds)
-
-      const lastActive = await this.lastActiveSessionStore.read()
-      if (lastActive && affectedSessionIds.includes(lastActive.sessionId)) {
-        await this.lastActiveSessionStore.clear()
-      }
-
-      for (const id of affectedSessionIds) {
-        this.sessionDirectory.remove(id)
-        this.transcriptEmitter.deleteSession(id)
-      }
-
-      return {
-        status: 'deleted',
-        affectedSessionIds,
-        affectedActivities,
-      }
-    } finally {
-      archiveLease.release()
-      this.runScheduler.dequeueNext()
-    }
-  }
-
-  /** 汇总子树中需要在归档前停止的运行、队列和对话动作。 */
-  private collectSessionActivities(
-    sessions: readonly AgentSessionSummary[],
-  ): SessionLineageActivity[] {
-    const approvalSessionIds = new Set(
-      this.getPendingApprovals().map((approval) => approval.sessionId),
-    )
-    const clarificationSessionIds = new Set(
-      this.getPendingClarifications().map(
-        (clarification) => clarification.sessionId,
-      ),
-    )
-
-    return sessions.flatMap((session) => {
-      const kinds: SessionLineageActivityKind[] = []
-      if (
-        session.state === 'running' ||
-        this.runScheduler.isRunStarting(session.sessionId)
-      ) {
-        kinds.push('running')
-      }
-      if (session.state === 'queued') kinds.push('queued')
-      if (approvalSessionIds.has(session.sessionId)) {
-        kinds.push('pending-approval')
-      }
-      if (clarificationSessionIds.has(session.sessionId)) {
-        kinds.push('pending-clarification')
-      }
-
-      return kinds.length > 0
-        ? [{ sessionId: session.sessionId, title: session.title, kinds }]
-        : []
-    })
+    return this.sessionLineageLifecycle.delete(request)
   }
 
   /** 断言会话谱系可用，不可用时抛出错误阻断操作。 */
@@ -808,7 +485,7 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     this.rejectSessionPendingApprovals(request.sessionId)
 
     // 先检查队列中的待处理请求
-    if (this.runScheduler.cancelQueued(request.sessionId, request.agentId)) {
+    if (this.runAdmission.cancelQueued(request.sessionId, request.agentId)) {
       return (
         this.sessionDirectory.find(request.sessionId) ?? {
           agentId: request.agentId,
@@ -845,9 +522,8 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
  */
 export function createYuanxiaoRuntimeForTesting(
   dependencies: YuanxiaoRuntimeDependencies,
-  services?: RuntimeServices,
 ): YuanxiaoRuntime {
-  return new DefaultYuanxiaoRuntime(dependencies, services)
+  return new DefaultYuanxiaoRuntime(dependencies)
 }
 
 /**
@@ -864,8 +540,8 @@ export type YuanxiaoRuntime = Pick<
   | 'restoreFromBackup'
   | 'resetConfiguration'
   | 'listSessions'
-  | 'getLastActiveSession'
   | 'setLastActiveSession'
+  | 'resumeSession'
   | 'createSession'
   | 'getTranscript'
   | 'sendMessage'
