@@ -47,10 +47,10 @@ describe('bash 审批事件', () => {
       agentId: YUANXIAO_DEFAULT_AGENT_ID,
       sessionId: session.sessionId,
       runId: '',
-      command: 'ls -la',
+      command: 'git push',
       cwd: '/tmp',
-      riskLevel: 'normal',
-      riskDescription: '列目录',
+      riskLevel: 'medium',
+      riskDescription: '推送远端',
     })
 
     // 确认审批已被登记
@@ -159,10 +159,10 @@ describe('bash 审批事件', () => {
         agentId: YUANXIAO_DEFAULT_AGENT_ID,
         sessionId: session.sessionId,
         runId: '',
-        command: 'ls -la',
+        command: 'git push',
         cwd: '/tmp',
-        riskLevel: 'normal',
-        riskDescription: '列目录',
+        riskLevel: 'medium',
+        riskDescription: '推送远端',
       })
     }).not.toThrow()
 

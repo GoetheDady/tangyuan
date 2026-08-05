@@ -173,7 +173,7 @@ describe('YuanxiaoRuntime 会话谱系归档与恢复', () => {
       runId: 'run-child',
       command: 'bun run test',
       cwd: '/tmp',
-      riskLevel: 'normal',
+      riskLevel: 'medium',
       riskDescription: '测试审批',
     })
     const clarification = gateway.requestClarification({

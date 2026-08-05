@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>元宵命令审批设计 · ADR-0039</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --ink: #1a2233;
+    --muted: #64708a;
+    --line: #e3e7ee;
+    --green: #1a9e6c;
+    --green-bg: #e6f6ef;
+    --orange: #d97706;
+    --orange-bg: #fdf1e0;
+    --red: #dc2626;
+    --red-bg: #fdeaea;
+    --slate: #475569;
+    --slate-bg: #eef1f6;
+    --indigo: #4f46e5;
+    --indigo-bg: #ecebfe;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 40px 20px 60px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 36px; }
+  header h1 { font-size: 30px; letter-spacing: .5px; }
+  header p { color: var(--muted); margin-top: 8px; font-size: 15px; }
+  .badge {
+    display: inline-block; padding: 4px 12px; border-radius: 999px;
+    background: var(--indigo-bg); color: var(--indigo); font-size: 13px; font-weight: 600;
+    margin-top: 12px;
+  }
+  section { margin-bottom: 36px; }
+  .sec-title { font-size: 19px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+  .sec-title .num {
+    width: 26px; height: 26px; border-radius: 8px; background: var(--indigo); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 14px;
+  }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 24px; }
+  .grid { display: grid; gap: 14px; }
+  .g2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .g3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .consensus { display: grid; gap: 12px; }
+  .item { display: flex; gap: 12px; align-items: flex-start; }
+  .item .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--indigo); margin-top: 9px; flex-shrink: 0; }
+  .item b { display: block; }
+  .item span { color: var(--muted); font-size: 14px; }
+  /* 流程图 */
+  .flow { display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .node {
+    width: 100%; max-width: 420px; padding: 14px 20px; border-radius: 12px;
+    text-align: center; font-weight: 600; border: 1.5px solid;
+    background: #fff;
+  }
+  .node small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .start { border-color: var(--slate); }
+  .gate { border-color: var(--red); color: var(--red); background: var(--red-bg); }
+  .check { border-color: var(--indigo); color: var(--indigo); background: var(--indigo-bg); }
+  .free { border-color: var(--green); color: var(--green); background: var(--green-bg); }
+  .ask { border-color: var(--orange); color: var(--orange); background: var(--orange-bg); }
+  .stop { border-color: var(--red); background: var(--red-bg); color: var(--red); }
+  .arrow { color: var(--muted); font-size: 18px; line-height: 1.1; padding: 2px 0; }
+  .branch { display: flex; gap: 16px; width: 100%; max-width: 760px; justify-content: center; margin: 6px 0; flex-wrap: wrap; }
+  .branch .lane { flex: 1; min-width: 220px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .lane-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  /* 表格 */
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 13px; color: var(--muted); font-weight: 600; background: #fafbfc; }
+  tr:last-child td { border-bottom: none; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; }
+  .pill.n { background: var(--green-bg); color: var(--green); }
+  .pill.m { background: var(--orange-bg); color: var(--orange); }
+  .pill.h { background: var(--red-bg); color: var(--red); }
+  code {
+    background: #eef1f6; padding: 1px 7px; border-radius: 6px;
+    font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 13px;
+  }
+  .list { display: grid; gap: 8px; }
+  .list li { margin-left: 18px; }
+  .note { background: var(--slate-bg); border-radius: 10px; padding: 12px 16px; font-size: 13.5px; color: var(--slate); margin-top: 12px; }
+  .compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .compare .card h4 { margin-bottom: 8px; font-size: 15px; }
+  .compare ul { list-style: none; display: grid; gap: 6px; font-size: 13.5px; color: var(--slate); }
+  footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 40px; }
+  .steps { counter-reset: step; display: grid; gap: 12px; }
+  .step { display: flex; gap: 14px; align-items: flex-start; }
+  .step .n {
+    counter-increment: step; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--indigo-bg); color: var(--indigo); font-weight: 700; font-size: 14px;
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;
+  }
+  .step b { display: block; }
+  .step span { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>元宵 · 命令审批设计</h1>
+    <p>默认免审 + 命令作用域边界 · 对应 ADR-0039，取代 ADR-0027 的"每次执行前必须审批"</p>
+    <span class="badge">参考 Codex 沙箱 + 审批分层 · Hermes 硬性拦截</span>
+  </header>
+
+  <!-- 共识 -->
+  <section>
+    <div class="sec-title"><span class="num">1</span>六条核心共识</div>
+    <div class="card consensus">
+      <div class="item"><span class="dot"></span><div><b>免审判据 = 命令作用域边界</b><span>只动当前 Agent 工作空间 + 无网络 + 非破坏性 → 默认免审；越界才审批。不是模型信心。</span></div></div>
+      <div class="item"><span class="dot"></span><div><b>三层权力</b><span>Agent 提议（riskLevel + 理由）→ 确定性规则裁定 → 用户覆盖（Agent 命令许可）。Agent 没有免审决定权。</span></div></div>
+      <div class="item"><span class="dot"></span><div><b>三档处置</b><span>normal 免审只记录；medium 审批、可记住；high 永远逐次审批、不可记住。</span></div></div>
+      <div class="item"><span class="dot"></span><div><b>审批者只有人</b><span>不做独立自动审查者（不引入 Codex auto-review 等价物）。</span></div></div>
+      <div class="item"><span class="dot"></span><div><b>分层实现</b><span>MVP 先做静态判定（扩展 assessBashRisk），后续接入 macOS Seatbelt 强制沙箱兜底。</span></div></div>
+      <div class="item"><span class="dot"></span><div><b>硬性拦截清单</b><span>系统级不可逆操作直接拒绝，不进审批，不可覆盖。</span></div></div>
+    </div>
+  </section>
+
+  <!-- 流程 -->
+  <section>
+    <div class="sec-title"><span class="num">2</span>一次命令执行的完整旅程</div>
+    <div class="card" style="padding: 28px 24px;">
+      <div class="flow">
+        <div class="node start">Agent 提议执行 <code>run_command</code><small>附 riskLevel 与理由（提议权）</small></div>
+        <div class="arrow">↓</div>
+        <div class="node gate">硬性拦截检查<small>命中 → 直接拒绝，连"允许"按钮都没有</small></div>
+        <div class="arrow">↓ 未命中</div>
+        <div class="node check">作用域边界判定（确定性规则）<small>工作空间内 + 无网络 + 非破坏性</small></div>
+        <div class="arrow">↓</div>
+        <div class="branch">
+          <div class="lane">
+            <div class="lane-label">normal · 边界内</div>
+            <div class="node free" style="max-width: 300px;">免审直接执行<small>仅记录执行历史</small></div>
+          </div>
+          <div class="lane">
+            <div class="lane-label">medium · 越界但可逆</div>
+            <div class="node ask" style="max-width: 300px;">弹窗审批<small>可"记住"→ 写入 Agent 命令许可</small></div>
+          </div>
+          <div class="lane">
+            <div class="lane-label">high · 不可逆 / 破坏性</div>
+            <div class="node ask" style="max-width: 300px;">弹窗审批<small>永远逐次确认，不可记住</small></div>
+          </div>
+        </div>
+        <div class="arrow">↓ 用户允许</div>
+        <div class="node free">执行命令<small>获批命令仍拥有当前 macOS 用户权限（ADR-0027 保留条款）</small></div>
+        <div class="arrow">↓ 用户拒绝 / 取消 / 会话退出</div>
+        <div class="node stop">不执行<small>以可理解的拒绝结果返回 Agent（fail-closed）</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 三档表 -->
+  <section>
+    <div class="sec-title"><span class="num">3</span>三档风险处置</div>
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <table>
+        <tr><th>档位</th><th>含义</th><th>典型命令</th><th>默认处置</th><th>能否"记住"</th></tr>
+        <tr>
+          <td><span class="pill n">normal</span></td>
+          <td>边界内：只动工作空间、无网络、非破坏性</td>
+          <td><code>git status</code> <code>ls</code> <code>cat</code> <code>grep</code></td>
+          <td>免审直接跑，只记录历史</td>
+          <td>不需要记住</td>
+        </tr>
+        <tr>
+          <td><span class="pill m">medium</span></td>
+          <td>越界但可逆：联网、写工作区外</td>
+          <td><code>git push</code> <code>npm install</code> <code>curl</code></td>
+          <td>弹窗审批</td>
+          <td>可以（写入 Agent 命令许可）</td>
+        </tr>
+        <tr>
+          <td><span class="pill h">high</span></td>
+          <td>不可逆 / 破坏性操作</td>
+          <td><code>rm -rf</code>（非硬性范围）</td>
+          <td>弹窗审批，规则与许可都不能覆盖</td>
+          <td>永远不可以</td>
+        </tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- 硬性拦截 -->
+  <section>
+    <div class="sec-title"><span class="num">4</span>硬性拦截清单（不可绕过）</div>
+    <div class="grid g2">
+      <div class="card">
+        <h4 style="margin-bottom: 10px;">拦截范围</h4>
+        <ul class="list">
+          <li><code>rm -rf /</code> 及变体（含 <code>--no-preserve-root</code>）</li>
+          <li>fork bomb（<code>:(){ :|:& };:</code> 等）</li>
+          <li><code>mkfs</code> / 格式化、<code>dd</code> 写块设备（<code>/dev/sd*</code>、<code>/dev/rdisk*</code>）</li>
+          <li>覆盖写入 <code>/etc</code>、<code>~/.ssh</code> 等关键系统 / 凭据路径</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4 style="margin-bottom: 10px;">行为</h4>
+        <ul class="list">
+          <li>命中 = <b>直接拒绝执行</b>，返回解释性错误给 Agent</li>
+          <li>不进审批流程，连"允许"按钮都不出现</li>
+          <li>不可被"记住"、不可被任何许可覆盖</li>
+          <li>合理需求请在 Agent 之外手动执行</li>
+        </ul>
+        <div class="note">参考 Hermes hardline blocklist："floor below yolo"——在审批层之前触发，无覆盖开关。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 参考对照 -->
+  <section>
+    <div class="sec-title"><span class="num">5</span>与主流 Agent 对照</div>
+    <div class="compare">
+      <div class="card">
+        <h4>Codex</h4>
+        <ul>
+          <li>沙箱（macOS Seatbelt / Linux bwrap）+ 审批策略两层</li>
+          <li>边界内自动跑；逃逸（写工作区外、联网）才审批</li>
+          <li>静态安全白名单（只读命令集）+ 用户 allow/prompt/deny 规则</li>
+          <li>可选独立审查 Agent（auto-review）——我们不做</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Claude Code</h4>
+        <ul>
+          <li>内置只读命令集（ls / cat / grep / 只读 git…）任何模式不弹窗</li>
+          <li>权限由运行时强制，不由模型决定</li>
+          <li>规则顺序：deny → ask → allow；"允许"按仓库 + 命令永久保存</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Hermes</h4>
+        <ul>
+          <li>危险模式黑名单，命中必审批</li>
+          <li>hardline blocklist：yolo 也拦不住</li>
+          <li>smart 模式用辅助 LLM 评估，不确定才转人工——我们不做</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 实施顺序 -->
+  <section>
+    <div class="sec-title"><span class="num">6</span>实施顺序</div>
+    <div class="card">
+      <div class="steps">
+        <div class="step"><span class="n"></span><div><b>MVP · 静态判定</b><span>扩展 <code>assessBashRisk</code> 为完整作用域判定（安全白名单 + 危险模式 + 硬性拦截）；<code>request()</code> 对 normal 直接放行；更新 <code>run_command</code> 文案与测试。</span></div></div>
+        <div class="step"><span class="n"></span><div><b>后续 · 沙箱兜底</b><span>在 <code>run_command</code> 执行边界接入 macOS Seatbelt 强制沙箱，静态判错的越界动作由系统拦截并转入审批。</span></div></div>
+      </div>
+      <div class="note">术语见 CONTEXT.md：命令作用域边界、默认免审、命令风险判断、Agent 命令许可、高风险命令。</div>
+    </div>
+  </section>
+
+  <footer>元宵 · 命令审批设计 · ADR-0039 · 取代 ADR-0027 默认行为</footer>
+</div>
+</body>
+</html>

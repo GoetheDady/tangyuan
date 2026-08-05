@@ -52,6 +52,10 @@ export class CommandPermissionModule {
   async request(
     request: BashApprovalRequest,
   ): Promise<{ approved: boolean }> {
+    if (request.riskLevel === 'normal') {
+      return { approved: true }
+    }
+
     if (await this.isAllowed(request)) {
       return { approved: true }
     }

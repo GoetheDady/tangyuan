@@ -664,7 +664,7 @@ describe('RealPiSdkGateway 审批与路径拒绝不产生副作用', () => {
     expect(runCommandTool).toBeDefined()
 
     const result = await runCommandTool!.execute('call-1', {
-      command: 'rm -rf /',
+      command: 'rm -rf ./build',
     })
 
     expect(result.content[0]?.text).toContain('拒绝')

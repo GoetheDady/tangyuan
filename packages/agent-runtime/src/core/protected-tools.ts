@@ -107,12 +107,13 @@ export function createRunCommandTool(
 ): YuanxiaoToolDefinition {
   return {
     name: PROTECTED_TOOL_NAMES.bash,
-    label: '运行命令（需审批）',
+    label: '运行命令',
     description:
-      '在当前工作目录中执行 bash 命令。每次执行前需要用户审批。命令将以当前 macOS 用户权限运行。',
+      '在当前工作目录中执行 bash 命令。只读命令默认免审执行；其余命令执行前需要用户审批；被安全策略拦截的命令不会执行。命令将以当前 macOS 用户权限运行。',
     promptSnippet: `${PROTECTED_TOOL_NAMES.bash}(command: string) → 执行 bash 命令`,
     promptGuidelines: [
-      '执行前会请求用户审批，仅本次有效',
+      '只读命令（如 ls、git status）默认免审执行',
+      '其他命令执行前会请求用户审批，仅本次有效',
       '命令将以当前 macOS 用户权限执行',
       '如果用户拒绝，命令不会执行',
     ],
@@ -126,6 +127,13 @@ export function createRunCommandTool(
     },
     async execute(_toolCallId: string, params: { command: string }) {
       const risk = assessBashRisk(params.command)
+
+      if (risk.blocked !== undefined) {
+        return {
+          content: [{ type: 'text', text: risk.description }],
+        }
+      }
+
       const result = await context.gateway.requestBashApproval({
         agentId: context.agentId || 'yuanxiao',
         sessionId: context.sessionId,
