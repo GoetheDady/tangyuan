@@ -300,22 +300,25 @@ export const runtimeAuthSnapshotSchema = z.strictObject({
 })
 
 /**
+ * 校验 Agent 列表中展示的 Agent 摘要（不含 profile 文件状态）。
+ */
+export const agentSummarySchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  displayName: z.string(),
+  status: z.enum(['active', 'archived']),
+  defaultProviderId: z.string().nullable(),
+  defaultModelId: z.string().nullable(),
+  homePath: z.string(),
+  archivedAt: z.string().nullable(),
+  directoryStatus: z.enum(['healthy', 'damaged']),
+})
+
+/**
  * 校验 Renderer 可以接收的完整运行时快照。
  */
 export const runtimeSnapshotSchema = z.strictObject({
   activeAgent: agentProfileSchema,
-  agents: z.array(
-    z.strictObject({
-      agentId: nonEmptyIdentifierSchema,
-      displayName: z.string(),
-      status: z.enum(['active', 'archived']),
-      defaultProviderId: z.string().nullable(),
-      defaultModelId: z.string().nullable(),
-      homePath: z.string(),
-      archivedAt: z.string().nullable(),
-      directoryStatus: z.enum(['healthy', 'damaged']),
-    }),
-  ),
+  agents: z.array(agentSummarySchema),
   providers: z.array(providerDescriptorSchema),
   models: z.array(modelDescriptorSchema),
   settings: runtimeSettingsSchema,
@@ -544,61 +547,25 @@ export const agentEventSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('agent-created'),
     agentId: nonEmptyIdentifierSchema,
-    agent: z.strictObject({
-      agentId: nonEmptyIdentifierSchema,
-      displayName: z.string(),
-      status: z.enum(['active', 'archived']),
-      defaultProviderId: z.string().nullable(),
-      defaultModelId: z.string().nullable(),
-      homePath: z.string(),
-      archivedAt: z.string().nullable(),
-      directoryStatus: z.enum(['healthy', 'damaged']),
-    }),
+    agent: agentSummarySchema,
     occurredAt: timestampSchema,
   }),
   z.strictObject({
     type: z.literal('agent-config-updated'),
     agentId: nonEmptyIdentifierSchema,
-    agent: z.strictObject({
-      agentId: nonEmptyIdentifierSchema,
-      displayName: z.string(),
-      status: z.enum(['active', 'archived']),
-      defaultProviderId: z.string().nullable(),
-      defaultModelId: z.string().nullable(),
-      homePath: z.string(),
-      archivedAt: z.string().nullable(),
-      directoryStatus: z.enum(['healthy', 'damaged']),
-    }),
+    agent: agentSummarySchema,
     occurredAt: timestampSchema,
   }),
   z.strictObject({
     type: z.literal('agent-archived'),
     agentId: nonEmptyIdentifierSchema,
-    agent: z.strictObject({
-      agentId: nonEmptyIdentifierSchema,
-      displayName: z.string(),
-      status: z.enum(['active', 'archived']),
-      defaultProviderId: z.string().nullable(),
-      defaultModelId: z.string().nullable(),
-      homePath: z.string(),
-      archivedAt: z.string().nullable(),
-      directoryStatus: z.enum(['healthy', 'damaged']),
-    }),
+    agent: agentSummarySchema,
     occurredAt: timestampSchema,
   }),
   z.strictObject({
     type: z.literal('agent-recovered'),
     agentId: nonEmptyIdentifierSchema,
-    agent: z.strictObject({
-      agentId: nonEmptyIdentifierSchema,
-      displayName: z.string(),
-      status: z.enum(['active', 'archived']),
-      defaultProviderId: z.string().nullable(),
-      defaultModelId: z.string().nullable(),
-      homePath: z.string(),
-      archivedAt: z.string().nullable(),
-      directoryStatus: z.enum(['healthy', 'damaged']),
-    }),
+    agent: agentSummarySchema,
     occurredAt: timestampSchema,
   }),
   z.strictObject({
@@ -924,6 +891,13 @@ export const approveBashRequestSchema = z.strictObject({
  * 校验拒绝 Bash 执行的请求。
  */
 export const rejectBashRequestSchema = z.strictObject({
+  approvalId: nonEmptyIdentifierSchema,
+})
+
+/**
+ * 校验批准 Skill 操作的请求（只需 approvalId，不含 Bash 特有的 remember 字段）。
+ */
+export const approveSkillOperationRequestSchema = z.strictObject({
   approvalId: nonEmptyIdentifierSchema,
 })
 

@@ -1,8 +1,10 @@
 import { z } from 'zod'
 import {
   agentSessionSummarySchema,
+  agentSummarySchema,
   answerClarificationRequestSchema,
   approveBashRequestSchema,
+  approveSkillOperationRequestSchema,
   archiveSessionRequestSchema,
   archiveSessionResultSchema,
   deleteSessionRequestSchema,
@@ -67,6 +69,7 @@ import type {
   AgentSummary,
   AnswerClarificationRequest,
   ApproveBashRequest,
+  ApproveSkillOperationRequest,
   ArchiveAgentRequest,
   BashApprovalRequest,
   CancelClarificationRequest,
@@ -206,7 +209,7 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.skillsListShared]: undefined
   [DESKTOP_IPC_CHANNELS.skillsInstall]: SkillOperationParams
   [DESKTOP_IPC_CHANNELS.skillsDelete]: SkillOperationParams
-  [DESKTOP_IPC_CHANNELS.skillsApproveOperation]: ApproveBashRequest
+  [DESKTOP_IPC_CHANNELS.skillsApproveOperation]: ApproveSkillOperationRequest
   [DESKTOP_IPC_CHANNELS.skillsRejectOperation]: RejectBashRequest
   [DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals]: undefined
   [DESKTOP_IPC_CHANNELS.skillsGetInstallRecords]: undefined
@@ -263,7 +266,7 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.skillsListShared]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.skillsInstall]: skillOperationParamsSchema,
   [DESKTOP_IPC_CHANNELS.skillsDelete]: skillOperationParamsSchema,
-  [DESKTOP_IPC_CHANNELS.skillsApproveOperation]: approveBashRequestSchema,
+  [DESKTOP_IPC_CHANNELS.skillsApproveOperation]: approveSkillOperationRequestSchema,
   [DESKTOP_IPC_CHANNELS.skillsRejectOperation]: rejectBashRequestSchema,
   [DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.skillsGetInstallRecords]: z.undefined(),
@@ -379,61 +382,12 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsCreate]: agentSessionSummarySchema,
   [DESKTOP_IPC_CHANNELS.sessionsSendMessage]: transcriptSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsCancelRun]: agentSessionSummarySchema,
-  [DESKTOP_IPC_CHANNELS.agentsList]: z.array(
-    z.strictObject({
-      agentId: nonEmptyIdentifierSchema,
-      displayName: z.string(),
-      status: z.enum(['active', 'archived']),
-      defaultProviderId: z.string().nullable(),
-      defaultModelId: z.string().nullable(),
-      homePath: z.string(),
-      archivedAt: z.string().nullable(),
-      directoryStatus: z.enum(['healthy', 'damaged']),
-    }),
-  ),
-  [DESKTOP_IPC_CHANNELS.agentsUpdateConfig]: z.strictObject({
-    agentId: nonEmptyIdentifierSchema,
-    displayName: z.string(),
-    status: z.enum(['active', 'archived']),
-    defaultProviderId: z.string().nullable(),
-    defaultModelId: z.string().nullable(),
-    homePath: z.string(),
-    archivedAt: z.string().nullable(),
-    directoryStatus: z.enum(['healthy', 'damaged']),
-  }),
-  [DESKTOP_IPC_CHANNELS.agentsArchive]: z.strictObject({
-    agentId: nonEmptyIdentifierSchema,
-    displayName: z.string(),
-    status: z.enum(['active', 'archived']),
-    defaultProviderId: z.string().nullable(),
-    defaultModelId: z.string().nullable(),
-    homePath: z.string(),
-    archivedAt: z.string().nullable(),
-    directoryStatus: z.enum(['healthy', 'damaged']),
-  }),
-  [DESKTOP_IPC_CHANNELS.agentsRecover]: z.strictObject({
-    agentId: nonEmptyIdentifierSchema,
-    displayName: z.string(),
-    status: z.enum(['active', 'archived']),
-    defaultProviderId: z.string().nullable(),
-    defaultModelId: z.string().nullable(),
-    homePath: z.string(),
-    archivedAt: z.string().nullable(),
-    directoryStatus: z.enum(['healthy', 'damaged']),
-  }),
+  [DESKTOP_IPC_CHANNELS.agentsList]: z.array(agentSummarySchema),
+  [DESKTOP_IPC_CHANNELS.agentsUpdateConfig]: agentSummarySchema,
+  [DESKTOP_IPC_CHANNELS.agentsArchive]: agentSummarySchema,
+  [DESKTOP_IPC_CHANNELS.agentsRecover]: agentSummarySchema,
   [DESKTOP_IPC_CHANNELS.agentsReconcile]: z.strictObject({
-    agents: z.array(
-      z.strictObject({
-        agentId: nonEmptyIdentifierSchema,
-        displayName: z.string(),
-        status: z.enum(['active', 'archived']),
-        defaultProviderId: z.string().nullable(),
-        defaultModelId: z.string().nullable(),
-        homePath: z.string(),
-        archivedAt: z.string().nullable(),
-        directoryStatus: z.enum(['healthy', 'damaged']),
-      }),
-    ),
+    agents: z.array(agentSummarySchema),
     unclaimedDirectories: z.array(
       z.strictObject({
         agentId: nonEmptyIdentifierSchema,
@@ -442,26 +396,8 @@ export const desktopIpcResponseSchemas = {
       }),
     ),
   }),
-  [DESKTOP_IPC_CHANNELS.agentsClaimDirectory]: z.strictObject({
-    agentId: nonEmptyIdentifierSchema,
-    displayName: z.string(),
-    status: z.enum(['active', 'archived']),
-    defaultProviderId: z.string().nullable(),
-    defaultModelId: z.string().nullable(),
-    homePath: z.string(),
-    archivedAt: z.string().nullable(),
-    directoryStatus: z.enum(['healthy', 'damaged']),
-  }),
-  [DESKTOP_IPC_CHANNELS.agentsRebuildYuanxiao]: z.strictObject({
-    agentId: nonEmptyIdentifierSchema,
-    displayName: z.string(),
-    status: z.enum(['active', 'archived']),
-    defaultProviderId: z.string().nullable(),
-    defaultModelId: z.string().nullable(),
-    homePath: z.string(),
-    archivedAt: z.string().nullable(),
-    directoryStatus: z.enum(['healthy', 'damaged']),
-  }),
+  [DESKTOP_IPC_CHANNELS.agentsClaimDirectory]: agentSummarySchema,
+  [DESKTOP_IPC_CHANNELS.agentsRebuildYuanxiao]: agentSummarySchema,
   [DESKTOP_IPC_CHANNELS.sessionsGetModelInfo]: sessionModelInfoSchema,
   [DESKTOP_IPC_CHANNELS.sessionsSetModel]: sessionModelInfoSchema,
   [DESKTOP_IPC_CHANNELS.sessionsSetThinkingLevel]: sessionModelInfoSchema,

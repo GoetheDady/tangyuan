@@ -24,6 +24,7 @@ playwright-report/
 e2e/renderer/*.png
 e2e/renderer/*.webm
 apps/desktop/qa/*.png
+docs/design/images/generated-*.png
 
 # Caches
 .eslintcache
@@ -48,6 +49,7 @@ lerna-debug.log*
 
 # Local tool state
 .codegraph/
+.scratch/
 
 # OS files
 .DS_Store

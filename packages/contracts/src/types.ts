@@ -336,6 +336,13 @@ export interface ApproveBashRequest {
 }
 
 /**
+ * 描述 Renderer 批准 Skill 操作时传给 Main 的请求。
+ */
+export interface ApproveSkillOperationRequest {
+  approvalId: string
+}
+
+/**
  * 描述 Renderer 拒绝 Bash 执行时传给 Main 的请求。
  */
 export interface RejectBashRequest {
@@ -939,13 +946,6 @@ export interface SkillInstallRecord {
   installedAt: string
   updatedAt: string
   status: 'active' | 'deleted'
-}
-
-/**
- * 持久化在磁盘上的 Skill 安装记录结构。
- */
-export interface PersistedSkillRecords {
-  skills: SkillInstallRecord[]
 }
 
 /**

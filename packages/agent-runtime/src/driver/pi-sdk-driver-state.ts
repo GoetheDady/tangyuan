@@ -91,7 +91,27 @@ export abstract class PiSdkDriverState {
     this.profileStore = resolved.profileStore
     this.sessionIndexStore = resolved.sessionIndexStore
     this.messageStore = resolved.messageStore
-    this.attemptLifecycle = new AttemptLifecycle(this.sessionIndexStore)
+    this.attemptLifecycle = new AttemptLifecycle({
+      sessionIndexStore: this.sessionIndexStore,
+      messageStore: this.messageStore,
+      emit: (event) => this.emit(event),
+      updateSessionState: async (sessionId, state) => {
+        await this.updateSessionState(sessionId, state)
+      },
+      invalidateTranscript: (sessionId) => {
+        this.transcriptCache.delete(sessionId)
+      },
+      performBootstrapCompletionGating: () =>
+        this.profileStore.performBootstrapCompletionGating(),
+      afterRun: async (sessionId, agentId) => {
+        if (this.pendingProfileRefreshes.delete(sessionId)) {
+          await this.refreshSessionProfileContext(sessionId).catch((error) => {
+            this.emitProfileRefreshError(agentId, error)
+          })
+        }
+      },
+      now: this.now,
+    })
     this.configurationModule = resolved.configurationModule
     this.profileModule = resolved.profileModule
     this.eventBus = resolved.eventBus
@@ -328,7 +348,7 @@ export abstract class PiSdkDriverState {
       ) {
         continue
       }
-      if (this.activeRunIds.has(sessionId)) {
+      if (this.attemptLifecycle.getActiveRunId(sessionId)) {
         this.pendingProfileRefreshes.add(sessionId)
         continue
       }

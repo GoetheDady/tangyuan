@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AttemptLifecycle } from './attempt-lifecycle'
+import type { AttemptLifecycleDependencies } from './attempt-lifecycle'
 import type { PersistedAttemptEntry } from './session-index-types'
 
-function createIndex(initialAttempts: PersistedAttemptEntry[] = []) {
+function createDeps(initialAttempts: PersistedAttemptEntry[] = []) {
   let attempts = initialAttempts
-  const index = {
+  const sessionIndexStore = {
     resolveAttempts: vi.fn(async () => attempts),
     upsertAttempt: vi.fn(
       async (_sessionId: string, attempt: PersistedAttemptEntry) => {
@@ -18,13 +19,52 @@ function createIndex(initialAttempts: PersistedAttemptEntry[] = []) {
     ),
   }
 
-  return { index, getAttempts: () => attempts }
+  const deps: AttemptLifecycleDependencies = {
+    sessionIndexStore,
+    messageStore: {
+      append: vi.fn((input) => ({
+        messageId: `${input.sessionId}-message-1`,
+        agentId: input.agentId,
+        sessionId: input.sessionId,
+        role: input.role as 'agent',
+        content: input.content,
+        createdAt: '2026-08-04T00:00:00.000Z',
+      })),
+      appendDelta: vi.fn((messageId) => ({
+        messageId,
+        agentId: 'test',
+        sessionId: 'test',
+        role: 'agent' as const,
+        content: '',
+        createdAt: '2026-08-04T00:00:00.000Z',
+      })),
+      complete: vi.fn((messageId) => ({
+        messageId,
+        agentId: 'test',
+        sessionId: 'test',
+        role: 'agent' as const,
+        content: '',
+        createdAt: '2026-08-04T00:00:00.000Z',
+      })),
+      removeIfEmpty: vi.fn(() => false),
+    },
+    emit: vi.fn(),
+    updateSessionState: vi.fn(async () => {}),
+    invalidateTranscript: vi.fn(),
+    performBootstrapCompletionGating: vi.fn(async () => {}),
+    afterRun: vi.fn(async () => {}),
+    now: () => '2026-08-04T00:00:00.000Z',
+  }
+
+  return { deps, sessionIndexStore, getAttempts: () => attempts }
 }
 
 describe('AttemptLifecycle', () => {
   it('启动时持久化 running attempt 并同步会话摘要', async () => {
-    const { index, getAttempts } = createIndex()
-    const lifecycle = new AttemptLifecycle(index)
+    const { deps, sessionIndexStore, getAttempts } = createDeps()
+    // start/finish are private but we access them directly to test persistence logic
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lifecycle = new AttemptLifecycle(deps) as any
 
     await expect(
       lifecycle.start({
@@ -44,7 +84,7 @@ describe('AttemptLifecycle', () => {
     expect(getAttempts()).toEqual([
       expect.objectContaining({ runId: 'run-1', status: 'running' }),
     ])
-    expect(index.upsertAttempt).toHaveBeenCalledWith(
+    expect(sessionIndexStore.upsertAttempt).toHaveBeenCalledWith(
       'session-1',
       expect.objectContaining({ runId: 'run-1', status: 'running' }),
       {
@@ -56,7 +96,7 @@ describe('AttemptLifecycle', () => {
   })
 
   it('终态保留 running attempt 的启动时间与消息关联', async () => {
-    const { index } = createIndex([
+    const { deps, sessionIndexStore } = createDeps([
       {
         attemptId: 'run-1',
         runId: 'run-1',
@@ -67,7 +107,8 @@ describe('AttemptLifecycle', () => {
         inReplyTo: 'user-message-1',
       },
     ])
-    const lifecycle = new AttemptLifecycle(index)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lifecycle = new AttemptLifecycle(deps) as any
 
     await expect(
       lifecycle.finish({
@@ -88,7 +129,7 @@ describe('AttemptLifecycle', () => {
       inReplyTo: 'user-message-1',
       retryCount: 2,
     })
-    expect(index.upsertAttempt).toHaveBeenCalledWith(
+    expect(sessionIndexStore.upsertAttempt).toHaveBeenCalledWith(
       'session-1',
       expect.objectContaining({
         messageId: 'agent-message-1',
