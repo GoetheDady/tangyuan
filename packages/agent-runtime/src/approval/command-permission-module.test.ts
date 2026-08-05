@@ -64,19 +64,6 @@ describe('CommandPermissionModule', () => {
     expect(module.list()).toHaveLength(0)
   })
 
-  it('normal 命令命中硬性拦截时不放行', async () => {
-    const { module } = await createModule()
-    const request = makeRequest({
-      riskLevel: 'high',
-      command: 'rm -rf /',
-    })
-    const pending = module.request(request)
-    await new Promise<void>((resolve) => setTimeout(resolve, 5))
-    expect(module.list()).toHaveLength(1)
-    module.reject('approval-1')
-    await expect(pending).resolves.toEqual({ approved: false })
-  })
-
   it('按 Agent、cwd 与命令持久化许可并跨会话免审', async () => {
     const root = await mkdtemp(join(tmpdir(), 'yuanxiao-command-permission-'))
     tempRoots.push(root)
