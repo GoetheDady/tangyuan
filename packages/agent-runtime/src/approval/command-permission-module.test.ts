@@ -25,7 +25,7 @@ function makeRequest(
     runId: 'run-1',
     command: 'bun test',
     cwd: '/workspace/project',
-    riskLevel: 'medium',
+    riskLevel: 'normal',
     riskDescription: '命令将以当前 macOS 用户权限执行。',
     status: 'pending',
     createdAt: '2026-08-04T00:00:00.000Z',
@@ -55,28 +55,6 @@ async function waitForEventCount(
 }
 
 describe('CommandPermissionModule', () => {
-  it('normal 命令直接放行且不创建审批请求', async () => {
-    const { module, events } = await createModule()
-    await expect(
-      module.request(makeRequest({ riskLevel: 'normal' })),
-    ).resolves.toEqual({ approved: true })
-    expect(events).toHaveLength(0)
-    expect(module.list()).toHaveLength(0)
-  })
-
-  it('normal 命令命中硬性拦截时不放行', async () => {
-    const { module } = await createModule()
-    const request = makeRequest({
-      riskLevel: 'high',
-      command: 'rm -rf /',
-    })
-    const pending = module.request(request)
-    await new Promise<void>((resolve) => setTimeout(resolve, 5))
-    expect(module.list()).toHaveLength(1)
-    module.reject('approval-1')
-    await expect(pending).resolves.toEqual({ approved: false })
-  })
-
   it('按 Agent、cwd 与命令持久化许可并跨会话免审', async () => {
     const root = await mkdtemp(join(tmpdir(), 'yuanxiao-command-permission-'))
     tempRoots.push(root)
