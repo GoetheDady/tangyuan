@@ -386,4 +386,42 @@ describe('useChatSessionActions', () => {
       sessionId: 'session-1',
     })
   })
+
+  it('transcript 读取挂起时 isLoadingTranscript 为 true，完成后回到 false', async () => {
+    const store = createWorkbenchStore()
+    let resolveTranscript: (value: ReturnType<typeof createTranscript>) => void =
+      () => {}
+    vi.mocked(window.api.getTranscript).mockReturnValue(
+      new Promise((resolve) => {
+        resolveTranscript = resolve
+      }),
+    )
+
+    const { result } = renderActions(store)
+
+    await waitFor(() => {
+      expect(result.current.isLoadingTranscript).toBe(true)
+    })
+
+    await act(async () => {
+      resolveTranscript(createTranscript('session-1'))
+    })
+
+    await waitFor(() => {
+      expect(result.current.isLoadingTranscript).toBe(false)
+    })
+  })
+
+  it('transcript 读取失败后 isLoadingTranscript 回到 false', async () => {
+    const store = createWorkbenchStore()
+    vi.mocked(window.api.getTranscript).mockRejectedValue(
+      new Error('读取失败'),
+    )
+
+    const { result } = renderActions(store)
+
+    await waitFor(() => {
+      expect(result.current.isLoadingTranscript).toBe(false)
+    })
+  })
 })

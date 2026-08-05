@@ -12,6 +12,7 @@ import { BashApprovalCard } from '@/components/BashApprovalCard'
 import { Composer } from '@/components/Composer'
 import { ForkSourceNotice } from '@/components/ForkSourceNotice'
 import { QuestionClarificationCard } from '@/components/QuestionClarificationCard'
+import { SessionLoadingHint } from '@/components/SessionLoadingHint'
 import { TranscriptMessages } from '@/components/TranscriptMessages'
 
 export interface ConversationAreaComposerProps {
@@ -39,6 +40,8 @@ export interface ConversationAreaProps {
   forkSource?: { messageId: string; sdkEntryId?: string } | null
   /** 当前会话的 transcript（会话不匹配时由组件忽略）。 */
   transcript: TranscriptSnapshot | null
+  /** 当前会话的 transcript 是否仍在读取；读取中且无内容时展示会话读取提示。 */
+  isLoadingTranscript: boolean
   /** 模型是否正在流式输出。 */
   isStreaming: boolean
   /** 是否在等待响应（发送中/排队/运行中）。 */
@@ -126,20 +129,30 @@ export function ConversationArea(
             }}
           />
         )}
-        <TranscriptMessages
-          key={selectedSession?.sessionId ?? 'no-session'}
-          transcript={props.transcript}
-          isStreaming={props.isStreaming}
-          isAwaitingResponse={props.isAwaitingResponse}
-          sessionId={selectedSession?.sessionId ?? null}
-          forkSource={props.forkSource}
-          onRetry={(userMessageId) => {
-            props.actions.onRetry(userMessageId)
-          }}
-          onFork={(userMessageId) => {
-            props.actions.onFork(userMessageId)
-          }}
-        />
+        {props.isLoadingTranscript && props.transcript === null ? (
+          <SessionLoadingHint />
+        ) : (
+          <div
+            key={selectedSession?.sessionId ?? 'no-session'}
+            className="animate-session-content-enter flex min-h-0 flex-1 flex-col"
+            data-testid="message-stream"
+          >
+            <TranscriptMessages
+              key={selectedSession?.sessionId ?? 'no-session'}
+              transcript={props.transcript}
+              isStreaming={props.isStreaming}
+              isAwaitingResponse={props.isAwaitingResponse}
+              sessionId={selectedSession?.sessionId ?? null}
+              forkSource={props.forkSource}
+              onRetry={(userMessageId) => {
+                props.actions.onRetry(userMessageId)
+              }}
+              onFork={(userMessageId) => {
+                props.actions.onFork(userMessageId)
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {selectedSession && sessionApprovals.length > 0 && (

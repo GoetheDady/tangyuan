@@ -387,7 +387,47 @@
   }
 }
 
+@keyframes session-content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes session-hint-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 @layer components {
+  /* 会话切换过渡：消息流淡入，读取提示延迟出现，避免快速读取时闪现。 */
+  .animate-session-content-enter {
+    animation: session-content-enter var(--duration-slow) var(--ease-standard)
+      both;
+  }
+
+  .animate-session-hint-in {
+    animation: session-hint-fade-in var(--duration-fast) var(--ease-standard)
+      150ms both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-session-content-enter,
+    .animate-session-hint-in {
+      animation: none;
+    }
+  }
+
   [data-slot='alert-dialog-overlay'] {
     will-change: opacity;
   }

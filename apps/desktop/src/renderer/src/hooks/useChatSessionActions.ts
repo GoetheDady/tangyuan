@@ -39,6 +39,7 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
   isLoadingModelInfo: boolean
   isSwitchingModel: boolean
   cancellingSessionId: string | null
+  isLoadingTranscript: boolean
   createSession(): Promise<void>
   sendMessage(): Promise<void>
   retryMessage(userMessageId: string): Promise<void>
@@ -57,6 +58,8 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
     null,
   )
   const openSessionRequestIdRef = useRef(0)
+  /** 最近一次 transcript 读取失败的会话；失败后不再视为读取中。 */
+  const [failedSessionId, setFailedSessionId] = useState<string | null>(null)
   const persistLastActiveSessionQueueRef = useRef<Promise<void>>(
     Promise.resolve(),
   )
@@ -105,6 +108,11 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
   }, [sessions, sessionId])
   const selectedTranscript: TranscriptSnapshot | null =
     transcript?.sessionId === selectedSession?.sessionId ? transcript : null
+  // 路由会话的 transcript 尚未就绪且读取未失败时，视为正在读取。
+  const isLoadingTranscript =
+    sessionId !== undefined &&
+    transcript === null &&
+    failedSessionId !== sessionId
 
   // 当前 Agent 的会话列表尚未加载时按需读取；结果按 Agent 落盘，互不覆盖。
   // 一次 includeArchived 查询同时填充活跃与归档两个分片，避免重复 IPC。
@@ -132,6 +140,7 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
     if (!sessionId || !activeAgentId) return
 
     const requestId = ++openSessionRequestIdRef.current
+    setFailedSessionId(null)
     void window.api
       .getTranscript({ agentId: activeAgentId, sessionId })
       .then((nextTranscript) => {
@@ -143,6 +152,7 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
       .catch((error) => {
         if (requestId !== openSessionRequestIdRef.current) return
 
+        setFailedSessionId(sessionId)
         toast.error(error instanceof Error ? error.message : '读取会话消息失败')
       })
     // 路由变化即会话切换；每次切换都重新读取最新 transcript。
@@ -407,6 +417,7 @@ export function useChatSessionActions(options: UseChatSessionActionsOptions): {
     isLoadingModelInfo: sessionModel.isLoadingModelInfo,
     isSwitchingModel: sessionModel.isSwitchingModel,
     cancellingSessionId,
+    isLoadingTranscript,
     createSession,
     sendMessage,
     retryMessage,

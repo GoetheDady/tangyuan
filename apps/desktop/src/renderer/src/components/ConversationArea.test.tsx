@@ -23,6 +23,7 @@ function renderConversationArea(
       parentSession={null}
       forkSource={null}
       transcript={null}
+      isLoadingTranscript={false}
       isStreaming={false}
       isAwaitingResponse={false}
       pendingApprovals={[]}
@@ -132,5 +133,37 @@ describe('ConversationArea', () => {
 
     expect(screen.getByText('ls')).toBeInTheDocument()
     expect(screen.queryByText('rm -rf /')).not.toBeInTheDocument()
+  })
+
+  it('transcript 读取中显示会话读取提示，不渲染消息流', () => {
+    renderConversationArea({ isLoadingTranscript: true })
+
+    expect(screen.getByTestId('session-loading-hint')).toBeInTheDocument()
+    expect(screen.queryByTestId('message-scroll-area')).not.toBeInTheDocument()
+  })
+
+  it('transcript 就绪后读取提示消失，消息流以进入动画容器渲染', () => {
+    renderConversationArea({
+      isLoadingTranscript: false,
+      transcript: {
+        sessionId: 'session-1',
+        agentId: 'yuanxiao',
+        entries: [],
+        updatedAt: '2026-07-28T00:00:00.000Z',
+      },
+    })
+
+    expect(screen.queryByTestId('session-loading-hint')).not.toBeInTheDocument()
+    expect(screen.getByTestId('message-scroll-area')).toBeInTheDocument()
+    expect(screen.getByTestId('message-stream')).toHaveClass(
+      'animate-session-content-enter',
+    )
+  })
+
+  it('transcript 读取失败后不显示读取提示，回到消息流空态', () => {
+    renderConversationArea({ isLoadingTranscript: false })
+
+    expect(screen.queryByTestId('session-loading-hint')).not.toBeInTheDocument()
+    expect(screen.getByTestId('message-stream')).toBeInTheDocument()
   })
 })

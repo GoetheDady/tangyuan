@@ -251,6 +251,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
           parentSession={parentSession}
           forkSource={forkSource}
           transcript={selectedTranscript}
+          isLoadingTranscript={sessionActions.isLoadingTranscript}
           isStreaming={isSelectedSessionRunning}
           isAwaitingResponse={isAwaitingResponse}
           pendingApprovals={sessionPendingApprovals}
