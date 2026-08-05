@@ -2,7 +2,7 @@ import { dirname, resolve as pathResolve } from 'node:path'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
 import type { ToolApprovalGateway } from '../driver'
-import { assessBashRisk } from './command-risk'
+import { assessBashRisk } from './utils'
 
 /**
  * Pi SDK 原生危险工具名：文件读取、命令执行、文件写入和文件编辑。
@@ -95,24 +95,9 @@ function guardPath(
 }
 
 /**
- * 执行一条已获批准的命令；后续接入沙箱执行器时替换此实现即可。
- */
-async function runApprovedCommand(command: string, cwd: string) {
-  const { exec } = await import('node:child_process')
-  const { promisify } = await import('node:util')
-  const execAsync = promisify(exec)
-  const { stdout, stderr } = await execAsync(command, {
-    cwd,
-    timeout: 120_000,
-  })
-  return stdout + (stderr ? `\nstderr:\n${stderr}` : '')
-}
-
-/**
  * 创建受审批的命令执行工具，替代原生 bash。
  *
- * 只读命令默认免审执行；其余命令先创建审批请求，用户未批准或拒绝时
- * 命令绝不执行；命中硬性拦截的命令直接拒绝，不进审批流程。
+ * 每次执行前都会创建审批请求；用户未批准或拒绝时命令绝不执行。
  *
  * @param context - 运行上下文。
  * @returns 命令执行工具定义。
@@ -166,10 +151,21 @@ export function createRunCommandTool(
       }
 
       try {
-        const text = await runApprovedCommand(params.command, context.cwd)
+        const { exec } = await import('node:child_process')
+        const { promisify } = await import('node:util')
+        const execAsync = promisify(exec)
+        const { stdout, stderr } = await execAsync(params.command, {
+          cwd: context.cwd,
+          timeout: 120_000,
+        })
 
         return {
-          content: [{ type: 'text', text }],
+          content: [
+            {
+              type: 'text',
+              text: stdout + (stderr ? `\nstderr:\n${stderr}` : ''),
+            },
+          ],
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : '命令执行失败'
