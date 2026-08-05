@@ -839,6 +839,14 @@ export interface OpenExternalLinkRequest {
 }
 
 /**
+ * Renderer 向 Main 请求展示系统通知的载荷。
+ */
+export interface SendNotificationRequest {
+  title: string
+  body: string
+}
+
+/**
  * Renderer 用于展示当前 Session 使用的模型和 Thinking Level 信息。
  */
 export interface SessionModelInfo {

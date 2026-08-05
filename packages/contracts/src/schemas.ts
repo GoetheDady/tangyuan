@@ -880,6 +880,14 @@ export const openExternalLinkRequestSchema = z.strictObject({
 })
 
 /**
+ * Renderer 向 Main 请求展示系统通知的 Zod schema。
+ */
+export const sendNotificationRequestSchema = z.strictObject({
+  title: z.string().min(1),
+  body: z.string(),
+})
+
+/**
  * 校验批准 Bash 执行的请求。
  */
 export const approveBashRequestSchema = z.strictObject({

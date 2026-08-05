@@ -15,6 +15,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { WindowShell } from '@/components/WindowShell'
 import { createAgentEventBridge } from '@/lib/agent-event-bridge'
+import { createHybridNotifications } from '@/lib/hybrid-notifications'
 import {
   loadDesktopWorkbenchOnce,
 } from '@/lib/desktop-workbench-loader'
@@ -150,7 +151,7 @@ function DesktopRoutes(): React.JSX.Element {
     const bridge = createAgentEventBridge({
       store: workbenchStore,
       api: window.api,
-      notifications: toast,
+      notifications: createHybridNotifications(window.api),
       frames: {
         request: (callback) => requestAnimationFrame(callback),
         cancel: (frameId) => cancelAnimationFrame(frameId),

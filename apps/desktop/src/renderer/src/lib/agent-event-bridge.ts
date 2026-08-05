@@ -7,7 +7,7 @@ interface AgentEventBridgeApi extends Pick<
   'refreshRuntime' | 'subscribeToAgentEvents'
 > {}
 
-interface AgentEventNotifications {
+export interface AgentEventNotifications {
   success(message: string): void
   info(message: string): void
   error(message: string): void

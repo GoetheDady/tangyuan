@@ -32,6 +32,7 @@ import {
   deleteProviderRequestSchema,
   runtimeSnapshotSchema,
   sendMessageRequestSchema,
+  sendNotificationRequestSchema,
   sessionModelInfoSchema,
   setSessionModelRequestSchema,
   setSessionThinkingLevelRequestSchema,
@@ -94,6 +95,7 @@ import type {
   RuntimeConfiguration,
   RuntimeSnapshot,
   SendMessageRequest,
+  SendNotificationRequest,
   SessionModelInfo,
   SetSessionModelRequest,
   SetSessionThinkingLevelRequest,
@@ -162,6 +164,7 @@ export const DESKTOP_IPC_CHANNELS = {
   sessionsDelete: 'yuanxiao:sessions:delete',
   sessionsResume: 'yuanxiao:sessions:resume',
   sessionsSetLastActive: 'yuanxiao:sessions:set-last-active',
+  notificationSend: 'yuanxiao:notification:send',
 } as const
 
 /**
@@ -228,6 +231,7 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.sessionsDelete]: DeleteSessionRequest
   [DESKTOP_IPC_CHANNELS.sessionsResume]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: SetLastActiveSessionRequest
+  [DESKTOP_IPC_CHANNELS.notificationSend]: SendNotificationRequest
 }
 
 /**
@@ -288,6 +292,7 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsResume]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]:
     setLastActiveSessionRequestSchema,
+  [DESKTOP_IPC_CHANNELS.notificationSend]: sendNotificationRequestSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**
@@ -363,6 +368,7 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsDelete]: DeleteSessionResult
   [DESKTOP_IPC_CHANNELS.sessionsResume]: SessionResumeSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: LastActiveSession | null
+  [DESKTOP_IPC_CHANNELS.notificationSend]: void
 }
 
 /**
@@ -437,6 +443,7 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsResume]: sessionResumeSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]:
     lastActiveSessionSchema.nullable(),
+  [DESKTOP_IPC_CHANNELS.notificationSend]: z.void(),
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
 /**

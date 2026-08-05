@@ -221,6 +221,7 @@ export function installDefaultAppApi(): void {
     rejectSkillOperation: vi.fn().mockResolvedValue(undefined),
     getPendingSkillApprovals: vi.fn().mockResolvedValue([]),
     getSkillInstallRecords: vi.fn().mockResolvedValue([]),
+    sendNotification: vi.fn().mockResolvedValue(undefined),
   }
 
   Object.defineProperty(window, 'api', {

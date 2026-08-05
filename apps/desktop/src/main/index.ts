@@ -365,6 +365,14 @@ app.whenReady().then(() => {
       }
       await shell.openExternal(validated)
     },
+    () => {
+      const win = BrowserWindow.getAllWindows()[0]
+      if (win) {
+        if (win.isMinimized()) win.restore()
+        win.show()
+        win.focus()
+      }
+    },
   )
 
   const mainWindow = createWindow()

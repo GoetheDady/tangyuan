@@ -34,3 +34,8 @@ export type AgentEventBroadcaster = (event: AgentEvent) => void
  * 描述 Main 侧安全打开外部链接的方法签名。
  */
 export type OpenExternalLinkHandler = (url: string) => Promise<void>
+
+/**
+ * 描述 Main 侧将主窗口带到前台的方法签名。
+ */
+export type FocusWindowHandler = () => void

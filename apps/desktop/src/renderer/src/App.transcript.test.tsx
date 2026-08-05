@@ -187,6 +187,7 @@ describe('App', () => {
         rejectSkillOperation: vi.fn(),
         getPendingSkillApprovals: vi.fn(),
         getSkillInstallRecords: vi.fn(),
+        sendNotification: vi.fn().mockResolvedValue(undefined),
       } satisfies DesktopPreloadApi,
     })
     render(<App />)
@@ -304,6 +305,7 @@ describe('App', () => {
         rejectSkillOperation: vi.fn(),
         getPendingSkillApprovals: vi.fn(),
         getSkillInstallRecords: vi.fn(),
+        sendNotification: vi.fn().mockResolvedValue(undefined),
       } satisfies DesktopPreloadApi,
     })
     render(<App />)
@@ -411,6 +413,7 @@ describe('App', () => {
         rejectSkillOperation: vi.fn(),
         getPendingSkillApprovals: vi.fn(),
         getSkillInstallRecords: vi.fn(),
+        sendNotification: vi.fn().mockResolvedValue(undefined),
       } satisfies DesktopPreloadApi,
     })
     render(<App />)
@@ -657,6 +660,7 @@ describe('App', () => {
         rejectSkillOperation: vi.fn(),
         getPendingSkillApprovals: vi.fn(),
         getSkillInstallRecords: vi.fn(),
+        sendNotification: vi.fn().mockResolvedValue(undefined),
       } satisfies DesktopPreloadApi,
     })
     render(<App />)
@@ -787,6 +791,7 @@ describe('App', () => {
         rejectSkillOperation: vi.fn(),
         getPendingSkillApprovals: vi.fn(),
         getSkillInstallRecords: vi.fn(),
+        sendNotification: vi.fn().mockResolvedValue(undefined),
       } satisfies DesktopPreloadApi,
     })
     render(<App />)

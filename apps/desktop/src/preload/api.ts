@@ -31,6 +31,7 @@ import {
   type ProviderConfiguration,
   type DeleteProviderRequest,
   type SendMessageRequest,
+  type SendNotificationRequest,
   type SetSessionModelRequest,
   type SetSessionThinkingLevelRequest,
   type SetLastActiveSessionRequest,
@@ -145,6 +146,9 @@ export function createYuanxiaoPreloadApi(
     },
     openExternalLink: async (request: OpenExternalLinkRequest) => {
       await invoke(DESKTOP_IPC_CHANNELS.openExternalLink, request)
+    },
+    sendNotification: async (request: SendNotificationRequest) => {
+      await invoke(DESKTOP_IPC_CHANNELS.notificationSend, request)
     },
     updateAgentConfig: async (request: UpdateAgentConfigRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.agentsUpdateConfig, request)

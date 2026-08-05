@@ -28,6 +28,7 @@ import type {
   RuntimeConfiguration,
   RuntimeSnapshot,
   SendMessageRequest,
+  SendNotificationRequest,
   SessionModelInfo,
   SetSessionModelRequest,
   SetSessionThinkingLevelRequest,
@@ -132,4 +133,5 @@ export interface DesktopPreloadApi {
   getPendingClarifications(): Promise<QuestionClarificationRequest[]>
 
   openExternalLink(request: OpenExternalLinkRequest): Promise<void>
+  sendNotification(request: SendNotificationRequest): Promise<void>
 }

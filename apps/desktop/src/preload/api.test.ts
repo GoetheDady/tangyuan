@@ -81,6 +81,7 @@ describe('createYuanxiaoPreloadApi', () => {
       'saveProvider',
       'saveRuntimeConfiguration',
       'sendMessage',
+      'sendNotification',
       'setLastActiveSession',
       'setSessionModel',
       'setSessionThinkingLevel',
