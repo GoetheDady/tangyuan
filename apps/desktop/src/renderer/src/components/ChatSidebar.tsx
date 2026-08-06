@@ -38,6 +38,8 @@ export interface ChatSidebarProps {
   onArchiveSession(session: AgentSessionSummary): void
   /** 永久删除某个会话谱系。 */
   onDeleteSession(session: AgentSessionSummary): void
+  /** 重命名某个会话标题。 */
+  onRenameSession(session: AgentSessionSummary, title: string): void
 }
 
 /**
@@ -147,7 +149,6 @@ export function ChatSidebar(props: ChatSidebarProps): React.JSX.Element {
             }}
           >
             <MessageSquarePlus
-              data-icon="inline-start"
               size={14}
               aria-hidden="true"
             />
@@ -175,6 +176,7 @@ export function ChatSidebar(props: ChatSidebarProps): React.JSX.Element {
                     onSelect={props.onSelectSession}
                     onArchive={props.onArchiveSession}
                     onDelete={props.onDeleteSession}
+                    onRename={props.onRenameSession}
                   />
                 </div>
               ))}
@@ -182,7 +184,7 @@ export function ChatSidebar(props: ChatSidebarProps): React.JSX.Element {
           ) : (
             <div className="text-caption text-muted-foreground px-2.5 py-3">
               <p className="font-medium">暂无会话</p>
-              <p className="mt-1 text-[10px]">新建会话后会显示在这里</p>
+              <p className="mt-1 text-caption">新建会话后会显示在这里</p>
             </div>
           )}
         </div>

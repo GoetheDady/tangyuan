@@ -1,6 +1,8 @@
 import { GitBranch } from 'lucide-react'
 import React from 'react'
 
+import { Button } from '@/components/ui/button'
+
 /**
  * 分叉来源提示的属性。
  */
@@ -39,13 +41,15 @@ export function ForkSourceNotice({
           : '分叉自已不可用的会话'}
       </span>
       {isParentAvailable && parentSessionTitle && (
-        <button
+        <Button
           type="button"
-          className="window-no-drag text-caption text-foreground hover:bg-accent focus-visible:ring-ring/50 shrink-0 rounded-md px-2 py-1 font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
+          variant="ghost"
+          size="sm"
+          className="window-no-drag shrink-0"
           onClick={onViewSource}
         >
           查看来源消息
-        </button>
+        </Button>
       )}
     </div>
   )

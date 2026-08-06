@@ -1,8 +1,20 @@
 import '@testing-library/jest-dom/vitest'
+import { useState } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { Composer, type ComposerProps } from './Composer'
+
+/**
+ * Composer 依赖 TooltipProvider（生产环境由 App 根节点提供），
+ * 单测直接渲染组件时需自行补上。
+ */
+function renderWithTooltip(ui: Parameters<typeof render>[0]) {
+  return render(ui, {
+    wrapper: ({ children }) => <TooltipProvider>{children}</TooltipProvider>,
+  })
+}
 
 function createDefaultSessionModelInfo(overrides = {}) {
   return {
@@ -65,7 +77,7 @@ describe('Composer', () => {
   // ===========================================================================
 
   it('renders textarea with placeholder', () => {
-    render(<Composer {...createDefaultProps()} />)
+    renderWithTooltip(<Composer {...createDefaultProps()} />)
 
     const textarea = screen.getByLabelText('消息')
     expect(textarea).toBeInTheDocument()
@@ -75,7 +87,7 @@ describe('Composer', () => {
   it('calls onChange when user types', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    render(<Composer {...createDefaultProps({ onChange })} />)
+    renderWithTooltip(<Composer {...createDefaultProps({ onChange })} />)
 
     const textarea = screen.getByLabelText('消息')
     await user.type(textarea, '你好')
@@ -86,7 +98,9 @@ describe('Composer', () => {
   it('calls onSubmit when Enter is pressed', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    render(<Composer {...createDefaultProps({ value: '你好', onSubmit })} />)
+    renderWithTooltip(
+      <Composer {...createDefaultProps({ value: '你好', onSubmit })} />,
+    )
 
     const textarea = screen.getByLabelText('消息')
     await user.type(textarea, '{Enter}')
@@ -97,7 +111,9 @@ describe('Composer', () => {
   it('does not call onSubmit on empty value', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    render(<Composer {...createDefaultProps({ value: '', onSubmit })} />)
+    renderWithTooltip(
+      <Composer {...createDefaultProps({ value: '', onSubmit })} />,
+    )
 
     const textarea = screen.getByLabelText('消息')
     await user.type(textarea, '{Enter}')
@@ -108,7 +124,9 @@ describe('Composer', () => {
   it('does not call onSubmit when Shift+Enter is pressed', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    render(<Composer {...createDefaultProps({ value: '你好', onSubmit })} />)
+    renderWithTooltip(
+      <Composer {...createDefaultProps({ value: '你好', onSubmit })} />,
+    )
 
     const textarea = screen.getByLabelText('消息')
     await user.type(textarea, '{Shift>}{Enter}{/Shift}')
@@ -123,7 +141,9 @@ describe('Composer', () => {
   it('handles IME composition correctly - Enter during composing does not send', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    render(<Composer {...createDefaultProps({ value: '拼音', onSubmit })} />)
+    renderWithTooltip(
+      <Composer {...createDefaultProps({ value: '拼音', onSubmit })} />,
+    )
 
     const textarea = screen.getByLabelText('消息')
 
@@ -156,7 +176,7 @@ describe('Composer', () => {
 
   it('adjusts height when typing multi-line content', async () => {
     const user = userEvent.setup()
-    render(<Composer {...createDefaultProps({ value: '' })} />)
+    renderWithTooltip(<Composer {...createDefaultProps({ value: '' })} />)
 
     const textarea = screen.getByLabelText('消息') as HTMLTextAreaElement
 
@@ -177,7 +197,9 @@ describe('Composer', () => {
   // ===========================================================================
 
   it('shows "发送" button when not running', () => {
-    render(<Composer {...createDefaultProps({ isRunning: false })} />)
+    renderWithTooltip(
+      <Composer {...createDefaultProps({ isRunning: false })} />,
+    )
 
     expect(screen.getByRole('button', { name: /发送/ })).toBeInTheDocument()
     expect(
@@ -186,7 +208,7 @@ describe('Composer', () => {
   })
 
   it('shows "停止" button when running', () => {
-    render(<Composer {...createDefaultProps({ isRunning: true })} />)
+    renderWithTooltip(<Composer {...createDefaultProps({ isRunning: true })} />)
 
     expect(screen.getByRole('button', { name: /停止/ })).toBeInTheDocument()
     expect(
@@ -195,13 +217,13 @@ describe('Composer', () => {
   })
 
   it('disables send button when text is empty', () => {
-    render(<Composer {...createDefaultProps({ value: '' })} />)
+    renderWithTooltip(<Composer {...createDefaultProps({ value: '' })} />)
 
     expect(screen.getByRole('button', { name: /发送/ })).toBeDisabled()
   })
 
   it('enables send button when text is not empty', () => {
-    render(<Composer {...createDefaultProps({ value: '你好' })} />)
+    renderWithTooltip(<Composer {...createDefaultProps({ value: '你好' })} />)
 
     expect(screen.getByRole('button', { name: /发送/ })).toBeEnabled()
   })
@@ -209,7 +231,7 @@ describe('Composer', () => {
   it('calls onCancel when stop button is clicked', async () => {
     const user = userEvent.setup()
     const onCancel = vi.fn()
-    render(
+    renderWithTooltip(
       <Composer
         {...createDefaultProps({ isRunning: true, onCancel, value: '草稿' })}
       />,
@@ -224,7 +246,9 @@ describe('Composer', () => {
   it('calls onSubmit via form submit button click', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    render(<Composer {...createDefaultProps({ value: '你好', onSubmit })} />)
+    renderWithTooltip(
+      <Composer {...createDefaultProps({ value: '你好', onSubmit })} />,
+    )
 
     const button = screen.getByRole('button', { name: /发送/ })
     await user.click(button)
@@ -235,7 +259,9 @@ describe('Composer', () => {
   it('does not submit via button click when value is empty', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    render(<Composer {...createDefaultProps({ value: '', onSubmit })} />)
+    renderWithTooltip(
+      <Composer {...createDefaultProps({ value: '', onSubmit })} />,
+    )
 
     const button = screen.getByRole('button', { name: /发送/ })
     await user.click(button)
@@ -248,7 +274,7 @@ describe('Composer', () => {
   // ===========================================================================
 
   it('keeps textarea enabled during running for draft editing', () => {
-    render(
+    renderWithTooltip(
       <Composer
         {...createDefaultProps({ isRunning: true, value: '草稿内容' })}
       />,
@@ -262,7 +288,7 @@ describe('Composer', () => {
   it('does not call onSubmit when Enter is pressed during running', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    render(
+    renderWithTooltip(
       <Composer
         {...createDefaultProps({ isRunning: true, value: '你好', onSubmit })}
       />,
@@ -277,7 +303,7 @@ describe('Composer', () => {
   it('does not submit via form submit during running', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    render(
+    renderWithTooltip(
       <Composer
         {...createDefaultProps({ isRunning: true, value: '你好', onSubmit })}
       />,
@@ -291,7 +317,7 @@ describe('Composer', () => {
 
   it('preserves draft after stopping run', () => {
     const onChange = vi.fn()
-    const { rerender } = render(
+    const { rerender } = renderWithTooltip(
       <Composer
         {...createDefaultProps({
           isRunning: true,
@@ -324,14 +350,16 @@ describe('Composer', () => {
   // ===========================================================================
 
   it('disables textarea when disabled prop is true', () => {
-    render(<Composer {...createDefaultProps({ disabled: true })} />)
+    renderWithTooltip(<Composer {...createDefaultProps({ disabled: true })} />)
 
     const textarea = screen.getByLabelText('消息')
     expect(textarea).toBeDisabled()
   })
 
   it('does not render model controls when no session model info', () => {
-    render(<Composer {...createDefaultProps({ sessionModelInfo: null })} />)
+    renderWithTooltip(
+      <Composer {...createDefaultProps({ sessionModelInfo: null })} />,
+    )
 
     // 发送按钮仍然存在且可用（因为 disabled=false 且有文本）
     expect(screen.getByRole('button', { name: /发送/ })).toBeInTheDocument()
@@ -340,7 +368,7 @@ describe('Composer', () => {
   })
 
   it('disables send button when disabled prop is true', () => {
-    render(
+    renderWithTooltip(
       <Composer {...createDefaultProps({ disabled: true, value: '你好' })} />,
     )
 
@@ -354,7 +382,7 @@ describe('Composer', () => {
   // ===========================================================================
 
   it('renders the Pencil model pill selector', () => {
-    render(<Composer {...createDefaultProps()} />)
+    renderWithTooltip(<Composer {...createDefaultProps()} />)
 
     const modelTrigger = screen.getByRole('combobox', { name: '模型' })
     expect(modelTrigger).toBeInTheDocument()
@@ -365,7 +393,7 @@ describe('Composer', () => {
   it('calls onModelChange when selecting a different model', async () => {
     const user = userEvent.setup()
     const onModelChange = vi.fn()
-    render(<Composer {...createDefaultProps({ onModelChange })} />)
+    renderWithTooltip(<Composer {...createDefaultProps({ onModelChange })} />)
 
     const modelTrigger = screen.getByRole('combobox', { name: '模型' })
     await user.click(modelTrigger)
@@ -378,7 +406,9 @@ describe('Composer', () => {
   })
 
   it('disables model selectors when isSwitchingModel is true', () => {
-    render(<Composer {...createDefaultProps({ isSwitchingModel: true })} />)
+    renderWithTooltip(
+      <Composer {...createDefaultProps({ isSwitchingModel: true })} />,
+    )
 
     const triggerButtons = screen.getAllByRole('combobox')
     for (const button of triggerButtons) {
@@ -387,7 +417,7 @@ describe('Composer', () => {
   })
 
   it('disables model selectors during running', () => {
-    render(<Composer {...createDefaultProps({ isRunning: true })} />)
+    renderWithTooltip(<Composer {...createDefaultProps({ isRunning: true })} />)
 
     const triggerButtons = screen.getAllByRole('combobox')
     for (const button of triggerButtons) {
@@ -399,8 +429,8 @@ describe('Composer', () => {
   // 思考强度控件
   // ===========================================================================
 
-  it('renders thinking level selector when model supports thinking', () => {
-    render(
+  it('renders thinking level slider when model supports thinking', () => {
+    renderWithTooltip(
       <Composer
         {...createDefaultProps({
           sessionModelInfo: createDefaultSessionModelInfo({
@@ -413,14 +443,15 @@ describe('Composer', () => {
     )
 
     expect(screen.getByRole('combobox', { name: '模型' })).toBeInTheDocument()
-    expect(
-      screen.getByRole('combobox', { name: '思考强度' }),
-    ).toBeInTheDocument()
-    expect(screen.getAllByRole('combobox')).toHaveLength(2)
+    const slider = screen.getByRole('slider', { name: '思考强度' })
+    expect(slider).toBeInTheDocument()
+    expect(slider).toHaveAttribute('aria-valuenow', '0')
+    expect(slider).toHaveAttribute('aria-valuetext', '关')
+    expect(screen.getAllByRole('combobox')).toHaveLength(1)
   })
 
-  it('does not render thinking level selector when model does not support thinking', () => {
-    render(
+  it('does not render thinking level slider when model does not support thinking', () => {
+    renderWithTooltip(
       <Composer
         {...createDefaultProps({
           sessionModelInfo: createDefaultSessionModelInfo({
@@ -431,12 +462,14 @@ describe('Composer', () => {
       />,
     )
 
-    // Thinking 控件不应该渲染
-    expect(screen.queryByText(/Thinking:/)).not.toBeInTheDocument()
+    // 思考滑块不应该渲染
+    expect(
+      screen.queryByRole('slider', { name: '思考强度' }),
+    ).not.toBeInTheDocument()
   })
 
-  it('does not render thinking level selector when supportedThinkingLevels is empty', () => {
-    render(
+  it('does not render thinking level slider when supportedThinkingLevels is empty', () => {
+    renderWithTooltip(
       <Composer
         {...createDefaultProps({
           sessionModelInfo: createDefaultSessionModelInfo({
@@ -447,14 +480,75 @@ describe('Composer', () => {
       />,
     )
 
-    // Thinking 控件不应该渲染（即使 supportsThinking 为 true 但没有 levels）
-    expect(screen.queryByText(/Thinking:/)).not.toBeInTheDocument()
+    // 思考滑块不应该渲染（即使 supportsThinking 为 true 但没有 levels）
+    expect(
+      screen.queryByRole('slider', { name: '思考强度' }),
+    ).not.toBeInTheDocument()
   })
 
-  it('calls onThinkingLevelChange when selecting a different level', async () => {
+  it('does not render thinking level slider when only one level is supported', () => {
+    renderWithTooltip(
+      <Composer
+        {...createDefaultProps({
+          sessionModelInfo: createDefaultSessionModelInfo({
+            supportsThinking: true,
+            supportedThinkingLevels: ['medium'],
+            thinkingLevel: 'medium',
+          }),
+        })}
+      />,
+    )
+
+    // 单档位无法调节，滑块不渲染
+    expect(
+      screen.queryByRole('slider', { name: '思考强度' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('calls onThinkingLevelChange when adjusting the slider with keyboard', async () => {
     const user = userEvent.setup()
     const onThinkingLevelChange = vi.fn()
-    render(
+    // 模拟 ChatPage 的受控循环：滑块回调 → 父组件更新 thinkingLevel → 重渲染
+    function ThinkingLevelHarness({
+      onChange,
+    }: {
+      onChange: (level: string) => void
+    }) {
+      const [level, setLevel] = useState('off')
+      return (
+        <Composer
+          {...createDefaultProps({
+            sessionModelInfo: createDefaultSessionModelInfo({
+              supportsThinking: true,
+              supportedThinkingLevels: ['off', 'low', 'medium', 'high'],
+              thinkingLevel: level,
+            }),
+            onThinkingLevelChange: (next) => {
+              setLevel(next)
+              onChange(next)
+            },
+          })}
+        />
+      )
+    }
+
+    renderWithTooltip(<ThinkingLevelHarness onChange={onThinkingLevelChange} />)
+
+    const slider = screen.getByRole('slider', { name: '思考强度' })
+    slider.focus()
+
+    // 每按一次方向键实时切换一档：off → low → medium → high
+    await user.keyboard('{ArrowRight}')
+    expect(onThinkingLevelChange).toHaveBeenLastCalledWith('low')
+    await user.keyboard('{ArrowRight}')
+    expect(onThinkingLevelChange).toHaveBeenLastCalledWith('medium')
+    await user.keyboard('{ArrowRight}')
+    expect(onThinkingLevelChange).toHaveBeenLastCalledWith('high')
+  })
+
+  it('calls onThinkingLevelChange when clicking the slider track', async () => {
+    const onThinkingLevelChange = vi.fn()
+    renderWithTooltip(
       <Composer
         {...createDefaultProps({
           sessionModelInfo: createDefaultSessionModelInfo({
@@ -467,14 +561,12 @@ describe('Composer', () => {
       />,
     )
 
-    const thinkingTrigger = screen.getByRole('combobox', { name: '思考强度' })
-    await user.click(thinkingTrigger)
+    // jsdom 布局全为 0，轨道宽度 mock 为 1024；clientX=512 映射到中间档位（medium）
+    const track = screen.getByTestId('slider-track')
+    fireEvent.pointerDown(track, { clientX: 512, pointerId: 1 })
+    fireEvent.pointerUp(track, { clientX: 512, pointerId: 1 })
 
-    // 选择 high
-    const highOption = screen.getByRole('option', { name: 'Thinking: high' })
-    await user.click(highOption)
-
-    expect(onThinkingLevelChange).toHaveBeenCalledWith('high')
+    expect(onThinkingLevelChange).toHaveBeenCalledWith('medium')
   })
 
   // ===========================================================================
@@ -482,7 +574,7 @@ describe('Composer', () => {
   // ===========================================================================
 
   it('renders disabled attachment placeholder button', () => {
-    render(<Composer {...createDefaultProps()} />)
+    renderWithTooltip(<Composer {...createDefaultProps()} />)
 
     const attachmentButton = screen.getByLabelText('附件功能暂未开放')
     expect(attachmentButton).toBeInTheDocument()
@@ -491,7 +583,7 @@ describe('Composer', () => {
   })
 
   it('attachment button has type button to prevent form submission', () => {
-    render(<Composer {...createDefaultProps()} />)
+    renderWithTooltip(<Composer {...createDefaultProps()} />)
 
     const attachmentButton = screen.getByLabelText('附件功能暂未开放')
     expect(attachmentButton).toHaveAttribute('type', 'button')
@@ -502,7 +594,9 @@ describe('Composer', () => {
   // ===========================================================================
 
   it('shows loading text when model info is loading', () => {
-    render(<Composer {...createDefaultProps({ isLoadingModelInfo: true })} />)
+    renderWithTooltip(
+      <Composer {...createDefaultProps({ isLoadingModelInfo: true })} />,
+    )
 
     expect(screen.getByText('加载中...')).toBeInTheDocument()
   })

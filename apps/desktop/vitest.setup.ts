@@ -13,6 +13,25 @@ if (typeof Element !== 'undefined' && !Element.prototype.hasPointerCapture) {
 }
 
 /**
+ * Radix Slider 在 pointerdown 时会 setPointerCapture 接管指针事件，
+ * jsdom 未实现该方法；补齐为 no-op 保证点击轨道/拖拽路径不抛错。
+ */
+if (typeof Element !== 'undefined' && !Element.prototype.setPointerCapture) {
+  // @ts-expect-error jsdom 原型补齐
+  Element.prototype.setPointerCapture = vi.fn() as (pointerId: number) => void
+}
+
+if (
+  typeof Element !== 'undefined' &&
+  !Element.prototype.releasePointerCapture
+) {
+  // @ts-expect-error jsdom 原型补齐
+  Element.prototype.releasePointerCapture = vi.fn() as (
+    pointerId: number,
+  ) => void
+}
+
+/**
  * Radix Select 在 Content 挂载时会调用 scrollIntoView 将选中项滚动到可见区域。
  * jsdom 不实现此方法，补齐后避免 "scrollIntoView is not a function"。
  */

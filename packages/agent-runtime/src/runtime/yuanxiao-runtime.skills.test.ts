@@ -73,18 +73,5 @@ describe('YuanxiaoRuntime', () => {
       ).rejects.toThrow('无权管理')
     })
 
-    it('returns empty pending skill approvals initially', () => {
-      const runtimeDriver = createRuntimeDriver(createSnapshot())
-      const sessionDriver = createSessionDriver([])
-      const runtime = createYuanxiaoRuntimeForTesting({
-        configuration: runtimeDriver,
-        sessions: sessionDriver,
-        agents: sessionDriver,
-        profiles: sessionDriver,
-        skills: sessionDriver,
-      })
-
-      expect(runtime.getPendingSkillApprovals()).toEqual([])
-    })
   })
 })

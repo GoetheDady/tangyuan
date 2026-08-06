@@ -5,7 +5,6 @@ import type {
   DriverEvent,
 } from '../driver'
 import { TranscriptEmitter } from '../session/transcript-emitter'
-import { CommandPermissionModule, ClarificationRegistry } from '../approval'
 import { SessionDirectory } from '../session/session-directory'
 import { RuntimeSnapshotStore } from './runtime-snapshot-store'
 import { AgentManager, IdentityService } from '../agent'
@@ -66,9 +65,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
   protected readonly sessionDirectory: SessionDirectory
   protected readonly sessionContinuation: SessionContinuation
   protected readonly runAdmission: RunAdmissionGate
-  protected readonly commandPermissions: CommandPermissionModule
   protected readonly skillService: SkillService
-  protected readonly clarifications: ClarificationRegistry
 
   /**
    * 创建默认 YuanxiaoRuntime。
@@ -96,9 +93,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     this.snapshotStore = created.snapshotStore
     this.agentManager = created.agentManager
     this.identityService = created.identityService
-    this.commandPermissions = created.commandPermissions
     this.skillService = created.skillService
-    this.clarifications = created.clarifications
     this.runAdmission = new RunAdmissionGate({
       emit: this.emit.bind(this),
       upsertSessionState: (sessionId, state, updatedAt) =>
@@ -127,10 +122,8 @@ export abstract class YuanxiaoRuntimeOrchestrator {
       transcriptEmitter: this.transcriptEmitter,
       lastActiveSessionStore: this.lastActiveSessionStore,
       cancelRun: (request) => this.cancelRun(request),
-      pendingApprovalSessionIds: () =>
-        this.commandPermissions.list().map((approval) => approval.sessionId),
-      pendingClarificationSessionIds: () =>
-        this.clarifications.list().map((item) => item.sessionId),
+      pendingApprovalSessionIds: () => [],
+      pendingClarificationSessionIds: () => [],
       now: () => new Date().toISOString(),
     })
     this.sessions.subscribe((event) => {
@@ -142,18 +135,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
       if (!isInternalDriverEvent(event)) {
         this.emit(event)
       }
-      // 当 run 因任何原因结束（取消/失败/完成）时，自动清理
-      // 该 session 的待审批请求，防止审批卡片在 UI 中堆积。
-      if (event.type === 'turn-cancelled' || event.type === 'turn-failed') {
-        this.rejectSessionPendingApprovals(event.sessionId)
-      } else if (
-        event.type === 'run-state-changed' &&
-        event.state !== 'running' &&
-        event.state !== 'queued'
-      ) {
-        this.rejectSessionPendingApprovals(event.sessionId)
-      }
-
     })
   }
 
@@ -189,10 +170,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
    * @throws 当 Session 模块取消失败时，Promise 会 reject。
    */
   async cancelAllActiveRuns(): Promise<void> {
-    // 自动拒绝所有待审批请求
-    this.rejectAllPendingApprovals()
-    this.rejectAllPendingSkillApprovals()
-
     // 清空队列
     this.runAdmission.drainAll()
 
@@ -346,36 +323,4 @@ export abstract class YuanxiaoRuntimeOrchestrator {
     }
   }
 
-  /**
-   * 自动拒绝所有待审批请求（用于应用退出/全部取消场景）。
-   *
-   * @returns 无返回值。
-   * @throws 此方法不会主动抛出错误。
-   */
-  protected rejectAllPendingApprovals(): void {
-    this.commandPermissions.rejectAll()
-    this.clarifications.cancelAll()
-  }
-
-  /**
-   * 自动拒绝指定 session 的所有待审批请求。
-   *
-   * @param sessionId - 被取消的会话标识。
-   * @returns 无返回值。
-   * @throws 此方法不会主动抛出错误。
-   */
-  protected rejectSessionPendingApprovals(sessionId: string): void {
-    this.commandPermissions.rejectSession(sessionId)
-    this.clarifications.cancelSession(sessionId)
-  }
-
-  /**
-   * 自动拒绝所有待审批 Skill 操作（用于应用退出/全部取消场景）。
-   *
-   * @returns 无返回值。
-   * @throws 此方法不会主动抛出错误。
-   */
-  protected rejectAllPendingSkillApprovals(): void {
-    this.skillService.rejectAllApprovals()
-  }
 }

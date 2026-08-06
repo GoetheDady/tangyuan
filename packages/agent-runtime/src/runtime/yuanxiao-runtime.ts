@@ -1,12 +1,7 @@
 import { YuanxiaoRuntimeOrchestrator } from './yuanxiao-runtime-orchestrator'
 import type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencies'
 import { AgentRuntimeError } from '../core'
-import type { ToolApprovalGateway } from '../driver'
-import { createToolApprovalGateway } from '../approval'
 import type {
-  BashApprovalRequest,
-  QuestionClarificationRequest,
-  SkillApprovalRequest,
   SkillInstallRecord,
   SkillOperationParams,
   SkillSummary,
@@ -37,6 +32,7 @@ import {
   type LastActiveSession,
   type ProviderConfiguration,
   type RecoverSessionRequest,
+  type RenameSessionRequest,
   type RetryRunRequest,
   type RuntimeConfiguration,
   type RuntimeSnapshot,
@@ -52,35 +48,6 @@ export type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencie
  * Electron Main 调用运行时行为的唯一高层接口。
  */
 class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
-  async approveBash(
-    request: import('@yuanxiao/contracts').ApproveBashRequest,
-  ): Promise<void> {
-    await this.commandPermissions.approve(request)
-  }
-
-  async rejectBash(approvalId: string): Promise<void> {
-    this.commandPermissions.reject(approvalId)
-  }
-
-  getPendingApprovals(): BashApprovalRequest[] {
-    return this.commandPermissions.list()
-  }
-
-  async answerClarification(
-    clarificationId: string,
-    answer: string,
-  ): Promise<void> {
-    this.clarifications.answer(clarificationId, answer)
-  }
-
-  async cancelClarification(clarificationId: string): Promise<void> {
-    this.clarifications.cancel(clarificationId)
-  }
-
-  getPendingClarifications(): QuestionClarificationRequest[] {
-    return this.clarifications.list()
-  }
-
   async installSkill(params: SkillOperationParams): Promise<SkillSummary[]> {
     return this.skillService.install(params)
   }
@@ -89,30 +56,8 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     return this.skillService.delete(params)
   }
 
-  async approveSkillOperation(approvalId: string): Promise<void> {
-    this.skillService.approveOperation(approvalId)
-  }
-
-  async rejectSkillOperation(approvalId: string): Promise<void> {
-    this.skillService.rejectOperation(approvalId)
-  }
-
-  getPendingSkillApprovals(): SkillApprovalRequest[] {
-    return this.skillService.getPendingApprovals()
-  }
-
   async getSkillInstallRecords(): Promise<SkillInstallRecord[]> {
     return this.skillService.getInstallRecords()
-  }
-
-  createToolApprovalGateway(): ToolApprovalGateway {
-    return createToolApprovalGateway({
-      commandPermissions: this.commandPermissions,
-      clarifications: this.clarifications,
-      resolveRunId: (sessionId) =>
-        this.sessions.getActiveRunId(sessionId) ?? '',
-      now: () => new Date().toISOString(),
-    })
   }
 
   async listAgents(): Promise<AgentSummary[]> {
@@ -461,6 +406,19 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
     return this.sessionLineageLifecycle.delete(request)
   }
 
+  /**
+   * 重命名目标会话的标题。
+   *
+   * @param request - Agent 标识、会话标识与新标题。
+   * @returns 更新后的会话摘要。
+   * @throws 当会话不存在或写盘失败时，Promise 会 reject。
+   */
+  async renameSession(
+    request: RenameSessionRequest,
+  ): Promise<AgentSessionSummary> {
+    return this.sessions.renameSession(request.sessionId, request.title)
+  }
+
   /** 断言会话谱系可用，不可用时抛出错误阻断操作。 */
   private assertLineageAvailable(session: AgentSessionSummary): void {
     if (session.lineageUnavailable) {
@@ -481,9 +439,6 @@ class DefaultYuanxiaoRuntime extends YuanxiaoRuntimeOrchestrator {
    * @throws 当会话不存在或 Session 模块取消失败时，Promise 会 reject。
    */
   async cancelRun(request: CancelRunRequest): Promise<AgentSessionSummary> {
-    // 自动拒绝该 session 的所有待审批请求
-    this.rejectSessionPendingApprovals(request.sessionId)
-
     // 先检查队列中的待处理请求
     if (this.runAdmission.cancelQueued(request.sessionId, request.agentId)) {
       return (
@@ -550,6 +505,7 @@ export type YuanxiaoRuntime = Pick<
   | 'archiveSession'
   | 'recoverSession'
   | 'deleteSession'
+  | 'renameSession'
   | 'cancelRun'
   | 'subscribe'
   | 'cancelAllActiveRuns'
@@ -572,17 +528,7 @@ export type YuanxiaoRuntime = Pick<
   | 'getUserProfile'
   | 'updateSoul'
   | 'updateUserProfile'
-  | 'approveBash'
-  | 'rejectBash'
-  | 'getPendingApprovals'
-  | 'answerClarification'
-  | 'cancelClarification'
-  | 'getPendingClarifications'
-  | 'createToolApprovalGateway'
   | 'installSkill'
   | 'deleteSkill'
-  | 'approveSkillOperation'
-  | 'rejectSkillOperation'
-  | 'getPendingSkillApprovals'
   | 'getSkillInstallRecords'
 >

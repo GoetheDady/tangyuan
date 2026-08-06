@@ -1,6 +1,5 @@
 import { YUANXIAO_DEFAULT_AGENT_ID } from '@yuanxiao/contracts'
 import type { AgentEvent } from '../driver'
-import { CommandPermissionModule, ClarificationRegistry } from '../approval'
 import { AgentManager, IdentityService } from '../agent'
 import { TranscriptEmitter } from '../session/transcript-emitter'
 import { SkillService } from '../skill'
@@ -28,13 +27,6 @@ export function createRuntimeInternals(
       profiles: dependencies.profiles,
       snapshotStore,
     }),
-    commandPermissions: new CommandPermissionModule({
-      emit,
-      now,
-      ...(dependencies.commandPermissionFilePath
-        ? { filePath: dependencies.commandPermissionFilePath }
-        : {}),
-    }),
     skillService: new SkillService({
       skills: dependencies.skills,
       sessions: dependencies.sessions,
@@ -42,6 +34,5 @@ export function createRuntimeInternals(
       emit,
       now,
     }),
-    clarifications: new ClarificationRegistry({ emit, now }),
   }
 }

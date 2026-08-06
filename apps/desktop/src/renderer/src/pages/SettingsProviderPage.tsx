@@ -205,7 +205,7 @@ export function SettingsProviderPage(): React.JSX.Element {
             />
             <div>
               <p className="text-caption font-semibold">最近备份可用</p>
-              <p className="text-muted-foreground text-[10px]">
+              <p className="text-muted-foreground text-caption">
                 恢复后将重新检查 Provider 和模型配置
               </p>
             </div>
@@ -263,7 +263,7 @@ export function SettingsProviderPage(): React.JSX.Element {
             className="text-muted-foreground shrink-0"
             aria-hidden="true"
           />
-          <p className="text-muted-foreground text-[10px]">
+          <p className="text-muted-foreground text-caption">
             不会删除 Agent、用户资料或历史会话
           </p>
         </div>
@@ -341,9 +341,11 @@ export function SettingsProviderPage(): React.JSX.Element {
                 }
                 aria-invalid={Boolean(verificationError)}
               />
-              <button
+              <Button
                 type="button"
-                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors duration-200 disabled:opacity-50"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute top-1/2 right-1.5 -translate-y-1/2"
                 onClick={() => {
                   setShowApiKey(!showApiKey)
                 }}
@@ -355,7 +357,7 @@ export function SettingsProviderPage(): React.JSX.Element {
                 ) : (
                   <Eye size={15} aria-hidden="true" />
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -366,7 +368,7 @@ export function SettingsProviderPage(): React.JSX.Element {
             className="text-muted-foreground shrink-0"
             aria-hidden="true"
           />
-          <p className="text-muted-foreground text-[10px]">
+          <p className="text-muted-foreground text-caption">
             API Key 使用 macOS 安全存储加密保存在本机
           </p>
         </div>
@@ -382,7 +384,7 @@ export function SettingsProviderPage(): React.JSX.Element {
               <p className="text-caption text-destructive-soft-foreground font-semibold">
                 无法连接模型服务
               </p>
-              <p className="text-destructive-soft-foreground text-[10px] leading-[1.45]">
+              <p className="text-destructive-soft-foreground text-caption leading-[1.45]">
                 {verificationError}
               </p>
             </div>
@@ -426,23 +428,27 @@ export function SettingsProviderPage(): React.JSX.Element {
             )}
           </Button>
           {isVerifying ? (
-            <button
+            <Button
               type="button"
-              className="text-caption text-muted-foreground hover:text-foreground block w-full rounded-lg py-2 font-medium transition-colors duration-200"
+              variant="ghost"
+              size="sm"
+              className="w-full"
               onClick={() => {
                 void cancelVerification()
               }}
             >
               取消验证
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
-              className="text-caption text-muted-foreground hover:text-foreground block w-full rounded-lg py-2 font-medium transition-colors duration-200"
+              variant="ghost"
+              size="sm"
+              className="w-full"
               onClick={cancelForm}
             >
               取消
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -492,7 +498,7 @@ export function SettingsProviderPage(): React.JSX.Element {
                       <p className="text-caption text-destructive-soft-foreground font-semibold">
                         删除 {displayName}？
                       </p>
-                      <p className="text-destructive-soft-foreground text-[10px] leading-[1.45]">
+                      <p className="text-destructive-soft-foreground text-caption leading-[1.45]">
                         使用此 Provider 的 Agent
                         和会话将无法继续调用模型，此操作无法撤销。
                       </p>
@@ -530,32 +536,35 @@ export function SettingsProviderPage(): React.JSX.Element {
                 <div className="min-w-0 flex-1">
                   <p className="text-label font-medium">{displayName}</p>
                   {auth?.maskedValue ? (
-                    <p className="text-muted-foreground font-mono text-[10px]">
+                    <p className="text-muted-foreground font-mono text-caption">
                       {auth.maskedValue}
                     </p>
                   ) : null}
                 </div>
                 <div className="flex shrink-0 gap-1">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     aria-label={`编辑 ${displayName}`}
-                    className="text-muted-foreground hover:text-foreground rounded p-1 transition-colors duration-200"
                     onClick={() => {
                       openEdit(providerId)
                     }}
                   >
                     <Pencil size={13} aria-hidden="true" />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     aria-label={`删除 ${displayName}`}
-                    className="text-muted-foreground hover:text-destructive rounded p-1 transition-colors duration-200"
+                    className="hover:text-destructive"
                     onClick={() => {
                       setViewState({ mode: 'delete', providerId })
                     }}
                   >
                     <Trash2 size={13} aria-hidden="true" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             )

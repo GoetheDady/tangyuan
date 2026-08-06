@@ -635,7 +635,7 @@ test.describe('基础组件验收夹具', () => {
     }
 
     const toaster = page.locator('[data-sonner-toaster]')
-    await expect(toaster).toHaveAttribute('data-y-position', 'bottom')
+    await expect(toaster).toHaveAttribute('data-y-position', 'top')
     await expect(toaster).toHaveAttribute('data-x-position', 'right')
     await expect(
       page.getByRole('button', { name: '关闭通知' }).first(),

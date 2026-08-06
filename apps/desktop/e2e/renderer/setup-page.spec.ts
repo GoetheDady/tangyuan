@@ -184,7 +184,7 @@ test.describe('初始化配置页面', () => {
     await expect(item).toContainText('已刷新可用模型资源')
     await expect(page.locator('[data-sonner-toaster]')).toHaveAttribute(
       'data-y-position',
-      'bottom',
+      'top',
     )
   })
 })

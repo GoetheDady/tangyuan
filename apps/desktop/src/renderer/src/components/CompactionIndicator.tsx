@@ -35,12 +35,12 @@ export function CompactionIndicator({
       aria-label={`上下文已于 ${formattedTime} 自动压缩`}
       className="my-4 flex items-center justify-center gap-2"
     >
-      <span className="bg-border h-px flex-1" />
+      <span className="bg-split h-px flex-1" />
       <span className="text-label text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
         <Archive size={12} aria-hidden="true" />
         上下文已于 {formattedTime} 自动压缩
       </span>
-      <span className="bg-border h-px flex-1" />
+      <span className="bg-split h-px flex-1" />
     </div>
   )
 }

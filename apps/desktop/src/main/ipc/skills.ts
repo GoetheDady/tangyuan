@@ -57,47 +57,6 @@ export function registerSkillsIpc(
     )
   })
   ipcMain.handle(
-    DESKTOP_IPC_CHANNELS.skillsApproveOperation,
-    async (_event, payload) => {
-      const { approvalId } = parseDesktopIpcRequest(
-        DESKTOP_IPC_CHANNELS.skillsApproveOperation,
-        payload,
-      )
-      await runtime.approveSkillOperation(approvalId)
-      return parseDesktopIpcResponse(
-        DESKTOP_IPC_CHANNELS.skillsApproveOperation,
-        undefined,
-      )
-    },
-  )
-  ipcMain.handle(
-    DESKTOP_IPC_CHANNELS.skillsRejectOperation,
-    async (_event, payload) => {
-      const { approvalId } = parseDesktopIpcRequest(
-        DESKTOP_IPC_CHANNELS.skillsRejectOperation,
-        payload,
-      )
-      await runtime.rejectSkillOperation(approvalId)
-      return parseDesktopIpcResponse(
-        DESKTOP_IPC_CHANNELS.skillsRejectOperation,
-        undefined,
-      )
-    },
-  )
-  ipcMain.handle(
-    DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals,
-    async (_event, payload) => {
-      parseDesktopIpcRequest(
-        DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals,
-        payload,
-      )
-      return parseDesktopIpcResponse(
-        DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals,
-        runtime.getPendingSkillApprovals(),
-      )
-    },
-  )
-  ipcMain.handle(
     DESKTOP_IPC_CHANNELS.skillsGetInstallRecords,
     async (_event, payload) => {
       parseDesktopIpcRequest(

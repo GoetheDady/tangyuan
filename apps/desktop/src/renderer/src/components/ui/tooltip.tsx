@@ -24,7 +24,7 @@ const TooltipContent = React.forwardRef<
     {
       className,
       side = 'top',
-      sideOffset = 0,
+      sideOffset = 4,
       asChild = false,
       children,
       ...props

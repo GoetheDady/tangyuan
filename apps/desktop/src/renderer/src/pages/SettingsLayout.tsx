@@ -22,7 +22,7 @@ export function SettingsLayout(): React.JSX.Element {
 
         <Link
           to={redirectTarget}
-          className="window-no-drag hover:bg-soft flex h-9 items-center gap-2 rounded-lg px-2 text-sm transition-colors"
+          className="window-no-drag hover:bg-secondary flex h-9 items-center gap-2 rounded-lg px-2 text-sm transition-colors"
         >
           <ArrowLeft size={15} aria-hidden="true" />
           返回聊天
@@ -36,7 +36,7 @@ export function SettingsLayout(): React.JSX.Element {
           <NavLink
             to="/settings/providers"
             className={({ isActive }) =>
-              `window-no-drag flex h-9 items-center gap-2 rounded-lg px-2 text-sm transition-colors ${isActive ? 'bg-soft' : 'hover:bg-soft/60'}`
+              `window-no-drag flex h-9 items-center gap-2 rounded-lg px-2 text-sm transition-colors ${isActive ? 'bg-secondary' : 'hover:bg-secondary/60'}`
             }
           >
             <Settings2 size={15} aria-hidden="true" />
@@ -45,7 +45,7 @@ export function SettingsLayout(): React.JSX.Element {
           <NavLink
             to="/settings/agents"
             className={({ isActive }) =>
-              `window-no-drag flex h-9 items-center gap-2 rounded-lg px-2 text-sm transition-colors ${isActive ? 'bg-soft' : 'hover:bg-soft/60'}`
+              `window-no-drag flex h-9 items-center gap-2 rounded-lg px-2 text-sm transition-colors ${isActive ? 'bg-secondary' : 'hover:bg-secondary/60'}`
             }
           >
             <Bot size={15} aria-hidden="true" />

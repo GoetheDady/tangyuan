@@ -13,6 +13,8 @@ import {
 import { AnimatePresence, motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
+
 import { StreamdownMessage } from '@/components/StreamdownMessage'
 
 /**
@@ -251,14 +253,6 @@ export function AssistantMessage({
           </div>
         )}
 
-        {/* Unconfirmed text (shown while streaming) */}
-        {(state === 'unconfirmed-text' || state === 'active-tool-loop') &&
-          entry.content && (
-            <div className="border-warning-border bg-warning-soft text-caption text-warning-foreground rounded-md border px-2.5 py-2">
-              此文本尚未确认，后续仍可能出现工具调用。
-            </div>
-          )}
-
         {/* Cancelled / Failed footer */}
         {state === 'ended-nonfinal' && (
           <div className="text-body">
@@ -315,7 +309,7 @@ function ExecutionDisclosure({
   } else if (state === 'final-confirmed') {
     StatusIcon = Check
     label = '已完成执行过程'
-    bgClass = 'bg-secondary'
+    bgClass = 'bg-success-soft/40'
   } else if (attemptStatus === 'cancelled') {
     StatusIcon = CircleStop
     label = '已中断执行过程'
@@ -353,7 +347,7 @@ function ExecutionDisclosure({
               ? 'text-warning-foreground'
               : attemptStatus === 'failed'
                 ? 'text-destructive-soft-foreground'
-                : 'text-muted-foreground'
+                : 'text-success-foreground'
         }`}
         aria-hidden="true"
       />
@@ -408,7 +402,7 @@ function TurnTimeline({ turns }: { turns: RunTurn[] }): React.JSX.Element {
                     aria-hidden="true"
                   />
                 </span>
-                <span className="text-muted-foreground text-[10px]">
+                <span className="text-muted-foreground text-caption">
                   等待中…
                 </span>
               </div>
@@ -513,13 +507,13 @@ function StepRow({
       {/* Step body：标签行 + 内容行 */}
       <div className="min-w-0 flex-1 pb-2.5">
         <div className="flex items-baseline justify-between gap-2">
-          <span className={`text-[10px] ${labelClass}`}>{label}</span>
+          <span className={`text-caption ${labelClass}`}>{label}</span>
           <span className="text-muted-foreground shrink-0 text-[8px]">
             {meta}
           </span>
         </div>
         {note && (
-          <p className="text-muted-foreground mt-0.5 text-[10px] leading-[1.5]">
+          <p className="text-muted-foreground mt-0.5 text-caption leading-[1.5]">
             {note}
           </p>
         )}
@@ -575,7 +569,7 @@ function FailedFooter({
             <button
               type="button"
               onClick={() => setShowDetails((prev) => !prev)}
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[10px] transition-colors"
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-caption transition-colors"
             >
               {showDetails ? (
                 <ChevronDown size={10} aria-hidden="true" />
@@ -601,14 +595,15 @@ function FailedFooter({
           Agent 在产生最终回复前失败。您可以重试本次执行，原始用户请求将被复用。
         </p>
         {onRetry && (
-          <button
+          <Button
             type="button"
+            size="sm"
             onClick={onRetry}
-            className="bg-primary text-label text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring mt-1.5 inline-flex items-center gap-1 rounded-md px-3 py-1 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            className="mt-1.5"
           >
             <RefreshCw size={11} aria-hidden="true" />
             重试
-          </button>
+          </Button>
         )}
       </div>
     </div>

@@ -97,7 +97,12 @@ export function AgentSoulEditor({
   return (
     <section className="bg-card rounded-lg border p-6">
       <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-section-heading font-semibold">Agent 灵魂</h2>
+        <div>
+          <h2 className="text-section-heading font-semibold">Agent 灵魂</h2>
+          <p className="text-label text-muted-foreground mt-1">
+            塑造此 Agent 个性、行为方式和专属规则的提示词。
+          </p>
+        </div>
         {editable ? (
           <Button onClick={handleSave} disabled={!canSave || isSaving}>
             <Save aria-hidden="true" />

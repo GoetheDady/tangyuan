@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
+
 /**
  * 审批操作类型：允许本次、始终允许或拒绝。
  */
@@ -213,7 +215,7 @@ export function BashApprovalCard({
           <div>
             <label
               htmlFor={`approval-command-${approval.approvalId}`}
-              className="text-muted-foreground mb-1 block text-[10px] font-semibold tracking-wider uppercase"
+              className="text-muted-foreground mb-1 block text-caption font-semibold tracking-wider uppercase"
             >
               待执行命令
             </label>
@@ -229,7 +231,7 @@ export function BashApprovalCard({
 
           {/* 工作目录 */}
           <div className="text-label text-muted-foreground flex items-center gap-1.5">
-            <span className="text-[10px] font-semibold tracking-wider uppercase">
+            <span className="text-caption font-semibold tracking-wider uppercase">
               工作目录
             </span>
             <span
@@ -278,14 +280,12 @@ export function BashApprovalCard({
         {/* 底部操作按钮 */}
         <div className="border-warning-border/40 flex items-center justify-end gap-2 border-t px-4 py-2.5">
           {/* 拒绝按钮 */}
-          <button
+          <Button
             ref={firstButtonRef}
             type="button"
-            className={`text-label focus-visible:ring-ring inline-flex items-center gap-1 rounded-md border px-3 py-1.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
-              isResolved
-                ? 'border-border text-muted-foreground cursor-not-allowed'
-                : 'border-destructive-border bg-background text-destructive hover:bg-destructive-soft/20'
-            }`}
+            variant="outline"
+            size="sm"
+            className="border-destructive-border text-destructive hover:bg-destructive-soft/20 active:bg-destructive-soft/30 focus-visible:ring-destructive/20"
             onClick={() => {
               void executeAction('reject')
             }}
@@ -302,16 +302,13 @@ export function BashApprovalCard({
               <Ban size={12} aria-hidden="true" />
             )}
             拒绝
-          </button>
+          </Button>
 
           {approval.riskLevel !== 'high' && (
-            <button
+            <Button
               type="button"
-              className={`text-label focus-visible:ring-ring inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
-                isResolved
-                  ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                  : 'bg-secondary text-secondary-foreground hover:bg-split'
-              }`}
+              variant="secondary"
+              size="sm"
               onClick={() => {
                 void executeAction('approve-always')
               }}
@@ -328,17 +325,14 @@ export function BashApprovalCard({
                 <ShieldCheck size={12} aria-hidden="true" />
               )}
               始终允许
-            </button>
+            </Button>
           )}
 
           {/* 允许本次按钮 */}
-          <button
+          <Button
             type="button"
-            className={`text-label focus-visible:ring-ring inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
-              isResolved
-                ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                : 'bg-primary text-primary-foreground hover:bg-primary-hover'
-            }`}
+            variant="default"
+            size="sm"
             onClick={() => {
               void executeAction('approve-once')
             }}
@@ -355,7 +349,7 @@ export function BashApprovalCard({
               <Check size={12} aria-hidden="true" />
             )}
             允许本次
-          </button>
+          </Button>
         </div>
       </div>
     </div>

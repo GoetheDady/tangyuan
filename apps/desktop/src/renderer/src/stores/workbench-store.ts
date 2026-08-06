@@ -47,6 +47,8 @@ export interface WorkbenchActions {
   refreshRuntime(snapshot: RuntimeSnapshot): void
   replaceSessionCatalog(agentId: string, sessions: AgentSessionSummary[]): void
   addSession(session: AgentSessionSummary): void
+  /** 用 IPC 返回的更新摘要替换 store 中同一个会话，仅用于重命名等单条更新。 */
+  updateSession(session: AgentSessionSummary): void
   removeSessionLineage(input: {
     agentId: string
     allSessions: AgentSessionSummary[]
@@ -162,6 +164,21 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
                 (candidate) => candidate.sessionId !== session.sessionId,
               ),
             ],
+          },
+        }
+      })
+    },
+
+    updateSession: (session) => {
+      set((state) => {
+        const agentId = session.agentId
+        const current = state.sessionsByAgentId[agentId] ?? []
+        return {
+          sessionsByAgentId: {
+            ...state.sessionsByAgentId,
+            [agentId]: current.map((s) =>
+              s.sessionId === session.sessionId ? session : s,
+            ),
           },
         }
       })

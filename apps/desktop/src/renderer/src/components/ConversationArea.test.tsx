@@ -6,6 +6,7 @@ import {
   type AgentSessionSummary,
 } from '@yuanxiao/contracts'
 import { describe, expect, it, vi } from 'vitest'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { ConversationArea } from './ConversationArea'
 
 const session: AgentSessionSummary = createDefaultSessionSummary({
@@ -18,48 +19,50 @@ function renderConversationArea(
   overrides: Partial<Parameters<typeof ConversationArea>[0]> = {},
 ): ReturnType<typeof render> {
   return render(
-    <ConversationArea
-      selectedSession={session}
-      parentSession={null}
-      forkSource={null}
-      transcript={null}
-      isLoadingTranscript={false}
-      isStreaming={false}
-      isAwaitingResponse={false}
-      pendingApprovals={[]}
-      pendingClarifications={[]}
-      activeAgentDisplayName="元宵"
-      composer={{
-        value: '',
-        onChange: vi.fn(),
-        onSubmit: vi.fn(),
-        onCancel: vi.fn(),
-        isRunning: false,
-        disabled: false,
-        sessionModelInfo: null,
-        isLoadingModelInfo: false,
-        isSwitchingModel: false,
-        providers: [],
-        selectableModels: [],
-        onModelChange: vi.fn(),
-        onThinkingLevelChange: vi.fn(),
-      }}
-      actions={{
-        onRetry: vi.fn(),
-        onFork: vi.fn(),
-        onViewForkSource: vi.fn(),
-      }}
-      approvals={{
-        onApproveOnce: vi.fn(),
-        onApproveAlways: vi.fn(),
-        onReject: vi.fn(),
-      }}
-      clarifications={{
-        onAnswer: vi.fn(),
-        onCancel: vi.fn(),
-      }}
-      {...overrides}
-    />,
+    <TooltipProvider>
+      <ConversationArea
+        selectedSession={session}
+        parentSession={null}
+        forkSource={null}
+        transcript={null}
+        isLoadingTranscript={false}
+        isStreaming={false}
+        isAwaitingResponse={false}
+        pendingApprovals={[]}
+        pendingClarifications={[]}
+        activeAgentDisplayName="元宵"
+        composer={{
+          value: '',
+          onChange: vi.fn(),
+          onSubmit: vi.fn(),
+          onCancel: vi.fn(),
+          isRunning: false,
+          disabled: false,
+          sessionModelInfo: null,
+          isLoadingModelInfo: false,
+          isSwitchingModel: false,
+          providers: [],
+          selectableModels: [],
+          onModelChange: vi.fn(),
+          onThinkingLevelChange: vi.fn(),
+        }}
+        actions={{
+          onRetry: vi.fn(),
+          onFork: vi.fn(),
+          onViewForkSource: vi.fn(),
+        }}
+        approvals={{
+          onApproveOnce: vi.fn(),
+          onApproveAlways: vi.fn(),
+          onReject: vi.fn(),
+        }}
+        clarifications={{
+          onAnswer: vi.fn(),
+          onCancel: vi.fn(),
+        }}
+        {...overrides}
+      />
+    </TooltipProvider>,
   )
 }
 

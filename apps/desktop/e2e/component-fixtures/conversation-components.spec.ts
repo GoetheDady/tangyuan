@@ -126,13 +126,15 @@ test.describe('对话业务组件验收夹具', () => {
     await composer.dispatchEvent('compositionend')
     await expect(result).toContainText('提交 1 次')
 
-    const comboboxes = integrated.getByRole('combobox')
-    await comboboxes.nth(0).click()
+    await integrated.getByRole('combobox', { name: '模型' }).click()
     await page.getByRole('option', { name: 'Claude Opus 4.1' }).click()
     await expect(result).toContainText('模型 claude-opus-4-1')
 
-    await comboboxes.nth(1).click()
-    await page.getByRole('option', { name: 'Thinking: high' }).click()
+    const thinkingSlider = integrated.getByRole('slider', {
+      name: '思考强度',
+    })
+    await thinkingSlider.click()
+    await thinkingSlider.press('End')
     await expect(result).toContainText('思考 high')
 
     const running = page.getByTestId('composer-running')

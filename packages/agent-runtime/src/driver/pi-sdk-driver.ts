@@ -134,10 +134,7 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
     }
     this.sessionSoulVersions.set(sessionId, soul.version)
     this.sessionUserProfileVersions.set(sessionId, userProfile.version)
-    const createSessionRequest: PiSdkCreateSessionRequest = this
-      .toolApprovalGateway
-      ? { ...baseRequest, toolApprovalGateway: this.toolApprovalGateway }
-      : baseRequest
+    const createSessionRequest: PiSdkCreateSessionRequest = { ...baseRequest }
 
     if (request.agentId === YUANXIAO_DEFAULT_AGENT_ID) {
       createSessionRequest.onCreateAgent = async (displayName: string) =>
@@ -225,6 +222,21 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
    */
   getSessionAttempts(sessionId: string): Promise<PersistedAttemptEntry[]> {
     return this.sessionIndexStore.resolveAttempts(sessionId)
+  }
+
+  /**
+   * 重命名会话标题，原子写入索引文件。
+   *
+   * @param sessionId - 目标会话标识。
+   * @param title - 新标题。
+   * @returns 更新后的会话摘要。
+   * @throws 当会话不存在或写盘失败时，Promise 会 reject。
+   */
+  async renameSession(
+    sessionId: string,
+    title: string,
+  ): Promise<AgentSessionSummary> {
+    return this.sessionIndexStore.updateTitle(sessionId, title)
   }
 
   /** 返回指定会话当前活跃运行的 runId；无活跃运行时返回 undefined。 */

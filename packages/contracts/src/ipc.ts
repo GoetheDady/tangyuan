@@ -2,15 +2,11 @@ import { z } from 'zod'
 import {
   agentSessionSummarySchema,
   agentSummarySchema,
-  answerClarificationRequestSchema,
-  approveBashRequestSchema,
-  approveSkillOperationRequestSchema,
   archiveSessionRequestSchema,
   archiveSessionResultSchema,
   deleteSessionRequestSchema,
   deleteSessionResultSchema,
   archiveAgentRequestSchema,
-  cancelClarificationRequestSchema,
   cancelConfigurationVerificationRequestSchema,
   cancelRunRequestSchema,
   claimAgentDirectoryRequestSchema,
@@ -25,7 +21,6 @@ import {
   profileUpdateResultSchema,
   recoverAgentRequestSchema,
   recoverSessionRequestSchema,
-  rejectBashRequestSchema,
   retryRunRequestSchema,
   runtimeConfigurationSchema,
   providerConfigurationSchema,
@@ -43,13 +38,11 @@ import {
   updateSoulRequestSchema,
   updateUserProfileRequestSchema,
   userProfileContentSchema,
-  bashApprovalRequestSchema,
-  questionClarificationRequestSchema,
-  skillApprovalRequestSchema,
   skillInstallRecordSchema,
   skillSummarySchema,
   forkSessionRequestSchema,
   lastActiveSessionSchema,
+  renameSessionRequestSchema,
   sessionResumeSnapshotSchema,
   setLastActiveSessionRequestSchema,
 } from './schemas'
@@ -68,12 +61,7 @@ import type {
 import type {
   AgentSessionSummary,
   AgentSummary,
-  AnswerClarificationRequest,
-  ApproveBashRequest,
-  ApproveSkillOperationRequest,
   ArchiveAgentRequest,
-  BashApprovalRequest,
-  CancelClarificationRequest,
   CancelConfigurationVerificationRequest,
   CancelRunRequest,
   ClaimAgentDirectoryRequest,
@@ -87,10 +75,9 @@ import type {
   OpenExternalLinkRequest,
   ProfileUpdateResult,
   ProviderConfiguration,
-  QuestionClarificationRequest,
   RecoverAgentRequest,
-  RejectBashRequest,
   ForkSessionRequest,
+  RenameSessionRequest,
   RetryRunRequest,
   RuntimeConfiguration,
   RuntimeSnapshot,
@@ -99,7 +86,6 @@ import type {
   SessionModelInfo,
   SetSessionModelRequest,
   SetSessionThinkingLevelRequest,
-  SkillApprovalRequest,
   SkillInstallRecord,
   SkillOperationParams,
   SkillSummary,
@@ -144,18 +130,8 @@ export const DESKTOP_IPC_CHANNELS = {
   skillsListShared: 'yuanxiao:skills:list-shared',
   skillsInstall: 'yuanxiao:skills:install',
   skillsDelete: 'yuanxiao:skills:delete',
-  skillsApproveOperation: 'yuanxiao:skills:approve-operation',
-  skillsRejectOperation: 'yuanxiao:skills:reject-operation',
-  skillsGetPendingApprovals: 'yuanxiao:skills:get-pending-approvals',
   skillsGetInstallRecords: 'yuanxiao:skills:get-install-records',
   openExternalLink: 'yuanxiao:open-external-link',
-  sessionsApproveBash: 'yuanxiao:sessions:approve-bash',
-  sessionsRejectBash: 'yuanxiao:sessions:reject-bash',
-  sessionsGetPendingApprovals: 'yuanxiao:sessions:get-pending-approvals',
-  sessionsAnswerClarification: 'yuanxiao:sessions:answer-clarification',
-  sessionsCancelClarification: 'yuanxiao:sessions:cancel-clarification',
-  sessionsGetPendingClarifications:
-    'yuanxiao:sessions:get-pending-clarifications',
   sessionsGetTranscript: 'yuanxiao:sessions:get-transcript',
   sessionsRetryMessage: 'yuanxiao:sessions:retry-message',
   sessionsFork: 'yuanxiao:sessions:fork',
@@ -164,6 +140,7 @@ export const DESKTOP_IPC_CHANNELS = {
   sessionsDelete: 'yuanxiao:sessions:delete',
   sessionsResume: 'yuanxiao:sessions:resume',
   sessionsSetLastActive: 'yuanxiao:sessions:set-last-active',
+  sessionsRename: 'yuanxiao:sessions:rename',
   notificationSend: 'yuanxiao:notification:send',
 } as const
 
@@ -212,17 +189,8 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.skillsListShared]: undefined
   [DESKTOP_IPC_CHANNELS.skillsInstall]: SkillOperationParams
   [DESKTOP_IPC_CHANNELS.skillsDelete]: SkillOperationParams
-  [DESKTOP_IPC_CHANNELS.skillsApproveOperation]: ApproveSkillOperationRequest
-  [DESKTOP_IPC_CHANNELS.skillsRejectOperation]: RejectBashRequest
-  [DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals]: undefined
   [DESKTOP_IPC_CHANNELS.skillsGetInstallRecords]: undefined
   [DESKTOP_IPC_CHANNELS.openExternalLink]: OpenExternalLinkRequest
-  [DESKTOP_IPC_CHANNELS.sessionsApproveBash]: ApproveBashRequest
-  [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: RejectBashRequest
-  [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: undefined
-  [DESKTOP_IPC_CHANNELS.sessionsAnswerClarification]: AnswerClarificationRequest
-  [DESKTOP_IPC_CHANNELS.sessionsCancelClarification]: CancelClarificationRequest
-  [DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: GetSessionMessagesRequest
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: RetryRunRequest
   [DESKTOP_IPC_CHANNELS.sessionsFork]: ForkSessionRequest
@@ -231,6 +199,7 @@ export interface DesktopIpcRequestMap {
   [DESKTOP_IPC_CHANNELS.sessionsDelete]: DeleteSessionRequest
   [DESKTOP_IPC_CHANNELS.sessionsResume]: undefined
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: SetLastActiveSessionRequest
+  [DESKTOP_IPC_CHANNELS.sessionsRename]: RenameSessionRequest
   [DESKTOP_IPC_CHANNELS.notificationSend]: SendNotificationRequest
 }
 
@@ -270,19 +239,8 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.skillsListShared]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.skillsInstall]: skillOperationParamsSchema,
   [DESKTOP_IPC_CHANNELS.skillsDelete]: skillOperationParamsSchema,
-  [DESKTOP_IPC_CHANNELS.skillsApproveOperation]: approveSkillOperationRequestSchema,
-  [DESKTOP_IPC_CHANNELS.skillsRejectOperation]: rejectBashRequestSchema,
-  [DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.skillsGetInstallRecords]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.openExternalLink]: openExternalLinkRequestSchema,
-  [DESKTOP_IPC_CHANNELS.sessionsApproveBash]: approveBashRequestSchema,
-  [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: rejectBashRequestSchema,
-  [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: z.undefined(),
-  [DESKTOP_IPC_CHANNELS.sessionsAnswerClarification]:
-    answerClarificationRequestSchema,
-  [DESKTOP_IPC_CHANNELS.sessionsCancelClarification]:
-    cancelClarificationRequestSchema,
-  [DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: getSessionMessagesRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: retryRunRequestSchema,
   [DESKTOP_IPC_CHANNELS.sessionsFork]: forkSessionRequestSchema,
@@ -292,6 +250,7 @@ export const desktopIpcRequestSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsResume]: z.undefined(),
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]:
     setLastActiveSessionRequestSchema,
+  [DESKTOP_IPC_CHANNELS.sessionsRename]: renameSessionRequestSchema,
   [DESKTOP_IPC_CHANNELS.notificationSend]: sendNotificationRequestSchema,
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 
@@ -349,17 +308,8 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.skillsListShared]: SkillSummary[]
   [DESKTOP_IPC_CHANNELS.skillsInstall]: SkillSummary[]
   [DESKTOP_IPC_CHANNELS.skillsDelete]: SkillSummary[]
-  [DESKTOP_IPC_CHANNELS.skillsApproveOperation]: void
-  [DESKTOP_IPC_CHANNELS.skillsRejectOperation]: void
-  [DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals]: SkillApprovalRequest[]
   [DESKTOP_IPC_CHANNELS.skillsGetInstallRecords]: SkillInstallRecord[]
   [DESKTOP_IPC_CHANNELS.openExternalLink]: void
-  [DESKTOP_IPC_CHANNELS.sessionsApproveBash]: void
-  [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: void
-  [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: BashApprovalRequest[]
-  [DESKTOP_IPC_CHANNELS.sessionsAnswerClarification]: void
-  [DESKTOP_IPC_CHANNELS.sessionsCancelClarification]: void
-  [DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications]: QuestionClarificationRequest[]
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: TranscriptSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: TranscriptSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsFork]: AgentSessionSummary
@@ -368,6 +318,7 @@ export interface DesktopIpcResponseMap {
   [DESKTOP_IPC_CHANNELS.sessionsDelete]: DeleteSessionResult
   [DESKTOP_IPC_CHANNELS.sessionsResume]: SessionResumeSnapshot
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]: LastActiveSession | null
+  [DESKTOP_IPC_CHANNELS.sessionsRename]: AgentSessionSummary
   [DESKTOP_IPC_CHANNELS.notificationSend]: void
 }
 
@@ -415,25 +366,10 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.skillsListShared]: z.array(skillSummarySchema),
   [DESKTOP_IPC_CHANNELS.skillsInstall]: z.array(skillSummarySchema),
   [DESKTOP_IPC_CHANNELS.skillsDelete]: z.array(skillSummarySchema),
-  [DESKTOP_IPC_CHANNELS.skillsApproveOperation]: z.void(),
-  [DESKTOP_IPC_CHANNELS.skillsRejectOperation]: z.void(),
-  [DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals]: z.array(
-    skillApprovalRequestSchema,
-  ),
   [DESKTOP_IPC_CHANNELS.skillsGetInstallRecords]: z.array(
     skillInstallRecordSchema,
   ),
   [DESKTOP_IPC_CHANNELS.openExternalLink]: z.void(),
-  [DESKTOP_IPC_CHANNELS.sessionsApproveBash]: z.void(),
-  [DESKTOP_IPC_CHANNELS.sessionsRejectBash]: z.void(),
-  [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals]: z.array(
-    bashApprovalRequestSchema,
-  ),
-  [DESKTOP_IPC_CHANNELS.sessionsAnswerClarification]: z.void(),
-  [DESKTOP_IPC_CHANNELS.sessionsCancelClarification]: z.void(),
-  [DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications]: z.array(
-    questionClarificationRequestSchema,
-  ),
   [DESKTOP_IPC_CHANNELS.sessionsGetTranscript]: transcriptSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsRetryMessage]: transcriptSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsFork]: agentSessionSummarySchema,
@@ -443,6 +379,7 @@ export const desktopIpcResponseSchemas = {
   [DESKTOP_IPC_CHANNELS.sessionsResume]: sessionResumeSnapshotSchema,
   [DESKTOP_IPC_CHANNELS.sessionsSetLastActive]:
     lastActiveSessionSchema.nullable(),
+  [DESKTOP_IPC_CHANNELS.sessionsRename]: agentSessionSummarySchema,
   [DESKTOP_IPC_CHANNELS.notificationSend]: z.void(),
 } satisfies Record<DesktopIpcChannel, z.ZodType>
 

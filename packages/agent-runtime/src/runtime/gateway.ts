@@ -25,11 +25,6 @@ import {
 /** 元宵写入分叉会话 Pi JSONL 的来源记录 custom entry 类型。 */
 const YUANXIAO_FORK_SOURCE_ENTRY_TYPE = 'yuanxiao:fork-source'
 import { createUpdateSoulTool, createUpdateUserProfileTool } from '../profile'
-import {
-  createProtectedTools,
-  NATIVE_DANGEROUS_TOOL_NAMES,
-  toSdkCustomTools,
-} from '../core'
 
 export class RealPiSdkGateway implements PiSdkGateway {
   /**
@@ -118,6 +113,52 @@ export class RealPiSdkGateway implements PiSdkGateway {
       await session.prompt(request.prompt)
     } finally {
       request.signal.removeEventListener('abort', abortSession)
+      session.dispose()
+    }
+  }
+
+  /**
+   * 使用临时无工具会话执行单轮 LLM 补全，不保存任何上下文。
+   *
+   * @param request - Provider、Model、API Key 与 prompt 文本。
+   * @returns 模型文本回复；模型无输出时返回 null。
+   * @throws 当 SDK 模块加载、模型查找或调用失败时，Promise 会 reject。
+   */
+  async singleTurnCompletion(
+    request: import('@yuanxiao/contracts').RuntimeConfiguration & {
+      prompt: string
+    },
+  ): Promise<string | null> {
+    const {
+      AuthStorage,
+      ModelRegistry,
+      SessionManager,
+      SettingsManager,
+      createAgentSession,
+    } = await import('@earendil-works/pi-coding-agent')
+    const authStorage = AuthStorage.inMemory()
+    authStorage.setRuntimeApiKey(request.providerId, request.apiKey)
+
+    const modelRegistry = ModelRegistry.inMemory(authStorage)
+    const model = modelRegistry.find(request.providerId, request.modelId)
+
+    if (!model) {
+      throw new Error(`找不到模型 ${request.providerId}/${request.modelId}`)
+    }
+
+    const { session } = await createAgentSession({
+      authStorage,
+      modelRegistry,
+      model,
+      sessionManager: SessionManager.inMemory(),
+      settingsManager: SettingsManager.inMemory(),
+      noTools: 'all',
+    })
+
+    try {
+      await session.prompt(request.prompt)
+      return session.getLastAssistantText() ?? null
+    } finally {
       session.dispose()
     }
   }
@@ -464,7 +505,6 @@ export class RealPiSdkGateway implements PiSdkGateway {
       SessionManager,
       SettingsManager,
       createAgentSession,
-      createReadToolDefinition,
       DefaultResourceLoader,
     } = await import('@earendil-works/pi-coding-agent')
     const authStorage = AuthStorage.inMemory()
@@ -532,10 +572,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
     })
     await resourceLoader.reload()
 
-    // customTools 收容两种来源：YuanxiaoToolDefinition（带简化的 execute 签名）
-    // 与 ToolDefinition（来自 createProtectedTools 的 read_file 包装）。
-    // toSdkCustomTools 是唯一的类型适配边界，参见 protected-tools.ts。
-    const customTools: unknown[] = []
+    const customTools: ToolDefinition[] = []
 
     customTools.push(createUpdateSoulTool(request.onUpdateSoul))
     customTools.push(createUpdateUserProfileTool(request.onUpdateUserProfile))
@@ -570,113 +607,10 @@ export class RealPiSdkGateway implements PiSdkGateway {
                 text: `已创建 Agent「${result.displayName}」（ID: ${result.agentId}）。用户可以在 Agent 列表中切换到新 Agent 开始对话。`,
               },
             ],
+            details: undefined,
           }
         },
       })
-    }
-
-    // 注册带审批和路径保护的自定义工具
-    const approvalGateway = request.toolApprovalGateway
-    if (approvalGateway) {
-      const approvalRunContext = {
-        agentId: request.agentId,
-        sessionId: request.sessionId,
-        cwd: request.cwd,
-      }
-
-      // 受保护的危险工具：read_file / run_command / write_file / edit_file
-      // 通过 createProtectedTools 集中构造，使用与原生不同的工具名，
-      // 避免与 excludeTools 排除的原生名冲突。
-      customTools.push(
-        ...createProtectedTools(
-          {
-            gateway: approvalGateway,
-            agentId: request.agentId,
-            sessionId: request.sessionId,
-            cwd: request.cwd,
-          },
-          // 原生 read 工具定义工厂，供 read_file 复用（保留图片/offset/limit 能力）。
-          // createReadToolDefinition 的返回类型比泛型的 ToolDefinition 更具体
-          //（renderCall 参数在 strict 模式下不兼容），这一窄化仅限于此回调。
-          (cwd: string) => createReadToolDefinition(cwd) as ToolDefinition,
-        ),
-      )
-
-      // 自定义单问题澄清工具
-      customTools.push({
-        name: 'ask_clarification',
-        label: '询问用户（单问题澄清）',
-        description:
-          '向用户提出一个需要选择或回答的问题。每次只提一个问题，支持 2–5 个预设选项和可选的"其他"自由输入。后续问题通过新的 tool call 依次提出。',
-        promptSnippet:
-          'ask_clarification(question: string, options: string[], allowCustomAnswer?: boolean) → 用户选择的答案',
-        promptGuidelines: [
-          '每次只提一个问题，不要在一个 tool call 中提多个问题',
-          '选项数量应在 2–5 个之间',
-          '如果预设选项不足以覆盖用户可能的需求，设置 allowCustomAnswer 为 true',
-          '用户回答后将立即从断点继续执行',
-        ],
-        parameters: {
-          type: 'object',
-          properties: {
-            question: { type: 'string', minLength: 1 },
-            options: {
-              type: 'array',
-              items: { type: 'string', minLength: 1 },
-              minItems: 2,
-              maxItems: 5,
-            },
-            allowCustomAnswer: { type: 'boolean', default: false },
-          },
-          required: ['question', 'options'],
-          additionalProperties: false,
-        },
-        async execute(
-          _toolCallId: string,
-          params: {
-            question: string
-            options: string[]
-            allowCustomAnswer?: boolean
-          },
-        ) {
-          const result = await approvalGateway.requestClarification({
-            agentId: approvalRunContext.agentId || 'yuanxiao',
-            sessionId: approvalRunContext.sessionId,
-            runId: '',
-            question: params.question,
-            options: params.options,
-            allowCustomAnswer: params.allowCustomAnswer ?? false,
-          })
-
-          if (!result.answer) {
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: '用户取消了本次澄清。',
-                },
-              ],
-            }
-          }
-
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `用户回答：${result.answer}`,
-              },
-            ],
-          }
-        },
-      })
-    }
-
-    // 显式排除 Pi SDK 原生危险工具，由元宵受保护版本接管。
-    // 受保护版本使用不同的工具名（run_command / write_file / edit_file / read_file），
-    // 因此排除原生名不会牵连它们——安全边界不依赖 SDK 的工具注册顺序。
-    const excludedToolNames: string[] = []
-    if (approvalGateway) {
-      excludedToolNames.push(...NATIVE_DANGEROUS_TOOL_NAMES)
     }
 
     const { session } = await createAgentSession({
@@ -688,10 +622,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
       settingsManager: SettingsManager.inMemory(),
       resourceLoader,
       ...(customTools.length > 0
-        ? { customTools: toSdkCustomTools(customTools) }
-        : {}),
-      ...(excludedToolNames.length > 0
-        ? { excludeTools: excludedToolNames }
+        ? { customTools: customTools as ToolDefinition[] }
         : {}),
     })
 

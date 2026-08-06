@@ -105,6 +105,7 @@ function createRealFileGateway(): PiSdkGateway {
       ],
     }),
     verifyConfiguration: async () => undefined,
+    singleTurnCompletion: async () => null,
     createSession: async (request) => {
       const sessionManager = SessionManager.create(
         request.cwd,

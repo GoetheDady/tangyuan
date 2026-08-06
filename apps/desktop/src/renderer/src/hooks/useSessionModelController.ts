@@ -83,7 +83,6 @@ export function useSessionModelController({
       })
       if (requestId !== requestIdRef.current) return
       setSessionModelInfo(info)
-      toast.success(`已切换到 Thinking Level: ${level}`)
     } catch (error: unknown) {
       if (requestId !== requestIdRef.current) return
       toast.error(

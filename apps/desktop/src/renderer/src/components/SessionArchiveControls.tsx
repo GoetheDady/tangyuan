@@ -57,7 +57,7 @@ export function ArchivedSessionList(props: {
         {rootSessions.map((session) => (
           <div
             key={session.sessionId}
-            className="text-muted-foreground flex h-8 min-w-0 items-center gap-1 rounded-lg px-2.5 text-[11px]"
+            className="text-muted-foreground hover:bg-secondary/60 flex h-8 min-w-0 items-center gap-1 rounded-lg px-2.5 text-[11px] transition-colors"
           >
             <span className="min-w-0 flex-1 truncate">{session.title}</span>
             <Button

@@ -1,5 +1,11 @@
 import { Paperclip, Send, StopCircle } from 'lucide-react'
-import { useCallback, useRef, useState, type KeyboardEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react'
 
 import type {
   ModelDescriptor,
@@ -18,13 +24,24 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+
+/** 思考档位（Pi SDK 枚举）到中文文案的映射，未知档位回退为原文。 */
+const THINKING_LEVEL_LABELS: Record<string, string> = {
+  off: '关',
+  minimal: '极简',
+  low: '低',
+  medium: '中',
+  high: '高',
+  xhigh: '极高',
+  max: '极限',
+}
 
 /**
  * Composer 组件的属性。
@@ -103,7 +120,17 @@ export function Composer({
   onThinkingLevelChange,
 }: ComposerProps): React.JSX.Element {
   const [isComposing, setIsComposing] = useState(false)
+  const [showThinkingLevel, setShowThinkingLevel] = useState(false)
+  const thinkingLevelHideTimerRef = useRef<number | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    return () => {
+      if (thinkingLevelHideTimerRef.current !== null) {
+        window.clearTimeout(thinkingLevelHideTimerRef.current)
+      }
+    }
+  }, [])
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current
@@ -137,7 +164,7 @@ export function Composer({
   const showThinkingControl =
     sessionModelInfo?.supportsThinking &&
     sessionModelInfo.supportedThinkingLevels &&
-    sessionModelInfo.supportedThinkingLevels.length > 0
+    sessionModelInfo.supportedThinkingLevels.length > 1
 
   const thinkingLevels = sessionModelInfo?.supportedThinkingLevels ?? []
   const selectedThinkingIndex = Math.max(
@@ -148,6 +175,27 @@ export function Composer({
     thinkingLevels.length <= 1
       ? 0
       : selectedThinkingIndex / (thinkingLevels.length - 1)
+  const selectedThinkingLevel = thinkingLevels[selectedThinkingIndex] ?? 'off'
+  const thinkingLevelLabel =
+    THINKING_LEVEL_LABELS[selectedThinkingLevel] ?? selectedThinkingLevel
+
+  const showThinkingLevelLabel = useCallback(() => {
+    if (thinkingLevelHideTimerRef.current !== null) {
+      window.clearTimeout(thinkingLevelHideTimerRef.current)
+      thinkingLevelHideTimerRef.current = null
+    }
+    setShowThinkingLevel(true)
+  }, [])
+
+  const hideThinkingLevelLabelSoon = useCallback(() => {
+    if (thinkingLevelHideTimerRef.current !== null) {
+      window.clearTimeout(thinkingLevelHideTimerRef.current)
+    }
+    thinkingLevelHideTimerRef.current = window.setTimeout(() => {
+      setShowThinkingLevel(false)
+      thinkingLevelHideTimerRef.current = null
+    }, 600)
+  }, [])
 
   return (
     <form
@@ -218,68 +266,66 @@ export function Composer({
             ) : null}
 
             {showThinkingControl ? (
-              <Select
-                value={sessionModelInfo?.thinkingLevel ?? 'off'}
-                onValueChange={onThinkingLevelChange}
-                disabled={isSwitchingModel || isRunning}
-              >
-                <SelectTrigger
-                  aria-label="思考强度"
-                  size="sm"
-                  className="text-caption text-muted-foreground h-6 w-[96px] gap-1.5 border-0 bg-transparent p-0 hover:border-0 [&>svg]:hidden"
-                >
-                  <span>思考</span>
-                  <span className="bg-border relative h-[5px] w-16 shrink-0 rounded-full">
+              <>
+                <span className="text-caption text-muted-foreground shrink-0">
+                  思考
+                </span>
+                <div className="relative h-6 w-16 shrink-0">
+                  <Slider
+                    aria-label="思考强度"
+                    aria-valuetext={thinkingLevelLabel}
+                    className="h-full w-full"
+                    min={0}
+                    max={thinkingLevels.length - 1}
+                    step={1}
+                    value={[selectedThinkingIndex]}
+                    disabled={isSwitchingModel || isRunning}
+                    onValueChange={([index]) => {
+                      onThinkingLevelChange(thinkingLevels[index] ?? 'off')
+                    }}
+                    onPointerDown={showThinkingLevelLabel}
+                    onPointerUp={hideThinkingLevelLabelSoon}
+                    onValueCommit={hideThinkingLevelLabelSoon}
+                  />
+                  {showThinkingLevel ? (
                     <span
                       aria-hidden="true"
-                      className="bg-primary absolute inset-y-0 left-0 rounded-full"
-                      style={{ width: `${thinkingProgress * 100}%` }}
-                    />
-                    <span
-                      aria-hidden="true"
-                      className="border-primary bg-background absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
-                      style={{ left: `${thinkingProgress * 100}%` }}
-                    />
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {thinkingLevels.map((level) => (
-                      <SelectItem key={level} value={level}>
-                        Thinking: {level}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+                      className="bg-primary text-primary-foreground pointer-events-none absolute -top-6 z-10 -translate-x-1/2 rounded-[6px] px-1.5 py-0.5 text-[10px] whitespace-nowrap"
+                      style={{
+                        left: `max(16px, min(${thinkingProgress * 100}%, calc(100% - 16px)))`,
+                      }}
+                    >
+                      {thinkingLevelLabel}
+                    </span>
+                  ) : null}
+                </div>
+              </>
             ) : null}
 
             {isLoadingModelInfo ? (
-              <span className="text-muted-foreground shrink-0 text-[10px]">
+              <span className="text-muted-foreground text-caption shrink-0">
                 加载中...
               </span>
             ) : null}
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    disabled
-                    aria-label="附件功能暂未开放"
-                  >
-                    <Paperclip aria-hidden="true" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>附件功能暂未开放</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled
+                  aria-label="附件功能暂未开放"
+                >
+                  <Paperclip aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>附件功能暂未开放</p>
+              </TooltipContent>
+            </Tooltip>
 
             {isRunning ? (
               <Button

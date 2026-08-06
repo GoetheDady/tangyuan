@@ -513,6 +513,13 @@ export type AgentEvent =
       delta: TranscriptDelta
       occurredAt: string
     }
+  | {
+      type: 'session-title-changed'
+      agentId: AgentId
+      sessionId: string
+      title: string
+      occurredAt: string
+    }
 
 /**
  * 处理 Agent 标准事件的回调方法。
@@ -894,6 +901,16 @@ export interface AgentSkillsStatus {
   agentSkillsCount: number
   /** 同名冲突 Skill 数量。 */
   conflictsCount: number
+}
+
+/**
+ * 描述重命名会话标题的请求。
+ */
+export interface RenameSessionRequest {
+  agentId: AgentId
+  sessionId: string
+  /** 新标题；最长 200 个字符。 */
+  title: string
 }
 
 /**

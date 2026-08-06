@@ -21,7 +21,7 @@ export function AwaitingResponseIndicator(): React.JSX.Element {
         aria-label="Agent 正在响应"
       >
         <div className="text-muted-foreground flex items-center gap-1.5 px-1 py-2">
-          <span className="size-1.5 animate-pulse rounded-full bg-current [animation-delay:0ms]" />
+          <span className="size-1.5 animate-pulse rounded-full bg-current" />
           <span className="size-1.5 animate-pulse rounded-full bg-current [animation-delay:200ms]" />
           <span className="size-1.5 animate-pulse rounded-full bg-current [animation-delay:400ms]" />
         </div>

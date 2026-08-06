@@ -455,4 +455,18 @@ export class SessionIndexStore {
       this.updateEntry(draft, sessionId, { thinkingLevel })
     })
   }
+
+  /**
+   * 更新会话标题并写盘，返回更新后的会话摘要。
+   *
+   * @param sessionId - 目标会话标识。
+   * @param title - 新标题。
+   * @returns 更新后的 AgentSessionSummary。
+   * @throws 当会话不存在或索引写入失败时，Promise 会 reject。
+   */
+  async updateTitle(sessionId: string, title: string): Promise<AgentSessionSummary> {
+    return this.commitMutation((draft) =>
+      this.toSummary(this.updateEntry(draft, sessionId, { title })),
+    )
+  }
 }

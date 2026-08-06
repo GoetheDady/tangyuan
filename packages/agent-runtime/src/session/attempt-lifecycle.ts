@@ -32,6 +32,15 @@ export interface AttemptLifecycleDependencies {
   invalidateTranscript(sessionId: string): void
   performBootstrapCompletionGating(): Promise<void>
   afterRun(sessionId: string, agentId: AgentId): Promise<void>
+  /**
+   * 首轮成功完成后的可选 hook（fire-and-forget）。
+   * 由装配点注入以实现标题生成等附加行为，AttemptLifecycle 不感知具体策略。
+   */
+  afterFirstRun?(
+    sessionId: string,
+    agentId: AgentId,
+    context: { userMessage: string; assistantReply: string },
+  ): Promise<void>
   now(): string
 }
 
@@ -342,6 +351,20 @@ export class AttemptLifecycle {
         ...(retryCount > 0 ? { retryCount } : {}),
       })
       await this.dependencies.updateSessionState(input.sessionId, 'completed')
+      // 首轮成功完成后异步触发 afterFirstRun hook（fire-and-forget，失败不影响主流程）。
+      if (
+        this.runSequenceBySession.get(input.sessionId) === 1 &&
+        this.dependencies.afterFirstRun
+      ) {
+        void this.dependencies
+          .afterFirstRun(input.sessionId, input.agentId, {
+            userMessage: input.content.slice(0, 500),
+            assistantReply: accumulatedReply.slice(0, 500),
+          })
+          .catch(() => {
+            // fire-and-forget：标题生成失败静默忽略。
+          })
+      }
     } catch (error) {
       if (isAbortError(error) || !this.activeRunIds.has(input.sessionId)) {
         await this.finishCancelled(input, retryCount)

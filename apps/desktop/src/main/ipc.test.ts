@@ -83,6 +83,7 @@ describe('registerDesktopAppIpc', () => {
       }),
       recoverSession: vi.fn().mockResolvedValue([session]),
       deleteSession: vi.fn(),
+      renameSession: vi.fn().mockResolvedValue(session),
       cancelRun: vi.fn().mockResolvedValue(session),
       subscribe: vi.fn(),
       cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined),
@@ -195,7 +196,7 @@ describe('registerDesktopAppIpc', () => {
       openExternalLink,
     )
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(50)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(51)
     expect(broadcastAgentEvent).toHaveBeenCalledWith(
       createAttemptStartedEvent(),
     )
@@ -267,7 +268,10 @@ describe('registerDesktopAppIpc', () => {
       }),
     ).resolves.toEqual(session)
     await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsResume)(null, undefined),
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsResume)(
+        null,
+        undefined,
+      ),
     ).resolves.toMatchObject({ activeSession: session })
     expect(runtime.resumeSession).toHaveBeenCalledOnce()
     await expect(
@@ -312,6 +316,18 @@ describe('registerDesktopAppIpc', () => {
         confirmActivityStop: false,
       }),
     ).resolves.toMatchObject({ status: 'archived' })
+    await expect(
+      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsRename)(null, {
+        agentId: 'yuanxiao',
+        sessionId: 'session-1',
+        title: '新标题',
+      }),
+    ).resolves.toEqual(session)
+    expect(runtime.renameSession).toHaveBeenCalledWith({
+      agentId: 'yuanxiao',
+      sessionId: 'session-1',
+      title: '新标题',
+    })
     await expect(
       getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsRecover)(null, {
         agentId: 'yuanxiao',
@@ -496,6 +512,7 @@ describe('registerDesktopAppIpc', () => {
       archiveSession: vi.fn(),
       recoverSession: vi.fn(),
       deleteSession: vi.fn(),
+      renameSession: vi.fn(),
       cancelRun: vi.fn(),
       subscribe: vi.fn(),
       cancelAllActiveRuns: vi.fn().mockResolvedValue(undefined),

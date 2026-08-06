@@ -24,7 +24,7 @@ function Toaster(): React.JSX.Element {
   return (
     <SonnerToaster
       theme="light"
-      position="bottom-right"
+      position="top-right"
       duration={TOAST_DURATION_MS}
       gap={TOAST_GAP_PX}
       visibleToasts={TOAST_VISIBLE_COUNT}

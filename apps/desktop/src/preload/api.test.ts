@@ -38,12 +38,8 @@ describe('createYuanxiaoPreloadApi', () => {
     const api = createYuanxiaoPreloadApi(invoke, subscribe)
 
     expect(Object.keys(api).sort()).toEqual([
-      'answerClarification',
-      'approveBash',
-      'approveSkillOperation',
       'archiveAgent',
       'archiveSession',
-      'cancelClarification',
       'cancelRun',
       'cancelRuntimeConfigurationVerification',
       'claimAgentDirectory',
@@ -52,9 +48,6 @@ describe('createYuanxiaoPreloadApi', () => {
       'deleteSession',
       'deleteSkill',
       'forkSession',
-      'getPendingApprovals',
-      'getPendingClarifications',
-      'getPendingSkillApprovals',
       'getRuntimeSnapshot',
       'getSessionModelInfo',
       'getSkillInstallRecords',
@@ -72,8 +65,7 @@ describe('createYuanxiaoPreloadApi', () => {
       'recoverAgent',
       'recoverSession',
       'refreshRuntime',
-      'rejectBash',
-      'rejectSkillOperation',
+      'renameSession',
       'resetConfiguration',
       'restoreFromBackup',
       'resumeSession',
@@ -159,9 +151,6 @@ describe('createYuanxiaoPreloadApi', () => {
     await api.openExternalLink({ url: 'https://example.com' })
     await api.listAgentSkills({ agentId: 'agent-1' })
     await api.listSharedSkills()
-    await api.approveBash({ approvalId: 'approval-1', remember: true })
-    await api.rejectBash({ approvalId: 'approval-2' })
-    await api.getPendingApprovals()
     await api.installSkill({
       operation: 'install',
       source: 'shared',
@@ -176,9 +165,6 @@ describe('createYuanxiaoPreloadApi', () => {
       targetAgentId: 'agent-1',
       skillName: 'test-skill',
     })
-    await api.approveSkillOperation({ approvalId: 'approval-3' })
-    await api.rejectSkillOperation({ approvalId: 'approval-4' })
-    await api.getPendingSkillApprovals()
     await api.getSkillInstallRecords()
     api.subscribeToAgentEvents(() => undefined)
 
@@ -292,12 +278,6 @@ describe('createYuanxiaoPreloadApi', () => {
       [DESKTOP_IPC_CHANNELS.skillsListAgent, { agentId: 'agent-1' }],
       [DESKTOP_IPC_CHANNELS.skillsListShared],
       [
-        DESKTOP_IPC_CHANNELS.sessionsApproveBash,
-        { approvalId: 'approval-1', remember: true },
-      ],
-      [DESKTOP_IPC_CHANNELS.sessionsRejectBash, { approvalId: 'approval-2' }],
-      [DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals],
-      [
         DESKTOP_IPC_CHANNELS.skillsInstall,
         {
           operation: 'install',
@@ -317,15 +297,6 @@ describe('createYuanxiaoPreloadApi', () => {
           skillName: 'test-skill',
         },
       ],
-      [
-        DESKTOP_IPC_CHANNELS.skillsApproveOperation,
-        { approvalId: 'approval-3' },
-      ],
-      [
-        DESKTOP_IPC_CHANNELS.skillsRejectOperation,
-        { approvalId: 'approval-4' },
-      ],
-      [DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals],
       [DESKTOP_IPC_CHANNELS.skillsGetInstallRecords],
     ])
     expect(subscriptions).toEqual([

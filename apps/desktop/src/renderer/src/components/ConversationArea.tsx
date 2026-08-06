@@ -117,6 +117,12 @@ export function ConversationArea(
         <h2 className="text-section-heading min-w-0 flex-1 truncate font-semibold">
           {selectedSession?.title ?? '新对话'}
         </h2>
+        {(props.isAwaitingResponse || props.isStreaming) && (
+          <span
+            aria-label="运行中"
+            className="bg-primary ml-3 size-1.5 shrink-0 animate-pulse rounded-full"
+          />
+        )}
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col">

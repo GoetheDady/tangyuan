@@ -35,7 +35,6 @@ import type {
   PiSdkDriverOptions,
   PiSdkGateway,
   PiSdkSessionHandle,
-  ToolApprovalGateway,
 } from './pi-sdk-driver-contracts'
 
 export abstract class PiSdkDriverState {
@@ -65,7 +64,6 @@ export abstract class PiSdkDriverState {
   protected readonly pendingProfileRefreshes = new Set<string>()
   protected readonly activeRunIds = new Map<string, string>()
   protected readonly runSequenceBySession = new Map<string, number>()
-  protected toolApprovalGateway: ToolApprovalGateway | undefined
 
   /**
    * 创建 Pi SDK Driver 骨架。
@@ -110,6 +108,30 @@ export abstract class PiSdkDriverState {
           })
         }
       },
+      afterFirstRun: async (sessionId, agentId, { userMessage, assistantReply }) => {
+        // 仅对根会话（非分叉）生成标题。
+        const indexEntry = await this.sessionIndexStore.resolveEntry(sessionId).catch(() => null)
+        if (!indexEntry || indexEntry.forkedFrom) return
+
+        try {
+          const config = await this.resolveSessionConfiguration(indexEntry)
+          const prompt = buildTitleGenerationPrompt(userMessage, assistantReply)
+          const raw = await this.gateway.singleTurnCompletion({ ...config, prompt })
+          const title = sanitizeTitleResponse(raw)
+          if (!title) return
+
+          await this.sessionIndexStore.updateTitle(sessionId, title)
+          this.emit({
+            type: 'session-title-changed',
+            agentId,
+            sessionId,
+            title,
+            occurredAt: this.now(),
+          })
+        } catch {
+          // fire-and-forget：标题生成失败静默忽略。
+        }
+      },
       now: this.now,
     })
     this.configurationModule = resolved.configurationModule
@@ -128,7 +150,6 @@ export abstract class PiSdkDriverState {
         this.refreshAgentProfileContext(agentId),
       refreshAllContexts: () => this.refreshAllProfileContext(),
     })
-    this.toolApprovalGateway = options.toolApprovalGateway
   }
 
   /**
@@ -288,11 +309,7 @@ export abstract class PiSdkDriverState {
     ])
     this.sessionSoulVersions.set(sessionId, soul.version)
     this.sessionUserProfileVersions.set(sessionId, userProfile.version)
-    const handle = await this.gateway.openSession(
-      this.toolApprovalGateway
-        ? { ...openRequest, toolApprovalGateway: this.toolApprovalGateway }
-        : openRequest,
-    )
+    const handle = await this.gateway.openSession(openRequest)
     this.sessionHandles.set(sessionId, handle)
     // 会话运行配置属于会话：Thinking Level 由元宵索引恢复，
     // 不依赖 Pi session 文件是否记住上次取值。
@@ -732,4 +749,43 @@ export abstract class PiSdkDriverState {
 
     return info
   }
+}
+
+/**
+ * 构建用于生成会话标题的单轮 LLM prompt。
+ *
+ * 只传入用户消息和助手首句回复，各截断至 500 字符，保持 prompt 轻量。
+ */
+function buildTitleGenerationPrompt(
+  userMessage: string,
+  assistantReply: string,
+): string {
+  const parts = [`用户：${userMessage}`]
+  if (assistantReply) {
+    parts.push(`助手：${assistantReply}`)
+  }
+  return (
+    `根据以下对话内容，用一句话概括本次会话的主题，生成一个简洁的标题。\n` +
+    `要求：不超过 20 个字，不加引号、冒号或标点，直接输出标题文本。\n\n` +
+    parts.join('\n')
+  )
+}
+
+/**
+ * 清理 LLM 返回的标题文本：去除首尾空白、引号与常见前缀。
+ *
+ * @returns 清理后的标题；结果为空时返回 null，让调用方保留原有标题。
+ */
+function sanitizeTitleResponse(raw: string | null): string | null {
+  if (!raw) return null
+  const cleaned = raw
+    .trim()
+    // 去除首尾引号（直引号与弯引号）
+    .replace(/^["'""'']+|["'""'']+$/g, '')
+    // 去除"标题："前缀
+    .replace(/^标题[：:]\s*/, '')
+    .trim()
+    // 截断至 40 字符上限
+    .slice(0, 40)
+  return cleaned || null
 }

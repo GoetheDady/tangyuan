@@ -2,11 +2,7 @@ import type {
   AgentEventListener,
   AgentSessionSummary,
   AgentSummary,
-  AnswerClarificationRequest,
-  ApproveBashRequest,
   ArchiveAgentRequest,
-  BashApprovalRequest,
-  CancelClarificationRequest,
   CancelConfigurationVerificationRequest,
   CancelRunRequest,
   ClaimAgentDirectoryRequest,
@@ -21,9 +17,8 @@ import type {
   OpenExternalLinkRequest,
   ProfileUpdateResult,
   ProviderConfiguration,
-  QuestionClarificationRequest,
   RecoverAgentRequest,
-  RejectBashRequest,
+  RenameSessionRequest,
   RetryRunRequest,
   RuntimeConfiguration,
   RuntimeSnapshot,
@@ -32,7 +27,6 @@ import type {
   SessionModelInfo,
   SetSessionModelRequest,
   SetSessionThinkingLevelRequest,
-  SkillApprovalRequest,
   SkillInstallRecord,
   SkillOperationParams,
   SkillSummary,
@@ -82,6 +76,7 @@ export interface DesktopPreloadApi {
   archiveSession(request: ArchiveSessionRequest): Promise<ArchiveSessionResult>
   recoverSession(request: RecoverSessionRequest): Promise<AgentSessionSummary[]>
   deleteSession(request: DeleteSessionRequest): Promise<DeleteSessionResult>
+  renameSession(request: RenameSessionRequest): Promise<AgentSessionSummary>
   resumeSession(): Promise<SessionResumeSnapshot>
   setLastActiveSession(
     request: SetLastActiveSessionRequest,
@@ -120,17 +115,7 @@ export interface DesktopPreloadApi {
   listSharedSkills(): Promise<SkillSummary[]>
   installSkill(params: SkillOperationParams): Promise<SkillSummary[]>
   deleteSkill(params: SkillOperationParams): Promise<SkillSummary[]>
-  approveSkillOperation(request: ApproveBashRequest): Promise<void>
-  rejectSkillOperation(request: RejectBashRequest): Promise<void>
-  getPendingSkillApprovals(): Promise<SkillApprovalRequest[]>
   getSkillInstallRecords(): Promise<SkillInstallRecord[]>
-
-  approveBash(request: ApproveBashRequest): Promise<void>
-  rejectBash(request: RejectBashRequest): Promise<void>
-  getPendingApprovals(): Promise<BashApprovalRequest[]>
-  answerClarification(request: AnswerClarificationRequest): Promise<void>
-  cancelClarification(request: CancelClarificationRequest): Promise<void>
-  getPendingClarifications(): Promise<QuestionClarificationRequest[]>
 
   openExternalLink(request: OpenExternalLinkRequest): Promise<void>
   sendNotification(request: SendNotificationRequest): Promise<void>

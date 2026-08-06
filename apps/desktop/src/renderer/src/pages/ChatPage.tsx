@@ -1,13 +1,10 @@
 import type {
   AgentSummary,
-  BashApprovalRequest,
   ModelDescriptor,
-  QuestionClarificationRequest,
 } from '@yuanxiao/contracts'
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { useStore } from 'zustand'
-import { useShallow } from 'zustand/react/shallow'
 
 import { ChatSidebar } from '@/components/ChatSidebar'
 import { ConversationArea } from '@/components/ConversationArea'
@@ -16,14 +13,10 @@ import {
 } from '@/components/SessionArchiveControls'
 import { useChatSessionActions } from '@/hooks/useChatSessionActions'
 import { useSessionArchive } from '@/hooks/useSessionArchive'
-import { computePendingApprovalSessionIds } from '@/lib/agent-event-state'
 import {
   EMPTY_SESSIONS,
   type WorkbenchStoreApi,
 } from '@/stores/workbench-store'
-
-const EMPTY_APPROVALS: BashApprovalRequest[] = []
-const EMPTY_CLARIFICATIONS: QuestionClarificationRequest[] = []
 
 /**
  * 聊天页路由守卫：运行时未就绪时重定向到控制台。
@@ -100,23 +93,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
   )
   const isSendingMessage = useStore(store, (state) =>
     sessionId ? (state.sendingBySessionId[sessionId] ?? false) : false,
-  )
-  const sessionPendingApprovals = useStore(store, (state) =>
-    sessionId
-      ? (state.pendingApprovalsBySessionId[sessionId] ?? EMPTY_APPROVALS)
-      : EMPTY_APPROVALS,
-  )
-  const sessionPendingClarifications = useStore(store, (state) =>
-    sessionId
-      ? (state.pendingClarificationsBySessionId[sessionId] ??
-        EMPTY_CLARIFICATIONS)
-      : EMPTY_CLARIFICATIONS,
-  )
-  const pendingApprovalSessionIds = useStore(
-    store,
-    useShallow((state) =>
-      computePendingApprovalSessionIds(state.pendingApprovalsBySessionId),
-    ),
   )
 
   const activeAgent = useMemo(
@@ -221,7 +197,7 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
           activeAgentId={activeAgentId}
           sessions={sessions}
           selectedSessionId={selectedSession?.sessionId ?? null}
-          pendingApprovalSessionIds={pendingApprovalSessionIds}
+          pendingApprovalSessionIds={[]}
           archivedSessions={archivedSessions}
           recoveringSessionId={sessionArchive.recoveringSessionId}
           onAgentChange={(nextAgentId) => {
@@ -245,6 +221,23 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
           onDeleteSession={(session) => {
             sessionArchive.requestDeleteSession(session)
           }}
+          onRenameSession={(session, title) => {
+            void (async () => {
+              try {
+                const updated = await window.api.renameSession({
+                  agentId: session.agentId,
+                  sessionId: session.sessionId,
+                  title,
+                })
+                store.getState().updateSession(updated)
+              } catch (error: unknown) {
+                const { toast } = await import('sonner')
+                toast.error(
+                  error instanceof Error ? error.message : '重命名会话失败',
+                )
+              }
+            })()
+          }}
         />
         <ConversationArea
           selectedSession={selectedSession}
@@ -254,8 +247,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
           isLoadingTranscript={sessionActions.isLoadingTranscript}
           isStreaming={isSelectedSessionRunning}
           isAwaitingResponse={isAwaitingResponse}
-          pendingApprovals={sessionPendingApprovals}
-          pendingClarifications={sessionPendingClarifications}
           activeAgentDisplayName={activeAgentDisplayName}
           composer={{
             value: composerText,
@@ -294,31 +285,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
             },
             onViewForkSource: () => {
               viewForkSource()
-            },
-          }}
-          approvals={{
-            onApproveOnce: (approvalId) => {
-              void window.api.approveBash({ approvalId })
-            },
-            onApproveAlways: (approval) => {
-              void window.api.approveBash({
-                approvalId: approval.approvalId,
-                remember: true,
-              })
-            },
-            onReject: (approvalId) => {
-              void window.api.rejectBash({ approvalId })
-            },
-          }}
-          clarifications={{
-            onAnswer: (clarificationId, answer) => {
-              void window.api.answerClarification({
-                clarificationId,
-                answer,
-              })
-            },
-            onCancel: (clarificationId) => {
-              void window.api.cancelClarification({ clarificationId })
             },
           }}
         />

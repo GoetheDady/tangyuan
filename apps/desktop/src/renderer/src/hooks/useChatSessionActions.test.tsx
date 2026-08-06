@@ -2,6 +2,7 @@ import type { AgentSessionSummary } from '@yuanxiao/contracts'
 import { createDefaultSessionSummary } from '@yuanxiao/contracts'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
+import { toast } from 'sonner'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -423,5 +424,32 @@ describe('useChatSessionActions', () => {
     await waitFor(() => {
       expect(result.current.isLoadingTranscript).toBe(false)
     })
+  })
+
+  it('切换思考强度成功后不弹成功提示，失败时弹错误提示', async () => {
+    const successSpy = vi
+      .spyOn(toast, 'success')
+      .mockImplementation(() => '')
+    const errorSpy = vi.spyOn(toast, 'error').mockImplementation(() => '')
+    try {
+      const store = createWorkbenchStore()
+      const { result } = renderActions(store)
+
+      await act(async () => {
+        await result.current.handleThinkingLevelChange('medium')
+      })
+      expect(successSpy).not.toHaveBeenCalled()
+
+      vi.mocked(window.api.setSessionThinkingLevel).mockRejectedValue(
+        new Error('切换失败'),
+      )
+      await act(async () => {
+        await result.current.handleThinkingLevelChange('high')
+      })
+      expect(errorSpy).toHaveBeenCalled()
+    } finally {
+      successSpy.mockRestore()
+      errorSpy.mockRestore()
+    }
   })
 })

@@ -483,7 +483,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                           {skill.conflict ? (
                             <Badge
                               variant="outline"
-                              className="shrink-0 border-amber-300 text-amber-600"
+                              className="shrink-0 border-warning-border text-warning-foreground"
                             >
                               已覆盖同名共享 Skill
                             </Badge>
@@ -491,7 +491,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                           {skill.hasScripts ? (
                             <Badge
                               variant="outline"
-                              className="shrink-0 border-orange-300 text-orange-600"
+                              className="shrink-0 border-destructive-border text-destructive-soft-foreground"
                             >
                               含脚本
                             </Badge>
@@ -502,7 +502,7 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                             {skill.description}
                           </p>
                         ) : null}
-                        <p className="text-muted-foreground/60 mt-0.5 truncate font-mono text-[10px]">
+                        <p className="text-muted-foreground/60 mt-0.5 truncate font-mono text-caption">
                           {skill.path}
                         </p>
                       </div>
@@ -567,12 +567,12 @@ export function ConsoleAgentDetailPage(): React.JSX.Element {
                             {record.status === 'active' ? '生效中' : '已删除'}
                           </Badge>
                           {record.targetAgentId ? (
-                            <span className="text-muted-foreground truncate font-mono text-[10px]">
+                            <span className="text-muted-foreground truncate font-mono text-caption">
                               {record.targetAgentId}
                             </span>
                           ) : null}
                         </div>
-                        <div className="text-muted-foreground mt-1 flex gap-4 text-[10px]">
+                        <div className="text-muted-foreground mt-1 flex gap-4 text-caption">
                           <span>安装: {record.installedAt}</span>
                           <span>更新: {record.updatedAt}</span>
                         </div>

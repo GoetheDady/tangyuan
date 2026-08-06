@@ -6,6 +6,7 @@ import type {
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { GitBranchPlus, Sparkles } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
+import { Button } from '@/components/ui/button'
 import {
   AssistantMessage,
   TIMELINE_TOGGLE_ANIMATION_MS,
@@ -507,18 +508,20 @@ export function TranscriptMessages({
                           {formatMessageTime(item.createdAt)}
                         </time>
                         {onFork ? (
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="icon-sm"
                             aria-label="从此处分叉"
                             title="从此处分叉"
-                            className="window-no-drag text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/50 flex size-6 items-center justify-center rounded-md transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
+                            className="window-no-drag"
                             onClick={(event) => {
                               event.stopPropagation()
                               onFork(item.messageId)
                             }}
                           >
                             <GitBranchPlus size={14} aria-hidden="true" />
-                          </button>
+                          </Button>
                         ) : null}
                       </footer>
                     </article>

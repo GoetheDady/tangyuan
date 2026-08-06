@@ -131,7 +131,7 @@ describe('AssistantMessage', () => {
     expect(screen.getByText('FINAL TURN')).toBeInTheDocument()
   })
 
-  it('shows unconfirmed notice in unconfirmed-text state', () => {
+  it('does not show unconfirmed notice in unconfirmed-text state', () => {
     const entry = createEntry({
       content: '分析正在进行中...',
       attempt: {
@@ -157,7 +157,7 @@ describe('AssistantMessage', () => {
     render(<AssistantMessage entry={entry} isStreaming />)
 
     expect(screen.getByText('仍在执行')).toBeInTheDocument()
-    expect(screen.getByText(/尚未确认/)).toBeInTheDocument()
+    expect(screen.queryByText(/尚未确认/)).not.toBeInTheDocument()
   })
 
   it('shows the current automatic retry count while running', () => {

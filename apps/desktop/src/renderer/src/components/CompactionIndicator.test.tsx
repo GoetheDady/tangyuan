@@ -40,7 +40,7 @@ describe('CompactionIndicator', () => {
     const { container } = render(
       <CompactionIndicator timestamp={testTimestamp} />,
     )
-    const separators = container.querySelectorAll('.h-px.bg-border')
+    const separators = container.querySelectorAll('.h-px.bg-split')
     expect(separators).toHaveLength(2)
   })
 })

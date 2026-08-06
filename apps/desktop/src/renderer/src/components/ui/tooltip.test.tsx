@@ -102,7 +102,7 @@ describe('Tooltip', () => {
     expect(content).toHaveAttribute('data-level', '2')
     expect(content).toHaveAttribute('data-side', 'top')
     expect(contentPropsSpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({ side: 'top', sideOffset: 0 }),
+      expect.objectContaining({ side: 'top', sideOffset: 4 }),
     )
 
     for (const className of [

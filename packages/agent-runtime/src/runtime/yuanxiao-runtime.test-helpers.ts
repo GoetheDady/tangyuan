@@ -152,6 +152,9 @@ export function createSessionDriver(
     setSessionsArchived: vi.fn(async () => currentSessions),
     deleteSessions: vi.fn().mockResolvedValue(undefined),
     getSessionAttempts: vi.fn(async () => []),
+    renameSession: vi.fn(async () => {
+      throw new Error('测试未配置 renameSession。')
+    }),
     getActiveRunId: vi.fn((sessionId: string) => activeRunIds.get(sessionId)),
     getActiveRunCount: vi.fn(() => activeRunIds.size),
     getSessionModelInfo: vi.fn(async () => {

@@ -4,6 +4,7 @@
 
 - **语言**：始终使用中文回复，包括解释、计划、commit message、PR 描述以及写入文档的内容。代码、标识符、API 名称保持英文。
 - **查代码优先用 codegraph**：仓库已建有 `.codegraph/` 索引。理解或定位代码时，先用 `codegraph explore <query>` 或 `codegraph query <search>`，需要调用关系时用 `codegraph callers/callees/impact`，再回退到 `rg` 等文本搜索。
+- **视觉识别调用 Claude Code**：任务涉及视觉识别（如图片内容理解、截图/界面分析、视觉验证等）时，调用 Claude Code 处理。
 
 ## Pi 启动流程
 

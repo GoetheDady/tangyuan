@@ -24,6 +24,14 @@ export function mergeAgentEventIntoSessions(
     ]
   }
 
+  if (event.type === 'session-title-changed') {
+    return sessions.map((session) =>
+      session.sessionId === event.sessionId
+        ? { ...session, title: event.title }
+        : session,
+    )
+  }
+
   const sessionId = getAgentEventSessionId(event)
   const nextState = getAgentEventRunState(event)
 
@@ -58,7 +66,8 @@ export function getAgentEventSessionId(event: AgentEvent): string | null {
     event.type === 'approval-resolved' ||
     event.type === 'clarification-required' ||
     event.type === 'clarification-resolved' ||
-    event.type === 'transcript-delta'
+    event.type === 'transcript-delta' ||
+    event.type === 'session-title-changed'
   ) {
     return event.sessionId
   }

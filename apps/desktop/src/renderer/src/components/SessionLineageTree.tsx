@@ -1,7 +1,8 @@
 import type { AgentSessionSummary } from '@yuanxiao/contracts'
 import { MoreHorizontal } from 'lucide-react'
-import React, { useMemo } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +30,8 @@ export interface SessionLineageTreeProps {
   onArchive: (session: AgentSessionSummary) => void
   /** 删除某个会话谱系的回调。 */
   onDelete: (session: AgentSessionSummary) => void
+  /** 重命名某个会话标题的回调。 */
+  onRename: (session: AgentSessionSummary, title: string) => void
 }
 
 /**
@@ -113,6 +116,7 @@ function SessionLineageNode(props: {
   onSelect: (session: AgentSessionSummary) => void
   onArchive: (session: AgentSessionSummary) => void
   onDelete: (session: AgentSessionSummary) => void
+  onRename: (session: AgentSessionSummary, title: string) => void
 }): React.JSX.Element {
   const {
     session,
@@ -125,6 +129,7 @@ function SessionLineageNode(props: {
     onSelect,
     onArchive,
     onDelete,
+    onRename,
   } = props
   const isSelected = session.sessionId === selectedSessionId
   const hasPendingApproval = pendingApprovalSessionIds.includes(
@@ -137,6 +142,37 @@ function SessionLineageNode(props: {
     childrenByParentId.get(session.sessionId) ?? []
   ).filter((child) => !visitedSessionIds.includes(child.sessionId))
 
+  // 重命名行内编辑状态
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // 首次对话标题未生成时（空字符串）且运行中，禁止重命名
+  const isRenamingDisabled = session.title === '' && isRunning
+
+  const displayTitle = session.title || '新会话'
+
+  function startEditing(): void {
+    setEditValue(displayTitle)
+    setIsEditing(true)
+    // 等 input 渲染后聚焦全选
+    setTimeout(() => {
+      inputRef.current?.select()
+    }, 0)
+  }
+
+  function commitRename(): void {
+    const trimmed = editValue.trim()
+    if (trimmed && trimmed !== displayTitle) {
+      onRename(session, trimmed)
+    }
+    setIsEditing(false)
+  }
+
+  function cancelEditing(): void {
+    setIsEditing(false)
+  }
+
   return (
     <div role="none">
       {/* group/item 使 ⋯ 按钮在行 hover 时可见 */}
@@ -144,7 +180,7 @@ function SessionLineageNode(props: {
         role="treeitem"
         tabIndex={0}
         aria-label={[
-          session.title,
+          displayTitle,
           hasPendingApproval ? '待审批' : isRunning ? '运行中' : '',
         ]
           .filter(Boolean)
@@ -162,31 +198,63 @@ function SessionLineageNode(props: {
             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
         }`}
         onClick={() => {
-          onSelect(session)
+          if (!isEditing) onSelect(session)
         }}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
+          if (!isEditing && (event.key === 'Enter' || event.key === ' ')) {
             event.preventDefault()
             onSelect(session)
           }
         }}
       >
-        <span
-          className={`min-w-0 flex-1 truncate ${
-            isRoot
-              ? `text-body ${isSelected ? 'font-semibold' : 'font-medium'}`
-              : ''
-          }`}
-        >
-          {session.title}
-        </span>
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            maxLength={200}
+            className={`min-w-0 flex-1 truncate rounded bg-transparent outline-none ${
+              isRoot
+                ? `text-body ${isSelected ? 'font-semibold' : 'font-medium'}`
+                : ''
+            }`}
+            onChange={(e) => {
+              setEditValue(e.target.value)
+            }}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                commitRename()
+              } else if (e.key === 'Escape') {
+                e.preventDefault()
+                cancelEditing()
+              }
+            }}
+            onClick={(e) => {
+              e.stopPropagation()
+            }}
+            autoFocus
+          />
+        ) : (
+          <span
+            className={`min-w-0 flex-1 truncate ${
+              isRoot
+                ? `text-body ${isSelected ? 'font-semibold' : 'font-medium'}`
+                : ''
+            }`}
+          >
+            {displayTitle}
+          </span>
+        )}
 
-        {(isRunning || hasPendingApproval) && (
+        {!isEditing && (isRunning || hasPendingApproval) && (
           <>
             <span
               aria-hidden="true"
               className={`size-1.5 shrink-0 rounded-full ${
-                hasPendingApproval ? 'bg-warning' : 'bg-info'
+                hasPendingApproval ? 'bg-warning' : 'bg-primary'
               }`}
             />
             <span className="sr-only">
@@ -198,19 +266,22 @@ function SessionLineageNode(props: {
         {/* ⋯ 菜单触发器：hover 时可见，下拉打开时始终可见。
             React portal 事件会沿虚拟树冒泡到 treeitem 的 onClick，
             用容器 div 阻止冒泡以防误触 onSelect。 */}
+        {!isEditing && (
         <div
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
+            <Button
               type="button"
-              aria-label={`${session.title}的操作菜单`}
-              className="hover:bg-accent/80 focus-visible:ring-ring/50 invisible shrink-0 rounded p-0.5 transition-colors focus-visible:ring-[3px] focus-visible:outline-none group-hover/item:visible data-[state=open]:visible"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`${displayTitle}的操作菜单`}
+              className="invisible shrink-0 transition-colors group-hover/item:visible data-[state=open]:visible"
             >
               <MoreHorizontal size={14} aria-hidden="true" />
-            </button>
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="bottom">
             {hasSubtreeActivity && (
@@ -221,6 +292,14 @@ function SessionLineageNode(props: {
                 <DropdownMenuSeparator />
               </>
             )}
+            <DropdownMenuItem
+              disabled={isRenamingDisabled}
+              onSelect={() => {
+                startEditing()
+              }}
+            >
+              重命名
+            </DropdownMenuItem>
             <DropdownMenuItem
               disabled={hasSubtreeActivity}
               onSelect={() => {
@@ -242,6 +321,7 @@ function SessionLineageNode(props: {
           </DropdownMenuContent>
         </DropdownMenu>
         </div>
+        )}
       </div>
 
       {childSessions.length > 0 && (
@@ -259,6 +339,7 @@ function SessionLineageNode(props: {
               onSelect={onSelect}
               onArchive={onArchive}
               onDelete={onDelete}
+              onRename={onRename}
             />
           ))}
         </div>
@@ -270,8 +351,9 @@ function SessionLineageNode(props: {
 /**
  * 以任意深度展示会话的分叉谱系。
  *
- * 每个节点的行 hover 时显示 ⋯ 按钮，点击展开下拉：归档 / 分割线 / 删除。
+ * 每个节点的行 hover 时显示 ⋯ 按钮，点击展开下拉：重命名 / 归档 / 分割线 / 删除。
  * 若该会话谱系存在活动任务，归档与删除项均置灰，并在菜单顶部说明原因。
+ * 首次对话标题尚未生成（空标题 + 运行中）时，重命名项置灰。
  */
 export function SessionLineageTree({
   sessions,
@@ -281,6 +363,7 @@ export function SessionLineageTree({
   onSelect,
   onArchive,
   onDelete,
+  onRename,
 }: SessionLineageTreeProps): React.JSX.Element {
   const childrenByParentId = useMemo(
     () => groupChildrenByParentId(sessions),
@@ -307,6 +390,7 @@ export function SessionLineageTree({
           onSelect={onSelect}
           onArchive={onArchive}
           onDelete={onDelete}
+          onRename={onRename}
         />
       ))}
     </>

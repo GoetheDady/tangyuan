@@ -27,60 +27,6 @@ export interface PiSdkVerificationRequest extends RuntimeConfiguration {
 }
 
 /**
- * 工具审批与文件路径校验网关。
- *
- * 由 YuanxiaoRuntime 实现，注入到 PiSdkDriver 的自定义工具中，
- * 用于在执行 bash 前创建审批、在校验文件路径时判断是否允许访问。
- */
-export interface ToolApprovalGateway {
-  /**
-   * 请求用户批准一次 Bash 执行。
-   *
-   * @param params - 审批所需上下文（Agent、session、run、命令、工作目录、风险说明）。
-   * @returns 用户批准后 resolve `{ approved: true }`，拒绝后 resolve `{ approved: false }`。
-   * @throws 此方法不会主动抛出错误；审批超时或取消通过 approved: false 表示。
-   */
-  requestBashApproval(params: {
-    agentId: string
-    sessionId: string
-    runId: string
-    command: string
-    cwd: string
-    riskLevel: import('@yuanxiao/contracts').BashRiskLevel
-    riskDescription: string
-  }): Promise<{ approved: boolean }>
-
-  /**
-   * 校验文件路径是否允许当前 Agent 访问。
-   *
-   * @param params - 校验上下文（Agent、路径、操作类型）。
-   * @returns allowed 为 true 表示允许访问；为 false 时 reason 包含拒绝原因。
-   * @throws 此方法不会主动抛出错误。
-   */
-  validateFilePath(params: {
-    agentId: string
-    path: string
-    operation: 'read' | 'write' | 'edit'
-  }): { allowed: boolean; reason?: string }
-
-  /**
-   * 请求用户回答一个问题澄清。
-   *
-   * @param params - 澄清所需上下文（Agent、session、run、问题、选项、是否允许自定义答案）。
-   * @returns 用户回答后 resolve `{ answer: string }`，取消后 answer 为空字符串。
-   * @throws 此方法不会主动抛出错误。
-   */
-  requestClarification(params: {
-    agentId: string
-    sessionId: string
-    runId: string
-    question: string
-    options: string[]
-    allowCustomAnswer: boolean
-  }): Promise<{ answer: string }>
-}
-
-/**
  * 描述创建真实 Pi SDK 会话时需要的参数。
  */
 export interface PiSdkCreateSessionRequest extends RuntimeConfiguration {
@@ -98,8 +44,6 @@ export interface PiSdkCreateSessionRequest extends RuntimeConfiguration {
   onUpdateSoul: (content: string) => Promise<ProfileUpdateResult>
   /** 绑定到当前会话观察版本的共享用户画像更新回调。 */
   onUpdateUserProfile: (content: string) => Promise<ProfileUpdateResult>
-  /** 工具审批与路径校验网关（用于 bash 审批和文件路径保护）。 */
-  toolApprovalGateway?: ToolApprovalGateway
 }
 
 /**
@@ -118,8 +62,6 @@ export interface PiSdkOpenSessionRequest extends RuntimeConfiguration {
   onUpdateSoul: (content: string) => Promise<ProfileUpdateResult>
   /** 绑定到当前会话观察版本的共享用户画像更新回调。 */
   onUpdateUserProfile: (content: string) => Promise<ProfileUpdateResult>
-  /** 工具审批与路径校验网关（用于 bash 审批和文件路径保护）。 */
-  toolApprovalGateway?: ToolApprovalGateway
 }
 
 /**
@@ -364,6 +306,15 @@ export interface PiSdkGateway {
   verifyConfiguration(request: PiSdkVerificationRequest): Promise<void>
 
   /**
+   * 使用临时无工具会话执行单轮 LLM 补全，不保存任何上下文。
+   *
+   * @param request - 运行时配置与 prompt 文本。
+   * @returns 模型文本回复；模型无输出时返回 null。
+   * @throws 当 SDK 调用失败或模型不可用时，Promise 会 reject。
+   */
+  singleTurnCompletion(request: RuntimeConfiguration & { prompt: string }): Promise<string | null>
+
+  /**
    * 创建真实 Pi SDK 会话运行器。
    *
    * @param request - 已验证配置、会话标识和 Agent Home 工作目录。
@@ -442,6 +393,4 @@ export interface PiSdkDriverOptions {
   userDataPath?: string
   gateway?: PiSdkGateway
   encryptionAdapter?: ConfigEncryptionAdapter
-  /** 工具审批与路径校验网关（用于 bash 审批和文件路径保护）。 */
-  toolApprovalGateway?: ToolApprovalGateway
 }

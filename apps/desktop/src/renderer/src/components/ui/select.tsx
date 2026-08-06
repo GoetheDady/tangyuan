@@ -149,7 +149,7 @@ const SelectSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Separator
     ref={ref}
-    className={cn('bg-muted -mx-1 my-1 h-px', className)}
+    className={cn('bg-split -mx-1 my-1 h-px', className)}
     {...props}
   />
 ))

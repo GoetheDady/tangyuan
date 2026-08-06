@@ -226,7 +226,7 @@ export function ConsoleAgentListPage(): React.JSX.Element {
               {displayedAgents.map((agent) => (
                 <div
                   key={agent.agentId}
-                  className="bg-card flex items-center justify-between rounded-lg border p-4 transition hover:shadow-sm"
+                  className="bg-card flex items-center justify-between rounded-lg border p-4 transition-shadow duration-200 ease-(--ease-standard) hover:shadow-level-1"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2.5">

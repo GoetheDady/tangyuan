@@ -123,6 +123,7 @@ export function installDefaultAppApi(): void {
     }),
     recoverSession: vi.fn().mockResolvedValue([]),
     deleteSession: vi.fn(),
+    renameSession: vi.fn(),
     cancelRun: vi.fn().mockResolvedValue(
       createDefaultSessionSummary({
         sessionId: 'welcome',

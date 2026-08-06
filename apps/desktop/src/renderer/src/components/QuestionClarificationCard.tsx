@@ -2,6 +2,8 @@ import type { QuestionClarificationRequest } from '@yuanxiao/contracts'
 import { Check, HelpCircle, LoaderCircle, MessageSquare, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
+
 /**
  * 澄清卡片当前阶段。
  */
@@ -353,13 +355,9 @@ export function QuestionClarificationCard({
                     disabled={isSubmitting || isResolved}
                     aria-label="自定义答案输入"
                   />
-                  <button
+                  <Button
                     type="button"
-                    className={`text-body focus-visible:ring-ring inline-flex shrink-0 items-center gap-1 rounded-md px-3 py-2 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
-                      isResolved || !customAnswer.trim()
-                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                        : 'bg-primary text-primary-foreground hover:bg-primary-hover'
-                    }`}
+                    size="sm"
                     onClick={() => {
                       void submitCustomAnswer()
                     }}
@@ -378,7 +376,7 @@ export function QuestionClarificationCard({
                       <Check size={14} aria-hidden="true" />
                     )}
                     提交
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -398,9 +396,10 @@ export function QuestionClarificationCard({
         {/* 底部取消 */}
         {!isResolved && (
           <div className="border-primary-border/30 flex items-center justify-end gap-2 border-t px-4 py-2.5">
-            <button
+            <Button
               type="button"
-              className="border-border bg-background text-label text-muted-foreground hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1 rounded-md border px-3 py-1.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              variant="outline"
+              size="sm"
               onClick={() => {
                 void handleCancel()
               }}
@@ -409,7 +408,7 @@ export function QuestionClarificationCard({
             >
               <X size={12} aria-hidden="true" />
               取消
-            </button>
+            </Button>
           </div>
         )}
       </div>

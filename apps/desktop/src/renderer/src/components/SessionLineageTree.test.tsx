@@ -30,6 +30,7 @@ const defaultProps = {
   onSelect: vi.fn(),
   onArchive: vi.fn(),
   onDelete: vi.fn(),
+  onRename: vi.fn(),
 }
 
 describe('SessionLineageTree', () => {
@@ -92,6 +93,7 @@ describe('SessionLineageTree', () => {
         onSelect={onSelect}
         onArchive={vi.fn()}
         onDelete={vi.fn()}
+        onRename={vi.fn()}
       />,
     )
 
@@ -158,6 +160,7 @@ describe('SessionLineageTree', () => {
           onSelect={vi.fn()}
           onArchive={onArchive}
           onDelete={vi.fn()}
+        onRename={vi.fn()}
         />,
       )
 
@@ -186,6 +189,7 @@ describe('SessionLineageTree', () => {
           onSelect={onSelect}
           onArchive={vi.fn()}
           onDelete={onDelete}
+          onRename={vi.fn()}
         />,
       )
 

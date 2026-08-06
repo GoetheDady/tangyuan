@@ -166,24 +166,6 @@ describe('YuanxiaoRuntime 会话谱系归档与恢复', () => {
       skills: sessionDriver,
     })
     await runtime.listSessions()
-    const gateway = runtime.createToolApprovalGateway()
-    const approval = gateway.requestBashApproval({
-      agentId: YUANXIAO_DEFAULT_AGENT_ID,
-      sessionId: child.sessionId,
-      runId: 'run-child',
-      command: 'bun run test',
-      cwd: '/tmp',
-      riskLevel: 'normal',
-      riskDescription: '测试审批',
-    })
-    const clarification = gateway.requestClarification({
-      agentId: YUANXIAO_DEFAULT_AGENT_ID,
-      sessionId: child.sessionId,
-      runId: 'run-child',
-      question: '继续吗？',
-      options: ['继续', '停止'],
-      allowCustomAnswer: false,
-    })
 
     await expect(
       runtime.archiveSession({
@@ -197,14 +179,12 @@ describe('YuanxiaoRuntime 会话谱系归档与恢复', () => {
       affectedActivities: [
         {
           sessionId: 'child',
-          kinds: ['running', 'pending-approval', 'pending-clarification'],
+          kinds: ['running'],
         },
         { sessionId: 'grandchild', kinds: ['queued'] },
       ],
     })
     expect(sessionDriver.setSessionsArchived).not.toHaveBeenCalled()
-    expect(runtime.getPendingApprovals()).toHaveLength(1)
-    expect(runtime.getPendingClarifications()).toHaveLength(1)
 
     const archivePromise = runtime.archiveSession({
       agentId: YUANXIAO_DEFAULT_AGENT_ID,
@@ -222,8 +202,6 @@ describe('YuanxiaoRuntime 会话谱系归档与恢复', () => {
     cancelDeferred.resolve()
     await expect(archivePromise).resolves.toMatchObject({ status: 'archived' })
     expect(sessionDriver.setSessionsArchived).toHaveBeenCalledOnce()
-    await expect(approval).resolves.toEqual({ approved: false })
-    await expect(clarification).resolves.toEqual({ answer: '' })
   })
 
   it('停止并归档自定义 Agent 的活动会话', async () => {

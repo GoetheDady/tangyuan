@@ -34,7 +34,7 @@ describe('Toaster', () => {
     cleanup()
   })
 
-  it('keeps direct Sonner calls in the themed bottom-right queue', async () => {
+  it('keeps direct Sonner calls in the themed top-right queue', async () => {
     render(<Toaster />)
 
     act(() => {
@@ -49,7 +49,7 @@ describe('Toaster', () => {
     expect(item?.querySelector('[data-icon] svg')).toHaveClass(
       'text-success-foreground',
     )
-    expect(toaster).toHaveAttribute('data-y-position', 'bottom')
+    expect(toaster).toHaveAttribute('data-y-position', 'top')
     expect(toaster).toHaveAttribute('data-x-position', 'right')
     expect(toaster).toHaveStyle({ '--gap': '8px' })
     expect(screen.getByRole('button', { name: '关闭通知' })).toBeInTheDocument()

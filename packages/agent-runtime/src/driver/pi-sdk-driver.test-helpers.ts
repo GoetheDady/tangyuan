@@ -237,6 +237,7 @@ export function createPiSdkGateway(
       requests.push(request)
       await (options.verifyConfiguration?.(request) ?? Promise.resolve())
     },
+    singleTurnCompletion: async () => null,
     createSession: async (request) => {
       sessionRequests.push(request)
       const handle = createPromptingHandle(request.sessionId, (messages) => {

@@ -6,7 +6,7 @@ import {
 } from './runtime'
 import { LastActiveSessionStore } from './session'
 import { PiSdkDriver } from './driver'
-import type { PiSdkDriverOptions, ToolApprovalGateway } from './driver'
+import type { PiSdkDriverOptions } from './driver'
 import { createDefaultStores } from './stores'
 
 export {
@@ -61,9 +61,6 @@ export { PiSdkDriver } from './driver'
 export function createYuanxiaoRuntime(
   options?: PiSdkDriverOptions,
 ): YuanxiaoRuntime {
-  // eslint-disable-next-line prefer-const -- assigned after driver/runtime creation
-  let gatewayInstance: ToolApprovalGateway | undefined
-
   // 使用 createDefaultStores 创建所有 Store 模块
   // 使 Store 创建与 PiSdkDriver 解耦
   const fsRoot = options?.fsRoot ?? homedir()
@@ -79,32 +76,7 @@ export function createYuanxiaoRuntime(
       : {}),
   })
 
-  const driver = new PiSdkDriver(
-    {
-      ...options,
-      toolApprovalGateway: {
-        requestBashApproval: (params) => {
-          if (!gatewayInstance) {
-            return Promise.resolve({ approved: false })
-          }
-          return gatewayInstance.requestBashApproval(params)
-        },
-        validateFilePath: (params) => {
-          if (!gatewayInstance) {
-            return { allowed: false, reason: '审批网关未初始化。' }
-          }
-          return gatewayInstance.validateFilePath(params)
-        },
-        requestClarification: (params) => {
-          if (!gatewayInstance) {
-            return Promise.resolve({ answer: '' })
-          }
-          return gatewayInstance.requestClarification(params)
-        },
-      },
-    },
-    stores,
-  )
+  const driver = new PiSdkDriver(options, stores)
   // Store 由 createDefaultStores 统一创建并注入 Driver 与 Runtime，
   // 不再由 Driver 内部重复创建一套。
   const lastActiveSessionStore = new LastActiveSessionStore({
@@ -119,17 +91,13 @@ export function createYuanxiaoRuntime(
     agents: stores.agentRegistry,
     profiles: stores.profileModule,
     skills: stores.skillStore,
-    commandPermissionFilePath: stores.layout.commandPermissions(),
     lastActiveSessionStore,
   })
-
-  gatewayInstance = runtime.createToolApprovalGateway()
 
   return runtime
 }
 
 export * from './agent'
-export * from './approval'
 export * from './core'
 export * from './driver'
 export * from './profile'

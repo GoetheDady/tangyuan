@@ -606,6 +606,13 @@ export const agentEventSchema = z.discriminatedUnion('type', [
     delta: transcriptDeltaSchema,
     occurredAt: timestampSchema,
   }),
+  z.strictObject({
+    type: z.literal('session-title-changed'),
+    agentId: nonEmptyIdentifierSchema,
+    sessionId: nonEmptyIdentifierSchema,
+    title: z.string().min(1),
+    occurredAt: timestampSchema,
+  }),
 ])
 
 /**
@@ -614,6 +621,15 @@ export const agentEventSchema = z.discriminatedUnion('type', [
 export const createSessionRequestSchema = z.strictObject({
   agentId: nonEmptyIdentifierSchema,
   title: z.string().trim().min(1),
+})
+
+/**
+ * 校验重命名会话标题请求。
+ */
+export const renameSessionRequestSchema = z.strictObject({
+  agentId: nonEmptyIdentifierSchema,
+  sessionId: nonEmptyIdentifierSchema,
+  title: z.string().min(1).max(200),
 })
 
 /**

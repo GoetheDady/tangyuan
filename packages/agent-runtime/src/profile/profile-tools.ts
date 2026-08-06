@@ -2,6 +2,7 @@ import type { ProfileUpdateResult } from '@yuanxiao/contracts'
 
 interface ProfileToolResult {
   content: Array<{ type: 'text'; text: string }>
+  details: unknown
 }
 
 export interface UpdateSoulToolDefinition extends Record<string, unknown> {
@@ -148,5 +149,5 @@ async function executeProfileUpdate(
 }
 
 function textResult(text: string): ProfileToolResult {
-  return { content: [{ type: 'text', text }] }
+  return { content: [{ type: 'text', text }], details: undefined }
 }

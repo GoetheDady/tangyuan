@@ -63,6 +63,7 @@ export interface SessionModule {
   retryMessage(request: RetryRunRequest): Promise<void>
   forkSession(request: ForkSessionRequest): Promise<AgentSessionSummary>
   getSessionAttempts(sessionId: string): Promise<PersistedAttemptEntry[]>
+  renameSession(sessionId: string, title: string): Promise<AgentSessionSummary>
   getSessionModelInfo(
     request: GetSessionModelInfoRequest,
   ): Promise<SessionModelInfo>

@@ -7,7 +7,7 @@ import type { YuanxiaoRuntime } from '@yuanxiao/agent-runtime'
 import type { IpcMainLike } from './types'
 
 /**
- * 注册 Session 生命周期、执行、审批与澄清相关 IPC handler。
+ * 注册 Session 生命周期与执行相关 IPC handler。
  */
 export function registerSessionsIpc(
   ipcMain: IpcMainLike,
@@ -132,6 +132,17 @@ export function registerSessionsIpc(
     },
   )
   ipcMain.handle(
+    DESKTOP_IPC_CHANNELS.sessionsRename,
+    async (_event, payload) => {
+      return parseDesktopIpcResponse(
+        DESKTOP_IPC_CHANNELS.sessionsRename,
+        await runtime.renameSession(
+          parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsRename, payload),
+        ),
+      )
+    },
+  )
+  ipcMain.handle(
     DESKTOP_IPC_CHANNELS.sessionsResume,
     async (_event, payload) => {
       parseDesktopIpcRequest(DESKTOP_IPC_CHANNELS.sessionsResume, payload)
@@ -194,88 +205,6 @@ export function registerSessionsIpc(
             payload,
           ),
         ),
-      )
-    },
-  )
-  ipcMain.handle(
-    DESKTOP_IPC_CHANNELS.sessionsApproveBash,
-    async (_event, payload) => {
-      const request = parseDesktopIpcRequest(
-        DESKTOP_IPC_CHANNELS.sessionsApproveBash,
-        payload,
-      )
-      await runtime.approveBash(request)
-      return parseDesktopIpcResponse(
-        DESKTOP_IPC_CHANNELS.sessionsApproveBash,
-        undefined,
-      )
-    },
-  )
-  ipcMain.handle(
-    DESKTOP_IPC_CHANNELS.sessionsRejectBash,
-    async (_event, payload) => {
-      const { approvalId } = parseDesktopIpcRequest(
-        DESKTOP_IPC_CHANNELS.sessionsRejectBash,
-        payload,
-      )
-      await runtime.rejectBash(approvalId)
-      return parseDesktopIpcResponse(
-        DESKTOP_IPC_CHANNELS.sessionsRejectBash,
-        undefined,
-      )
-    },
-  )
-  ipcMain.handle(
-    DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals,
-    async (_event, payload) => {
-      parseDesktopIpcRequest(
-        DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals,
-        payload,
-      )
-      return parseDesktopIpcResponse(
-        DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals,
-        runtime.getPendingApprovals(),
-      )
-    },
-  )
-  ipcMain.handle(
-    DESKTOP_IPC_CHANNELS.sessionsAnswerClarification,
-    async (_event, payload) => {
-      const { clarificationId, answer } = parseDesktopIpcRequest(
-        DESKTOP_IPC_CHANNELS.sessionsAnswerClarification,
-        payload,
-      )
-      await runtime.answerClarification(clarificationId, answer)
-      return parseDesktopIpcResponse(
-        DESKTOP_IPC_CHANNELS.sessionsAnswerClarification,
-        undefined,
-      )
-    },
-  )
-  ipcMain.handle(
-    DESKTOP_IPC_CHANNELS.sessionsCancelClarification,
-    async (_event, payload) => {
-      const { clarificationId } = parseDesktopIpcRequest(
-        DESKTOP_IPC_CHANNELS.sessionsCancelClarification,
-        payload,
-      )
-      await runtime.cancelClarification(clarificationId)
-      return parseDesktopIpcResponse(
-        DESKTOP_IPC_CHANNELS.sessionsCancelClarification,
-        undefined,
-      )
-    },
-  )
-  ipcMain.handle(
-    DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications,
-    async (_event, payload) => {
-      parseDesktopIpcRequest(
-        DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications,
-        payload,
-      )
-      return parseDesktopIpcResponse(
-        DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications,
-        runtime.getPendingClarifications(),
       )
     },
   )

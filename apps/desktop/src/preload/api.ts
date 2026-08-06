@@ -2,12 +2,9 @@ import {
   DESKTOP_AGENT_EVENT_CHANNEL,
   DESKTOP_IPC_CHANNELS,
   type AgentEventListener,
-  type AnswerClarificationRequest,
-  type ApproveBashRequest,
   type ArchiveAgentRequest,
   type ArchiveSessionRequest,
   type DeleteSessionRequest,
-  type CancelClarificationRequest,
   type CancelRunRequest,
   type ClaimAgentDirectoryRequest,
   type CreateSessionRequest,
@@ -24,8 +21,8 @@ import {
   type OpenExternalLinkRequest,
   type RecoverAgentRequest,
   type RecoverSessionRequest,
-  type RejectBashRequest,
   type RetryRunRequest,
+  type RenameSessionRequest,
   type RuntimeConfiguration,
   type CancelConfigurationVerificationRequest,
   type ProviderConfiguration,
@@ -132,6 +129,9 @@ export function createYuanxiaoPreloadApi(
     deleteSession: async (request: DeleteSessionRequest) => {
       return invoke(DESKTOP_IPC_CHANNELS.sessionsDelete, request)
     },
+    renameSession: async (request: RenameSessionRequest) => {
+      return invoke(DESKTOP_IPC_CHANNELS.sessionsRename, request)
+    },
     subscribeToAgentEvents: (listener: AgentEventListener) => {
       return subscribe(DESKTOP_AGENT_EVENT_CHANNEL, listener)
     },
@@ -203,35 +203,8 @@ export function createYuanxiaoPreloadApi(
     deleteSkill: async (params: SkillOperationParams) => {
       return invoke(DESKTOP_IPC_CHANNELS.skillsDelete, params)
     },
-    approveSkillOperation: async (request: ApproveBashRequest) => {
-      await invoke(DESKTOP_IPC_CHANNELS.skillsApproveOperation, request)
-    },
-    rejectSkillOperation: async (request: RejectBashRequest) => {
-      await invoke(DESKTOP_IPC_CHANNELS.skillsRejectOperation, request)
-    },
-    getPendingSkillApprovals: async () => {
-      return invoke(DESKTOP_IPC_CHANNELS.skillsGetPendingApprovals)
-    },
     getSkillInstallRecords: async () => {
       return invoke(DESKTOP_IPC_CHANNELS.skillsGetInstallRecords)
-    },
-    approveBash: async (request: ApproveBashRequest) => {
-      await invoke(DESKTOP_IPC_CHANNELS.sessionsApproveBash, request)
-    },
-    rejectBash: async (request: RejectBashRequest) => {
-      await invoke(DESKTOP_IPC_CHANNELS.sessionsRejectBash, request)
-    },
-    getPendingApprovals: async () => {
-      return invoke(DESKTOP_IPC_CHANNELS.sessionsGetPendingApprovals)
-    },
-    answerClarification: async (request: AnswerClarificationRequest) => {
-      await invoke(DESKTOP_IPC_CHANNELS.sessionsAnswerClarification, request)
-    },
-    cancelClarification: async (request: CancelClarificationRequest) => {
-      await invoke(DESKTOP_IPC_CHANNELS.sessionsCancelClarification, request)
-    },
-    getPendingClarifications: async () => {
-      return invoke(DESKTOP_IPC_CHANNELS.sessionsGetPendingClarifications)
     },
   }
 }

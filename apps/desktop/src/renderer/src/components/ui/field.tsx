@@ -169,7 +169,7 @@ const FieldLabel = React.forwardRef<
       data-required={isRequired || undefined}
       data-optional={isOptional || undefined}
       className={cn(
-        'group-data-[disabled=true]/field:text-disabled-foreground group-data-[invalid=true]/field:text-destructive flex w-fit items-center gap-1 text-xs leading-5 group-data-[orientation=horizontal]/field:w-full',
+        'group-data-[disabled=true]/field:text-disabled-foreground group-data-[invalid=true]/field:text-destructive flex w-fit items-center gap-1 text-label leading-5 group-data-[orientation=horizontal]/field:w-full',
         className,
       )}
       {...props}
@@ -186,7 +186,7 @@ const FieldLabel = React.forwardRef<
       ) : isOptional ? (
         <span
           data-slot="field-optional"
-          className="text-muted-foreground ml-0.5 text-[10px] font-normal"
+          className="text-muted-foreground ml-0.5 text-caption font-normal"
         >
           （可选）
         </span>
@@ -260,7 +260,7 @@ const FieldDescription = React.forwardRef<
       id={descriptionId}
       data-slot="field-description"
       className={cn(
-        'text-muted-foreground group-data-[disabled=true]/field:text-disabled-foreground m-0 text-[11px] leading-[18px] font-normal',
+        'text-muted-foreground group-data-[disabled=true]/field:text-disabled-foreground m-0 text-caption font-normal',
         className,
       )}
       {...props}
@@ -324,7 +324,7 @@ const FieldError = React.forwardRef<HTMLDivElement, FieldErrorProps>(
         role="alert"
         data-slot="field-error"
         className={cn(
-          'text-destructive text-[11px] leading-[18px] font-normal',
+          'text-destructive text-caption font-normal',
           className,
         )}
         {...props}
