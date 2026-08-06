@@ -167,9 +167,6 @@ describe('registerDesktopAppIpc', () => {
       ]),
       installSkill: vi.fn().mockResolvedValue([]),
       deleteSkill: vi.fn().mockResolvedValue([]),
-      approveSkillOperation: vi.fn().mockResolvedValue(undefined),
-      rejectSkillOperation: vi.fn().mockResolvedValue(undefined),
-      getPendingSkillApprovals: vi.fn().mockReturnValue([]),
       getSkillInstallRecords: vi.fn().mockResolvedValue([]),
     }
     const broadcastAgentEvent = vi.fn()
@@ -189,7 +186,7 @@ describe('registerDesktopAppIpc', () => {
       openExternalLink,
     )
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(42)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(33)
     expect(broadcastAgentEvent).toHaveBeenCalledWith(
       createAttemptStartedEvent(),
     )
@@ -562,9 +559,6 @@ describe('registerDesktopAppIpc', () => {
       reloadAllSessions: vi.fn().mockResolvedValue(undefined),
       installSkill: vi.fn().mockResolvedValue([]),
       deleteSkill: vi.fn().mockResolvedValue([]),
-      approveSkillOperation: vi.fn().mockResolvedValue(undefined),
-      rejectSkillOperation: vi.fn().mockResolvedValue(undefined),
-      getPendingSkillApprovals: vi.fn().mockReturnValue([]),
       getSkillInstallRecords: vi.fn().mockResolvedValue([]),
     }
 
@@ -620,9 +614,6 @@ describe('registerDesktopAppIpc', () => {
       cancelAllActiveRuns: vi.fn(),
       installSkill: vi.fn(),
       deleteSkill: vi.fn(),
-      approveSkillOperation: vi.fn(),
-      rejectSkillOperation: vi.fn(),
-      getPendingSkillApprovals: vi.fn(),
       getSkillInstallRecords: vi.fn(),
     } as unknown as YuanxiaoRuntime
 

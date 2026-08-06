@@ -212,9 +212,6 @@ export function installDefaultAppApi(): void {
     listSharedSkills: vi.fn().mockResolvedValue([]),
     installSkill: vi.fn().mockResolvedValue([]),
     deleteSkill: vi.fn().mockResolvedValue([]),
-    approveSkillOperation: vi.fn().mockResolvedValue(undefined),
-    rejectSkillOperation: vi.fn().mockResolvedValue(undefined),
-    getPendingSkillApprovals: vi.fn().mockResolvedValue([]),
     getSkillInstallRecords: vi.fn().mockResolvedValue([]),
     sendNotification: vi.fn().mockResolvedValue(undefined),
   }

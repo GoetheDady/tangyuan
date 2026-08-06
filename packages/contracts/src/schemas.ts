@@ -857,12 +857,5 @@ export const sendNotificationRequestSchema = z.strictObject({
 })
 
 /**
- * 校验批准 Skill 操作的请求（只需 approvalId，不含 Bash 特有的 remember 字段）。
- */
-export const approveSkillOperationRequestSchema = z.strictObject({
-  approvalId: nonEmptyIdentifierSchema,
-})
-
-/**
  * 桌面端允许 Renderer 通过 Preload API 调用的 IPC channel。
  */

@@ -411,9 +411,6 @@ export function createPreloadApiInitScript(
         listSharedSkills: async () => [],
         installSkill: async () => [],
         deleteSkill: async () => [],
-        approveSkillOperation: async () => {},
-        rejectSkillOperation: async () => {},
-        getPendingSkillApprovals: async () => [],
         getSkillInstallRecords: async () => [],
       };
     })();
