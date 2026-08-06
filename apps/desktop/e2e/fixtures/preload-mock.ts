@@ -415,9 +415,6 @@ export function createPreloadApiInitScript(
         rejectSkillOperation: async () => {},
         getPendingSkillApprovals: async () => [],
         getSkillInstallRecords: async () => [],
-        approveBash: async () => {},
-        rejectBash: async () => {},
-        getPendingApprovals: async () => [],
       };
     })();
   `

@@ -45,7 +45,6 @@ describe('SessionLineageTree', () => {
         ]}
         rootSessions={[createSession('root', '根会话')]}
         selectedSessionId={null}
-        pendingApprovalSessionIds={[]}
         {...defaultProps}
       />,
     )
@@ -66,7 +65,6 @@ describe('SessionLineageTree', () => {
         ]}
         rootSessions={[createSession('root', '根会话')]}
         selectedSessionId={null}
-        pendingApprovalSessionIds={[]}
         {...defaultProps}
       />,
     )
@@ -124,7 +122,7 @@ describe('SessionLineageTree', () => {
     expect(screen.getByRole('treeitem', { name: /会话 B/ })).toHaveAttribute('aria-level', '2')
   })
 
-  it('标注运行中与待审批状态', () => {
+  it('标注运行中状态', () => {
     render(
       <SessionLineageTree
         sessions={[
@@ -133,13 +131,12 @@ describe('SessionLineageTree', () => {
         ]}
         rootSessions={[{ ...createSession('root', '根会话'), state: 'running' }]}
         selectedSessionId="child"
-        pendingApprovalSessionIds={['child']}
         {...defaultProps}
       />,
     )
 
     expect(screen.getByRole('treeitem', { name: /根会话.*运行中/ })).toBeInTheDocument()
-    expect(screen.getByRole('treeitem', { name: /子会话.*待审批/ })).toHaveAttribute(
+    expect(screen.getByRole('treeitem', { name: /子会话/ })).toHaveAttribute(
       'aria-selected',
       'true',
     )

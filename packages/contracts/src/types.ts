@@ -302,90 +302,6 @@ export interface AgentRuntimeErrorPayload {
  */
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
-/** Runtime 对 Bash 命令给出的最低风险等级。 */
-export type BashRiskLevel = 'normal' | 'medium' | 'high'
-
-/**
- * 描述问题澄清请求的当前状态。
- */
-export type ClarificationStatus = 'pending' | 'answered' | 'cancelled'
-
-/**
- * 描述一次 Bash 执行的审批请求（传给 Renderer 展示）。
- */
-export interface BashApprovalRequest {
-  approvalId: string
-  agentId: AgentId
-  sessionId: string
-  runId: string
-  command: string
-  cwd: string
-  riskLevel: BashRiskLevel
-  riskDescription: string
-  status: ApprovalStatus
-  createdAt: string
-}
-
-/**
- * 描述 Renderer 批准 Bash 执行时传给 Main 的请求。
- */
-export interface ApproveBashRequest {
-  approvalId: string
-  /** 是否把普通/中风险命令记为当前 Agent 与 cwd 的长期许可。 */
-  remember?: boolean
-}
-
-/**
- * 描述 Renderer 批准 Skill 操作时传给 Main 的请求。
- */
-export interface ApproveSkillOperationRequest {
-  approvalId: string
-}
-
-/**
- * 描述 Renderer 拒绝 Bash 执行时传给 Main 的请求。
- */
-export interface RejectBashRequest {
-  approvalId: string
-}
-
-/**
- * 描述一次问题澄清请求（传给 Renderer 展示）。
- *
- * 每次 tool call 只包含一个问题，支持 2–5 个预设选项以及
- * 可选的"其他"自由输入。后续问题通过新的 tool call 依次提出。
- */
-export interface QuestionClarificationRequest {
-  clarificationId: string
-  agentId: AgentId
-  sessionId: string
-  runId: string
-  /** 澄清问题文本。 */
-  question: string
-  /** 2–5 个预设选项。 */
-  options: string[]
-  /** 是否允许"其他"自由输入。 */
-  allowCustomAnswer: boolean
-  status: ClarificationStatus
-  createdAt: string
-}
-
-/**
- * 描述 Renderer 提交澄清答案时传给 Main 的请求。
- */
-export interface AnswerClarificationRequest {
-  clarificationId: string
-  /** 用户选择的答案：预设选项文本或自定义输入。 */
-  answer: string
-}
-
-/**
- * 描述 Renderer 取消澄清时传给 Main 的请求。
- */
-export interface CancelClarificationRequest {
-  clarificationId: string
-}
-
 /**
  * 描述 Agent 运行过程中发给 YuanxiaoRuntime 和 Renderer 的标准事件。
  */
@@ -463,21 +379,6 @@ export type AgentEvent =
       occurredAt: string
     }
   | {
-      type: 'approval-required'
-      agentId: AgentId
-      sessionId: string
-      approval: BashApprovalRequest
-      occurredAt: string
-    }
-  | {
-      type: 'approval-resolved'
-      agentId: AgentId
-      sessionId: string
-      approvalId: string
-      status: 'approved' | 'rejected'
-      occurredAt: string
-    }
-  | {
       type: 'skill-approval-required'
       agentId: AgentId
       approval: SkillApprovalRequest
@@ -488,22 +389,6 @@ export type AgentEvent =
       agentId: AgentId
       approvalId: string
       status: 'approved' | 'rejected'
-      occurredAt: string
-    }
-  | {
-      type: 'clarification-required'
-      agentId: AgentId
-      sessionId: string
-      clarification: QuestionClarificationRequest
-      occurredAt: string
-    }
-  | {
-      type: 'clarification-resolved'
-      agentId: AgentId
-      sessionId: string
-      clarificationId: string
-      answer: string
-      status: 'answered' | 'cancelled'
       occurredAt: string
     }
   | {

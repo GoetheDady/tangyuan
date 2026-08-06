@@ -20,8 +20,6 @@ export interface ChatSidebarProps {
   sessions: readonly AgentSessionSummary[]
   /** 当前选中的会话标识。 */
   selectedSessionId: string | null
-  /** 存在待审批请求的会话标识列表。 */
-  pendingApprovalSessionIds: readonly string[]
   /** 已归档的会话列表。 */
   archivedSessions: readonly AgentSessionSummary[]
   /** 正在恢复的会话标识。 */
@@ -172,7 +170,6 @@ export function ChatSidebar(props: ChatSidebarProps): React.JSX.Element {
                     sessions={props.sessions}
                     rootSessions={group.sessions}
                     selectedSessionId={props.selectedSessionId}
-                    pendingApprovalSessionIds={props.pendingApprovalSessionIds}
                     onSelect={props.onSelectSession}
                     onArchive={props.onArchiveSession}
                     onDelete={props.onDeleteSession}

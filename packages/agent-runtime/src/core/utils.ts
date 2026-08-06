@@ -329,7 +329,7 @@ export function isForkSource(value: unknown): value is ForkSource {
  * @throws 此方法不会主动抛出错误。
  */
 export function assessBashRisk(command: string): {
-  level: import('@yuanxiao/contracts').BashRiskLevel
+  level: 'normal' | 'medium' | 'high'
   description: string
 } {
   const highRiskPatterns: Array<{ pattern: RegExp; label: string }> = [

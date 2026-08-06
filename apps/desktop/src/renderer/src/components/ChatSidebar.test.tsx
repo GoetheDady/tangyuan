@@ -46,7 +46,6 @@ describe('ChatSidebar', () => {
             createSession('session-2', '较早会话'),
           ]}
           selectedSessionId="session-1"
-          pendingApprovalSessionIds={[]}
           archivedSessions={[]}
           recoveringSessionId={null}
           onAgentChange={vi.fn()}

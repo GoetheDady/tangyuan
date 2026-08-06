@@ -21,10 +21,10 @@ import {
   isForkSource,
   normalizePiSdkSessionEvent,
 } from '../core'
+import { createUpdateSoulTool, createUpdateUserProfileTool } from '../profile'
 
 /** 元宵写入分叉会话 Pi JSONL 的来源记录 custom entry 类型。 */
 const YUANXIAO_FORK_SOURCE_ENTRY_TYPE = 'yuanxiao:fork-source'
-import { createUpdateSoulTool, createUpdateUserProfileTool } from '../profile'
 
 export class RealPiSdkGateway implements PiSdkGateway {
   /**

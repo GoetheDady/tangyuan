@@ -404,13 +404,6 @@ describe('DESKTOP_IPC_CHANNELS', () => {
       sessionsCreate: 'yuanxiao:sessions:create',
       sessionsSendMessage: 'yuanxiao:sessions:send-message',
       sessionsCancelRun: 'yuanxiao:sessions:cancel-run',
-      sessionsAnswerClarification: 'yuanxiao:sessions:answer-clarification',
-      sessionsApproveBash: 'yuanxiao:sessions:approve-bash',
-      sessionsCancelClarification: 'yuanxiao:sessions:cancel-clarification',
-      sessionsRejectBash: 'yuanxiao:sessions:reject-bash',
-      sessionsGetPendingApprovals: 'yuanxiao:sessions:get-pending-approvals',
-      sessionsGetPendingClarifications:
-        'yuanxiao:sessions:get-pending-clarifications',
       sessionsGetTranscript: 'yuanxiao:sessions:get-transcript',
       sessionsRetryMessage: 'yuanxiao:sessions:retry-message',
       sessionsFork: 'yuanxiao:sessions:fork',
@@ -419,6 +412,7 @@ describe('DESKTOP_IPC_CHANNELS', () => {
       sessionsDelete: 'yuanxiao:sessions:delete',
       sessionsResume: 'yuanxiao:sessions:resume',
       sessionsSetLastActive: 'yuanxiao:sessions:set-last-active',
+      sessionsRename: 'yuanxiao:sessions:rename',
       agentsArchive: 'yuanxiao:agents:archive',
       agentsClaimDirectory: 'yuanxiao:agents:claim-directory',
       agentsList: 'yuanxiao:agents:list',
@@ -442,6 +436,7 @@ describe('DESKTOP_IPC_CHANNELS', () => {
       skillsGetPendingApprovals: 'yuanxiao:skills:get-pending-approvals',
       skillsGetInstallRecords: 'yuanxiao:skills:get-install-records',
       openExternalLink: 'yuanxiao:open-external-link',
+      notificationSend: 'yuanxiao:notification:send',
     })
   })
 })

@@ -35,8 +35,6 @@ interface SessionLineageLifecycleDependencies {
   transcriptEmitter: Pick<TranscriptEmitter, 'deleteSession'>
   lastActiveSessionStore: Pick<LastActiveSessionStore, 'read' | 'clear'>
   cancelRun(request: CancelRunRequest): Promise<AgentSessionSummary>
-  pendingApprovalSessionIds(): readonly string[]
-  pendingClarificationSessionIds(): readonly string[]
   now(): string
 }
 
@@ -242,13 +240,6 @@ export class SessionLineageLifecycle {
   private collectActivities(
     sessions: readonly AgentSessionSummary[],
   ): SessionLineageActivity[] {
-    const approvalSessionIds = new Set(
-      this.dependencies.pendingApprovalSessionIds(),
-    )
-    const clarificationSessionIds = new Set(
-      this.dependencies.pendingClarificationSessionIds(),
-    )
-
     return sessions.flatMap((session) => {
       const kinds: SessionLineageActivityKind[] = []
       if (
@@ -258,12 +249,6 @@ export class SessionLineageLifecycle {
         kinds.push('running')
       }
       if (session.state === 'queued') kinds.push('queued')
-      if (approvalSessionIds.has(session.sessionId)) {
-        kinds.push('pending-approval')
-      }
-      if (clarificationSessionIds.has(session.sessionId)) {
-        kinds.push('pending-clarification')
-      }
 
       return kinds.length > 0
         ? [{ sessionId: session.sessionId, title: session.title, kinds }]

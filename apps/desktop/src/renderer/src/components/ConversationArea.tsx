@@ -1,17 +1,13 @@
 import type {
   AgentSessionSummary,
-  BashApprovalRequest,
   ModelDescriptor,
   ProviderDescriptor,
-  QuestionClarificationRequest,
   SessionModelInfo,
   TranscriptSnapshot,
 } from '@yuanxiao/contracts'
 
-import { BashApprovalCard } from '@/components/BashApprovalCard'
 import { Composer } from '@/components/Composer'
 import { ForkSourceNotice } from '@/components/ForkSourceNotice'
-import { QuestionClarificationCard } from '@/components/QuestionClarificationCard'
 import { SessionLoadingHint } from '@/components/SessionLoadingHint'
 import { TranscriptMessages } from '@/components/TranscriptMessages'
 
@@ -46,10 +42,6 @@ export interface ConversationAreaProps {
   isStreaming: boolean
   /** 是否在等待响应（发送中/排队/运行中）。 */
   isAwaitingResponse: boolean
-  /** 当前 Agent 的全部待审批请求（按会话过滤在组件内完成）。 */
-  pendingApprovals: readonly BashApprovalRequest[]
-  /** 当前 Agent 的全部待澄清问题（按会话过滤在组件内完成）。 */
-  pendingClarifications: readonly QuestionClarificationRequest[]
   /** 输入区占位符中使用的 Agent 显示名。 */
   activeAgentDisplayName: string
   /** 输入区与模型选择状态。 */
@@ -59,17 +51,6 @@ export interface ConversationAreaProps {
     onRetry(userMessageId: string): void
     onFork(userMessageId: string): void
     onViewForkSource(): void
-  }
-  /** 审批操作回调。 */
-  approvals: {
-    onApproveOnce(approvalId: string): void
-    onApproveAlways(approval: BashApprovalRequest): void
-    onReject(approvalId: string): void
-  }
-  /** 澄清操作回调。 */
-  clarifications: {
-    onAnswer(clarificationId: string, answer: string): void
-    onCancel(clarificationId: string): void
   }
 }
 
@@ -87,23 +68,6 @@ export function ConversationArea(
   props: ConversationAreaProps,
 ): React.JSX.Element {
   const { selectedSession } = props
-
-  const sessionApprovals =
-    selectedSession === null
-      ? []
-      : props.pendingApprovals.filter(
-          (approval) =>
-            approval.sessionId === selectedSession.sessionId &&
-            approval.status === 'pending',
-        )
-  const sessionClarifications =
-    selectedSession === null
-      ? []
-      : props.pendingClarifications.filter(
-          (clarification) =>
-            clarification.sessionId === selectedSession.sessionId &&
-            clarification.status === 'pending',
-        )
 
   return (
     <section
@@ -160,47 +124,6 @@ export function ConversationArea(
           </div>
         )}
       </div>
-
-      {selectedSession && sessionApprovals.length > 0 && (
-        <div className="bg-background shrink-0 px-4 py-2">
-          <div className="mx-auto max-w-[720px] space-y-2">
-            {sessionApprovals.map((approval) => (
-              <BashApprovalCard
-                key={approval.approvalId}
-                approval={approval}
-                onApproveOnce={async (approvalId) => {
-                  props.approvals.onApproveOnce(approvalId)
-                }}
-                onApproveAlways={async () => {
-                  props.approvals.onApproveAlways(approval)
-                }}
-                onReject={async (approvalId) => {
-                  props.approvals.onReject(approvalId)
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {selectedSession && sessionClarifications.length > 0 && (
-        <div className="bg-background shrink-0 px-4 py-2">
-          <div className="mx-auto max-w-[720px] space-y-2">
-            {sessionClarifications.map((clarification) => (
-              <QuestionClarificationCard
-                key={clarification.clarificationId}
-                clarification={clarification}
-                onAnswer={async (clarificationId, answer) => {
-                  props.clarifications.onAnswer(clarificationId, answer)
-                }}
-                onCancel={async (clarificationId) => {
-                  props.clarifications.onCancel(clarificationId)
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
       <footer
         data-testid="chat-composer-area"

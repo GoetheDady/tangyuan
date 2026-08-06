@@ -122,8 +122,6 @@ export abstract class YuanxiaoRuntimeOrchestrator {
       transcriptEmitter: this.transcriptEmitter,
       lastActiveSessionStore: this.lastActiveSessionStore,
       cancelRun: (request) => this.cancelRun(request),
-      pendingApprovalSessionIds: () => [],
-      pendingClarificationSessionIds: () => [],
       now: () => new Date().toISOString(),
     })
     this.sessions.subscribe((event) => {

@@ -2,8 +2,6 @@ import type {
   AgentEvent,
   AgentEventListener,
   AgentSummary,
-  BashApprovalRequest,
-  QuestionClarificationRequest,
   RuntimeSnapshot,
 } from '@yuanxiao/contracts'
 import { createRuntimeSnapshot } from '@yuanxiao/contracts'
@@ -55,40 +53,6 @@ function createRuntime(agents = [YUANXIAO]): RuntimeSnapshot {
     },
     auth: { apiKey: { configured: true, maskedValue: 'sk-...1234' } },
   })
-}
-
-function createApproval(
-  sessionId = 'session-1',
-  command = 'bun run test',
-): BashApprovalRequest {
-  return {
-    approvalId: `approval-${sessionId}`,
-    agentId: 'yuanxiao',
-    sessionId,
-    runId: `run-${sessionId}`,
-    command,
-    cwd: '/workspace',
-    riskDescription: '运行测试',
-    riskLevel: 'normal',
-    status: 'pending',
-    createdAt: NOW,
-  }
-}
-
-function createClarification(
-  sessionId = 'session-1',
-): QuestionClarificationRequest {
-  return {
-    clarificationId: `clarification-${sessionId}`,
-    agentId: 'yuanxiao',
-    sessionId,
-    runId: `run-${sessionId}`,
-    question: '是否继续？',
-    options: ['继续', '停止'],
-    allowCustomAnswer: false,
-    status: 'pending',
-    createdAt: NOW,
-  }
 }
 
 function createHarness() {
@@ -154,10 +118,8 @@ describe('createAgentEventBridge', () => {
     expect(harness.frames.cancel).not.toHaveBeenCalled()
   })
 
-  it('将 Agent、session、审批和澄清事件归并到 store 并产生现有通知', () => {
+  it('将 Agent、session 事件归并到 store 并产生现有通知', () => {
     const harness = createHarness()
-    const approval = createApproval()
-    const clarification = createClarification()
 
     harness.dispatch({
       type: 'agent-created',
@@ -177,33 +139,12 @@ describe('createAgentEventBridge', () => {
       },
       occurredAt: NOW,
     })
-    harness.dispatch({
-      type: 'approval-required',
-      agentId: 'yuanxiao',
-      sessionId: 'session-1',
-      approval,
-      occurredAt: NOW,
-    })
-    harness.dispatch({
-      type: 'clarification-required',
-      agentId: 'yuanxiao',
-      sessionId: 'session-1',
-      clarification,
-      occurredAt: NOW,
-    })
 
     expect(harness.store.getState().agents).toEqual([RESEARCHER])
     expect(harness.store.getState().sessionsByAgentId.yuanxiao).toHaveLength(1)
-    expect(
-      harness.store.getState().pendingApprovalsBySessionId['session-1'],
-    ).toEqual([approval])
-    expect(
-      harness.store.getState().pendingClarificationsBySessionId['session-1'],
-    ).toEqual([clarification])
     expect(harness.notifications.success).toHaveBeenCalledWith(
       '已创建 Agent「研究助手」',
     )
-    expect(harness.notifications.info).toHaveBeenCalledTimes(2)
   })
 
   it('Profile 更新后刷新 Runtime，并按现有规则报告刷新失败', async () => {
@@ -236,24 +177,6 @@ describe('createAgentEventBridge', () => {
     await vi.waitFor(() => {
       expect(failure.notifications.error).toHaveBeenCalledWith('刷新失败')
     })
-  })
-
-  it('审批请求始终进入 Renderer 待处理投影', () => {
-    const harness = createHarness()
-    const approval = createApproval('session-1', 'bun run test')
-
-    harness.dispatch({
-      type: 'approval-required',
-      agentId: approval.agentId,
-      sessionId: approval.sessionId,
-      approval,
-      occurredAt: NOW,
-    })
-
-    expect(
-      harness.store.getState().pendingApprovalsBySessionId[approval.sessionId],
-    ).toEqual([approval])
-    expect(harness.notifications.info).toHaveBeenCalledOnce()
   })
 
   it('同一帧按到达顺序合并 transcript delta，且只提交一次 store 更新', () => {

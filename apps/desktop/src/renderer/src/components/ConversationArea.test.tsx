@@ -28,8 +28,6 @@ function renderConversationArea(
         isLoadingTranscript={false}
         isStreaming={false}
         isAwaitingResponse={false}
-        pendingApprovals={[]}
-        pendingClarifications={[]}
         activeAgentDisplayName="元宵"
         composer={{
           value: '',
@@ -50,15 +48,6 @@ function renderConversationArea(
           onRetry: vi.fn(),
           onFork: vi.fn(),
           onViewForkSource: vi.fn(),
-        }}
-        approvals={{
-          onApproveOnce: vi.fn(),
-          onApproveAlways: vi.fn(),
-          onReject: vi.fn(),
-        }}
-        clarifications={{
-          onAnswer: vi.fn(),
-          onCancel: vi.fn(),
         }}
         {...overrides}
       />
@@ -100,42 +89,6 @@ describe('ConversationArea', () => {
     await user.type(input, '！')
     await user.keyboard('{Enter}')
     expect(onSubmit).toHaveBeenCalled()
-  })
-
-  it('只展示当前会话的待审批请求', () => {
-    const onApproveOnce = vi.fn()
-    renderConversationArea({
-      pendingApprovals: [
-        {
-          approvalId: 'approval-1',
-          sessionId: 'session-1',
-          agentId: 'yuanxiao',
-          command: 'ls',
-          cwd: '/tmp',
-          runId: 'run-1',
-          riskDescription: '低风险',
-          riskLevel: 'normal',
-          status: 'pending',
-          createdAt: '2026-07-28T00:00:00.000Z',
-        },
-        {
-          approvalId: 'approval-2',
-          sessionId: 'other-session',
-          agentId: 'yuanxiao',
-          command: 'rm -rf /',
-          cwd: '/',
-          runId: 'run-2',
-          riskDescription: '高风险',
-          riskLevel: 'high',
-          status: 'pending',
-          createdAt: '2026-07-28T00:00:00.000Z',
-        },
-      ],
-      approvals: { onApproveOnce, onApproveAlways: vi.fn(), onReject: vi.fn() },
-    })
-
-    expect(screen.getByText('ls')).toBeInTheDocument()
-    expect(screen.queryByText('rm -rf /')).not.toBeInTheDocument()
   })
 
   it('transcript 读取中显示会话读取提示，不渲染消息流', () => {

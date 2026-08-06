@@ -22,8 +22,6 @@ export interface SessionLineageTreeProps {
   rootSessions: readonly AgentSessionSummary[]
   /** 当前选中的会话标识。 */
   selectedSessionId: string | null
-  /** 存在待审批请求的会话标识列表。 */
-  pendingApprovalSessionIds: readonly string[]
   /** 选中某个会话时的回调。 */
   onSelect: (session: AgentSessionSummary) => void
   /** 归档某个会话谱系的回调。 */
@@ -110,7 +108,6 @@ function SessionLineageNode(props: {
   depth: number
   childrenByParentId: Map<string, AgentSessionSummary[]>
   selectedSessionId: string | null
-  pendingApprovalSessionIds: readonly string[]
   subtreeActiveSessionIds: Set<string>
   visitedSessionIds: readonly string[]
   onSelect: (session: AgentSessionSummary) => void
@@ -123,7 +120,6 @@ function SessionLineageNode(props: {
     depth,
     childrenByParentId,
     selectedSessionId,
-    pendingApprovalSessionIds,
     subtreeActiveSessionIds,
     visitedSessionIds,
     onSelect,
@@ -132,9 +128,6 @@ function SessionLineageNode(props: {
     onRename,
   } = props
   const isSelected = session.sessionId === selectedSessionId
-  const hasPendingApproval = pendingApprovalSessionIds.includes(
-    session.sessionId,
-  )
   const isRunning = session.state === 'running' || session.state === 'queued'
   const hasSubtreeActivity = subtreeActiveSessionIds.has(session.sessionId)
   const isRoot = depth === 1
@@ -181,7 +174,7 @@ function SessionLineageNode(props: {
         tabIndex={0}
         aria-label={[
           displayTitle,
-          hasPendingApproval ? '待审批' : isRunning ? '运行中' : '',
+          isRunning ? '运行中' : '',
         ]
           .filter(Boolean)
           .join(' ')}
@@ -249,17 +242,13 @@ function SessionLineageNode(props: {
           </span>
         )}
 
-        {!isEditing && (isRunning || hasPendingApproval) && (
+        {!isEditing && isRunning && (
           <>
             <span
               aria-hidden="true"
-              className={`size-1.5 shrink-0 rounded-full ${
-                hasPendingApproval ? 'bg-warning' : 'bg-primary'
-              }`}
+              className="bg-primary size-1.5 shrink-0 rounded-full"
             />
-            <span className="sr-only">
-              {hasPendingApproval ? '待审批' : '运行中'}
-            </span>
+            <span className="sr-only">运行中</span>
           </>
         )}
 
@@ -333,7 +322,6 @@ function SessionLineageNode(props: {
               depth={depth + 1}
               childrenByParentId={childrenByParentId}
               selectedSessionId={selectedSessionId}
-              pendingApprovalSessionIds={pendingApprovalSessionIds}
               subtreeActiveSessionIds={subtreeActiveSessionIds}
               visitedSessionIds={[...visitedSessionIds, childSession.sessionId]}
               onSelect={onSelect}
@@ -359,7 +347,6 @@ export function SessionLineageTree({
   sessions,
   rootSessions,
   selectedSessionId,
-  pendingApprovalSessionIds,
   onSelect,
   onArchive,
   onDelete,
@@ -384,7 +371,6 @@ export function SessionLineageTree({
           depth={1}
           childrenByParentId={childrenByParentId}
           selectedSessionId={selectedSessionId}
-          pendingApprovalSessionIds={pendingApprovalSessionIds}
           subtreeActiveSessionIds={subtreeActiveSessionIds}
           visitedSessionIds={[session.sessionId]}
           onSelect={onSelect}

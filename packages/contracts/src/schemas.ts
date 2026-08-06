@@ -205,7 +205,7 @@ export const sessionLineageActivitySchema = z.strictObject({
   sessionId: nonEmptyIdentifierSchema,
   title: z.string(),
   kinds: z.array(
-    z.enum(['running', 'queued', 'pending-approval', 'pending-clarification']),
+    z.enum(['running', 'queued']),
   ),
 })
 
@@ -470,22 +470,6 @@ export const questionClarificationRequestSchema = z.strictObject({
 })
 
 /**
- * 校验 Bash 审批请求。
- */
-export const bashApprovalRequestSchema = z.strictObject({
-  approvalId: nonEmptyIdentifierSchema,
-  agentId: nonEmptyIdentifierSchema,
-  sessionId: nonEmptyIdentifierSchema,
-  runId: nonEmptyIdentifierSchema,
-  command: z.string().min(1),
-  cwd: z.string().min(1),
-  riskLevel: z.enum(['normal', 'medium', 'high']),
-  riskDescription: z.string(),
-  status: z.enum(['pending', 'approved', 'rejected']),
-  createdAt: timestampSchema,
-})
-
-/**
  * 校验 Main 向 Renderer 推送的标准 Agent 事件。
  */
 export const agentEventSchema = z.discriminatedUnion('type', [
@@ -566,37 +550,6 @@ export const agentEventSchema = z.discriminatedUnion('type', [
     type: z.literal('agent-recovered'),
     agentId: nonEmptyIdentifierSchema,
     agent: agentSummarySchema,
-    occurredAt: timestampSchema,
-  }),
-  z.strictObject({
-    type: z.literal('approval-required'),
-    agentId: nonEmptyIdentifierSchema,
-    sessionId: nonEmptyIdentifierSchema,
-    approval: bashApprovalRequestSchema,
-    occurredAt: timestampSchema,
-  }),
-  z.strictObject({
-    type: z.literal('approval-resolved'),
-    agentId: nonEmptyIdentifierSchema,
-    sessionId: nonEmptyIdentifierSchema,
-    approvalId: nonEmptyIdentifierSchema,
-    status: z.enum(['approved', 'rejected']),
-    occurredAt: timestampSchema,
-  }),
-  z.strictObject({
-    type: z.literal('clarification-required'),
-    agentId: nonEmptyIdentifierSchema,
-    sessionId: nonEmptyIdentifierSchema,
-    clarification: questionClarificationRequestSchema,
-    occurredAt: timestampSchema,
-  }),
-  z.strictObject({
-    type: z.literal('clarification-resolved'),
-    agentId: nonEmptyIdentifierSchema,
-    sessionId: nonEmptyIdentifierSchema,
-    clarificationId: nonEmptyIdentifierSchema,
-    answer: z.string(),
-    status: z.enum(['answered', 'cancelled']),
     occurredAt: timestampSchema,
   }),
   z.strictObject({
@@ -904,40 +857,10 @@ export const sendNotificationRequestSchema = z.strictObject({
 })
 
 /**
- * 校验批准 Bash 执行的请求。
- */
-export const approveBashRequestSchema = z.strictObject({
-  approvalId: nonEmptyIdentifierSchema,
-  remember: z.boolean().optional(),
-})
-
-/**
- * 校验拒绝 Bash 执行的请求。
- */
-export const rejectBashRequestSchema = z.strictObject({
-  approvalId: nonEmptyIdentifierSchema,
-})
-
-/**
  * 校验批准 Skill 操作的请求（只需 approvalId，不含 Bash 特有的 remember 字段）。
  */
 export const approveSkillOperationRequestSchema = z.strictObject({
   approvalId: nonEmptyIdentifierSchema,
-})
-
-/**
- * 校验提交澄清答案的请求。
- */
-export const answerClarificationRequestSchema = z.strictObject({
-  clarificationId: nonEmptyIdentifierSchema,
-  answer: z.string().min(1),
-})
-
-/**
- * 校验取消澄清的请求。
- */
-export const cancelClarificationRequestSchema = z.strictObject({
-  clarificationId: nonEmptyIdentifierSchema,
 })
 
 /**

@@ -7,8 +7,6 @@ import {
 } from '@/lib/agent-event-session-state'
 import {
   mergeAgentEventIntoAgents,
-  mergeAgentEventIntoPendingApprovals,
-  mergeAgentEventIntoPendingClarifications,
 } from '@/lib/agent-event-state'
 import type { WorkbenchState } from '@/stores/workbench-store'
 
@@ -18,8 +16,6 @@ export type AgentEventProjectionState = Pick<
   | 'agents'
   | 'sessionsByAgentId'
   | 'transcriptsBySessionId'
-  | 'pendingApprovalsBySessionId'
-  | 'pendingClarificationsBySessionId'
   | 'sendingBySessionId'
 >
 
@@ -67,32 +63,6 @@ export function projectAgentEvent(
     partial.transcriptsBySessionId = {
       ...state.transcriptsBySessionId,
       [event.sessionId]: applyTranscriptDelta(currentTranscript, event.delta),
-    }
-  }
-
-  if (
-    event.type === 'approval-required' ||
-    event.type === 'approval-resolved'
-  ) {
-    partial.pendingApprovalsBySessionId = {
-      ...state.pendingApprovalsBySessionId,
-      [event.sessionId]: mergeAgentEventIntoPendingApprovals(
-        state.pendingApprovalsBySessionId[event.sessionId] ?? [],
-        event,
-      ),
-    }
-  }
-
-  if (
-    event.type === 'clarification-required' ||
-    event.type === 'clarification-resolved'
-  ) {
-    partial.pendingClarificationsBySessionId = {
-      ...state.pendingClarificationsBySessionId,
-      [event.sessionId]: mergeAgentEventIntoPendingClarifications(
-        state.pendingClarificationsBySessionId[event.sessionId] ?? [],
-        event,
-      ),
     }
   }
 

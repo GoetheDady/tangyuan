@@ -197,7 +197,6 @@ function ChatPage(props: { store: WorkbenchStoreApi }): React.JSX.Element {
           activeAgentId={activeAgentId}
           sessions={sessions}
           selectedSessionId={selectedSession?.sessionId ?? null}
-          pendingApprovalSessionIds={[]}
           archivedSessions={archivedSessions}
           recoveringSessionId={sessionArchive.recoveringSessionId}
           onAgentChange={(nextAgentId) => {

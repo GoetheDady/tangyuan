@@ -2,15 +2,12 @@ import type {
   AgentEvent,
   AgentSessionSummary,
   AgentSummary,
-  BashApprovalRequest,
-  QuestionClarificationRequest,
   RuntimeSnapshot,
   TranscriptSnapshot,
 } from '@yuanxiao/contracts'
 import { createRuntimeSnapshot } from '@yuanxiao/contracts'
 import { describe, expect, it } from 'vitest'
 
-import { computePendingApprovalSessionIds } from '../lib/agent-event-state'
 import {
   createWorkbenchStore,
 } from './workbench-store'
@@ -79,41 +76,6 @@ function createTranscript(
   return { agentId, sessionId, entries: [], updatedAt: NOW }
 }
 
-function createApproval(
-  agentId: string,
-  sessionId: string,
-): BashApprovalRequest {
-  return {
-    approvalId: `approval-${sessionId}`,
-    agentId,
-    sessionId,
-    runId: `run-${sessionId}`,
-    command: 'bun run test',
-    cwd: '/workspace',
-    riskDescription: '运行测试',
-    riskLevel: 'normal',
-    status: 'pending',
-    createdAt: NOW,
-  }
-}
-
-function createClarification(
-  agentId: string,
-  sessionId: string,
-): QuestionClarificationRequest {
-  return {
-    clarificationId: `clarification-${sessionId}`,
-    agentId,
-    sessionId,
-    runId: `run-${sessionId}`,
-    question: '是否继续？',
-    options: ['继续', '停止'],
-    allowCustomAnswer: false,
-    status: 'pending',
-    createdAt: NOW,
-  }
-}
-
 describe('createWorkbenchStore', () => {
   it('创建不共享残留状态的默认 vanilla store', () => {
     const first = createWorkbenchStore()
@@ -125,8 +87,6 @@ describe('createWorkbenchStore', () => {
       sessionsByAgentId: {},
       transcriptsBySessionId: {},
       sendingBySessionId: {},
-      pendingApprovalsBySessionId: {},
-      pendingClarificationsBySessionId: {},
       composerDraft: '',
       isInitializing: true,
       activeSession: null,
@@ -295,56 +255,6 @@ describe('createWorkbenchStore', () => {
     expect(store.getState().agents).toEqual([YUANXIAO, renamedResearcher])
   })
 
-  it('通过事件按 session 加入和解决临时请求', () => {
-    const store = createWorkbenchStore()
-    const firstApproval = createApproval('yuanxiao', 'session-1')
-    const secondApproval = createApproval('researcher', 'session-2')
-    const firstClarification = createClarification('yuanxiao', 'session-1')
-
-    store.getState().applyAgentEvent({
-      type: 'approval-required',
-      agentId: firstApproval.agentId,
-      sessionId: firstApproval.sessionId,
-      approval: firstApproval,
-      occurredAt: NOW,
-    })
-    store.getState().applyAgentEvent({
-      type: 'approval-required',
-      agentId: secondApproval.agentId,
-      sessionId: secondApproval.sessionId,
-      approval: secondApproval,
-      occurredAt: NOW,
-    })
-    store.getState().applyAgentEvent({
-      type: 'clarification-required',
-      agentId: firstClarification.agentId,
-      sessionId: firstClarification.sessionId,
-      clarification: firstClarification,
-      occurredAt: NOW,
-    })
-    store.getState().applyAgentEvent({
-      type: 'approval-resolved',
-      agentId: firstApproval.agentId,
-      sessionId: firstApproval.sessionId,
-      approvalId: firstApproval.approvalId,
-      status: 'approved',
-      occurredAt: NOW,
-    })
-
-    expect(store.getState().pendingApprovalsBySessionId).toEqual({
-      'session-1': [],
-      'session-2': [secondApproval],
-    })
-    expect(store.getState().pendingClarificationsBySessionId).toEqual({
-      'session-1': [firstClarification],
-    })
-    expect(
-      computePendingApprovalSessionIds(
-        store.getState().pendingApprovalsBySessionId,
-      ),
-    ).toEqual(['session-2'])
-  })
-
   it('按 session 打开、更新和清理 transcript', () => {
     const store = createWorkbenchStore()
     store.getState().openSession(createTranscript('yuanxiao', 'session-1'))
@@ -370,72 +280,6 @@ describe('createWorkbenchStore', () => {
     expect(
       store.getState().transcriptsBySessionId['session-2']?.entries,
     ).toHaveLength(1)
-  })
-
-  it('发送状态、审批和澄清请求按 session 隔离并可语义清理', () => {
-    const store = createWorkbenchStore()
-    const firstApproval = createApproval('yuanxiao', 'session-1')
-    const secondApproval = createApproval('researcher', 'session-2')
-    const firstClarification = createClarification('yuanxiao', 'session-1')
-    const secondClarification = createClarification('researcher', 'session-2')
-
-    store.getState().startSessionExecution({ sessionId: 'session-1' })
-    store.getState().startSessionExecution({ sessionId: 'session-2' })
-    store.getState().applyAgentEvent({
-      type: 'approval-required',
-      agentId: firstApproval.agentId,
-      sessionId: firstApproval.sessionId,
-      approval: firstApproval,
-      occurredAt: NOW,
-    })
-    store.getState().applyAgentEvent({
-      type: 'approval-required',
-      agentId: secondApproval.agentId,
-      sessionId: secondApproval.sessionId,
-      approval: secondApproval,
-      occurredAt: NOW,
-    })
-    store.getState().applyAgentEvent({
-      type: 'clarification-required',
-      agentId: firstClarification.agentId,
-      sessionId: firstClarification.sessionId,
-      clarification: firstClarification,
-      occurredAt: NOW,
-    })
-    store.getState().applyAgentEvent({
-      type: 'clarification-required',
-      agentId: secondClarification.agentId,
-      sessionId: secondClarification.sessionId,
-      clarification: secondClarification,
-      occurredAt: NOW,
-    })
-    store.getState().endSessionExecution('session-1')
-    store.getState().applyAgentEvent({
-      type: 'approval-resolved',
-      agentId: firstApproval.agentId,
-      sessionId: firstApproval.sessionId,
-      approvalId: firstApproval.approvalId,
-      status: 'approved',
-      occurredAt: NOW,
-    })
-
-    expect(store.getState().sendingBySessionId).toEqual({
-      'session-1': false,
-      'session-2': true,
-    })
-    expect(store.getState().pendingApprovalsBySessionId).toEqual({
-      'session-1': [],
-      'session-2': [secondApproval],
-    })
-    expect(store.getState().pendingClarificationsBySessionId).toEqual({
-      'session-1': [firstClarification],
-      'session-2': [secondClarification],
-    })
-    expect(
-      computePendingApprovalSessionIds(
-        store.getState().pendingApprovalsBySessionId,
-      ),
-    ).toEqual(['session-2'])
   })
 
   it('执行完成通过一次 transition 更新 transcript、会话目录与发送状态', () => {
@@ -484,8 +328,6 @@ describe('createWorkbenchStore', () => {
     const parent = createSession('yuanxiao', 'parent')
     const child = createSession('yuanxiao', 'child')
     const survivor = createSession('yuanxiao', 'survivor')
-    const approval = createApproval('yuanxiao', 'parent')
-    const clarification = createClarification('yuanxiao', 'child')
     store
       .getState()
       .replaceSessionCatalog('yuanxiao', [parent, child, survivor])
@@ -493,20 +335,6 @@ describe('createWorkbenchStore', () => {
     store.getState().openSession(createTranscript('yuanxiao', 'child'))
     store.getState().startSessionExecution({ sessionId: 'parent' })
     store.getState().startSessionExecution({ sessionId: 'child' })
-    store.getState().applyAgentEvent({
-      type: 'approval-required',
-      agentId: 'yuanxiao',
-      sessionId: 'parent',
-      approval,
-      occurredAt: NOW,
-    })
-    store.getState().applyAgentEvent({
-      type: 'clarification-required',
-      agentId: 'yuanxiao',
-      sessionId: 'child',
-      clarification,
-      occurredAt: NOW,
-    })
 
     store.getState().removeSessionLineage({
       agentId: 'yuanxiao',
@@ -518,12 +346,6 @@ describe('createWorkbenchStore', () => {
     for (const sessionId of ['parent', 'child']) {
       expect(store.getState().transcriptsBySessionId).not.toHaveProperty(sessionId)
       expect(store.getState().sendingBySessionId).not.toHaveProperty(sessionId)
-      expect(store.getState().pendingApprovalsBySessionId).not.toHaveProperty(
-        sessionId,
-      )
-      expect(store.getState().pendingClarificationsBySessionId).not.toHaveProperty(
-        sessionId,
-      )
     }
   })
 

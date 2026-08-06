@@ -1,8 +1,6 @@
 import type {
   AgentEvent,
   AgentSessionSummary,
-  BashApprovalRequest,
-  QuestionClarificationRequest,
   TranscriptSnapshot,
 } from '@yuanxiao/contracts'
 import { describe, expect, it } from 'vitest'
@@ -19,8 +17,6 @@ function createState(
     agents: [],
     sessionsByAgentId: {},
     transcriptsBySessionId: {},
-    pendingApprovalsBySessionId: {},
-    pendingClarificationsBySessionId: {},
     sendingBySessionId: {},
     ...overrides,
   }
@@ -44,41 +40,6 @@ function createTranscript(
   sessionId: string,
 ): TranscriptSnapshot {
   return { agentId, sessionId, entries: [], updatedAt: NOW }
-}
-
-function createApproval(
-  agentId: string,
-  sessionId: string,
-): BashApprovalRequest {
-  return {
-    approvalId: `approval-${sessionId}`,
-    agentId,
-    sessionId,
-    runId: `run-${sessionId}`,
-    command: 'bun run test',
-    cwd: '/workspace',
-    riskDescription: '运行测试',
-    riskLevel: 'normal',
-    status: 'pending',
-    createdAt: NOW,
-  }
-}
-
-function createClarification(
-  agentId: string,
-  sessionId: string,
-): QuestionClarificationRequest {
-  return {
-    clarificationId: `clarification-${sessionId}`,
-    agentId,
-    sessionId,
-    runId: `run-${sessionId}`,
-    question: '是否继续？',
-    options: ['继续', '停止'],
-    allowCustomAnswer: false,
-    status: 'pending',
-    createdAt: NOW,
-  }
 }
 
 describe('projectAgentEvent', () => {
@@ -113,72 +74,6 @@ describe('projectAgentEvent', () => {
     expect(partial.transcriptsBySessionId).not.toBe(
       state.transcriptsBySessionId,
     )
-  })
-
-  it('approval-required 追加、approval-resolved 移除待审批请求', () => {
-    const approval = createApproval('yuanxiao', 'session-1')
-    const state = createState()
-
-    const required = projectAgentEvent(state, {
-      type: 'approval-required',
-      agentId: approval.agentId,
-      sessionId: approval.sessionId,
-      approval,
-      occurredAt: NOW,
-    })
-    expect(required.pendingApprovalsBySessionId?.['session-1']).toEqual([
-      approval,
-    ])
-
-    const resolved = projectAgentEvent(
-      {
-        ...state,
-        pendingApprovalsBySessionId: required.pendingApprovalsBySessionId!,
-      },
-      {
-        type: 'approval-resolved',
-        agentId: approval.agentId,
-        sessionId: approval.sessionId,
-        approvalId: approval.approvalId,
-        status: 'approved',
-        occurredAt: NOW,
-      },
-    )
-    expect(resolved.pendingApprovalsBySessionId?.['session-1']).toEqual([])
-  })
-
-  it('clarification-required 追加、clarification-resolved 移除待澄清请求', () => {
-    const clarification = createClarification('yuanxiao', 'session-1')
-    const state = createState()
-
-    const required = projectAgentEvent(state, {
-      type: 'clarification-required',
-      agentId: clarification.agentId,
-      sessionId: clarification.sessionId,
-      clarification,
-      occurredAt: NOW,
-    })
-    expect(required.pendingClarificationsBySessionId?.['session-1']).toEqual([
-      clarification,
-    ])
-
-    const resolved = projectAgentEvent(
-      {
-        ...state,
-        pendingClarificationsBySessionId:
-          required.pendingClarificationsBySessionId!,
-      },
-      {
-        type: 'clarification-resolved',
-        agentId: clarification.agentId,
-        sessionId: clarification.sessionId,
-        clarificationId: clarification.clarificationId,
-        answer: '继续',
-        status: 'answered',
-        occurredAt: NOW,
-      },
-    )
-    expect(resolved.pendingClarificationsBySessionId?.['session-1']).toEqual([])
   })
 
   it('turn-cancelled / turn-failed / run-state-changed 非 running 清空发送状态', () => {

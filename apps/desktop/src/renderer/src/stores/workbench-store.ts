@@ -2,8 +2,6 @@ import type {
   AgentEvent,
   AgentSessionSummary,
   AgentSummary,
-  BashApprovalRequest,
-  QuestionClarificationRequest,
   RuntimeSnapshot,
   TranscriptSnapshot,
 } from '@yuanxiao/contracts'
@@ -33,11 +31,6 @@ export interface WorkbenchState {
   archivedSessionsByAgentId: Record<string, AgentSessionSummary[]>
   transcriptsBySessionId: Record<string, TranscriptSnapshot>
   sendingBySessionId: Record<string, boolean>
-  pendingApprovalsBySessionId: Record<string, BashApprovalRequest[]>
-  pendingClarificationsBySessionId: Record<
-    string,
-    QuestionClarificationRequest[]
-  >
   composerDraft: string
   isInitializing: boolean
 }
@@ -95,8 +88,6 @@ function createInitialState(): WorkbenchState {
     archivedSessionsByAgentId: {},
     transcriptsBySessionId: {},
     sendingBySessionId: {},
-    pendingApprovalsBySessionId: {},
-    pendingClarificationsBySessionId: {},
     composerDraft: '',
     isInitializing: true,
   }
@@ -205,14 +196,6 @@ export function createWorkbenchStore(): WorkbenchStoreApi {
           affected,
         ),
         sendingBySessionId: omitKeys(state.sendingBySessionId, affected),
-        pendingApprovalsBySessionId: omitKeys(
-          state.pendingApprovalsBySessionId,
-          affected,
-        ),
-        pendingClarificationsBySessionId: omitKeys(
-          state.pendingClarificationsBySessionId,
-          affected,
-        ),
       }))
     },
 

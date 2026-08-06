@@ -165,13 +165,6 @@ describe('registerDesktopAppIpc', () => {
           hasScripts: false,
         },
       ]),
-      approveBash: vi.fn().mockResolvedValue(undefined),
-      rejectBash: vi.fn().mockResolvedValue(undefined),
-      getPendingApprovals: vi.fn().mockReturnValue([]),
-      answerClarification: vi.fn().mockResolvedValue(undefined),
-      cancelClarification: vi.fn().mockResolvedValue(undefined),
-      getPendingClarifications: vi.fn().mockReturnValue([]),
-      createToolApprovalGateway: vi.fn(),
       installSkill: vi.fn().mockResolvedValue([]),
       deleteSkill: vi.fn().mockResolvedValue([]),
       approveSkillOperation: vi.fn().mockResolvedValue(undefined),
@@ -196,7 +189,7 @@ describe('registerDesktopAppIpc', () => {
       openExternalLink,
     )
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(51)
+    expect(ipcMain.handle).toHaveBeenCalledTimes(42)
     expect(broadcastAgentEvent).toHaveBeenCalledWith(
       createAttemptStartedEvent(),
     )
@@ -456,17 +449,6 @@ describe('registerDesktopAppIpc', () => {
       },
     ])
     expect(runtime.listSharedSkills).toHaveBeenCalledOnce()
-
-    await expect(
-      getHandler(handlers, DESKTOP_IPC_CHANNELS.sessionsApproveBash)(null, {
-        approvalId: 'approval-1',
-        remember: true,
-      }),
-    ).resolves.toBeUndefined()
-    expect(runtime.approveBash).toHaveBeenCalledWith({
-      approvalId: 'approval-1',
-      remember: true,
-    })
   })
 
   it('rejects malformed IPC payloads before they reach the runtime', async () => {
@@ -578,13 +560,6 @@ describe('registerDesktopAppIpc', () => {
       listSharedSkills: vi.fn().mockResolvedValue([]),
       reloadAgentSessions: vi.fn().mockResolvedValue(undefined),
       reloadAllSessions: vi.fn().mockResolvedValue(undefined),
-      approveBash: vi.fn().mockResolvedValue(undefined),
-      rejectBash: vi.fn().mockResolvedValue(undefined),
-      getPendingApprovals: vi.fn().mockReturnValue([]),
-      answerClarification: vi.fn().mockResolvedValue(undefined),
-      cancelClarification: vi.fn().mockResolvedValue(undefined),
-      getPendingClarifications: vi.fn().mockReturnValue([]),
-      createToolApprovalGateway: vi.fn(),
       installSkill: vi.fn().mockResolvedValue([]),
       deleteSkill: vi.fn().mockResolvedValue([]),
       approveSkillOperation: vi.fn().mockResolvedValue(undefined),
@@ -643,13 +618,6 @@ describe('registerDesktopAppIpc', () => {
       cancelRun: vi.fn(),
       subscribe: vi.fn(),
       cancelAllActiveRuns: vi.fn(),
-      approveBash: vi.fn(),
-      rejectBash: vi.fn(),
-      getPendingApprovals: vi.fn(),
-      answerClarification: vi.fn(),
-      cancelClarification: vi.fn(),
-      getPendingClarifications: vi.fn(),
-      createToolApprovalGateway: vi.fn(),
       installSkill: vi.fn(),
       deleteSkill: vi.fn(),
       approveSkillOperation: vi.fn(),

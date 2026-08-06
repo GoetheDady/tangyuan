@@ -1,7 +1,5 @@
 import type {
   AgentReplyEntry,
-  BashApprovalRequest,
-  QuestionClarificationRequest,
   SessionModelInfo,
   TranscriptEntry,
   TranscriptSnapshot,
@@ -9,10 +7,8 @@ import type {
 import { useMemo, useState } from 'react'
 
 import { AssistantMessage } from '@/components/AssistantMessage'
-import { BashApprovalCard } from '@/components/BashApprovalCard'
 import { CompactionIndicator } from '@/components/CompactionIndicator'
 import { Composer } from '@/components/Composer'
-import { QuestionClarificationCard } from '@/components/QuestionClarificationCard'
 import { StreamdownMessage } from '@/components/StreamdownMessage'
 import { TranscriptMessages } from '@/components/TranscriptMessages'
 import { UserMessage } from '@/components/UserMessage'
@@ -315,71 +311,7 @@ const longTranscript: TranscriptSnapshot = {
   }),
 }
 
-const approvals: Record<'once' | 'always' | 'reject', BashApprovalRequest> = {
-  once: {
-    approvalId: 'approval-once',
-    agentId: 'yuanxiao',
-    sessionId: 'fixture-session',
-    runId: 'run-approval-once',
-    command: 'bun run --filter @yuanxiao/desktop test',
-    cwd: '/Users/gdsw/gdsw/yuanxiao',
-    riskDescription: '命令会执行测试脚本，但不会写入生产数据。',
-    riskLevel: 'normal',
-    status: 'pending',
-    createdAt: FIXED_TIME,
-  },
-  always: {
-    approvalId: 'approval-always',
-    agentId: 'yuanxiao',
-    sessionId: 'fixture-session',
-    runId: 'run-approval-always',
-    command: 'bun run typecheck',
-    cwd: '/Users/gdsw/gdsw/yuanxiao',
-    riskDescription: '长期许可只对当前 Agent、工作目录和完全相同命令生效。',
-    riskLevel: 'normal',
-    status: 'pending',
-    createdAt: FIXED_TIME,
-  },
-  reject: {
-    approvalId: 'approval-reject',
-    agentId: 'yuanxiao',
-    sessionId: 'fixture-session',
-    runId: 'run-approval-reject',
-    command: 'rm -rf ./out',
-    cwd: '/Users/gdsw/gdsw/yuanxiao',
-    riskDescription: '命令会删除构建产物，应在确认无需保留后执行。',
-    riskLevel: 'high',
-    status: 'pending',
-    createdAt: FIXED_TIME,
-  },
-}
-
-const clarifications: QuestionClarificationRequest[] = [
-  {
-    clarificationId: 'clarification-1',
-    agentId: 'yuanxiao',
-    sessionId: 'fixture-session',
-    runId: 'run-clarification-1',
-    question: '视觉基准应该覆盖哪种桌面宽度？',
-    options: ['1024', '1280', '1440+'],
-    allowCustomAnswer: true,
-    status: 'pending',
-    createdAt: FIXED_TIME,
-  },
-  {
-    clarificationId: 'clarification-2',
-    agentId: 'yuanxiao',
-    sessionId: 'fixture-session',
-    runId: 'run-clarification-2',
-    question: '完成后是否立即运行完整 Renderer E2E？',
-    options: ['立即运行', '仅运行常规回归'],
-    allowCustomAnswer: true,
-    status: 'pending',
-    createdAt: FIXED_TIME,
-  },
-]
-
-/** 对话业务组件的独立 Renderer 验收夹具。 */
+const longTranscript: TranscriptSnapshot = {
 export default function ConversationComponentsFixturePage(): React.JSX.Element {
   const [composerValue, setComposerValue] = useState('请继续完成跨组件验收。')
   const [submitCount, setSubmitCount] = useState(0)
@@ -389,30 +321,11 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
     modelInfo.thinkingLevel ?? 'medium',
   )
   const [retryCount, setRetryCount] = useState(0)
-  const [approvalResults, setApprovalResults] = useState<
-    Record<string, string>
-  >({})
-  const [clarificationIndex, setClarificationIndex] = useState(0)
-  const [clarificationAnswers, setClarificationAnswers] = useState<string[]>([])
 
   const currentModelInfo = useMemo(
     () => ({ ...modelInfo, modelId, thinkingLevel }),
     [modelId, thinkingLevel],
   )
-
-  /** 记录审批场景的已确认结果。
-   *
-   * @param id - 审批请求标识。
-   * @param result - 用户可见的决策结果。
-   * @returns 完成状态更新的 Promise。
-   * @throws 此夹具回调不会抛出错误。
-   */
-  const resolveApproval = async (id: string, result: string): Promise<void> => {
-    setApprovalResults((current) => ({ ...current, [id]: result }))
-  }
-
-  const currentClarification =
-    clarifications[clarificationIndex] ?? clarifications[0]!
 
   return (
     <main
@@ -550,64 +463,6 @@ export default function ConversationComponentsFixturePage(): React.JSX.Element {
             <StateCard label="取消 · 保留历史" testId="assistant-cancelled">
               <AssistantMessage entry={cancelledReply} isStreaming={false} />
             </StateCard>
-          </div>
-        </FixtureSection>
-
-        <FixtureSection
-          id="conversation-actions"
-          title="对话动作"
-          description="Bash 三种决策与连续单问题澄清；完成后保留确认结果。"
-        >
-          <div className="space-y-6">
-            {(Object.keys(approvals) as Array<keyof typeof approvals>).map(
-              (scenario) => {
-                const approval = approvals[scenario]
-                return (
-                  <div
-                    key={scenario}
-                    data-approval-scenario={scenario}
-                    className="bg-muted/20 rounded-xl border p-4"
-                  >
-                    <BashApprovalCard
-                      approval={approval}
-                      onApproveOnce={(id) => resolveApproval(id, '仅允许本次')}
-                      onApproveAlways={(id) => resolveApproval(id, '始终允许')}
-                      onReject={(id) => resolveApproval(id, '已拒绝')}
-                    />
-                    <output
-                      role="status"
-                      className="text-muted-foreground block text-center text-xs"
-                    >
-                      {approvalResults[approval.approvalId] ?? '等待决策'}
-                    </output>
-                  </div>
-                )
-              },
-            )}
-
-            <div
-              className="bg-muted/20 rounded-xl border p-4"
-              data-testid="clarification-sequence"
-            >
-              <QuestionClarificationCard
-                clarification={currentClarification}
-                onAnswer={async (_id, answer) => {
-                  setClarificationAnswers((current) => [...current, answer])
-                  setClarificationIndex((current) =>
-                    Math.min(current + 1, clarifications.length - 1),
-                  )
-                }}
-                onCancel={async () => {
-                  setClarificationAnswers((current) => [...current, '已取消'])
-                }}
-              />
-              <output
-                role="status"
-                className="text-muted-foreground block text-center text-xs"
-              >
-                已确认：{clarificationAnswers.join(' → ') || '等待回答'}
-              </output>
-            </div>
           </div>
         </FixtureSection>
 
