@@ -19,7 +19,6 @@ test.describe('对话业务组件视觉基准', () => {
     'integrated',
     'message-primitives',
     'assistant-states',
-    'conversation-actions',
     'composer-states',
   ]) {
     test(`${section} 保持独立视觉基准`, async ({ page }) => {

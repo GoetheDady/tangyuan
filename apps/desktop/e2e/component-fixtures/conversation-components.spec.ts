@@ -11,7 +11,7 @@ test.describe('对话业务组件验收夹具', () => {
     await page.evaluate(() => document.fonts.ready)
   })
 
-  test('完整展示 Composer、消息流、执行历史、压缩与对话动作', async ({
+  test('完整展示 Composer、消息流、执行历史与压缩', async ({
     page,
   }) => {
     await expect(
@@ -21,7 +21,6 @@ test.describe('对话业务组件验收夹具', () => {
       '完整消息流',
       '消息原语',
       'AssistantMessage 状态矩阵',
-      '对话动作',
       'Composer 状态矩阵',
       '长内容与虚拟列表',
     ]) {

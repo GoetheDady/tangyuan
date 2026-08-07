@@ -139,7 +139,7 @@ const activeToolLoopReply = createAgentReplyFixture({
         {
           index: 0,
           kind: 'thinking',
-          content: '正在检查窄宽度下 Composer 与对话动作是否互相遮挡。',
+          content: '正在检查窄宽度下 Composer 与长消息是否互相遮挡。',
           status: 'completed',
           startedAt: FIXED_TIME,
           completedAt: '2026-07-22T08:30:01.000Z',
