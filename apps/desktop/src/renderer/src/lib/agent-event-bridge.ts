@@ -101,42 +101,6 @@ export function createAgentEventBridge({
         })
     }
 
-    if (event.type === 'approval-required') {
-      store.getState().applyAgentEvent(event)
-      notifications.info(
-        `Bash 命令需要审批：${event.approval.command.slice(0, 60)}...`,
-      )
-      return
-    }
-
-    if (event.type === 'approval-resolved') {
-      store.getState().applyAgentEvent(event)
-      if (event.status === 'approved') {
-        notifications.success('已批准 Bash 命令执行')
-      } else {
-        notifications.info('已拒绝 Bash 命令执行')
-      }
-      return
-    }
-
-    if (event.type === 'clarification-required') {
-      store.getState().applyAgentEvent(event)
-      notifications.info(
-        `Agent 需要更多信息：${event.clarification.question.slice(0, 60)}...`,
-      )
-      return
-    }
-
-    if (event.type === 'clarification-resolved') {
-      store.getState().applyAgentEvent(event)
-      if (event.status === 'answered') {
-        notifications.success(`已回答：${event.answer}`)
-      } else {
-        notifications.info('已取消澄清')
-      }
-      return
-    }
-
     if (event.type === 'transcript-delta') {
       enqueueTranscriptDelta(event)
       return

@@ -67,8 +67,6 @@ pnpm build:linux # 产出 AppImage/snap/deb
 - #23: 共享用户资料与隔离身份维护
 - #24: 共享与 Agent 专属 Skill 加载
 - #25: 多 Agent run 并发、排队与取消
-- #26: Bash 审批与文件工具路径保护
-- #27: Skill 安装、更新和删除审批
 - #28: 安全流式 Markdown 与纯文本 Composer
 - #29: 虚拟化 transcript 与 Pi compaction 状态
 

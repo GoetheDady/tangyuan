@@ -148,7 +148,7 @@ Renderer UI 只调用 Preload API，不直接访问 Pi SDK。
 
 - 作为 Electron Main 和 IPC 唯一依赖的高层运行时接口。
 - 组合配置、Session、Agent 生命周期、Profile、Skill 五个必需职责模块。
-- 管理会话缓存、运行调度、审批和统一事件转换。
+- 管理会话缓存、运行调度和统一事件转换。
 - 保持 Renderer/IPC 契约不受内部模块调整影响。
 
 `YuanxiaoRuntime` 是深模块，不是数据库或 SDK 的一对一包装。

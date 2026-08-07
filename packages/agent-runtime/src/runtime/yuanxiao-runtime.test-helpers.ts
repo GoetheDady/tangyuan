@@ -204,10 +204,6 @@ export function createSessionDriver(
     }),
     listAgentSkills: vi.fn().mockResolvedValue([]),
     listSharedSkills: vi.fn().mockResolvedValue([]),
-    preflightSkillOperation: vi.fn().mockResolvedValue({
-      description: '测试 Skill',
-      hasScripts: false,
-    }),
     installSkill: vi.fn().mockResolvedValue([]),
     deleteSkill: vi.fn().mockResolvedValue([]),
     getSkillInstallRecords: vi.fn().mockResolvedValue([]),

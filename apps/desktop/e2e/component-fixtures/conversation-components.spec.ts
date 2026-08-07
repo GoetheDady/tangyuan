@@ -36,8 +36,6 @@ test.describe('对话业务组件验收夹具', () => {
     await expect(page.getByTestId('assistant-candidate')).toBeVisible()
     await expect(page.getByTestId('assistant-failed')).toBeVisible()
     await expect(page.getByTestId('assistant-cancelled')).toBeVisible()
-    await expect(page.locator('[data-approval-scenario]')).toHaveCount(3)
-    await expect(page.getByTestId('clarification-sequence')).toBeVisible()
   })
 
   test('用户消息 hover 时才在气泡下方同一行显示时间和单个分叉图标', async ({
@@ -160,38 +158,6 @@ test.describe('对话业务组件验收夹具', () => {
     )
   })
 
-  test('Bash Approval 三种决策均进入已确认状态', async ({ page }) => {
-    const scenarios = [
-      ['once', '仅允许本次执行此命令', '仅允许本次'],
-      ['always', '始终允许此命令（当前会话中同命令免审）', '始终允许'],
-      ['reject', '拒绝此命令执行', '已拒绝'],
-    ] as const
-
-    for (const [scenario, action, result] of scenarios) {
-      const region = page.locator(`[data-approval-scenario="${scenario}"]`)
-      await region.getByRole('button', { name: action }).click()
-      await expect(region.getByRole('status')).toContainText(result)
-      await expect(region.getByText('已处理')).toBeVisible()
-    }
-  })
-
-  test('连续单问题澄清、自定义输入和 Enter 提交可完成', async ({ page }) => {
-    const sequence = page.getByTestId('clarification-sequence')
-    await sequence.getByRole('radio', { name: '选择：1280' }).click()
-    await expect(
-      sequence.getByText('完成后是否立即运行完整 Renderer E2E？'),
-    ).toBeVisible()
-
-    await sequence.getByRole('button', { name: '输入自定义答案' }).click()
-    const input = sequence.getByLabel('自定义答案输入')
-    await expect(input).toBeFocused()
-    await input.fill('先跑常规回归，再跑视觉门禁')
-    await input.press('Enter')
-    await expect(sequence.getByRole('status')).toContainText(
-      '1280 → 先跑常规回归，再跑视觉门禁',
-    )
-  })
-
   test('ARIA 覆盖 expanded、disabled、busy、status、alert 与装饰图标', async ({
     page,
   }) => {
@@ -247,10 +213,6 @@ test.describe('对话业务组件验收夹具', () => {
 
       await expectInsideViewport(page, page.getByTestId('integrated-chat'))
       await expectInsideViewport(page, page.getByTestId('composer-running'))
-      await expectInsideViewport(
-        page,
-        page.getByTestId('clarification-sequence'),
-      )
     })
   }
 

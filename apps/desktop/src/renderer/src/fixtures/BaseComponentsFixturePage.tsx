@@ -977,7 +977,7 @@ export default function BaseComponentsFixturePage(): React.JSX.Element {
                     variant="outline"
                     onClick={() => {
                       toast.dismiss()
-                      toast.info('Bash 命令需要审批')
+                      toast.info('会话已进入后台')
                     }}
                   >
                     显示 info Toast

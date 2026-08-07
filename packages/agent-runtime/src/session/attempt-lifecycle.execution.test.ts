@@ -3,6 +3,7 @@ import { MessageStore } from './message-store'
 import { AttemptLifecycle } from './attempt-lifecycle'
 import type { PersistedAttemptEntry } from './session-index-types'
 import type { DriverEvent, PiSdkSessionHandle } from '../driver'
+import { createPromptingHandle } from '../driver/pi-sdk-driver.test-helpers'
 
 describe('AttemptLifecycle 执行协议', () => {
   it('通过一个 execute 调用完成启动、流式消息、终态持久化与收尾', async () => {
@@ -39,6 +40,7 @@ describe('AttemptLifecycle 执行协议', () => {
       now: () => '2026-08-04T00:00:00.000Z',
     })
     const handle: PiSdkSessionHandle = {
+      ...createPromptingHandle('session-1'),
       prompt: async (_prompt, options) => {
         options?.onEvent?.({ type: 'text-delta', delta: '完成' })
         return '完成'

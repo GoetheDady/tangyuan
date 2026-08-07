@@ -21,7 +21,6 @@ import {
   type SkillSummary,
 } from '@yuanxiao/contracts'
 import type { DirectoryLayout } from '../core'
-import type { SkillOperationPreflight } from '../runtime/runtime-modules'
 
 /**
  * Pi SDK ResourceLoader 解析出的 Skill 结构（mapSkillsToSummaries 输入）。
@@ -131,32 +130,6 @@ export class SkillStore {
     return this.mapSkillsToSummaries(skills, diagnostics)
   }
 
-  /** 在审批前读取真实 Skill 信息并校验目标。 */
-  async preflightSkillOperation(
-    params: SkillOperationParams,
-  ): Promise<SkillOperationPreflight> {
-    const targetDir = this.resolveSkillTargetDir(
-      params.source,
-      params.targetAgentId,
-    )
-    const skillDir =
-      params.operation === 'install'
-        ? params.skillDirPath
-        : join(targetDir, params.skillName)
-
-    if (!skillDir) {
-      throw new Error('安装 Skill 需要提供 skillDirPath。')
-    }
-
-    const metadata = await this.readSkillMetadata(skillDir, params.skillName)
-    const conflict = await this.resolveLayerConflict(params)
-
-    return {
-      ...metadata,
-      ...(conflict ? { conflict } : {}),
-    }
-  }
-
   /**
    * 安装或更新 Skill（含 SKILL.md 校验和原子写入）。
    *
@@ -199,7 +172,10 @@ export class SkillStore {
       try {
         await rename(
           skillTargetDir,
-          join(trashDir, `${params.skillName}-${this.now().replace(/:/g, '-')}`),
+          join(
+            trashDir,
+            `${params.skillName}-${this.now().replace(/:/g, '-')}`,
+          ),
         )
       } catch {
         // 目录不存在则忽略
@@ -329,34 +305,36 @@ export class SkillStore {
       }
     }
 
-    return Promise.all(skills.map(async (skill) => {
-      const source: 'shared' | 'agent' = skill.filePath.startsWith(
-        agentSkillsPath.replace(YUANXIAO_DEFAULT_AGENT_ID, ''),
-      )
-        ? 'agent'
-        : skill.filePath.startsWith(sharedSkillsPath)
-          ? 'shared'
-          : 'agent'
+    return Promise.all(
+      skills.map(async (skill) => {
+        const source: 'shared' | 'agent' = skill.filePath.startsWith(
+          agentSkillsPath.replace(YUANXIAO_DEFAULT_AGENT_ID, ''),
+        )
+          ? 'agent'
+          : skill.filePath.startsWith(sharedSkillsPath)
+            ? 'shared'
+            : 'agent'
 
-      const conflict = collisionsByWinnerPath.get(skill.filePath)
+        const conflict = collisionsByWinnerPath.get(skill.filePath)
 
-      const summary: SkillSummary = {
-        name: skill.name,
-        description: skill.description ?? '',
-        source,
-        path: skill.filePath,
-        hasScripts: await this.isDirectory(join(skill.baseDir, 'scripts')),
-      }
-
-      if (conflict) {
-        summary.conflict = {
-          overriddenPath: conflict.overriddenPath,
-          overriddenSource: conflict.overriddenSource,
+        const summary: SkillSummary = {
+          name: skill.name,
+          description: skill.description ?? '',
+          source,
+          path: skill.filePath,
+          hasScripts: await this.isDirectory(join(skill.baseDir, 'scripts')),
         }
-      }
 
-      return summary
-    }))
+        if (conflict) {
+          summary.conflict = {
+            overriddenPath: conflict.overriddenPath,
+            overriddenSource: conflict.overriddenSource,
+          }
+        }
+
+        return summary
+      }),
+    )
   }
 
   /**
@@ -393,7 +371,7 @@ export class SkillStore {
   private async readSkillMetadata(
     dirPath: string,
     expectedName: string,
-  ): Promise<Pick<SkillOperationPreflight, 'description' | 'hasScripts'>> {
+  ): Promise<{ description: string; hasScripts: boolean }> {
     const skillMdPath = join(dirPath, 'SKILL.md')
 
     try {
@@ -425,27 +403,6 @@ export class SkillStore {
     return {
       description,
       hasScripts: await this.isDirectory(join(dirPath, 'scripts')),
-    }
-  }
-
-  private async resolveLayerConflict(
-    params: SkillOperationParams,
-  ): Promise<SkillOperationPreflight['conflict'] | undefined> {
-    if (params.source !== 'agent') return undefined
-
-    const sharedSkillPath = join(
-      this.layout.sharedSkills(),
-      params.skillName,
-      'SKILL.md',
-    )
-    try {
-      await access(sharedSkillPath, fsConstants.R_OK)
-      return {
-        overriddenPath: sharedSkillPath,
-        overriddenSource: 'shared',
-      }
-    } catch {
-      return undefined
     }
   }
 

@@ -1,8 +1,7 @@
 import type { AgentId } from './types'
 
 /** 会话谱系归档前需要停止的活动类型。 */
-export type SessionLineageActivityKind =
-  'running' | 'queued' | 'pending-approval' | 'pending-clarification'
+export type SessionLineageActivityKind = 'running' | 'queued'
 
 /** 单个会话中会被归档操作停止的活动。 */
 export interface SessionLineageActivity {

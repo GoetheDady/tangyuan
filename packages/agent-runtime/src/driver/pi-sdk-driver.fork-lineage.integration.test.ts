@@ -39,6 +39,7 @@ function createRealFileGateway(): PiSdkGateway {
 
     return {
       sdkSessionFile,
+      setSystemPromptContext: () => undefined,
       prompt: async (prompt: string) => {
         sessionManager.appendMessage({
           role: 'user',
@@ -90,6 +91,7 @@ function createRealFileGateway(): PiSdkGateway {
         supportedThinkingLevels: ['off', 'low', 'medium', 'high'],
         supportsThinking: true,
       }),
+      reload: async () => undefined,
     }
   }
 

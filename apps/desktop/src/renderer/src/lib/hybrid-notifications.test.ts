@@ -12,12 +12,13 @@ vi.mock('sonner', () => ({
 }))
 
 describe('createHybridNotifications', () => {
-  let sendNotification: ReturnType<typeof vi.fn>
-  let api: Pick<DesktopPreloadApi, 'sendNotification'>
+  const sendNotification = vi.fn<DesktopPreloadApi['sendNotification']>()
+  const api: Pick<DesktopPreloadApi, 'sendNotification'> = {
+    sendNotification,
+  }
 
   beforeEach(() => {
-    sendNotification = vi.fn().mockResolvedValue(undefined)
-    api = { sendNotification }
+    sendNotification.mockReset().mockResolvedValue(undefined)
     vi.mocked(toast.success).mockClear()
     vi.mocked(toast.info).mockClear()
     vi.mocked(toast.error).mockClear()
@@ -40,8 +41,8 @@ describe('createHybridNotifications', () => {
 
     it('info 调用 toast.info', () => {
       const n = createHybridNotifications(api)
-      n.info('需要审批')
-      expect(toast.info).toHaveBeenCalledWith('需要审批')
+      n.info('会话已进入后台')
+      expect(toast.info).toHaveBeenCalledWith('会话已进入后台')
       expect(sendNotification).not.toHaveBeenCalled()
     })
 
@@ -64,21 +65,30 @@ describe('createHybridNotifications', () => {
     it('success 调用系统通知，标题为「元宵」', () => {
       const n = createHybridNotifications(api)
       n.success('已归档 Agent')
-      expect(sendNotification).toHaveBeenCalledWith({ title: '元宵', body: '已归档 Agent' })
+      expect(sendNotification).toHaveBeenCalledWith({
+        title: '元宵',
+        body: '已归档 Agent',
+      })
       expect(toast.success).not.toHaveBeenCalled()
     })
 
     it('info 调用系统通知，标题为「元宵」', () => {
       const n = createHybridNotifications(api)
-      n.info('Bash 命令需要审批')
-      expect(sendNotification).toHaveBeenCalledWith({ title: '元宵', body: 'Bash 命令需要审批' })
+      n.info('会话已进入后台')
+      expect(sendNotification).toHaveBeenCalledWith({
+        title: '元宵',
+        body: '会话已进入后台',
+      })
       expect(toast.info).not.toHaveBeenCalled()
     })
 
     it('error 调用系统通知，标题为「元宵 — 错误」', () => {
       const n = createHybridNotifications(api)
       n.error('执行失败')
-      expect(sendNotification).toHaveBeenCalledWith({ title: '元宵 — 错误', body: '执行失败' })
+      expect(sendNotification).toHaveBeenCalledWith({
+        title: '元宵 — 错误',
+        body: '执行失败',
+      })
       expect(toast.error).not.toHaveBeenCalled()
     })
 

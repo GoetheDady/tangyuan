@@ -1,4 +1,3 @@
-import { YUANXIAO_DEFAULT_AGENT_ID } from '@yuanxiao/contracts'
 import type { AgentEvent } from '../driver'
 import { AgentManager, IdentityService } from '../agent'
 import { TranscriptEmitter } from '../session/transcript-emitter'
@@ -10,7 +9,6 @@ import type { YuanxiaoRuntimeDependencies } from './yuanxiao-runtime-dependencie
 export function createRuntimeInternals(
   dependencies: YuanxiaoRuntimeDependencies,
   emit: (event: AgentEvent) => void,
-  now: () => string,
 ) {
   const snapshotStore = new RuntimeSnapshotStore({
     configuration: dependencies.configuration,
@@ -30,9 +28,7 @@ export function createRuntimeInternals(
     skillService: new SkillService({
       skills: dependencies.skills,
       sessions: dependencies.sessions,
-      defaultAgentId: YUANXIAO_DEFAULT_AGENT_ID,
-      emit,
-      now,
+      defaultAgentId: 'yuanxiao',
     }),
   }
 }

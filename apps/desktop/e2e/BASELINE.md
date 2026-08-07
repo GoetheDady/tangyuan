@@ -79,7 +79,7 @@
 
 ## #59 对话业务组件跨组件验收（2026-07-22）
 
-新增独立 `conversation-components` Renderer 夹具，并以 `docs/design/yuanxiao-ui.pen` 中的 Composer、User Message、Assistant Message、Bash Approval 和 Question Clarification 画板逐区核对尺寸、间距、排版、圆角、边框、语义颜色、阴影层级、图标、执行轨道和状态文案。
+新增独立 `conversation-components` Renderer 夹具，并以 `docs/design/yuanxiao-ui.pen` 中的 Composer、User Message 和 Assistant Message 画板逐区核对尺寸、间距、排版、圆角、边框、语义颜色、阴影层级、图标、执行轨道和状态文案。
 
 ### 固定视觉环境
 
@@ -87,8 +87,7 @@
 
 ### 基准更新理由
 
-- 首次建立完整消息流、消息原语、Assistant 状态矩阵、Bash/澄清动作、Composer 状态和手动展开/聚焦状态的对话专属像素基准。
-- 基准同时记录 Bash 已处理和 Question Clarification 已确认的短暂完成状态，避免只验收待处理卡片。
+- 首次建立完整消息流、消息原语、Assistant 状态矩阵、Composer 状态和手动展开/聚焦状态的对话专属像素基准。
 - 视觉基准仅在 `chromium-fixtures-visual` 标准环境执行；常规 Renderer/fixture 回归继续以行为、ARIA、几何和溢出断言为门禁。
 - 本次没有接受产品视觉改版；新增 PNG 是对 Issue #50–#58 已完成组件的首次跨组件基线固化。
 
@@ -96,8 +95,6 @@
 
 - Composer：输入区、分隔线、模型/思考/附件控制栏和发送/停止动作保持单卡层级；附件仅为禁用占位。
 - User/Assistant：用户纯文本右对齐，Agent Markdown 左对齐；执行 disclosure、时间线、候选正文、失败/取消与最终正文层级一致。
-- Bash Approval：命令、工作目录、风险说明、警告和三决策按钮保持同一警告表面，完成态切换为成功语义。
-- Question Clarification：单问题、单选项、自定义输入、取消和已回答状态保持同一主色表面与键盘焦点顺序。
 - Transcript：压缩提示不进入对话气泡；长历史使用稳定条目身份和虚拟列表，不在会话切换时复用上一会话节点。
 
 ## #59 后续修正：真实 ChatPage Pencil 基准（2026-07-22）

@@ -199,9 +199,9 @@ export interface PiSdkSessionHandle {
   /**
    * Pi SDK 实际写入的原生 session 文件路径。
    *
-   * @remarks 测试替身可以省略；真实 SDK 创建会话时会返回带时间戳的文件名。
+   * @remarks 生产实现和测试替身都必须提供，Runtime 以它作为 Pi session 的唯一真相路径。
    */
-  sdkSessionFile?: string
+  sdkSessionFile: string
 
   /**
    * 向真实 Pi SDK 会话发送 prompt。
@@ -221,7 +221,7 @@ export interface PiSdkSessionHandle {
    * @param context - 身份上下文片段（soul/user 或 bootstrap）。
    * @returns 无返回值。
    */
-  setSystemPromptContext?(context: string): void
+  setSystemPromptContext(context: string): void
 
   /**
    * 取消当前会话正在运行的 Agent 响应。
@@ -248,7 +248,7 @@ export interface PiSdkSessionHandle {
    * @returns 无返回值。
    * @throws 当模型不存在或未配置凭据时，Promise 会 reject。
    */
-  setModel?(providerId: string, modelId: string, apiKey?: string): Promise<void>
+  setModel(providerId: string, modelId: string, apiKey?: string): Promise<void>
 
   /**
    * 切换当前会话的 Thinking Level。
@@ -257,7 +257,7 @@ export interface PiSdkSessionHandle {
    * @returns 无返回值。
    * @throws 当会话不支持 Thinking 时可能会 reject。
    */
-  setThinkingLevel?(level: string): Promise<void>
+  setThinkingLevel(level: string): Promise<void>
 
   /**
    * 读取当前会话的模型和 Thinking Level 信息。
@@ -265,7 +265,7 @@ export interface PiSdkSessionHandle {
    * @returns 当前会话的模型信息。
    * @throws 当会话信息无法读取时，Promise 会 reject。
    */
-  getModelInfo?(): Promise<SessionModelInfo>
+  getModelInfo(): Promise<SessionModelInfo>
 
   /**
    * 重新加载 ResourceLoader（Skill 变更后刷新系统提示词）。
@@ -273,11 +273,11 @@ export interface PiSdkSessionHandle {
    * @returns 无返回值。
    * @throws 当 reload 失败时，Promise 会 reject。
    */
-  reload?(): Promise<void>
+  reload(): Promise<void>
 }
 
 /**
- * 描述从 Pi SDK ModelRegistry 读取到的资源列表。
+ * 描述从 Pi SDK ModelRuntime 读取到的资源列表。
  */
 export interface PiSdkRuntimeResources {
   providers: ProviderDescriptor[]
@@ -289,7 +289,7 @@ export interface PiSdkRuntimeResources {
  */
 export interface PiSdkGateway {
   /**
-   * 读取 SDK ModelRegistry 中可展示的 Provider 和 Model。
+   * 读取 SDK ModelRuntime 中可展示的 Provider 和 Model。
    *
    * @returns Provider 和模型描述列表。
    * @throws 当 SDK 资源读取失败时，Promise 会 reject。
@@ -312,7 +312,9 @@ export interface PiSdkGateway {
    * @returns 模型文本回复；模型无输出时返回 null。
    * @throws 当 SDK 调用失败或模型不可用时，Promise 会 reject。
    */
-  singleTurnCompletion(request: RuntimeConfiguration & { prompt: string }): Promise<string | null>
+  singleTurnCompletion(
+    request: RuntimeConfiguration & { prompt: string },
+  ): Promise<string | null>
 
   /**
    * 创建真实 Pi SDK 会话运行器。

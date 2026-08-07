@@ -1,16 +1,9 @@
 import type {
-  AgentEvent,
-  SkillApprovalRequest,
   SkillInstallRecord,
   SkillOperationParams,
   SkillSummary,
 } from '@yuanxiao/contracts'
-import type {
-  SessionModule,
-  SkillModule,
-  SkillOperationPreflight,
-} from '../runtime/runtime-modules'
-import { SkillApprovalRegistry } from './skill-approval-registry'
+import type { SessionModule, SkillModule } from '../runtime/runtime-modules'
 
 /**
  * 创建 SkillService 所需的依赖。
@@ -19,32 +12,21 @@ export interface SkillServiceDependencies {
   skills: SkillModule
   sessions: SessionModule
   defaultAgentId: string
-  emit: (event: AgentEvent) => void
-  now: () => string
 }
 
 /**
- * Skill 管理服务：承载「Skill 如何列出、安装/删除（含权限校验、审批、
- * 按来源 reload 会话）、读取安装记录」这一族操作，并持有 Skill 审批登记表。
- * 编排 SessionModule 与 SkillApprovalRegistry，安装/删除后按 Skill 来源
- * 决定刷新范围（共享 → 全部 session；专属 → 目标 Agent 的 session）。
+ * Skill 管理服务：承载 Skill 列出、安装、删除和安装记录读取，安装/删除后
+ * 按 Skill 来源刷新对应会话。
  */
 export class SkillService {
   private readonly skills: SkillModule
   private readonly sessions: SessionModule
   private readonly defaultAgentId: string
-  private readonly approvals: SkillApprovalRegistry
-  private readonly now: () => string
 
   constructor(dependencies: SkillServiceDependencies) {
     this.skills = dependencies.skills
     this.sessions = dependencies.sessions
     this.defaultAgentId = dependencies.defaultAgentId
-    this.now = dependencies.now
-    this.approvals = new SkillApprovalRegistry({
-      emit: dependencies.emit,
-      now: dependencies.now,
-    })
   }
 
   /**
@@ -69,32 +51,28 @@ export class SkillService {
   }
 
   /**
-   * 安装或更新 Skill（含权限校验、审批与按来源 reload）。
+   * 安装或更新 Skill（含权限校验与按来源 reload）。
    *
    * @param params - 操作参数。
    * @returns 更新后的 Skill 摘要列表。
-   * @throws 当权限不足、用户拒绝、校验或 Skill 模块安装失败时，Promise 会 reject。
+   * @throws 当权限不足、校验或 Skill 模块安装失败时，Promise 会 reject。
    */
   async install(params: SkillOperationParams): Promise<SkillSummary[]> {
     this.validatePermission(params)
-    const preflight = await this.skills.preflightSkillOperation(params)
-    await this.requireApproval(params, preflight)
     const result = await this.skills.installSkill(params)
     await this.reloadAfterOperation(params)
     return result
   }
 
   /**
-   * 删除 Skill（含权限校验、审批与按来源 reload）。
+   * 删除 Skill（含权限校验与按来源 reload）。
    *
    * @param params - 操作参数。
    * @returns 更新后的 Skill 摘要列表。
-   * @throws 当权限不足、用户拒绝或 Skill 模块删除失败时，Promise 会 reject。
+   * @throws 当权限不足或 Skill 模块删除失败时，Promise 会 reject。
    */
   async delete(params: SkillOperationParams): Promise<SkillSummary[]> {
     this.validatePermission(params)
-    const preflight = await this.skills.preflightSkillOperation(params)
-    await this.requireApproval(params, preflight)
     const result = await this.skills.deleteSkill(params)
     await this.reloadAfterOperation(params)
     return result
@@ -108,42 +86,6 @@ export class SkillService {
    */
   async getInstallRecords(): Promise<SkillInstallRecord[]> {
     return this.skills.getSkillInstallRecords()
-  }
-
-  /**
-   * 批准指定 Skill 操作审批请求。
-   *
-   * @param approvalId - 审批标识。
-   * @throws 当审批不存在或已过期时抛出错误。
-   */
-  approveOperation(approvalId: string): void {
-    this.approvals.approve(approvalId)
-  }
-
-  /**
-   * 拒绝指定 Skill 操作审批请求。
-   *
-   * @param approvalId - 审批标识。
-   * @throws 当审批不存在或已过期时抛出错误。
-   */
-  rejectOperation(approvalId: string): void {
-    this.approvals.reject(approvalId)
-  }
-
-  /**
-   * 读取所有待审批的 Skill 操作请求。
-   *
-   * @returns 待审批 Skill 操作请求列表。
-   */
-  getPendingApprovals(): SkillApprovalRequest[] {
-    return this.approvals.list()
-  }
-
-  /**
-   * 拒绝所有待审批 Skill 操作（用于应用退出/全部取消场景）。
-   */
-  rejectAllApprovals(): void {
-    this.approvals.rejectAll()
   }
 
   /**
@@ -169,38 +111,6 @@ export class SkillService {
       throw new Error(
         `Agent "${params.agentId}" 无权管理 Agent "${targetId}" 的专属 Skill。只有 Agent 自身或元宵可以操作。`,
       )
-    }
-  }
-
-  /**
-   * 创建 Skill 操作审批并等待用户决议，拒绝时抛错。
-   *
-   * @param params - 操作参数。
-   * @throws 当用户拒绝时抛出错误。
-   */
-  private async requireApproval(
-    params: SkillOperationParams,
-    preflight: SkillOperationPreflight,
-  ): Promise<void> {
-    const request: SkillApprovalRequest = {
-      approvalId: crypto.randomUUID(),
-      agentId: params.agentId,
-      operation: params.operation,
-      source: params.source,
-      ...(params.targetAgentId !== undefined
-        ? { targetAgentId: params.targetAgentId }
-        : {}),
-      skillName: params.skillName,
-      description: preflight.description,
-      hasScripts: preflight.hasScripts,
-      ...(preflight.conflict ? { conflict: preflight.conflict } : {}),
-      status: 'pending',
-      createdAt: this.now(),
-    }
-
-    const { approved } = await this.approvals.register(request)
-    if (!approved) {
-      throw new Error('用户拒绝了 Skill 操作。')
     }
   }
 

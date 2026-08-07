@@ -1,6 +1,5 @@
 import type {
   AgentSessionSummary,
-  DeleteSessionResult,
   SessionLineageActivity,
   SessionLineageActivityKind,
 } from '@yuanxiao/contracts'
@@ -21,8 +20,6 @@ import { Button } from '@/components/ui/button'
 const activityKindLabels: Record<SessionLineageActivityKind, string> = {
   running: '运行中',
   queued: '排队中',
-  'pending-approval': '待审批',
-  'pending-clarification': '待澄清',
 }
 
 export function ArchivedSessionList(props: {

@@ -56,7 +56,7 @@ describe('Toaster', () => {
   })
 
   it.each([
-    ['info', () => toast.info('需要审批'), 'text-info-foreground'],
+    ['info', () => toast.info('会话已进入后台'), 'text-info-foreground'],
     ['success', () => toast.success('操作成功'), 'text-success-foreground'],
     ['warning', () => toast.warning('需要注意'), 'text-warning-foreground'],
     [
@@ -75,7 +75,9 @@ describe('Toaster', () => {
       })
 
       const item = (
-        await screen.findByText(/需要审批|操作成功|需要注意|操作失败|正在保存/)
+        await screen.findByText(
+          /会话已进入后台|操作成功|需要注意|操作失败|正在保存/,
+        )
       ).closest('[data-sonner-toast]')
 
       expect(item).toHaveAttribute('data-type', type)

@@ -8,6 +8,7 @@ import {
   createDriverAtPath,
   createFakeEncryptionAdapter,
   createPiSdkGateway,
+  createPromptingHandle,
 } from './pi-sdk-driver.test-helpers'
 
 afterEach(cleanupTempDirs)
@@ -17,6 +18,11 @@ describe('PiSdkDriver', () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
+          ...createPromptingHandle(
+            request.sessionId,
+            undefined,
+            request.sdkSessionFile,
+          ),
           prompts: [] as string[],
           systemPromptContexts: [] as string[],
           setSystemPromptContext(context: string) {
@@ -87,6 +93,11 @@ describe('PiSdkDriver', () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
+          ...createPromptingHandle(
+            request.sessionId,
+            undefined,
+            request.sdkSessionFile,
+          ),
           prompts: [] as string[],
           systemPromptContexts: [] as string[],
           setSystemPromptContext(context: string) {

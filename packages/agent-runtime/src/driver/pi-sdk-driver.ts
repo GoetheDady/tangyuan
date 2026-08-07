@@ -18,9 +18,7 @@ import {
   type SendMessageRequest,
   type TranscriptSnapshot,
 } from '@yuanxiao/contracts'
-import type {
-  PiSdkCreateSessionRequest,
-} from './pi-sdk-driver-contracts'
+import type { PiSdkCreateSessionRequest } from './pi-sdk-driver-contracts'
 import type { SessionModule } from '../runtime/runtime-modules'
 import { resolveSdkEntryId } from './sdk-entry-id-resolver'
 import { PiSdkDriverState } from './pi-sdk-driver-state'
@@ -59,7 +57,9 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
   /** 永久删除 Pi session 文件并移除索引条目。 */
   async deleteSessions(sessionIds: readonly string[]): Promise<void> {
     const entries = await Promise.all(
-      sessionIds.map((sessionId) => this.sessionIndexStore.findEntry(sessionId)),
+      sessionIds.map((sessionId) =>
+        this.sessionIndexStore.findEntry(sessionId),
+      ),
     )
     for (const [index, sessionId] of sessionIds.entries()) {
       const entry = entries[index]
@@ -142,7 +142,6 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
     }
 
     const handle = await this.gateway.createSession(createSessionRequest)
-    const persistedSdkSessionFile = handle.sdkSessionFile ?? sdkSessionFile
     const session: AgentSessionSummary = {
       agentId: request.agentId,
       sessionId,
@@ -152,7 +151,7 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
     }
     const indexEntry: PersistedSessionIndexEntry = {
       sessionId,
-      sdkSessionFile: persistedSdkSessionFile,
+      sdkSessionFile: handle.sdkSessionFile,
       title: request.title,
       createdAt: now,
       updatedAt: now,
@@ -167,12 +166,10 @@ export class PiSdkDriver extends PiSdkDriverState implements SessionModule {
     this.messageStore.initSession(session.sessionId)
     this.sessionHandles.set(session.sessionId, handle)
     // 身份上下文走系统提示词：建会话时注入并 reload 使其生效。
-    if (handle.setSystemPromptContext) {
-      handle.setSystemPromptContext(
-        await this.profileStore.buildSystemPromptContext(request.agentId),
-      )
-      await handle.reload?.()
-    }
+    handle.setSystemPromptContext(
+      await this.profileStore.buildSystemPromptContext(request.agentId),
+    )
+    await handle.reload()
     this.emit({
       type: 'session-created',
       agentId: request.agentId,

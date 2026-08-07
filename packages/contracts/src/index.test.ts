@@ -20,7 +20,6 @@ import {
   persistedConfigurationV2Schema,
   runTurnSchema,
   runtimeSnapshotSchema,
-  skillApprovalRequestSchema,
   skillOperationParamsSchema,
   skillInstallRecordSchema,
   transcriptDeltaSchema,
@@ -84,7 +83,7 @@ describe('contracts schemas', () => {
           {
             sessionId: 'session-2',
             title: '子会话',
-            kinds: ['running', 'pending-clarification'],
+            kinds: ['running', 'queued'],
           },
         ],
       }),
@@ -431,9 +430,6 @@ describe('DESKTOP_IPC_CHANNELS', () => {
       skillsListShared: 'yuanxiao:skills:list-shared',
       skillsInstall: 'yuanxiao:skills:install',
       skillsDelete: 'yuanxiao:skills:delete',
-      skillsApproveOperation: 'yuanxiao:skills:approve-operation',
-      skillsRejectOperation: 'yuanxiao:skills:reject-operation',
-      skillsGetPendingApprovals: 'yuanxiao:skills:get-pending-approvals',
       skillsGetInstallRecords: 'yuanxiao:skills:get-install-records',
       openExternalLink: 'yuanxiao:open-external-link',
       notificationSend: 'yuanxiao:notification:send',
@@ -596,59 +592,6 @@ describe('createAgentProfileStatus', () => {
 })
 
 describe('Skill schemas', () => {
-  it('accepts a valid skill approval request', () => {
-    expect(
-      skillApprovalRequestSchema.parse({
-        approvalId: 'approval-1',
-        agentId: 'yuanxiao',
-        operation: 'install',
-        source: 'shared',
-        skillName: 'code-review',
-        description: 'Review code changes',
-        hasScripts: false,
-        status: 'pending',
-        createdAt: '2026-07-17T00:00:00.000Z',
-      }),
-    ).toBeTruthy()
-  })
-
-  it('accepts a skill approval request with conflict info', () => {
-    expect(
-      skillApprovalRequestSchema.parse({
-        approvalId: 'approval-2',
-        agentId: 'agent-1',
-        operation: 'install',
-        source: 'agent',
-        targetAgentId: 'agent-1',
-        skillName: 'code-review',
-        description: 'Review code changes',
-        hasScripts: true,
-        conflict: {
-          overriddenPath: '/shared/skills/code-review',
-          overriddenSource: 'shared',
-        },
-        status: 'pending',
-        createdAt: '2026-07-17T00:00:00.000Z',
-      }),
-    ).toBeTruthy()
-  })
-
-  it('rejects skill approval request with invalid operation', () => {
-    expect(() =>
-      skillApprovalRequestSchema.parse({
-        approvalId: 'approval-1',
-        agentId: 'yuanxiao',
-        operation: 'invalid',
-        source: 'shared',
-        skillName: 'test',
-        description: '',
-        hasScripts: false,
-        status: 'pending',
-        createdAt: '2026-07-17T00:00:00.000Z',
-      }),
-    ).toThrow()
-  })
-
   it('accepts valid skill operation params for install', () => {
     expect(
       skillOperationParamsSchema.parse({

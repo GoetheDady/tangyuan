@@ -108,15 +108,24 @@ export abstract class PiSdkDriverState {
           })
         }
       },
-      afterFirstRun: async (sessionId, agentId, { userMessage, assistantReply }) => {
+      afterFirstRun: async (
+        sessionId,
+        agentId,
+        { userMessage, assistantReply },
+      ) => {
         // 仅对根会话（非分叉）生成标题。
-        const indexEntry = await this.sessionIndexStore.resolveEntry(sessionId).catch(() => null)
+        const indexEntry = await this.sessionIndexStore
+          .resolveEntry(sessionId)
+          .catch(() => null)
         if (!indexEntry || indexEntry.forkedFrom) return
 
         try {
           const config = await this.resolveSessionConfiguration(indexEntry)
           const prompt = buildTitleGenerationPrompt(userMessage, assistantReply)
-          const raw = await this.gateway.singleTurnCompletion({ ...config, prompt })
+          const raw = await this.gateway.singleTurnCompletion({
+            ...config,
+            prompt,
+          })
           const title = sanitizeTitleResponse(raw)
           if (!title) return
 
@@ -202,7 +211,7 @@ export abstract class PiSdkDriverState {
     }
     const handle = this.sessionHandles.get(sessionId)
 
-    if (!handle?.getModelInfo) {
+    if (!handle) {
       return fallback
     }
 
@@ -313,16 +322,14 @@ export abstract class PiSdkDriverState {
     this.sessionHandles.set(sessionId, handle)
     // 会话运行配置属于会话：Thinking Level 由元宵索引恢复，
     // 不依赖 Pi session 文件是否记住上次取值。
-    if (indexEntry.thinkingLevel && handle.setThinkingLevel) {
+    if (indexEntry.thinkingLevel) {
       await handle.setThinkingLevel(indexEntry.thinkingLevel)
     }
     // 身份上下文走系统提示词：重启后打开历史会话时注入并 reload 使其生效。
-    if (handle.setSystemPromptContext) {
-      handle.setSystemPromptContext(
-        await this.profileStore.buildSystemPromptContext(indexEntry.agentId),
-      )
-      await handle.reload?.()
-    }
+    handle.setSystemPromptContext(
+      await this.profileStore.buildSystemPromptContext(indexEntry.agentId),
+    )
+    await handle.reload()
 
     return handle
   }
@@ -359,9 +366,7 @@ export abstract class PiSdkDriverState {
 
     for (const [sessionId, handle] of this.sessionHandles) {
       if (
-        (await this.sessionIndexStore.findEntry(sessionId))?.agentId !==
-          agentId ||
-        !handle.setSystemPromptContext
+        (await this.sessionIndexStore.findEntry(sessionId))?.agentId !== agentId
       ) {
         continue
       }
@@ -370,17 +375,12 @@ export abstract class PiSdkDriverState {
         continue
       }
       handle.setSystemPromptContext(context)
-      if (handle.reload) {
-        promises.push(
-          handle.reload().then(() => {
-            this.sessionSoulVersions.set(sessionId, soul.version)
-            this.sessionUserProfileVersions.set(sessionId, userProfile.version)
-          }),
-        )
-      } else {
-        this.sessionSoulVersions.set(sessionId, soul.version)
-        this.sessionUserProfileVersions.set(sessionId, userProfile.version)
-      }
+      promises.push(
+        handle.reload().then(() => {
+          this.sessionSoulVersions.set(sessionId, soul.version)
+          this.sessionUserProfileVersions.set(sessionId, userProfile.version)
+        }),
+      )
     }
 
     await Promise.all(promises)
@@ -436,7 +436,7 @@ export abstract class PiSdkDriverState {
   ): Promise<void> {
     const handle = this.sessionHandles.get(sessionId)
     const agentId = (await this.sessionIndexStore.findEntry(sessionId))?.agentId
-    if (!handle?.setSystemPromptContext || !agentId) return
+    if (!handle || !agentId) return
 
     const [context, soul, userProfile] = await Promise.all([
       this.profileStore.buildSystemPromptContext(agentId),
@@ -444,7 +444,7 @@ export abstract class PiSdkDriverState {
       this.profileStore.readUserProfile(),
     ])
     handle.setSystemPromptContext(context)
-    await handle.reload?.()
+    await handle.reload()
     this.sessionSoulVersions.set(sessionId, soul.version)
     this.sessionUserProfileVersions.set(sessionId, userProfile.version)
   }
@@ -605,7 +605,7 @@ export abstract class PiSdkDriverState {
 
     for (const [sessionId, handle] of this.sessionHandles) {
       const indexEntry = await this.sessionIndexStore.findEntry(sessionId)
-      if (indexEntry?.agentId === agentId && handle.reload) {
+      if (indexEntry?.agentId === agentId) {
         promises.push(handle.reload())
       }
     }
@@ -625,9 +625,7 @@ export abstract class PiSdkDriverState {
     const promises: Promise<void>[] = []
 
     for (const handle of this.sessionHandles.values()) {
-      if (handle.reload) {
-        promises.push(handle.reload())
-      }
+      promises.push(handle.reload())
     }
 
     await Promise.all(promises)
@@ -646,14 +644,6 @@ export abstract class PiSdkDriverState {
     await this.assertKnownSession(request.sessionId, request.agentId)
     const handle = await this.ensureSessionHandle(request.sessionId)
 
-    if (!handle.getModelInfo) {
-      throw new AgentRuntimeError({
-        code: 'driver-unavailable',
-        message: '当前会话不支持读取模型信息。',
-        recoverable: true,
-      })
-    }
-
     return handle.getModelInfo()
   }
 
@@ -669,14 +659,6 @@ export abstract class PiSdkDriverState {
   ): Promise<SessionModelInfo> {
     await this.assertKnownSession(request.sessionId, request.agentId)
     const handle = await this.ensureSessionHandle(request.sessionId)
-
-    if (!handle.setModel) {
-      throw new AgentRuntimeError({
-        code: 'driver-unavailable',
-        message: '当前会话不支持切换模型。',
-        recoverable: true,
-      })
-    }
 
     // 读取目标 Provider 的 API Key 用于跨 Provider 切换
     const indexEntry = await this.sessionIndexStore.resolveEntry(
@@ -697,14 +679,6 @@ export abstract class PiSdkDriverState {
       request.modelId,
     )
 
-    if (!handle.getModelInfo) {
-      throw new AgentRuntimeError({
-        code: 'driver-unavailable',
-        message: '当前会话不支持读取模型信息。',
-        recoverable: true,
-      })
-    }
-
     return handle.getModelInfo()
   }
 
@@ -721,31 +695,18 @@ export abstract class PiSdkDriverState {
     await this.assertKnownSession(request.sessionId, request.agentId)
     const handle = await this.ensureSessionHandle(request.sessionId)
 
-    if (!handle.setThinkingLevel) {
-      throw new AgentRuntimeError({
-        code: 'driver-unavailable',
-        message: '当前会话不支持切换 Thinking Level。',
-        recoverable: true,
-      })
-    }
-
     await handle.setThinkingLevel(request.level)
-
-    if (!handle.getModelInfo) {
-      throw new AgentRuntimeError({
-        code: 'driver-unavailable',
-        message: '当前会话不支持读取模型信息。',
-        recoverable: true,
-      })
-    }
 
     const info = await handle.getModelInfo()
     // Thinking Level 属于会话运行配置：持久化后重新打开会话才能恢复，
-    // 而不是静默回退到 Agent 默认配置。
-    await this.sessionIndexStore.setThinkingLevel(
-      request.sessionId,
-      request.level,
-    )
+    // 而不是静默回退到 Agent 默认配置。SDK 会按模型能力夹紧请求值，
+    // 因此只保存会话实际采用的等级。
+    if (info.thinkingLevel !== null) {
+      await this.sessionIndexStore.setThinkingLevel(
+        request.sessionId,
+        info.thinkingLevel,
+      )
+    }
 
     return info
   }

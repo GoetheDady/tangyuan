@@ -204,9 +204,7 @@ export const recoverSessionRequestSchema = z.strictObject({
 export const sessionLineageActivitySchema = z.strictObject({
   sessionId: nonEmptyIdentifierSchema,
   title: z.string(),
-  kinds: z.array(
-    z.enum(['running', 'queued']),
-  ),
+  kinds: z.array(z.enum(['running', 'queued'])),
 })
 
 /** 校验会话谱系归档结果。 */
@@ -452,21 +450,6 @@ export const agentRuntimeErrorPayloadSchema = z.strictObject({
   ]),
   message: z.string(),
   recoverable: z.boolean(),
-})
-
-/**
- * 校验问题澄清请求。
- */
-export const questionClarificationRequestSchema = z.strictObject({
-  clarificationId: nonEmptyIdentifierSchema,
-  agentId: nonEmptyIdentifierSchema,
-  sessionId: nonEmptyIdentifierSchema,
-  runId: nonEmptyIdentifierSchema,
-  question: z.string().min(1),
-  options: z.array(z.string().min(1)).min(2).max(5),
-  allowCustomAnswer: z.boolean(),
-  status: z.enum(['pending', 'answered', 'cancelled']),
-  createdAt: timestampSchema,
 })
 
 /**
@@ -776,28 +759,6 @@ export const agentSkillsStatusSchema = z.strictObject({
  */
 export const listAgentSkillsRequestSchema = z.strictObject({
   agentId: nonEmptyIdentifierSchema,
-})
-
-/**
- * 校验 Skill 审批请求。
- */
-export const skillApprovalRequestSchema = z.strictObject({
-  approvalId: nonEmptyIdentifierSchema,
-  agentId: nonEmptyIdentifierSchema,
-  operation: z.enum(['install', 'delete']),
-  source: z.enum(['shared', 'agent']),
-  targetAgentId: nonEmptyIdentifierSchema.optional(),
-  skillName: z.string().min(1),
-  description: z.string(),
-  hasScripts: z.boolean(),
-  conflict: z
-    .strictObject({
-      overriddenPath: z.string(),
-      overriddenSource: z.enum(['shared', 'agent']),
-    })
-    .optional(),
-  status: z.enum(['pending', 'approved', 'rejected']),
-  createdAt: timestampSchema,
 })
 
 /**

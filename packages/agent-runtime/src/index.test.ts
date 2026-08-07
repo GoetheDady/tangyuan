@@ -15,6 +15,7 @@ import {
   createDriver,
   createFakeEncryptionAdapter,
   createPiSdkGateway,
+  createPromptingHandle,
 } from './driver/pi-sdk-driver.test-helpers'
 
 afterEach(cleanupTempDirs)
@@ -62,6 +63,11 @@ describe('YuanxiaoRuntime', () => {
       createSession: async (request) => {
         let wasCancelled = false
         const handle = {
+          ...createPromptingHandle(
+            request.sessionId,
+            undefined,
+            request.sdkSessionFile,
+          ),
           prompts: [] as string[],
           systemPromptContexts: [] as string[],
           setSystemPromptContext(context: string) {

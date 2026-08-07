@@ -39,9 +39,18 @@ describe('SessionLineageTree', () => {
       <SessionLineageTree
         sessions={[
           createSession('root', '根会话'),
-          createSession('child', '子会话', { sessionId: 'root', entryId: 'e1' }),
-          createSession('grandchild', '二级分叉', { sessionId: 'child', entryId: 'e2' }),
-          createSession('great-grandchild', '三级分叉', { sessionId: 'grandchild', entryId: 'e3' }),
+          createSession('child', '子会话', {
+            sessionId: 'root',
+            entryId: 'e1',
+          }),
+          createSession('grandchild', '二级分叉', {
+            sessionId: 'child',
+            entryId: 'e2',
+          }),
+          createSession('great-grandchild', '三级分叉', {
+            sessionId: 'grandchild',
+            entryId: 'e3',
+          }),
         ]}
         rootSessions={[createSession('root', '根会话')]}
         selectedSessionId={null}
@@ -49,10 +58,22 @@ describe('SessionLineageTree', () => {
       />,
     )
 
-    expect(screen.getByRole('treeitem', { name: /根会话/ })).toHaveAttribute('aria-level', '1')
-    expect(screen.getByRole('treeitem', { name: /子会话/ })).toHaveAttribute('aria-level', '2')
-    expect(screen.getByRole('treeitem', { name: /二级分叉/ })).toHaveAttribute('aria-level', '3')
-    expect(screen.getByRole('treeitem', { name: /三级分叉/ })).toHaveAttribute('aria-level', '4')
+    expect(screen.getByRole('treeitem', { name: /根会话/ })).toHaveAttribute(
+      'aria-level',
+      '1',
+    )
+    expect(screen.getByRole('treeitem', { name: /子会话/ })).toHaveAttribute(
+      'aria-level',
+      '2',
+    )
+    expect(screen.getByRole('treeitem', { name: /二级分叉/ })).toHaveAttribute(
+      'aria-level',
+      '3',
+    )
+    expect(screen.getByRole('treeitem', { name: /三级分叉/ })).toHaveAttribute(
+      'aria-level',
+      '4',
+    )
   })
 
   it('同源多个分叉并列展示，互不覆盖', () => {
@@ -60,8 +81,14 @@ describe('SessionLineageTree', () => {
       <SessionLineageTree
         sessions={[
           createSession('root', '根会话'),
-          createSession('fork-a', '方案 A', { sessionId: 'root', entryId: 'e1' }),
-          createSession('fork-b', '方案 B', { sessionId: 'root', entryId: 'e1' }),
+          createSession('fork-a', '方案 A', {
+            sessionId: 'root',
+            entryId: 'e1',
+          }),
+          createSession('fork-b', '方案 B', {
+            sessionId: 'root',
+            entryId: 'e1',
+          }),
         ]}
         rootSessions={[createSession('root', '根会话')]}
         selectedSessionId={null}
@@ -69,25 +96,36 @@ describe('SessionLineageTree', () => {
       />,
     )
 
-    expect(screen.getByRole('treeitem', { name: /方案 A/ })).toHaveAttribute('aria-level', '2')
-    expect(screen.getByRole('treeitem', { name: /方案 B/ })).toHaveAttribute('aria-level', '2')
+    expect(screen.getByRole('treeitem', { name: /方案 A/ })).toHaveAttribute(
+      'aria-level',
+      '2',
+    )
+    expect(screen.getByRole('treeitem', { name: /方案 B/ })).toHaveAttribute(
+      'aria-level',
+      '2',
+    )
   })
 
   it('点击任意深度的会话都会回调该会话', async () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
-    const grandchild = createSession('grandchild', '孙会话', { sessionId: 'child', entryId: 'e2' })
+    const grandchild = createSession('grandchild', '孙会话', {
+      sessionId: 'child',
+      entryId: 'e2',
+    })
 
     render(
       <SessionLineageTree
         sessions={[
           createSession('root', '根会话'),
-          createSession('child', '子会话', { sessionId: 'root', entryId: 'e1' }),
+          createSession('child', '子会话', {
+            sessionId: 'root',
+            entryId: 'e1',
+          }),
           grandchild,
         ]}
         rootSessions={[createSession('root', '根会话')]}
         selectedSessionId={null}
-        pendingApprovalSessionIds={[]}
         onSelect={onSelect}
         onArchive={vi.fn()}
         onDelete={vi.fn()}
@@ -113,13 +151,18 @@ describe('SessionLineageTree', () => {
           createSession('a', '会话 A', { sessionId: 'b', entryId: 'e1' }),
         ]}
         selectedSessionId={null}
-        pendingApprovalSessionIds={[]}
         {...defaultProps}
       />,
     )
 
-    expect(screen.getByRole('treeitem', { name: /会话 A/ })).toHaveAttribute('aria-level', '1')
-    expect(screen.getByRole('treeitem', { name: /会话 B/ })).toHaveAttribute('aria-level', '2')
+    expect(screen.getByRole('treeitem', { name: /会话 A/ })).toHaveAttribute(
+      'aria-level',
+      '1',
+    )
+    expect(screen.getByRole('treeitem', { name: /会话 B/ })).toHaveAttribute(
+      'aria-level',
+      '2',
+    )
   })
 
   it('标注运行中状态', () => {
@@ -127,15 +170,22 @@ describe('SessionLineageTree', () => {
       <SessionLineageTree
         sessions={[
           { ...createSession('root', '根会话'), state: 'running' },
-          createSession('child', '子会话', { sessionId: 'root', entryId: 'e1' }),
+          createSession('child', '子会话', {
+            sessionId: 'root',
+            entryId: 'e1',
+          }),
         ]}
-        rootSessions={[{ ...createSession('root', '根会话'), state: 'running' }]}
+        rootSessions={[
+          { ...createSession('root', '根会话'), state: 'running' },
+        ]}
         selectedSessionId="child"
         {...defaultProps}
       />,
     )
 
-    expect(screen.getByRole('treeitem', { name: /根会话.*运行中/ })).toBeInTheDocument()
+    expect(
+      screen.getByRole('treeitem', { name: /根会话.*运行中/ }),
+    ).toBeInTheDocument()
     expect(screen.getByRole('treeitem', { name: /子会话/ })).toHaveAttribute(
       'aria-selected',
       'true',
@@ -153,11 +203,10 @@ describe('SessionLineageTree', () => {
           sessions={[session]}
           rootSessions={[session]}
           selectedSessionId={null}
-          pendingApprovalSessionIds={[]}
           onSelect={vi.fn()}
           onArchive={onArchive}
           onDelete={vi.fn()}
-        onRename={vi.fn()}
+          onRename={vi.fn()}
         />,
       )
 
@@ -182,7 +231,6 @@ describe('SessionLineageTree', () => {
           sessions={[session]}
           rootSessions={[session]}
           selectedSessionId={null}
-          pendingApprovalSessionIds={[]}
           onSelect={onSelect}
           onArchive={vi.fn()}
           onDelete={onDelete}
@@ -210,7 +258,6 @@ describe('SessionLineageTree', () => {
           sessions={[session]}
           rootSessions={[session]}
           selectedSessionId={null}
-          pendingApprovalSessionIds={[]}
           {...defaultProps}
         />,
       )
@@ -233,14 +280,18 @@ describe('SessionLineageTree', () => {
     it('后代有活动任务时父会话菜单也置灰', async () => {
       const user = userEvent.setup()
       const parent = createSession('parent', '父会话')
-      const child = createSession('child', '子会话', { sessionId: 'parent', entryId: 'e1' }, 'running')
+      const child = createSession(
+        'child',
+        '子会话',
+        { sessionId: 'parent', entryId: 'e1' },
+        'running',
+      )
 
       render(
         <SessionLineageTree
           sessions={[parent, child]}
           rootSessions={[parent]}
           selectedSessionId={null}
-          pendingApprovalSessionIds={[]}
           {...defaultProps}
         />,
       )

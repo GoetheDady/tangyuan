@@ -240,18 +240,26 @@ export function createPiSdkGateway(
     singleTurnCompletion: async () => null,
     createSession: async (request) => {
       sessionRequests.push(request)
-      const handle = createPromptingHandle(request.sessionId, (messages) => {
-        messagesBySession.set(request.sessionId, messages)
-      })
+      const handle = createPromptingHandle(
+        request.sessionId,
+        (messages) => {
+          messagesBySession.set(request.sessionId, messages)
+        },
+        request.sdkSessionFile,
+      )
       sessionHandles.push(handle)
 
       return handle
     },
     openSession: async (request) => {
       openSessionRequests.push(request)
-      const handle = createPromptingHandle(request.sessionId, (messages) => {
-        messagesBySession.set(request.sessionId, messages)
-      })
+      const handle = createPromptingHandle(
+        request.sessionId,
+        (messages) => {
+          messagesBySession.set(request.sessionId, messages)
+        },
+        request.sdkSessionFile,
+      )
       sessionHandles.push(handle)
 
       return handle
@@ -290,14 +298,19 @@ export function createPiSdkGateway(
 export function createPromptingHandle(
   sessionId: string,
   onMessages?: (messages: InternalMessage[]) => void,
+  sdkSessionFile = `/tmp/${sessionId}.jsonl`,
 ): PiSdkSessionHandle & {
   prompts: string[]
   systemPromptContexts: string[]
 } {
   const prompts: string[] = []
   const systemPromptContexts: string[] = []
+  let providerId = 'anthropic'
+  let modelId = 'claude-sonnet-4-5'
+  let thinkingLevel = 'off'
 
   return {
+    sdkSessionFile,
     prompts,
     systemPromptContexts,
     setSystemPromptContext: (context: string) => {
@@ -330,6 +343,22 @@ export function createPromptingHandle(
     },
     abort: async () => undefined,
     dispose: () => undefined,
+    setModel: async (nextProviderId: string, nextModelId: string) => {
+      providerId = nextProviderId
+      modelId = nextModelId
+    },
+    setThinkingLevel: async (level: string) => {
+      thinkingLevel = level
+    },
+    getModelInfo: async () => ({
+      providerId,
+      modelId,
+      displayName: modelId,
+      thinkingLevel,
+      supportedThinkingLevels: ['off', 'low', 'medium', 'high'],
+      supportsThinking: true,
+    }),
+    reload: async () => undefined,
   }
 }
 

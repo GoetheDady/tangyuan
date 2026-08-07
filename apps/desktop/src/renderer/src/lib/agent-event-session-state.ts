@@ -62,10 +62,6 @@ export function getAgentEventSessionId(event: AgentEvent): string | null {
     event.type === 'turn-cancelled' ||
     event.type === 'turn-failed' ||
     event.type === 'run-state-changed' ||
-    event.type === 'approval-required' ||
-    event.type === 'approval-resolved' ||
-    event.type === 'clarification-required' ||
-    event.type === 'clarification-resolved' ||
     event.type === 'transcript-delta' ||
     event.type === 'session-title-changed'
   ) {

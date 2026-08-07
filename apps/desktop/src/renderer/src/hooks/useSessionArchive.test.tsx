@@ -29,21 +29,26 @@ describe('useSessionArchive', () => {
     const archived = { ...target, archivedAt: NOW }
     store.getState().replaceSessionCatalog('yuanxiao', [target])
 
-    let resolveArchive!: (value: Awaited<
-      ReturnType<typeof window.api.archiveSession>
-    >) => void
+    let resolveArchive!: (
+      value: Awaited<ReturnType<typeof window.api.archiveSession>>,
+    ) => void
     vi.mocked(window.api.archiveSession).mockImplementation(
       () => new Promise((resolve) => (resolveArchive = resolve)),
     )
     vi.mocked(window.api.listSessions).mockResolvedValue([archived])
 
     const { result, rerender } = renderHook(
-      ({ agentId, selectedSessionId }: { agentId: string; selectedSessionId: string | null }) =>
-        useSessionArchive({ agentId, selectedSessionId, store }),
+      ({
+        agentId,
+        selectedSessionId,
+      }: {
+        agentId: string
+        selectedSessionId: string | null
+      }) => useSessionArchive({ agentId, selectedSessionId, store }),
       {
         initialProps: {
           agentId: 'yuanxiao',
-          selectedSessionId: target.sessionId,
+          selectedSessionId: target.sessionId as string | null,
         },
         wrapper: ({ children }) => <MemoryRouter>{children}</MemoryRouter>,
       },

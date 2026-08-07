@@ -157,8 +157,8 @@ Pi Agent SDK 至少包含这些能力：
 | 发送消息                          | `AgentSession.prompt()`                               | v1 必须支持                                                   |
 | 流式事件                          | `AgentSession.subscribe()`                            | v1 必须支持                                                   |
 | 取消运行                          | `AgentSession.abort()`                                | v1 必须支持                                                   |
-| 模型控制                          | `setModel()`、`ModelRegistry`                         | v1 必须支持基础选择                                           |
-| API Key / 认证                    | `AuthStorage`                                         | config JSON 保存 `safeStorage` adapter 生成的密文             |
+| 模型控制                          | `setModel()`、`ModelRuntime`                          | v1 必须支持基础选择                                           |
+| API Key / 认证                    | `ModelRuntime`、`InMemoryCredentialStore`             | config JSON 保存 `safeStorage` adapter 生成的密文             |
 | 会话状态                          | `messages`、`isStreaming`、`agent.state`              | v1 映射为元宵会话状态                                         |
 | 内置工具                          | `read`、`bash`、`edit`、`write`、`grep`、`find`、`ls` | v1 使用只读工具，并为 Agent profile 文件开放 `edit` / `write` |
 | 自定义工具                        | `defineTool()`                                        | v1 不支持                                                     |

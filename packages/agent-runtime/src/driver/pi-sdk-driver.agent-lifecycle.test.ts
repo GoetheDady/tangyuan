@@ -176,13 +176,17 @@ describe('PiSdkDriver', () => {
         existingSessions.push(sessionEntry)
         sessionsByCwd.set(request.cwd, existingSessions)
 
-        const handle = createPromptingHandle(request.sessionId, (messages) => {
-          // 更新 title 为第一条用户消息
-          const userMessage = messages.find((m) => m.role === 'user')
-          if (userMessage) {
-            sessionEntry.title = userMessage.content
-          }
-        })
+        const handle = createPromptingHandle(
+          request.sessionId,
+          (messages) => {
+            // 更新 title 为第一条用户消息
+            const userMessage = messages.find((m) => m.role === 'user')
+            if (userMessage) {
+              sessionEntry.title = userMessage.content
+            }
+          },
+          request.sdkSessionFile,
+        )
         gateway.sessionRequests.push(request)
         gateway.sessionHandles.push(handle)
 
@@ -302,7 +306,11 @@ describe('PiSdkDriver', () => {
         existingSessions.push(sessionEntry)
         sessionsByCwd.set(request.cwd, existingSessions)
 
-        const handle = createPromptingHandle(request.sessionId)
+        const handle = createPromptingHandle(
+          request.sessionId,
+          undefined,
+          request.sdkSessionFile,
+        )
         gateway.sessionRequests.push(request)
         gateway.sessionHandles.push(handle)
 
@@ -397,7 +405,11 @@ describe('PiSdkDriver', () => {
         existingSessions.push(sessionEntry)
         sessionsByCwd.set(request.cwd, existingSessions)
 
-        const handle = createPromptingHandle(request.sessionId)
+        const handle = createPromptingHandle(
+          request.sessionId,
+          undefined,
+          request.sdkSessionFile,
+        )
         gateway.sessionRequests.push(request)
         gateway.sessionHandles.push(handle)
 
@@ -454,19 +466,27 @@ describe('PiSdkDriver', () => {
     const sdkMessagesBySessionFile = new Map<string, TranscriptSnapshot>()
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
-        const handle = createPromptingHandle(request.sessionId, (messages) => {
-          sdkMessagesBySessionFile.set(
-            request.sdkSessionFile,
-            snapshotFromMessages(request.sessionId, 'yuanxiao', messages),
-          )
-        })
+        const handle = createPromptingHandle(
+          request.sessionId,
+          (messages) => {
+            sdkMessagesBySessionFile.set(
+              request.sdkSessionFile,
+              snapshotFromMessages(request.sessionId, 'yuanxiao', messages),
+            )
+          },
+          request.sdkSessionFile,
+        )
         gateway.sessionRequests.push(request)
         gateway.sessionHandles.push(handle)
 
         return handle
       },
       openSession: async (request) => {
-        const handle = createPromptingHandle(request.sessionId)
+        const handle = createPromptingHandle(
+          request.sessionId,
+          undefined,
+          request.sdkSessionFile,
+        )
         gateway.openSessionRequests.push(request)
         gateway.sessionHandles.push(handle)
 

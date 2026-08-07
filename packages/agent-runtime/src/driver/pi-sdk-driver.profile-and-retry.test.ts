@@ -11,6 +11,7 @@ import {
   createDeferred,
   createDriver,
   createPiSdkGateway,
+  createPromptingHandle,
   writeInitializedProfile,
 } from './pi-sdk-driver.test-helpers'
 
@@ -239,6 +240,11 @@ describe('PiSdkDriver', () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle: PiSdkSessionHandle = {
+          ...createPromptingHandle(
+            request.sessionId,
+            undefined,
+            request.sdkSessionFile,
+          ),
           setSystemPromptContext: () => undefined,
           reload: async () => {
             reloadCount++
@@ -311,6 +317,11 @@ describe('PiSdkDriver', () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle: PiSdkSessionHandle = {
+          ...createPromptingHandle(
+            request.sessionId,
+            undefined,
+            request.sdkSessionFile,
+          ),
           setSystemPromptContext: () => undefined,
           reload: async () => undefined,
           prompt: async (prompt) => {
@@ -366,6 +377,11 @@ describe('PiSdkDriver', () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle: PiSdkSessionHandle = {
+          ...createPromptingHandle(
+            request.sessionId,
+            undefined,
+            request.sdkSessionFile,
+          ),
           setSystemPromptContext: () => undefined,
           reload: async () => undefined,
           prompt: async () => {
@@ -462,6 +478,11 @@ describe('PiSdkDriver', () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle: PiSdkSessionHandle = {
+          ...createPromptingHandle(
+            request.sessionId,
+            undefined,
+            request.sdkSessionFile,
+          ),
           setSystemPromptContext: () => undefined,
           reload: async () => undefined,
           prompt: async () => {
@@ -736,6 +757,11 @@ describe('PiSdkDriver', () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
+          ...createPromptingHandle(
+            request.sessionId,
+            undefined,
+            request.sdkSessionFile,
+          ),
           prompts: [] as string[],
           systemPromptContexts: [] as string[],
           setSystemPromptContext(context: string) {
@@ -806,6 +832,11 @@ describe('PiSdkDriver', () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
+          ...createPromptingHandle(
+            request.sessionId,
+            undefined,
+            request.sdkSessionFile,
+          ),
           prompts: [] as string[],
           systemPromptContexts: [] as string[],
           setSystemPromptContext(context: string) {
@@ -902,6 +933,11 @@ describe('PiSdkDriver', () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
+          ...createPromptingHandle(
+            request.sessionId,
+            undefined,
+            request.sdkSessionFile,
+          ),
           prompts: [] as string[],
           systemPromptContexts: [] as string[],
           setSystemPromptContext(context: string) {

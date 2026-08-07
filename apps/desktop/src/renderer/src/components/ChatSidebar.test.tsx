@@ -82,7 +82,6 @@ describe('ChatSidebar', () => {
           activeAgentId="yuanxiao"
           sessions={[]}
           selectedSessionId={null}
-          pendingApprovalSessionIds={[]}
           archivedSessions={[]}
           recoveringSessionId={null}
           onAgentChange={vi.fn()}

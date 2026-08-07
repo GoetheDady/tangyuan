@@ -26,19 +26,58 @@ import { createUpdateSoulTool, createUpdateUserProfileTool } from '../profile'
 /** 元宵写入分叉会话 Pi JSONL 的来源记录 custom entry 类型。 */
 const YUANXIAO_FORK_SOURCE_ENTRY_TYPE = 'yuanxiao:fork-source'
 
+async function createIsolatedModelRuntime(
+  configuration?: Pick<
+    import('@yuanxiao/contracts').RuntimeConfiguration,
+    'providerId' | 'apiKey'
+  >,
+): Promise<import('@earendil-works/pi-coding-agent').ModelRuntime> {
+  const [{ InMemoryCredentialStore }, { ModelRuntime }] = await Promise.all([
+    import('@earendil-works/pi-ai'),
+    import('@earendil-works/pi-coding-agent'),
+  ])
+  const modelRuntime = await ModelRuntime.create({
+    credentials: new InMemoryCredentialStore(),
+    modelsPath: null,
+    allowModelNetwork: false,
+  })
+
+  if (configuration) {
+    await modelRuntime.setRuntimeApiKey(
+      configuration.providerId,
+      configuration.apiKey,
+      { allowNetwork: false },
+    )
+  }
+
+  return modelRuntime
+}
+
+function appendAssistantText(currentText: string, event: unknown): string {
+  let assistantText = currentText
+
+  for (const streamEvent of normalizePiSdkSessionEvent(event)) {
+    if (streamEvent.type === 'turn-started') {
+      assistantText = ''
+    }
+    if (streamEvent.type === 'text-delta') {
+      assistantText += streamEvent.delta
+    }
+  }
+
+  return assistantText
+}
+
 export class RealPiSdkGateway implements PiSdkGateway {
   /**
-   * 读取 Pi SDK ModelRegistry 中的 Provider 和 Model。
+   * 读取 Pi SDK ModelRuntime 中的 Provider 和 Model。
    *
    * @returns Provider 和模型描述列表。
    * @throws 当 SDK 模块加载或模型注册表读取失败时，Promise 会 reject。
    */
   async listProvidersAndModels(): Promise<PiSdkRuntimeResources> {
-    const { AuthStorage, ModelRegistry } =
-      await import('@earendil-works/pi-coding-agent')
-    const authStorage = AuthStorage.inMemory()
-    const modelRegistry = ModelRegistry.inMemory(authStorage)
-    const rawModels = modelRegistry.getAll()
+    const modelRuntime = await createIsolatedModelRuntime()
+    const rawModels = modelRuntime.getModels()
     const modelIndex = new Map<string, (typeof rawModels)[number]>()
     for (const model of rawModels) {
       const key = `${model.provider}:${model.id}`
@@ -47,14 +86,14 @@ export class RealPiSdkGateway implements PiSdkGateway {
       }
     }
     const models = [...modelIndex.values()]
-    const providerIds = [
-      ...new Set(models.map((model) => model.provider)),
-    ].sort()
+    const providers = [...modelRuntime.getProviders()].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    )
 
     return {
-      providers: providerIds.map((providerId) => ({
-        providerId,
-        displayName: modelRegistry.getProviderDisplayName(providerId),
+      providers: providers.map((provider) => ({
+        providerId: provider.id,
+        displayName: provider.name,
       })),
       models: models.map((model) => ({
         providerId: model.provider,
@@ -72,26 +111,17 @@ export class RealPiSdkGateway implements PiSdkGateway {
    * @throws 当 SDK 调用失败、模型不存在或取消信号触发时，Promise 会 reject。
    */
   async verifyConfiguration(request: PiSdkVerificationRequest): Promise<void> {
-    const {
-      AuthStorage,
-      ModelRegistry,
-      SessionManager,
-      SettingsManager,
-      createAgentSession,
-    } = await import('@earendil-works/pi-coding-agent')
-    const authStorage = AuthStorage.inMemory()
-    authStorage.setRuntimeApiKey(request.providerId, request.apiKey)
-
-    const modelRegistry = ModelRegistry.inMemory(authStorage)
-    const model = modelRegistry.find(request.providerId, request.modelId)
+    const { SessionManager, SettingsManager, createAgentSession } =
+      await import('@earendil-works/pi-coding-agent')
+    const modelRuntime = await createIsolatedModelRuntime(request)
+    const model = modelRuntime.getModel(request.providerId, request.modelId)
 
     if (!model) {
       throw new Error(`找不到模型 ${request.providerId}/${request.modelId}`)
     }
 
     const { session } = await createAgentSession({
-      authStorage,
-      modelRegistry,
+      modelRuntime,
       model,
       sessionManager: SessionManager.inMemory(),
       settingsManager: SettingsManager.inMemory(),
@@ -111,6 +141,9 @@ export class RealPiSdkGateway implements PiSdkGateway {
       }
 
       await session.prompt(request.prompt)
+      if (request.signal.aborted) {
+        throw new DOMException('Aborted', 'AbortError')
+      }
     } finally {
       request.signal.removeEventListener('abort', abortSession)
       session.dispose()
@@ -129,36 +162,33 @@ export class RealPiSdkGateway implements PiSdkGateway {
       prompt: string
     },
   ): Promise<string | null> {
-    const {
-      AuthStorage,
-      ModelRegistry,
-      SessionManager,
-      SettingsManager,
-      createAgentSession,
-    } = await import('@earendil-works/pi-coding-agent')
-    const authStorage = AuthStorage.inMemory()
-    authStorage.setRuntimeApiKey(request.providerId, request.apiKey)
-
-    const modelRegistry = ModelRegistry.inMemory(authStorage)
-    const model = modelRegistry.find(request.providerId, request.modelId)
+    const { SessionManager, SettingsManager, createAgentSession } =
+      await import('@earendil-works/pi-coding-agent')
+    const modelRuntime = await createIsolatedModelRuntime(request)
+    const model = modelRuntime.getModel(request.providerId, request.modelId)
 
     if (!model) {
       throw new Error(`找不到模型 ${request.providerId}/${request.modelId}`)
     }
 
     const { session } = await createAgentSession({
-      authStorage,
-      modelRegistry,
+      modelRuntime,
       model,
       sessionManager: SessionManager.inMemory(),
       settingsManager: SettingsManager.inMemory(),
       noTools: 'all',
     })
 
+    let assistantText = ''
+    const unsubscribe = session.subscribe((event: unknown) => {
+      assistantText = appendAssistantText(assistantText, event)
+    })
+
     try {
       await session.prompt(request.prompt)
-      return session.getLastAssistantText() ?? null
+      return assistantText || null
     } finally {
+      unsubscribe()
       session.dispose()
     }
   }
@@ -500,18 +530,13 @@ export class RealPiSdkGateway implements PiSdkGateway {
     mode: 'create' | 'open',
   ): Promise<PiSdkSessionHandle> {
     const {
-      AuthStorage,
-      ModelRegistry,
       SessionManager,
       SettingsManager,
       createAgentSession,
       DefaultResourceLoader,
     } = await import('@earendil-works/pi-coding-agent')
-    const authStorage = AuthStorage.inMemory()
-    authStorage.setRuntimeApiKey(request.providerId, request.apiKey)
-
-    const modelRegistry = ModelRegistry.inMemory(authStorage)
-    const model = modelRegistry.find(request.providerId, request.modelId)
+    const modelRuntime = await createIsolatedModelRuntime(request)
+    const model = modelRuntime.getModel(request.providerId, request.modelId)
 
     if (!model) {
       throw new Error(`找不到模型 ${request.providerId}/${request.modelId}`)
@@ -615,8 +640,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
 
     const { session } = await createAgentSession({
       cwd: request.cwd,
-      authStorage,
-      modelRegistry,
+      modelRuntime,
       model,
       sessionManager,
       settingsManager: SettingsManager.inMemory(),
@@ -633,7 +657,9 @@ export class RealPiSdkGateway implements PiSdkGateway {
       },
       prompt: async (prompt: string, options?: PiSdkPromptOptions) => {
         let eventListenerError: { value: unknown } | undefined
+        let assistantText = ''
         const unsubscribe = session.subscribe((event: unknown) => {
+          assistantText = appendAssistantText(assistantText, event)
           for (const streamEvent of normalizePiSdkSessionEvent(event)) {
             try {
               options?.onEvent?.(streamEvent)
@@ -648,7 +674,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
           if (eventListenerError !== undefined) {
             throw eventListenerError.value
           }
-          return session.getLastAssistantText() ?? null
+          return assistantText || null
         } finally {
           unsubscribe()
         }
@@ -665,10 +691,12 @@ export class RealPiSdkGateway implements PiSdkGateway {
         apiKey?: string,
       ) => {
         if (apiKey) {
-          authStorage.setRuntimeApiKey(providerId, apiKey)
+          await modelRuntime.setRuntimeApiKey(providerId, apiKey, {
+            allowNetwork: false,
+          })
         }
 
-        const newModel = modelRegistry.find(providerId, modelId)
+        const newModel = modelRuntime.getModel(providerId, modelId)
 
         if (!newModel) {
           throw new Error(`找不到模型 ${providerId}/${modelId}`)
@@ -702,13 +730,7 @@ export class RealPiSdkGateway implements PiSdkGateway {
       },
       reload: async () => {
         await resourceLoader.reload()
-        // session.reload() 重建系统提示词，使 Skill 变更立即生效
-        if (
-          typeof (session as { reload?: () => Promise<void> }).reload ===
-          'function'
-        ) {
-          await (session as { reload: () => Promise<void> }).reload()
-        }
+        await session.reload()
       },
     }
   }

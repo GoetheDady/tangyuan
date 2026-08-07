@@ -311,7 +311,6 @@ const longTranscript: TranscriptSnapshot = {
   }),
 }
 
-const longTranscript: TranscriptSnapshot = {
 export default function ConversationComponentsFixturePage(): React.JSX.Element {
   const [composerValue, setComposerValue] = useState('请继续完成跨组件验收。')
   const [submitCount, setSubmitCount] = useState(0)

@@ -141,9 +141,8 @@ export interface AgentReplyEntry {
   /**
    * Agent 回复的 Markdown 内容，语义为「最后一个回合的文字」。
    *
-   * 对齐 SDK 语义：Pi SDK 无「跨回合累加的最终回复」概念，
-   * `getLastAssistantText()` 取的是最后一条 assistant 消息的文字，
-   * 因此此字段不是所有回合文字的累加，而是最后一个回合面向用户的文字。
+   * 对齐 SDK 语义：此字段是最后一个回合面向用户的文字，
+   * 不把带工具的前序回合中间文字拼入最终回复。
    */
   readonly content: string
   /** 消息创建时间。 */
@@ -298,11 +297,6 @@ export interface AgentRuntimeErrorPayload {
 }
 
 /**
- * 描述 Bash 审批请求的当前状态。
- */
-export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
-
-/**
  * 描述 Agent 运行过程中发给 YuanxiaoRuntime 和 Renderer 的标准事件。
  */
 export type AgentEvent =
@@ -376,19 +370,6 @@ export type AgentEvent =
       type: 'agent-recovered'
       agentId: AgentId
       agent: AgentSummary
-      occurredAt: string
-    }
-  | {
-      type: 'skill-approval-required'
-      agentId: AgentId
-      approval: SkillApprovalRequest
-      occurredAt: string
-    }
-  | {
-      type: 'skill-approval-resolved'
-      agentId: AgentId
-      approvalId: string
-      status: 'approved' | 'rejected'
       occurredAt: string
     }
   | {
@@ -803,32 +784,6 @@ export interface RenameSessionRequest {
  */
 export interface ListAgentSkillsRequest {
   agentId: AgentId
-}
-
-/**
- * 描述一次 Skill 操作的审批请求（传给 Renderer 展示）。
- */
-export interface SkillApprovalRequest {
-  approvalId: string
-  agentId: AgentId
-  /** 操作类型。 */
-  operation: 'install' | 'delete'
-  /** Skill 来源范围。 */
-  source: 'shared' | 'agent'
-  /** 专属 Skill 操作时的目标 Agent。 */
-  targetAgentId?: AgentId
-  skillName: string
-  /** SKILL.md 中的 description 字段内容。 */
-  description: string
-  /** Skill 目录是否包含 scripts 子目录。 */
-  hasScripts: boolean
-  /** 当同名 Skill 在两层同时存在时的冲突信息。 */
-  conflict?: {
-    overriddenPath: string
-    overriddenSource: 'shared' | 'agent'
-  }
-  status: ApprovalStatus
-  createdAt: string
 }
 
 /**

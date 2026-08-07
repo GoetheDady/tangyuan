@@ -29,28 +29,6 @@ test.describe('对话业务组件视觉基准', () => {
     })
   }
 
-  test('Bash Approval 已确认状态保持视觉基准', async ({ page }) => {
-    const approval = page.locator('[data-approval-scenario="once"]')
-    await approval.getByRole('button', { name: '仅允许本次执行此命令' }).click()
-    await expect(approval.getByText('已处理')).toBeVisible()
-    await expect(approval).toHaveScreenshot(
-      'conversation-approval-resolved.png',
-      screenshotOptions,
-    )
-  })
-
-  test('Question Clarification 已确认状态保持视觉基准', async ({ page }) => {
-    const clarification = page.getByTestId('clarification-sequence')
-    await clarification.getByRole('radio', { name: '选择：1280' }).click()
-    await expect(clarification.getByRole('status')).toContainText(
-      '已确认：1280',
-    )
-    await expect(clarification).toHaveScreenshot(
-      'conversation-clarification-confirmed.png',
-      screenshotOptions,
-    )
-  })
-
   test('Composer focus-visible 保持视觉基准', async ({ page }) => {
     const integrated = page.getByTestId('integrated-chat')
     await integrated.getByLabel('消息').focus()

@@ -84,11 +84,7 @@ export abstract class YuanxiaoRuntimeOrchestrator {
       }),
       clear: async () => undefined,
     }
-    const created = createRuntimeInternals(
-      dependencies,
-      this.emit.bind(this),
-      () => new Date().toISOString(),
-    )
+    const created = createRuntimeInternals(dependencies, this.emit.bind(this))
     this.transcriptEmitter = created.transcriptEmitter
     this.snapshotStore = created.snapshotStore
     this.agentManager = created.agentManager
@@ -320,5 +316,4 @@ export abstract class YuanxiaoRuntimeOrchestrator {
       listener(event)
     }
   }
-
 }

@@ -203,7 +203,7 @@ export interface TranscriptMessagesProps {
  * - 自动跟随：用户在底部时新消息自动滚入视口
  * - 历史阅读不打扰：用户向上滚动后新消息不强制拉回
  * - 展开/收起锚点：展开或收起执行历史时保持 disclosure 按钮可见
- * - 容器高度自适应：审批/澄清卡片变化时自动调整滚动位置
+ * - 容器高度自适应：布局变化时自动调整滚动位置
  * - Memoization：已渲染消息的内容未变时跳过 Streamdown 重解析
  * - Compaction 检测：Pi 自动压缩条目渲染为非阻塞状态提示
  * - 稳定身份：多次执行尝试、失败重试、取消后条目身份不重复或错位
@@ -309,7 +309,7 @@ export function TranscriptMessages({
     return () => scrollEl.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // ResizeObserver 监听滚动容器高度变化（审批/澄清卡片出现/消失时）
+  // ResizeObserver 监听滚动容器高度变化。
   useEffect(() => {
     const scrollEl = scrollRef.current
     if (!scrollEl) return

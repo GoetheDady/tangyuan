@@ -155,7 +155,6 @@ export function createToolActivityLabel(
     bash: '正在运行命令',
     run_command: '正在运行命令',
     search: '正在搜索',
-    ask_clarification: '等待用户回答',
   }
 
   return labels[toolName] ?? '正在使用工具'

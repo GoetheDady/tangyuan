@@ -7,6 +7,7 @@ import {
   createDriver,
   createDriverAtPath,
   createPiSdkGateway,
+  createPromptingHandle,
   readJson,
 } from './pi-sdk-driver.test-helpers'
 
@@ -43,6 +44,11 @@ describe('PiSdkDriver · 执行尝试生命周期', () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
+          ...createPromptingHandle(
+            request.sessionId,
+            undefined,
+            request.sdkSessionFile,
+          ),
           prompts: [] as string[],
           systemPromptContexts: [] as string[],
           setSystemPromptContext(context: string) {

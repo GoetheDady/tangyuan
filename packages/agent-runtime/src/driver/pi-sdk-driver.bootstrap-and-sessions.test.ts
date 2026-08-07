@@ -371,19 +371,27 @@ describe('PiSdkDriver', () => {
     const sdkMessagesBySessionFile = new Map<string, TranscriptSnapshot>()
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
-        const handle = createPromptingHandle(request.sessionId, (messages) => {
-          sdkMessagesBySessionFile.set(
-            request.sdkSessionFile,
-            snapshotFromMessages(request.sessionId, 'yuanxiao', messages),
-          )
-        })
+        const handle = createPromptingHandle(
+          request.sessionId,
+          (messages) => {
+            sdkMessagesBySessionFile.set(
+              request.sdkSessionFile,
+              snapshotFromMessages(request.sessionId, 'yuanxiao', messages),
+            )
+          },
+          request.sdkSessionFile,
+        )
         gateway.sessionRequests.push(request)
         gateway.sessionHandles.push(handle)
 
         return handle
       },
       openSession: async (request) => {
-        const handle = createPromptingHandle(request.sessionId)
+        const handle = createPromptingHandle(
+          request.sessionId,
+          undefined,
+          request.sdkSessionFile,
+        )
         gateway.openSessionRequests.push(request)
         gateway.sessionHandles.push(handle)
 
@@ -567,6 +575,11 @@ describe('PiSdkDriver', () => {
     const gateway = createPiSdkGateway({
       createSession: async (request) => {
         const handle = {
+          ...createPromptingHandle(
+            request.sessionId,
+            undefined,
+            request.sdkSessionFile,
+          ),
           prompts: [] as string[],
           systemPromptContexts: [] as string[],
           setSystemPromptContext(context: string) {
@@ -686,6 +699,11 @@ describe('PiSdkDriver', () => {
           firstSessionId = request.sessionId
         }
         const handle = {
+          ...createPromptingHandle(
+            request.sessionId,
+            undefined,
+            request.sdkSessionFile,
+          ),
           prompts: [] as string[],
           systemPromptContexts: [] as string[],
           setSystemPromptContext(context: string) {
@@ -790,6 +808,7 @@ describe('PiSdkDriver', () => {
       (messages) => {
         childMessages = messages
       },
+      '/tmp/child-session.jsonl',
     )
     gateway.openSession = async (request) => {
       gateway.openSessionRequests.push(request)

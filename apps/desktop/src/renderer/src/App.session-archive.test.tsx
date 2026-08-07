@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event'
 import {
   createDefaultSessionSummary,
   type AgentSessionSummary,
-  type ArchiveSessionRequest,
   type DeleteSessionRequest,
 } from '@yuanxiao/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -144,7 +143,11 @@ describe('App 会话谱系归档与恢复', () => {
       status: 'confirmation-required',
       affectedSessionIds: [PARENT.sessionId, CHILD.sessionId],
       affectedActivities: [
-        { sessionId: PARENT.sessionId, title: PARENT.title, kinds: ['running'] },
+        {
+          sessionId: PARENT.sessionId,
+          title: PARENT.title,
+          kinds: ['running'],
+        },
       ],
     })
     window.location.hash = '#/chat/yuanxiao/parent-session'
@@ -156,7 +159,9 @@ describe('App 会话谱系归档与恢复', () => {
 
     expect(window.api.archiveSession).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-    expect(await screen.findByText('有活动任务，请先停止后再归档')).toBeInTheDocument()
+    expect(
+      await screen.findByText('有活动任务，请先停止后再归档'),
+    ).toBeInTheDocument()
     // 路由未跳转，当前会话仍可见
     expect(
       screen.getByRole('heading', { name: PARENT.title }),
@@ -438,12 +443,12 @@ describe('App 会话谱系归档与恢复', () => {
               {
                 sessionId: PARENT.sessionId,
                 title: PARENT.title,
-                kinds: ['running', 'pending-approval'],
+                kinds: ['running', 'queued'],
               },
               {
                 sessionId: CHILD.sessionId,
                 title: CHILD.title,
-                kinds: ['queued', 'pending-clarification'],
+                kinds: ['queued'],
               },
             ],
           }
@@ -465,11 +470,9 @@ describe('App 会话谱系归档与恢复', () => {
     expect(window.api.deleteSession).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: '确认永久删除' }))
     expect(await screen.findByRole('alertdialog')).toHaveTextContent(
-      '父会话：运行中、待审批',
+      '父会话：运行中、排队中',
     )
-    expect(screen.getByRole('alertdialog')).toHaveTextContent(
-      '子会话：排队中、待澄清',
-    )
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('子会话：排队中')
 
     await user.click(screen.getByRole('button', { name: '取消' }))
     expect(window.api.deleteSession).toHaveBeenCalledTimes(1)
